@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Image from "next/image";
 import { API_BASE, secureFetch } from "@/app/lib/api";
 
 const destinationFor = (role?: string, onboardingRequired?: boolean) => {
@@ -40,12 +41,15 @@ export default function Home() {
 
   return (
     <main className="pf-redirect-page">
-      <div className="pf-brand">
-        <span className="pf-brand-mark">PF</span>
-        <span>
-          <strong>PerformanceFactory</strong>
-          <small>Opening workspace</small>
-        </span>
+      <div className="pf-brand pf-brand-with-logo" aria-label="Performance Factory">
+        <Image
+          className="pf-brand-logo"
+          src="/brand/performance-factory-horizontal-clean.png"
+          alt="Performance Factory"
+          width={900}
+          height={211}
+          priority
+        />
       </div>
     </main>
   );

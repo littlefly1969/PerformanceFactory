@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -154,12 +155,15 @@ export function ProductShell({
   return (
     <main className="pf-shell">
       <header className="pf-topbar">
-        <Link className="pf-brand" href="/">
-          <span className="pf-brand-mark">PF</span>
-          <span>
-            <strong>PerformanceFactory</strong>
-            <small>{me?.role ? me.role.toLowerCase() : "workspace"}</small>
-          </span>
+        <Link className="pf-brand pf-brand-with-logo" href="/" aria-label="Performance Factory">
+          <Image
+            className="pf-brand-logo"
+            src="/brand/performance-factory-horizontal-clean.png"
+            alt="Performance Factory"
+            width={900}
+            height={211}
+            priority
+          />
         </Link>
         <div className="pf-topbar-right">
           {resolvedNav.length > 0 && (

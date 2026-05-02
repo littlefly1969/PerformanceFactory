@@ -32,7 +32,7 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
-    if (!user.isActive) {
+    if (user.isActive === false) {
       throw new UnauthorizedException('Account pending admin activation');
     }
 

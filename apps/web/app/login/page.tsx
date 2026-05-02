@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState } from "react";
-import { LanguageToggle } from "@/app/components/language-provider";
 import { API_BASE, secureFetch, storeAccessToken } from "@/app/lib/api";
 
 const demoAccounts = [
@@ -62,27 +62,41 @@ const demoAccounts = [
   },
 ];
 
-const groupedAccounts = demoAccounts.reduce(
-  (groups, account) => {
-    groups[account.group] = [...(groups[account.group] ?? []), account];
-    return groups;
+const demoAccessAccounts = [
+  {
+    label: "Admin demo",
+    account: demoAccounts.find((account) => account.email === "admin@example.com")!,
   },
-  {} as Record<string, typeof demoAccounts>,
-);
+  {
+    label: "Atleta demo",
+    account: demoAccounts.find((account) => account.email === "user@example.com")!,
+  },
+];
+
+const coachDemoAccounts = demoAccounts
+  .filter((account) => account.group === "Professionisti")
+  .map((account) => ({
+    label: `${account.label} coach`,
+    account,
+  }));
+
+const pendingAdminActivationMessage =
+  "L'admin sta valutando la tua richiesta e ti accettera.";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [registerFirstName, setRegisterFirstName] = useState("");
-  const [registerLastName, setRegisterLastName] = useState("");
+  const [registerFullName, setRegisterFullName] = useState("");
   const [registerEmail, setRegisterEmail] = useState("");
   const [registerPassword, setRegisterPassword] = useState("");
-  const [registerAiConsent, setRegisterAiConsent] = useState(true);
+  const registerAiConsent = true;
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [registering, setRegistering] = useState(false);
+  const [authMode, setAuthMode] = useState<"login" | "register">("register");
 
   const fill = (account: (typeof demoAccounts)[number]) => {
+    setAuthMode("login");
     setEmail(account.email);
     setPassword(account.password);
   };
@@ -100,7 +114,16 @@ export default function LoginPage() {
     });
 
     if (!response.ok) {
-      setMessage("Credentials are not valid or the API is not reachable.");
+      let errorMessage = "Credentials are not valid or the API is not reachable.";
+      try {
+        const data = (await response.json()) as { message?: string };
+        if (data.message === "Account pending admin activation") {
+          errorMessage = pendingAdminActivationMessage;
+        }
+      } catch {
+        // Keep the default login error when the API does not return JSON.
+      }
+      setMessage(errorMessage);
       setLoading(false);
       return;
     }
@@ -133,12 +156,22 @@ export default function LoginPage() {
     setMessage(null);
     setRegistering(true);
 
+    const fullNameParts = registerFullName.trim().split(/\s+/).filter(Boolean);
+    const firstName = fullNameParts[0] ?? "";
+    const lastName = fullNameParts.slice(1).join(" ");
+
+    if (!firstName || !lastName) {
+      setMessage("Inserisci nome e cognome.");
+      setRegistering(false);
+      return;
+    }
+
     const response = await secureFetch(`${API_BASE}/auth/register-athlete`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        firstName: registerFirstName,
-        lastName: registerLastName,
+        firstName,
+        lastName,
         email: registerEmail,
         password: registerPassword,
         aiConsent: registerAiConsent,
@@ -155,173 +188,227 @@ export default function LoginPage() {
       return;
     }
 
-    setRegisterFirstName("");
-    setRegisterLastName("");
+    setRegisterFullName("");
     setRegisterEmail("");
     setRegisterPassword("");
-    setRegisterAiConsent(true);
     setRegistering(false);
+    setAuthMode("login");
     setMessage(
       "Nuovo atleta creato. Un amministratore deve abilitarlo e collegargli i coach prima dell accesso.",
     );
   };
 
   return (
-    <main className="pf-login-page">
-      <section className="pf-login-hero">
-        <Link className="pf-brand" href="/">
-          <span className="pf-brand-mark">PF</span>
-          <span>
-            <strong>PerformanceFactory</strong>
-            <small>AI performance workflow</small>
-          </span>
-        </Link>
-        <div>
-          <p className="pf-eyebrow">Secure workspace</p>
-          <h1>Entra nel flusso corretto per il tuo ruolo.</h1>
-          <p>
-            Atleti, professionisti e admin vedono solo le azioni che servono
-            davvero: onboarding, review, generazione AI e pubblicazione dei
-            cicli restano separati e tracciati.
+    <main className="pf-auth-screen">
+      <section className="pf-auth-brand-panel" aria-labelledby="pf-auth-heading">
+        <div className="pf-auth-brand-content">
+          <Link className="pf-auth-brand-lockup" href="/" aria-label="Performance Factory">
+              <Image
+                className="pf-auth-brand-logo"
+                src="/brand/performance-factory-horizontal-clean.png"
+                alt="Performance Factory"
+                width={900}
+                height={211}
+                priority
+              />
+          </Link>
+
+          <p className="pf-auth-eyebrow">PERFORMANCE FACTORY</p>
+          <h1 id="pf-auth-heading" className="pf-auth-headline">
+            Valuta, monitora e migliora la tua performance
+          </h1>
+          <p className="pf-auth-copy">
+            Un unico spazio per iniziare il tuo percorso, seguire i progressi e
+            costruire un piano personalizzato.
           </p>
-        </div>
-        <div className="pf-login-proof">
-          <span>AI su richiesta admin</span>
-          <span>Approvazione professionista</span>
-          <span>Pubblicazione controllata</span>
+
+          <ul className="pf-auth-benefits" aria-label="Vantaggi Performance Factory">
+            <li>Valutazione iniziale</li>
+            <li>Percorso su misura</li>
+            <li>Progressi sempre visibili</li>
+          </ul>
         </div>
       </section>
 
-      <section className="pf-login-panel">
-        <div className="pf-login-tools">
-          <LanguageToggle />
-        </div>
-        <div>
-          <p className="pf-eyebrow">Sign in</p>
-          <h2>Accedi alla tua area</h2>
-          <p className="pf-muted">
-            Usa le credenziali reali oppure una scorciatoia seed per provare il
-            flusso.
-          </p>
-        </div>
-
-        <form className="pf-stack" onSubmit={onSubmit}>
-          <label className="pf-field">
-            Email
-            <input
-              className="pf-input"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
-          </label>
-          <label className="pf-field">
-            Password
-            <input
-              className="pf-input"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-            />
-          </label>
-          <button className="pf-button" type="submit" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
-
-        <div className="pf-seed-panel">
-          <div>
-            <p className="pf-eyebrow">Nuovo utente</p>
-            <h2>Richiedi accesso atleta</h2>
-            <p className="pf-muted">
-              L account resta sospeso finche un amministratore non lo abilita e
-              assegna i coach per area.
-            </p>
-          </div>
-          <form className="pf-stack" onSubmit={onRegister}>
-            <div className="pf-two-col">
-              <label className="pf-field">
-                Nome
-                <input
-                  className="pf-input"
-                  value={registerFirstName}
-                  onChange={(event) => setRegisterFirstName(event.target.value)}
-                  required
-                />
-              </label>
-              <label className="pf-field">
-                Cognome
-                <input
-                  className="pf-input"
-                  value={registerLastName}
-                  onChange={(event) => setRegisterLastName(event.target.value)}
-                  required
-                />
-              </label>
+      <section className="pf-auth-panel">
+        <div className="pf-auth-panel-inner">
+          <div className="pf-auth-card">
+            <div className="pf-auth-tabs" aria-label="Selezione autenticazione">
+              <button
+                className={authMode === "register" ? "active" : ""}
+                type="button"
+                onClick={() => setAuthMode("register")}
+              >
+                REGISTRATI
+              </button>
+              <button
+                className={authMode === "login" ? "active" : ""}
+                type="button"
+                onClick={() => setAuthMode("login")}
+              >
+                ACCEDI
+              </button>
             </div>
-            <label className="pf-field">
-              Email
-              <input
-                className="pf-input"
-                type="email"
-                value={registerEmail}
-                onChange={(event) => setRegisterEmail(event.target.value)}
-                required
-              />
-            </label>
-            <label className="pf-field">
-              Password
-              <input
-                className="pf-input"
-                type="password"
-                minLength={8}
-                value={registerPassword}
-                onChange={(event) => setRegisterPassword(event.target.value)}
-                required
-              />
-            </label>
-            <label className="pf-checkbox">
-              <input
-                type="checkbox"
-                checked={registerAiConsent}
-                onChange={(event) => setRegisterAiConsent(event.target.checked)}
-              />
-              Consento l uso dell AI per generare proposte e questionari
-              revisionati dai coach.
-            </label>
-            <button
-              className="pf-button-secondary"
-              type="submit"
-              disabled={registering}
-            >
-              {registering ? "Creazione..." : "Crea nuovo utente"}
-            </button>
-          </form>
-        </div>
 
-        <div className="pf-seed-panel">
-          {Object.entries(groupedAccounts).map(([group, accounts]) => (
-            <div key={group} className="pf-seed-group">
-              <strong>{group}</strong>
-              <div className="pf-role-grid">
-                {accounts.map((account) => (
-                  <button
-                    key={account.email}
-                    className="pf-button-secondary"
-                    type="button"
-                    onClick={() => fill(account)}
-                  >
-                    {account.label}
-                  </button>
-                ))}
+            <div className="pf-auth-card-header">
+              <p className="pf-eyebrow">
+                {authMode === "register" ? "Nuovo percorso" : "Bentornato"}
+              </p>
+              <h2>
+                {authMode === "register"
+                  ? "Crea il tuo account"
+                  : "Accedi alla tua area"}
+              </h2>
+              <p>
+                {authMode === "register"
+                  ? "Inizia da qui. Completerai il tuo profilo dopo il primo accesso."
+                  : "Inserisci le tue credenziali per continuare."}
+              </p>
+            </div>
+
+            <div className="pf-auth-socials" aria-label="Accesso social">
+              <span>Continua con</span>
+              <div>
+                <button type="button" aria-label="Continua con Apple">
+                  Continua con Apple
+                </button>
+                <button type="button" aria-label="Continua con Google">
+                  Continua con Google
+                </button>
               </div>
             </div>
-          ))}
-        </div>
 
-        {message && <div className="pf-alert warning">{message}</div>}
+            <div className="pf-auth-divider">
+              <span>oppure usa la tua email</span>
+            </div>
+
+            {authMode === "register" ? (
+              <form className="pf-stack" onSubmit={onRegister}>
+                <label className="pf-field">
+                  Nome e cognome
+                  <input
+                    className="pf-input"
+                    autoComplete="name"
+                    value={registerFullName}
+                    onChange={(event) => setRegisterFullName(event.target.value)}
+                    required
+                  />
+                </label>
+                <label className="pf-field">
+                  Email
+                  <input
+                    className="pf-input"
+                    type="email"
+                    autoComplete="email"
+                    value={registerEmail}
+                    onChange={(event) => setRegisterEmail(event.target.value)}
+                    required
+                  />
+                </label>
+                <label className="pf-field">
+                  Password
+                  <input
+                    className="pf-input"
+                    type="password"
+                    minLength={8}
+                    autoComplete="new-password"
+                    value={registerPassword}
+                    onChange={(event) => setRegisterPassword(event.target.value)}
+                    required
+                  />
+                </label>
+                <button
+                  className="pf-button"
+                  type="submit"
+                  disabled={registering}
+                >
+                  {registering ? "Creazione..." : "Crea account"}
+                </button>
+                <p className="pf-auth-legal">
+                  Creando il tuo account, accetti i Termini e l'Informativa privacy.
+                </p>
+              </form>
+            ) : (
+              <form className="pf-stack" onSubmit={onSubmit}>
+                <label className="pf-field">
+                  Email
+                  <input
+                    className="pf-input"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    required
+                  />
+                </label>
+                <label className="pf-field">
+                  Password
+                  <input
+                    className="pf-input"
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    required
+                  />
+                </label>
+                <div className="pf-login-options">
+                  <label className="pf-remember">
+                    <input type="checkbox" />
+                    Ricordami
+                  </label>
+                  <button className="pf-auth-text-link" type="button">
+                    Hai dimenticato la password?
+                  </button>
+                </div>
+                <button className="pf-button" type="submit" disabled={loading}>
+                  {loading ? "Accesso in corso..." : "Accedi"}
+                </button>
+              </form>
+            )}
+
+            {message && <div className="pf-alert warning">{message}</div>}
+          </div>
+
+          <div className="pf-auth-demo-card">
+            <div>
+              <p className="pf-eyebrow">Accesso demo</p>
+              <p>Solo per test interno</p>
+            </div>
+            <div className="pf-demo-groups">
+              <div className="pf-demo-group">
+                <span>Base</span>
+                <div className="pf-demo-actions">
+                  {demoAccessAccounts.map(({ label, account }) => (
+                    <button
+                      key={account.email}
+                      className="pf-button-secondary"
+                      type="button"
+                      onClick={() => fill(account)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="pf-demo-group">
+                <span>Coach aree</span>
+                <div className="pf-demo-actions coach">
+                  {coachDemoAccounts.map(({ label, account }) => (
+                    <button
+                      key={account.email}
+                      className="pf-button-secondary"
+                      type="button"
+                      onClick={() => fill(account)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
     </main>
   );

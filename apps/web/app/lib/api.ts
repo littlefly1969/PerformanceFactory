@@ -2,6 +2,16 @@ export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:4000/api';
 
 const TOKEN_KEY = 'pf.accessToken';
+const networkErrorResponse = () =>
+  new Response(
+    JSON.stringify({
+      message: 'API non raggiungibile. Verifica che il server API sia avviato.',
+    }),
+    {
+      status: 503,
+      headers: { 'Content-Type': 'application/json' },
+    },
+  );
 
 export function storeAccessToken(token?: string) {
   if (typeof window === 'undefined' || !token) {
@@ -28,9 +38,14 @@ async function refreshAccessToken() {
   if (typeof window === 'undefined') {
     return null;
   }
-  const response = await fetch(`${API_BASE}/auth/token`, {
-    credentials: 'include',
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE}/auth/token`, {
+      credentials: 'include',
+    });
+  } catch {
+    return null;
+  }
   if (!response.ok) {
     return null;
   }
@@ -60,11 +75,16 @@ export async function secureFetch(input: RequestInfo | URL, init: RequestInit = 
       ? await refreshAccessToken()
       : null);
 
-  const response = await fetch(input, {
-    ...init,
-    credentials: 'include',
-    headers: authHeaders(init.headers, token),
-  });
+  let response: Response;
+  try {
+    response = await fetch(input, {
+      ...init,
+      credentials: 'include',
+      headers: authHeaders(init.headers, token),
+    });
+  } catch {
+    return networkErrorResponse();
+  }
 
   if (
     needsBearer &&
@@ -74,11 +94,15 @@ export async function secureFetch(input: RequestInfo | URL, init: RequestInit = 
   ) {
     const refreshedToken = await refreshAccessToken();
     if (refreshedToken && refreshedToken !== token) {
-      return fetch(input, {
-        ...init,
-        credentials: 'include',
-        headers: authHeaders(init.headers, refreshedToken),
-      });
+      try {
+        return await fetch(input, {
+          ...init,
+          credentials: 'include',
+          headers: authHeaders(init.headers, refreshedToken),
+        });
+      } catch {
+        return networkErrorResponse();
+      }
     }
   }
 
