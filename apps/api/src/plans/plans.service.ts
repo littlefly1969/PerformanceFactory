@@ -152,13 +152,7 @@ export class PlansService {
       },
     });
 
-    return plans.map((plan) => {
-      const items =
-        actor.role === UserRole.USER
-          ? plan.items.filter((item) => item.status === 'ACTIVE')
-          : plan.items;
-      return { ...plan, items };
-    });
+    return plans;
   }
 
   private async getAllowedAreaIds(professionalId: string) {

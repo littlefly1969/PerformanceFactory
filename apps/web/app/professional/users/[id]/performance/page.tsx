@@ -26,6 +26,35 @@ type Snapshot = {
   createdAt: string;
   areas: SnapshotArea[];
 };
+type PlanItem = {
+  id: string;
+  status: string;
+  title: string;
+  body: string;
+  completedAt?: string | null;
+  completionRating?: number | null;
+};
+type Plan = {
+  id: string;
+  areaId: string;
+  version: number;
+  status: string;
+  createdAt: string;
+  items: PlanItem[];
+};
+type QuestionSet = {
+  id: string;
+  status: string;
+  createdAt: string;
+  areaId?: string;
+  questions: Array<{
+    id: string;
+    text: string;
+    orderIndex: number;
+    options: Array<{ id: string; label: string }>;
+    answers?: Array<{ answerOptionId?: string | null; scoreAwarded?: number | null }>;
+  }>;
+};
 
 const formatDate = (value?: string) => {
   if (!value) {
@@ -41,12 +70,15 @@ const formatDate = (value?: string) => {
     year: "numeric",
   });
 };
+const cleanStatus = (status: string) => status.replace(/_/g, " ").toLowerCase();
 
 export default function ProfessionalUserPerformancePage() {
   const params = useParams();
   const userId = typeof params?.id === "string" ? params.id : "";
   const [current, setCurrent] = useState<Snapshot | null>(null);
   const [history, setHistory] = useState<Snapshot[]>([]);
+  const [planHistory, setPlanHistory] = useState<Plan[]>([]);
+  const [questionHistory, setQuestionHistory] = useState<QuestionSet[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -100,8 +132,32 @@ export default function ProfessionalUserPerformancePage() {
       return;
     }
 
-    setCurrent((await currentRes.json()) as Snapshot);
-    setHistory((await historyRes.json()) as Snapshot[]);
+    const nextCurrent = (await currentRes.json()) as Snapshot;
+    const nextHistory = (await historyRes.json()) as Snapshot[];
+    setCurrent(nextCurrent);
+    setHistory(nextHistory);
+    const areaHistories = await Promise.all(
+      nextCurrent.areas.map(async (area) => {
+        const [plansRes, questionsRes] = await Promise.all([
+          secureFetch(
+            `${API_BASE}/plans/history${query}&areaId=${encodeURIComponent(area.areaId)}`,
+            { credentials: "include" },
+          ),
+          secureFetch(
+            `${API_BASE}/questions/history${query}&areaId=${encodeURIComponent(area.areaId)}`,
+            { credentials: "include" },
+          ),
+        ]);
+        return {
+          plans: plansRes.ok ? ((await plansRes.json()) as Plan[]) : [],
+          questions: questionsRes.ok
+            ? ((await questionsRes.json()) as QuestionSet[])
+            : [],
+        };
+      }),
+    );
+    setPlanHistory(areaHistories.flatMap((entry) => entry.plans));
+    setQuestionHistory(areaHistories.flatMap((entry) => entry.questions));
     setLoading(false);
   };
 
@@ -219,6 +275,95 @@ export default function ProfessionalUserPerformancePage() {
               title="No history"
               description="Snapshots appear after each closed cycle."
             />
+          )}
+        </div>
+      </section>
+
+      <section className="pf-panel">
+        <div className="pf-panel-header">
+          <div>
+            <h2>Storico lavori</h2>
+            <p className="pf-muted">
+              Esercizi attivi, completati e chiusi visibili per le aree assegnate.
+            </p>
+          </div>
+        </div>
+        <div className="pf-stack">
+          {planHistory.map((plan) => (
+            <article key={plan.id} className="pf-card">
+              <div className="pf-card-top">
+                <div>
+                  <h3>Versione {plan.version}</h3>
+                  <p className="pf-muted">{formatDate(plan.createdAt)}</p>
+                </div>
+                <StatusBadge tone={plan.status === "ACTIVE" ? "accent" : "neutral"}>
+                  {cleanStatus(plan.status)}
+                </StatusBadge>
+              </div>
+              <div className="pf-stack">
+                {plan.items.map((item) => (
+                  <div key={item.id} className="pf-work-row">
+                    <span>
+                      <strong>{item.title}</strong>
+                      <small>
+                        {cleanStatus(item.status)}
+                        {item.completedAt ? ` · completed ${formatDate(item.completedAt)}` : ""}
+                        {item.completionRating ? ` · rating ${item.completionRating}` : ""}
+                      </small>
+                    </span>
+                    <p className="pf-muted">{item.body}</p>
+                  </div>
+                ))}
+              </div>
+            </article>
+          ))}
+          {!loading && planHistory.length === 0 && (
+            <EmptyState title="No plan history" description="Published plan history will appear here." />
+          )}
+        </div>
+      </section>
+
+      <section className="pf-panel">
+        <div className="pf-panel-header">
+          <div>
+            <h2>Storico questionari</h2>
+            <p className="pf-muted">
+              Domande e risposte storiche visibili per le aree assegnate.
+            </p>
+          </div>
+        </div>
+        <div className="pf-stack">
+          {questionHistory.map((set) => (
+            <article key={set.id} className="pf-card">
+              <div className="pf-card-top">
+                <div>
+                  <h3>{formatDate(set.createdAt)}</h3>
+                  <p className="pf-muted">{set.questions.length} questions</p>
+                </div>
+                <StatusBadge tone={set.status === "CLOSED" ? "success" : "warning"}>
+                  {cleanStatus(set.status)}
+                </StatusBadge>
+              </div>
+              <div className="pf-stack">
+                {set.questions.map((question) => {
+                  const answer = question.answers?.[0];
+                  const answerLabel = question.options.find(
+                    (option) => option.id === answer?.answerOptionId,
+                  )?.label;
+                  return (
+                    <div key={question.id} className="pf-work-row">
+                      <span>
+                        <strong>{question.orderIndex}. {question.text}</strong>
+                        <small>{answerLabel ?? "No answer recorded"}</small>
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </article>
+          ))}
+          {!loading && questionHistory.length === 0 && (
+            <EmptyState title="No questionnaire history" description="Questionnaire history will appear here." />
           )}
         </div>
       </section>

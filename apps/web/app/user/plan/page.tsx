@@ -27,6 +27,7 @@ type Plan = {
   id: string;
   areaId: string;
   version: number;
+  status: string;
   createdAt: string;
   items: PlanItem[];
 };
@@ -47,6 +48,7 @@ export default function UserPlanPage() {
   const [plansByArea, setPlansByArea] = useState<Record<string, Plan | null>>(
     {},
   );
+  const [planHistory, setPlanHistory] = useState<Plan[]>([]);
 
   const activeItems = useMemo(
     () => plan?.items.filter((item) => item.status === "ACTIVE") ?? [],
@@ -81,8 +83,19 @@ export default function UserPlanPage() {
       const firstActive = entries.find(([, areaPlan]) =>
         areaPlan?.items.some((item) => item.status === "ACTIVE"),
       );
+      const requestedAreaId =
+        typeof window === "undefined"
+          ? ""
+          : new URLSearchParams(window.location.search).get("areaId");
       setAreaId(
-        (current) => current || firstActive?.[0] || loadedAreas[0]?.id || "",
+        (current) =>
+          current ||
+          (requestedAreaId && loadedAreas.some((area) => area.id === requestedAreaId)
+            ? requestedAreaId
+            : "") ||
+          firstActive?.[0] ||
+          loadedAreas[0]?.id ||
+          "",
       );
     }
   };
@@ -118,6 +131,11 @@ export default function UserPlanPage() {
     }
 
     setPlan((await response.json()) as Plan);
+    const historyResponse = await secureFetch(
+      `${API_BASE}/user/plan/history?areaId=${encodeURIComponent(selectedAreaId)}`,
+      { credentials: "include" },
+    );
+    setPlanHistory(historyResponse.ok ? ((await historyResponse.json()) as Plan[]) : []);
     setLoading(false);
   };
 
@@ -340,6 +358,50 @@ export default function UserPlanPage() {
                   : "Choose an area to load the current plan."
               }
             />
+          )}
+        </div>
+      </section>
+
+      <section className="pf-panel">
+        <div className="pf-panel-header">
+          <div>
+            <h2>Storico lavori</h2>
+            <p className="pf-muted">
+              Rivedi anche esercizi completati o chiusi delle versioni precedenti.
+            </p>
+          </div>
+        </div>
+        <div className="pf-stack">
+          {planHistory.map((historyPlan) => (
+            <article key={historyPlan.id} className="pf-card">
+              <div className="pf-card-top">
+                <div>
+                  <h3>Versione {historyPlan.version}</h3>
+                  <p className="pf-muted">{new Date(historyPlan.createdAt).toLocaleDateString("it-IT")}</p>
+                </div>
+                <StatusBadge tone={historyPlan.status === "ACTIVE" ? "accent" : "neutral"}>
+                  {cleanStatus(historyPlan.status)}
+                </StatusBadge>
+              </div>
+              <div className="pf-stack">
+                {historyPlan.items.map((item) => (
+                  <div key={item.id} className="pf-work-row">
+                    <span>
+                      <strong>{item.title}</strong>
+                      <small>
+                        {cleanStatus(item.status)}
+                        {item.completedAt ? ` · completato ${new Date(item.completedAt).toLocaleDateString("it-IT")}` : ""}
+                        {item.completionRating ? ` · voto ${item.completionRating}` : ""}
+                      </small>
+                    </span>
+                    <p className="pf-muted">{item.body}</p>
+                  </div>
+                ))}
+              </div>
+            </article>
+          ))}
+          {!loading && planHistory.length === 0 && (
+            <EmptyState title="Nessuno storico" description="Lo storico apparira dopo la pubblicazione dei piani." />
           )}
         </div>
       </section>

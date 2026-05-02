@@ -187,15 +187,15 @@ export default function AthleteDashboardPage() {
           </div>
           <div className="pf-stack">
             <div className="pf-metric-row">
-              <span>Active plan items</span>
+              <Link href="/user/plan">Active plan items</Link>
               <strong>{activeItems.length}</strong>
             </div>
             <div className="pf-metric-row">
-              <span>Open questionnaires</span>
+              <Link href="/user/questions">Open questionnaires</Link>
               <strong>{openQuestionSets.length}</strong>
             </div>
             <div className="pf-metric-row">
-              <span>Professionals</span>
+              <Link href="/user/performance">Performance history</Link>
               <strong>{professionals.length}</strong>
             </div>
             <div className="pf-actions">
@@ -237,10 +237,20 @@ export default function AthleteDashboardPage() {
                   </p>
                 )}
                 <div className="pf-row">
-                  <span>Questionnaire</span>
+                  <Link href={`/user/questions?areaId=${encodeURIComponent(row.area.id)}`}>
+                    Questionnaire
+                  </Link>
                   <StatusBadge tone={row.questionSet ? "warning" : "neutral"}>
                     {row.questionSet ? `${row.questionSet.questions.length} questions` : "Not available"}
                   </StatusBadge>
+                </div>
+                <div className="pf-actions">
+                  <Link className="pf-button-secondary" href={`/user/plan?areaId=${encodeURIComponent(row.area.id)}`}>
+                    Lavori
+                  </Link>
+                  <Link className="pf-button-secondary" href={`/user/questions?areaId=${encodeURIComponent(row.area.id)}`}>
+                    Questionari
+                  </Link>
                 </div>
               </article>
             );

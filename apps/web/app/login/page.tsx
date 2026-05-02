@@ -73,14 +73,8 @@ const groupedAccounts = demoAccounts.reduce(
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [registerFirstName, setRegisterFirstName] = useState("");
-  const [registerLastName, setRegisterLastName] = useState("");
-  const [registerEmail, setRegisterEmail] = useState("");
-  const [registerPassword, setRegisterPassword] = useState("");
-  const [registerAiConsent, setRegisterAiConsent] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [registering, setRegistering] = useState(false);
 
   const fill = (account: (typeof demoAccounts)[number]) => {
     setEmail(account.email);
@@ -126,44 +120,6 @@ export default function LoginPage() {
             ? "/admin/cycles"
             : "/";
     window.location.href = destination;
-  };
-
-  const onRegister = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setMessage(null);
-    setRegistering(true);
-
-    const response = await secureFetch(`${API_BASE}/auth/register-athlete`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        firstName: registerFirstName,
-        lastName: registerLastName,
-        email: registerEmail,
-        password: registerPassword,
-        aiConsent: registerAiConsent,
-      }),
-    });
-
-    if (!response.ok) {
-      setMessage(
-        response.status === 400
-          ? "Registrazione non valida o email gia presente."
-          : "Registrazione non disponibile.",
-      );
-      setRegistering(false);
-      return;
-    }
-
-    setRegisterFirstName("");
-    setRegisterLastName("");
-    setRegisterEmail("");
-    setRegisterPassword("");
-    setRegisterAiConsent(true);
-    setRegistering(false);
-    setMessage(
-      "Nuovo atleta creato. Un amministratore deve abilitarlo e collegargli i coach prima dell accesso.",
-    );
   };
 
   return (
@@ -236,69 +192,13 @@ export default function LoginPage() {
             <p className="pf-eyebrow">Nuovo utente</p>
             <h2>Richiedi accesso atleta</h2>
             <p className="pf-muted">
-              L account resta sospeso finche un amministratore non lo abilita e
-              assegna i coach per area.
+              Apri la pagina di registrazione dedicata per inserire i dati del
+              nuovo atleta.
             </p>
           </div>
-          <form className="pf-stack" onSubmit={onRegister}>
-            <div className="pf-two-col">
-              <label className="pf-field">
-                Nome
-                <input
-                  className="pf-input"
-                  value={registerFirstName}
-                  onChange={(event) => setRegisterFirstName(event.target.value)}
-                  required
-                />
-              </label>
-              <label className="pf-field">
-                Cognome
-                <input
-                  className="pf-input"
-                  value={registerLastName}
-                  onChange={(event) => setRegisterLastName(event.target.value)}
-                  required
-                />
-              </label>
-            </div>
-            <label className="pf-field">
-              Email
-              <input
-                className="pf-input"
-                type="email"
-                value={registerEmail}
-                onChange={(event) => setRegisterEmail(event.target.value)}
-                required
-              />
-            </label>
-            <label className="pf-field">
-              Password
-              <input
-                className="pf-input"
-                type="password"
-                minLength={8}
-                value={registerPassword}
-                onChange={(event) => setRegisterPassword(event.target.value)}
-                required
-              />
-            </label>
-            <label className="pf-checkbox">
-              <input
-                type="checkbox"
-                checked={registerAiConsent}
-                onChange={(event) => setRegisterAiConsent(event.target.checked)}
-              />
-              Consento l uso dell AI per generare proposte e questionari
-              revisionati dai coach.
-            </label>
-            <button
-              className="pf-button-secondary"
-              type="submit"
-              disabled={registering}
-            >
-              {registering ? "Creazione..." : "Crea nuovo utente"}
-            </button>
-          </form>
+          <Link className="pf-button-secondary" href="/register">
+            Crea nuovo utente
+          </Link>
         </div>
 
         <div className="pf-seed-panel">

@@ -106,6 +106,64 @@ export class QuestionsService {
     };
   }
 
+  async getQuestionSetHistory(actor: Actor, userId?: string, areaId?: string) {
+    const targetUserId = await this.resolveTargetUser(actor, userId);
+    if (!areaId) {
+      throw new BadRequestException('Missing area id');
+    }
+
+    if (actor.role === UserRole.PROFESSIONAL && targetUserId !== actor.id) {
+      const allowed = await this.abac.canAccessUserArea(
+        actor.id,
+        targetUserId,
+        areaId,
+      );
+      if (!allowed) {
+        throw new ForbiddenException('Not allowed for this area');
+      }
+    }
+
+    return this.prisma.questionSet.findMany({
+      where: {
+        userId: targetUserId,
+        areaId,
+        status:
+          actor.role === UserRole.USER ? { in: ['PUBLISHED', 'CLOSED'] } : undefined,
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        userId: true,
+        areaId: true,
+        planReleaseId: true,
+        type: true,
+        status: true,
+        createdAt: true,
+        questions: {
+          orderBy: { orderIndex: 'asc' },
+          select: {
+            id: true,
+            areaId: true,
+            text: true,
+            objectiveRef: true,
+            orderIndex: true,
+            area: { select: { id: true, name: true } },
+            options: { select: { id: true, label: true, score: true } },
+            answers: {
+              where: { userId: targetUserId },
+              select: {
+                id: true,
+                answerOptionId: true,
+                scoreAwarded: true,
+                answeredAt: true,
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
   async closeQuestionSet(actor: Actor, questionSetId: string) {
     if (!questionSetId) {
       throw new BadRequestException('Missing question set id');

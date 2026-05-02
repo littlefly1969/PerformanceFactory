@@ -238,15 +238,13 @@ export default function AdminAiConfigPage() {
   };
 
   const editTemplate = (template: OnboardingTemplate) => {
-    setTemplateDraft(template);
+    setTemplateDraft({ ...template });
     setTemplateOptionsText(stringifyOptions(template.optionsJson));
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const editAreaConfig = (config: AreaGenerationConfig) => {
-    setAreaConfigDraft(config);
+    setAreaConfigDraft({ ...config });
     setAreaConfigLayoutText(stringifyOptions(config.questionnaireLayoutJson));
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (

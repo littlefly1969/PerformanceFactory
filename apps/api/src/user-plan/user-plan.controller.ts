@@ -25,6 +25,19 @@ export class UserPlanController {
     return this.userPlan.getCurrentPlan(req.user?.id ?? '', areaId);
   }
 
+  @Get('plan/history')
+  @ApiOperation({ summary: 'Get user plan history' })
+  @ApiQuery({ name: 'areaId', required: true })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.USER)
+  getPlanHistory(
+    @Req() req: { user?: { id: string } },
+    @Query('areaId') areaId?: string,
+  ) {
+    return this.userPlan.getPlanHistory(req.user?.id ?? '', areaId);
+  }
+
   @Post('plan-items/:id/complete')
   @ApiOperation({ summary: 'Complete a plan item' })
   @ApiParam({ name: 'id' })

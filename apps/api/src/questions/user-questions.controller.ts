@@ -26,4 +26,20 @@ export class UserQuestionsController {
       role: req.user?.role ?? UserRole.USER,
     }, undefined, areaId);
   }
+
+  @Get('history')
+  @ApiOperation({ summary: 'Get question set history for user' })
+  @ApiQuery({ name: 'areaId', required: true })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.USER)
+  getHistory(
+    @Req() req: { user?: { id: string; role: UserRole } },
+    @Query('areaId') areaId?: string,
+  ) {
+    return this.questions.getQuestionSetHistory({
+      id: req.user?.id ?? '',
+      role: req.user?.role ?? UserRole.USER,
+    }, undefined, areaId);
+  }
 }

@@ -58,6 +58,45 @@ export class UserPlanService {
     return plan;
   }
 
+  async getPlanHistory(userId: string, areaId?: string) {
+    if (!userId) {
+      throw new BadRequestException('Missing user');
+    }
+    if (!areaId) {
+      throw new BadRequestException('Missing area id');
+    }
+
+    return this.prisma.improvementPlanRelease.findMany({
+      where: { userId, areaId, status: { in: ['ACTIVE', 'CLOSED'] } },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        userId: true,
+        areaId: true,
+        version: true,
+        status: true,
+        generatedBy: true,
+        createdAt: true,
+        sourceSnapshotId: true,
+        items: {
+          select: {
+            id: true,
+            areaId: true,
+            type: true,
+            title: true,
+            body: true,
+            metadata: true,
+            status: true,
+            completedAt: true,
+            completionNotes: true,
+            completionRating: true,
+            area: { select: { id: true, name: true } },
+          },
+        },
+      },
+    });
+  }
+
   async completePlanItem(
     userId: string,
     planItemId: string,

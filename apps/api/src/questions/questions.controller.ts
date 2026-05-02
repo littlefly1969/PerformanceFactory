@@ -47,6 +47,24 @@ export class QuestionsController {
     );
   }
 
+  @Get('history')
+  @ApiOperation({ summary: 'Get question set history' })
+  @ApiQuery({ name: 'userId', required: false })
+  @ApiQuery({ name: 'areaId', required: true })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard)
+  getHistory(
+    @Req() req: { user?: { id: string; role: UserRole } },
+    @Query('userId') userId?: string,
+    @Query('areaId') areaId?: string,
+  ) {
+    return this.questions.getQuestionSetHistory(
+      { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },
+      userId,
+      areaId,
+    );
+  }
+
   @Post(':setId/close')
   @ApiOperation({ summary: 'Close a question set' })
   @ApiParam({ name: 'setId' })
