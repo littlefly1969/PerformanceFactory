@@ -1,0 +1,19 @@
+[exec]
+enabled = true
+workspace_only = true
+
+allow_commands = [
+  "pnpm",
+  "node",
+  "git",
+  "docker",
+  "docker-compose"
+]
+
+deny_patterns = [
+  "../",
+  "/home/",
+  "/etc/",
+  "sudo",
+  "rm -rf /"
+]

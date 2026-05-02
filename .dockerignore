@@ -1,0 +1,8 @@
+node_modules
+apps/*/node_modules
+apps/api/dist
+apps/web/.next
+.git
+.env
+*.log
+coverage

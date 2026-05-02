@@ -1,0 +1,19 @@
+{
+  "name": "performancefactory",
+  "private": true,
+  "packageManager": "pnpm@10.28.2",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "db:up": "docker compose -f infra/docker-compose.dev.yml up -d",
+    "db:down": "docker compose -f infra/docker-compose.dev.yml down",
+    "db:check": "cd apps/api && pnpm prisma validate"
+  },
+  "devDependencies": {
+    "prisma-erd-generator": "^2.4.2",
+    "turbo": "2.8.1"
+  }
+}

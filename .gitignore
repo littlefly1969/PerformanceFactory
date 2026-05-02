@@ -1,0 +1,12 @@
+node_modules/
+apps/*/node_modules/
+apps/api/dist/
+apps/web/.next/
+.turbo/
+.env
+.env.*
+!.env.production.example
+*.log
+cookies.txt
+apps/api/cookies.txt
+coverage/
