@@ -13,7 +13,7 @@ export class CyclesService {
 
   async getStatus(actor: Actor, cycleId: string) {
     if (actor.role !== UserRole.ADMIN && actor.role !== UserRole.PROFESSIONAL) {
-      throw new ForbiddenException('Not allowed');
+      throw new ForbiddenException('Operazione non consentita');
     }
 
     return this.professional.getCycleStatus(actor, cycleId);

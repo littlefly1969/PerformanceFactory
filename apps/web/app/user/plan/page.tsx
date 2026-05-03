@@ -23,7 +23,7 @@ type PlanItem = {
   completionRating?: number | null;
 };
 
-type Plan = {
+type Piano = {
   id: string;
   areaId: string;
   version: number;
@@ -34,21 +34,28 @@ type Plan = {
 
 type Area = { id: string; name: string };
 
-const cleanStatus = (status: string) => status.replace(/_/g, " ").toLowerCase();
+const cleanStato = (status: string) =>
+  ({
+    ACTIVE: "attivo",
+    COMPLETED: "completato",
+    CLOSED: "chiuso",
+    PENDING: "in attesa",
+    PUBLISHED: "pubblicato",
+  })[status] ?? status.replace(/_/g, " ").toLowerCase();
 
-export default function UserPlanPage() {
-  const [plan, setPlan] = useState<Plan | null>(null);
+export default function UserPianoPage() {
+  const [plan, setPiano] = useState<Piano | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [authHint, setAuthHint] = useState<string | null>(null);
   const [notesById, setNotesById] = useState<Record<string, string>>({});
   const [ratingById, setRatingById] = useState<Record<string, string>>({});
-  const [areas, setAreas] = useState<Area[]>([]);
+  const [areas, setAree] = useState<Area[]>([]);
   const [areaId, setAreaId] = useState("");
-  const [plansByArea, setPlansByArea] = useState<Record<string, Plan | null>>(
+  const [plansByArea, setPianosByArea] = useState<Record<string, Piano | null>>(
     {},
   );
-  const [planHistory, setPlanHistory] = useState<Plan[]>([]);
+  const [planHistory, setPianoHistory] = useState<Piano[]>([]);
 
   const activeItems = useMemo(
     () => plan?.items.filter((item) => item.status === "ACTIVE") ?? [],
@@ -59,29 +66,29 @@ export default function UserPlanPage() {
     [plan],
   );
 
-  const loadAreas = async () => {
+  const loadAree = async () => {
     const response = await secureFetch(`${API_BASE}/areas`, {
       credentials: "include",
     });
     if (response.ok) {
-      const loadedAreas = (await response.json()) as Area[];
-      setAreas(loadedAreas);
+      const loadedAree = (await response.json()) as Area[];
+      setAree(loadedAree);
       const entries = await Promise.all(
-        loadedAreas.map(async (area) => {
+        loadedAree.map(async (area) => {
           const planResponse = await secureFetch(
             `${API_BASE}/user/plan/current?areaId=${encodeURIComponent(area.id)}`,
             { credentials: "include" },
           );
           return [
             area.id,
-            planResponse.ok ? ((await planResponse.json()) as Plan) : null,
+            planResponse.ok ? ((await planResponse.json()) as Piano) : null,
           ] as const;
         }),
       );
-      const nextPlans = Object.fromEntries(entries);
-      setPlansByArea(nextPlans);
-      const firstActive = entries.find(([, areaPlan]) =>
-        areaPlan?.items.some((item) => item.status === "ACTIVE"),
+      const nextPianos = Object.fromEntries(entries);
+      setPianosByArea(nextPianos);
+      const firstActive = entries.find(([, areaPiano]) =>
+        areaPiano?.items.some((item) => item.status === "ACTIVE"),
       );
       const requestedAreaId =
         typeof window === "undefined"
@@ -90,17 +97,17 @@ export default function UserPlanPage() {
       setAreaId(
         (current) =>
           current ||
-          (requestedAreaId && loadedAreas.some((area) => area.id === requestedAreaId)
+          (requestedAreaId && loadedAree.some((area) => area.id === requestedAreaId)
             ? requestedAreaId
             : "") ||
           firstActive?.[0] ||
-          loadedAreas[0]?.id ||
+          loadedAree[0]?.id ||
           "",
       );
     }
   };
 
-  const loadPlan = async (selectedAreaId = areaId) => {
+  const loadPiano = async (selectedAreaId = areaId) => {
     setLoading(true);
     setAuthHint(null);
     setMessage(null);
@@ -108,8 +115,8 @@ export default function UserPlanPage() {
     setRatingById({});
 
     if (!selectedAreaId) {
-      setPlan(null);
-      setMessage("Select an area to load the current plan.");
+      setPiano(null);
+      setMessage("Seleziona un'area per caricare il piano corrente.");
       setLoading(false);
       return;
     }
@@ -120,36 +127,36 @@ export default function UserPlanPage() {
     );
 
     if (!response.ok) {
-      setPlan(null);
+      setPiano(null);
       if (response.status === 401) {
-        setAuthHint("Sign in to view your plan.");
+        setAuthHint("Accedi per vedere il tuo piano.");
       } else if (response.status !== 404) {
-        setMessage("Unable to load the current plan.");
+        setMessage("Impossibile caricare il piano corrente.");
       }
       setLoading(false);
       return;
     }
 
-    setPlan((await response.json()) as Plan);
+    setPiano((await response.json()) as Piano);
     const historyResponse = await secureFetch(
       `${API_BASE}/user/plan/history?areaId=${encodeURIComponent(selectedAreaId)}`,
       { credentials: "include" },
     );
-    setPlanHistory(historyResponse.ok ? ((await historyResponse.json()) as Plan[]) : []);
+    setPianoHistory(historyResponse.ok ? ((await historyResponse.json()) as Piano[]) : []);
     setLoading(false);
   };
 
   useEffect(() => {
     void (async () => {
       if (!(await redirectIfOnboardingRequired())) {
-        await loadAreas();
+        await loadAree();
       }
     })();
   }, []);
 
   useEffect(() => {
     if (areaId) {
-      void loadPlan(areaId);
+      void loadPiano(areaId);
     }
   }, [areaId]);
 
@@ -182,43 +189,43 @@ export default function UserPlanPage() {
     if (!response.ok) {
       setMessage(
         response.status === 409
-          ? "This item is already completed."
-          : "Completion failed.",
+          ? "Questa attivita e gia stata completata."
+          : "Completamento non riuscito.",
       );
       return;
     }
 
-    await loadAreas();
-    await loadPlan();
+    await loadAree();
+    await loadPiano();
   };
 
   return (
     <ProductShell
-      eyebrow="Athlete workspace"
-      title="Active performance plan"
-      description="Work is organized by area. Areas with active work are highlighted first; open one and complete the assigned activity."
+      eyebrow="Ambiente atleta"
+      title="Piano performance attivo"
+      description="Il lavoro e organizzato per area. Le aree con attivita attive sono evidenziate per prime: aprine una e completa l'attivita assegnata."
       actions={
         <button
           className="pf-button-secondary"
           type="button"
-          onClick={() => loadAreas()}
+          onClick={() => loadAree()}
         >
-          Refresh areas
+          Aggiorna aree
         </button>
       }
       stats={[
         {
-          label: "Active items",
+          label: "Attivita attive",
           value: loading ? "..." : activeItems.length,
           tone: "accent",
         },
         {
-          label: "Completed",
+          label: "Completate",
           value: loading ? "..." : completedItems.length,
           tone: "success",
         },
         {
-          label: "Plan version",
+          label: "Versione piano",
           value: plan ? `v${plan.version}` : "-",
           tone: "warning",
         },
@@ -227,18 +234,18 @@ export default function UserPlanPage() {
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
-            <h2>Areas</h2>
-            <p className="pf-muted">Open the area that has work to complete.</p>
+            <h2>Aree</h2>
+            <p className="pf-muted">Apri l'area che contiene lavoro da completare.</p>
           </div>
         </div>
         <div className="pf-area-grid">
           {areas.map((area) => {
-            const areaPlan = plansByArea[area.id];
+            const areaPiano = plansByArea[area.id];
             const active =
-              areaPlan?.items.filter((item) => item.status === "ACTIVE")
+              areaPiano?.items.filter((item) => item.status === "ACTIVE")
                 .length ?? 0;
             const completed =
-              areaPlan?.items.filter((item) => item.status === "COMPLETED")
+              areaPiano?.items.filter((item) => item.status === "COMPLETED")
                 .length ?? 0;
             const selected = area.id === areaId;
             return (
@@ -252,16 +259,16 @@ export default function UserPlanPage() {
                   <strong>{area.name}</strong>
                   <small>
                     {active
-                      ? `${active} active work item`
+                      ? `${active} attivita attiva`
                       : completed
-                        ? `${completed} completed`
-                        : "No active plan"}
+                        ? `${completed} completate`
+                        : "Nessun piano attivo"}
                   </small>
                 </span>
                 <StatusBadge
                   tone={active ? "accent" : completed ? "success" : "neutral"}
                 >
-                  {active ? "To do" : completed ? "Done" : "Empty"}
+                  {active ? "Da fare" : completed ? "Completato" : "Vuoto"}
                 </StatusBadge>
               </button>
             );
@@ -272,17 +279,17 @@ export default function UserPlanPage() {
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
-            <h2>Today&apos;s work</h2>
+            <h2>Lavoro di oggi</h2>
             <p className="pf-muted">
-              Complete items only after the activity is actually done.
+              Completa le attivita solo quando sono state davvero eseguite.
             </p>
           </div>
           <button
             className="pf-button-secondary"
             type="button"
-            onClick={() => loadPlan()}
+            onClick={() => loadPiano()}
           >
-            Refresh
+            Aggiorna
           </button>
         </div>
 
@@ -296,18 +303,18 @@ export default function UserPlanPage() {
                 <div>
                   <h3>{item.title}</h3>
                   <p className="pf-muted">
-                    {item.area?.name ?? "Area"} ·{" "}
+                    {item.area?.name ?? "Area"} -{" "}
                     <span className="pf-mono">{item.id.slice(0, 8)}</span>
                   </p>
                 </div>
                 <StatusBadge tone="accent">
-                  {cleanStatus(item.status)}
+                  {cleanStato(item.status)}
                 </StatusBadge>
               </div>
               <p>{item.body}</p>
               <div className="pf-grid">
                 <label className="pf-field">
-                  Completion notes
+                  Note di completamento
                   <textarea
                     className="pf-textarea"
                     rows={3}
@@ -318,11 +325,11 @@ export default function UserPlanPage() {
                         [item.id]: event.target.value,
                       }))
                     }
-                    placeholder="What did you complete?"
+                    placeholder="Cosa hai completato?"
                   />
                 </label>
                 <label className="pf-field">
-                  Rating
+                  Voto
                   <input
                     className="pf-input"
                     type="number"
@@ -344,18 +351,18 @@ export default function UserPlanPage() {
                 type="button"
                 onClick={() => completePlanItem(item.id)}
               >
-                Mark complete
+                Segna come completata
               </button>
             </article>
           ))}
 
           {!loading && activeItems.length === 0 && (
             <EmptyState
-              title={areaId ? "No active work for this area" : "Select an area"}
+              title={areaId ? "Nessun lavoro attivo per questa area" : "Seleziona un'area"}
               description={
                 areaId
-                  ? "There is no published active item for the selected area."
-                  : "Choose an area to load the current plan."
+                  ? "Non ci sono attivita attive pubblicate per l'area selezionata."
+                  : "Scegli un'area per caricare il piano corrente."
               }
             />
           )}
@@ -380,7 +387,7 @@ export default function UserPlanPage() {
                   <p className="pf-muted">{new Date(historyPlan.createdAt).toLocaleDateString("it-IT")}</p>
                 </div>
                 <StatusBadge tone={historyPlan.status === "ACTIVE" ? "accent" : "neutral"}>
-                  {cleanStatus(historyPlan.status)}
+                  {cleanStato(historyPlan.status)}
                 </StatusBadge>
               </div>
               <div className="pf-stack">
@@ -389,9 +396,9 @@ export default function UserPlanPage() {
                     <span>
                       <strong>{item.title}</strong>
                       <small>
-                        {cleanStatus(item.status)}
-                        {item.completedAt ? ` · completato ${new Date(item.completedAt).toLocaleDateString("it-IT")}` : ""}
-                        {item.completionRating ? ` · voto ${item.completionRating}` : ""}
+                        {cleanStato(item.status)}
+                        {item.completedAt ? ` - completato ${new Date(item.completedAt).toLocaleDateString("it-IT")}` : ""}
+                        {item.completionRating ? ` - voto ${item.completionRating}` : ""}
                       </small>
                     </span>
                     <p className="pf-muted">{item.body}</p>

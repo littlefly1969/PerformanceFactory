@@ -29,7 +29,7 @@ type Cycle = {
   areaId: string;
   version: number;
   status?: string;
-  cycleStatus: string;
+  cycleStato: string;
   createdAt: string;
   user: UserRef;
   area: Area;
@@ -135,7 +135,7 @@ const formatDate = (value?: string | null) => {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime())
     ? "-"
-    : parsed.toLocaleDateString("en-US", {
+    : parsed.toLocaleDateString("it-IT", {
         month: "short",
         day: "2-digit",
         year: "numeric",
@@ -161,8 +161,19 @@ const badgeTone = (value: string) => {
 
 const displayUser = (user: UserRef) => {
   const fullName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
-  return fullName ? `${fullName} · ${user.email}` : user.email;
+  return fullName ? `${fullName} - ${user.email}` : user.email;
 };
+
+const formatStatus = (status: string) =>
+  ({
+    ACTIVE: "attivo",
+    COMPLETED: "completato",
+    CLOSED: "chiuso",
+    PENDING: "in attesa",
+    PUBLISHED: "pubblicato",
+    READY_TO_PUBLISH: "pronto da pubblicare",
+    WAITING_PROFESSIONAL_APPROVAL: "in attesa professionista",
+  })[status] ?? status.replace(/_/g, " ").toLowerCase();
 
 export default function AdminCyclesPage() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
@@ -196,7 +207,7 @@ export default function AdminCyclesPage() {
   );
   const waitingApproval =
     dashboard?.pendingCycles.filter(
-      (cycle) => cycle.cycleStatus !== "READY_TO_PUBLISH",
+      (cycle) => cycle.cycleStato !== "READY_TO_PUBLISH",
     ) ?? [];
   const readyCycles = dashboard?.readyCycles ?? [];
   const pendingActivation = athletes.filter((athlete) => !athlete.isActive);
@@ -228,8 +239,8 @@ export default function AdminCyclesPage() {
     if (!response.ok) {
       setMessage(
         response.status === 403
-          ? "Admin access required."
-          : `Dashboard load failed: ${await readError(response)}`,
+          ? "Accesso admin richiesto."
+          : `Caricamento dashboard non riuscito: ${await readError(response)}`,
       );
       setLoading(false);
       return;
@@ -286,15 +297,15 @@ export default function AdminCyclesPage() {
     const professionalId =
       selectedProfessionalByAthlete[selectionKey(athleteId, areaId)];
     if (!areaId) {
-      setMessage("Select an area before assigning a professional.");
+      setMessage("Seleziona un'area prima di assegnare un professionista.");
       return;
     }
     if (!professionalId) {
-      setMessage("Select a professional before assigning.");
+      setMessage("Seleziona un professionista prima dell'assegnazione.");
       return;
     }
     if (!professionalCanHandleArea(professionalId, areaId)) {
-      setMessage("Selected professional is not enabled for this area.");
+      setMessage("Il professionista selezionato non e abilitato per questa area.");
       return;
     }
     setBusyKey(`link:${athleteId}`);
@@ -306,12 +317,12 @@ export default function AdminCyclesPage() {
       body: JSON.stringify({ userId: athleteId, professionalId, areaId }),
     });
     if (!response.ok) {
-      setMessage(`Assignment failed: ${await readError(response)}`);
+      setMessage(`Assegnazione non riuscita: ${await readError(response)}`);
       setBusyKey(null);
       return;
     }
     setMessage(
-      "Athlete assigned to an enabled professional. Previous professional links were replaced.",
+      "Atleta assegnato a un professionista abilitato. I collegamenti precedenti sono stati sostituiti.",
     );
     await loadDashboard();
     setBusyKey(null);
@@ -324,7 +335,7 @@ export default function AdminCyclesPage() {
       .filter(([, checked]) => checked)
       .map(([areaId]) => areaId);
     if (!selected.length) {
-      setMessage("Select at least one area competence.");
+      setMessage("Seleziona almeno una competenza per area.");
       return;
     }
     setBusyKey(`competences:${professionalId}`);
@@ -336,12 +347,12 @@ export default function AdminCyclesPage() {
       body: JSON.stringify({ professionalId, areaIds: selected }),
     });
     if (!response.ok) {
-      setMessage(`Competence update failed: ${await readError(response)}`);
+      setMessage(`Aggiornamento competenze non riuscito: ${await readError(response)}`);
       setBusyKey(null);
       return;
     }
     setMessage(
-      "Competences saved. The professional sees linked athletes and matching approvals.",
+      "Competenze salvate. Il professionista vede gli atleti collegati e le approvazioni coerenti.",
     );
     await loadDashboard();
     setBusyKey(null);
@@ -359,12 +370,12 @@ export default function AdminCyclesPage() {
         body: JSON.stringify({
           userIds: [athlete.id],
           areaId: area.id,
-          runAllAreas: false,
+          runAllAree: false,
         }),
       },
     );
     if (!response.ok) {
-      setMessage(`AI preview failed: ${await readError(response)}`);
+      setMessage(`Anteprima AI non riuscita: ${await readError(response)}`);
       setBusyKey(null);
       return;
     }
@@ -388,15 +399,15 @@ export default function AdminCyclesPage() {
       body: JSON.stringify({
         userIds: [athleteId],
         areaId,
-        runAllAreas: false,
+        runAllAree: false,
       }),
     });
     if (!response.ok) {
-      setMessage(`AI generation failed: ${await readError(response)}`);
+      setMessage(`Generazione AI non riuscita: ${await readError(response)}`);
       setBusyKey(null);
       return;
     }
-    setMessage("AI proposal generated and sent to professional approval.");
+    setMessage("Proposta AI generata e inviata all'approvazione del professionista.");
     closeAiPreview();
     await loadDashboard();
     setBusyKey(null);
@@ -413,16 +424,16 @@ export default function AdminCyclesPage() {
       },
     );
     if (!response.ok) {
-      setMessage(`Publish failed: ${await readError(response)}`);
+      setMessage(`Pubblicazione non riuscita: ${await readError(response)}`);
       setBusyKey(null);
       return;
     }
-    setMessage("Cycle published. Athlete now sees plan and questionnaire.");
+    setMessage("Ciclo pubblicato. L'atleta ora vede piano e questionario.");
     await loadDashboard();
     setBusyKey(null);
   };
 
-  const closeAnsweredQuestionnaires = async () => {
+  const closeRisposteQuestionari = async () => {
     setBusyKey("maintenance:close-questionnaires");
     setMessage(null);
     const response = await secureFetch(
@@ -433,7 +444,7 @@ export default function AdminCyclesPage() {
       },
     );
     if (!response.ok) {
-      setMessage(`Maintenance failed: ${await readError(response)}`);
+      setMessage(`Manutenzione non riuscita: ${await readError(response)}`);
       setBusyKey(null);
       return;
     }
@@ -442,7 +453,7 @@ export default function AdminCyclesPage() {
       closedCount: number;
     };
     setMessage(
-      `Maintenance completed: ${result.closedCount}/${result.scanned} published questionnaires closed.`,
+      `Manutenzione completata: ${result.closedCount}/${result.scanned} questionari pubblicati chiusi.`,
     );
     await loadDashboard();
     setBusyKey(null);
@@ -459,57 +470,57 @@ export default function AdminCyclesPage() {
       },
     );
     if (!response.ok) {
-      setMessage(`Athlete update failed: ${await readError(response)}`);
+      setMessage(`Aggiornamento atleta non riuscito: ${await readError(response)}`);
       setBusyKey(null);
       return;
     }
-    setMessage(active ? "Athlete enabled." : "Athlete disabled.");
+    setMessage(active ? "Atleta abilitato." : "Atleta disabilitato.");
     await loadDashboard();
     setBusyKey(null);
   };
 
   return (
     <ProductShell
-      eyebrow="Admin workspace"
-      title="Operations dashboard"
-      description="Assign one professional per athlete area, generate AI cycles when athletes are ready, track approvals, and publish without copying IDs."
+      eyebrow="Ambiente admin"
+      title="Cruscotto operativo"
+      description="Assegna un professionista per area atleta, genera cicli AI quando gli atleti sono pronti, traccia le approvazioni e pubblica senza copiare ID."
       actions={
         <>
           <button
             className="pf-button-secondary"
             type="button"
-            onClick={closeAnsweredQuestionnaires}
+            onClick={closeRisposteQuestionari}
             disabled={busyKey === "maintenance:close-questionnaires"}
           >
-            Close submitted questionnaires
+            Chiudi questionari inviati
           </button>
           <button
             className="pf-button-secondary"
             type="button"
             onClick={() => loadDashboard()}
           >
-            Refresh
+            Aggiorna
           </button>
         </>
       }
       stats={[
         {
-          label: "Ready to generate",
+          label: "Pronti da generare",
           value: loading ? "..." : readyToGenerate.length,
           tone: "accent",
         },
         {
-          label: "Waiting approvals",
+          label: "Approvazioni in attesa",
           value: loading ? "..." : waitingApproval.length,
           tone: "warning",
         },
         {
-          label: "Ready to publish",
+          label: "Pronti da pubblicare",
           value: loading ? "..." : readyCycles.length,
           tone: "success",
         },
         {
-          label: "Pending activation",
+          label: "In attesa attivazione",
           value: loading ? "..." : pendingActivation.length,
           tone: pendingActivation.length ? "danger" : "neutral",
         },
@@ -520,14 +531,14 @@ export default function AdminCyclesPage() {
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
-            <h2>New athlete requests</h2>
+            <h2>Nuove richieste atleta</h2>
             <p className="pf-muted">
-              Athletes created from the public entry point must be enabled by an
-              admin before they can log in and complete onboarding.
+              Gli atleti creati dall'accesso pubblico devono essere abilitati
+              dall'admin prima di accedere e completare l'onboarding.
             </p>
           </div>
           <StatusBadge tone={pendingActivation.length ? "danger" : "success"}>
-            {pendingActivation.length} pending
+            {pendingActivation.length} in attesa
           </StatusBadge>
         </div>
         <div className="pf-table">
@@ -536,8 +547,8 @@ export default function AdminCyclesPage() {
               <div>
                 <strong>{displayUser(athlete)}</strong>
                 <p className="pf-muted">
-                  Created {formatDate(athlete.createdAt)} · onboarding{" "}
-                  {athlete.onboarding.status.toLowerCase()}
+                  Creato il {formatDate(athlete.createdAt)} - onboarding{" "}
+                  {formatStatus(athlete.onboarding.status)}
                 </p>
               </div>
               <button
@@ -546,14 +557,14 @@ export default function AdminCyclesPage() {
                 disabled={busyKey === `active:${athlete.id}`}
                 onClick={() => setAthleteActive(athlete.id, true)}
               >
-                Enable athlete
+                Abilita atleta
               </button>
             </article>
           ))}
           {!loading && pendingActivation.length === 0 && (
             <EmptyState
-              title="No pending athlete"
-              description="New athlete registration requests will appear here."
+              title="Nessun atleta in attesa"
+              description="Le nuove richieste di registrazione atleta appariranno qui."
             />
           )}
         </div>
@@ -562,14 +573,14 @@ export default function AdminCyclesPage() {
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
-            <h2>AI generation queue</h2>
+            <h2>Coda generazione AI</h2>
             <p className="pf-muted">
-              Athletes with completed onboarding and areas that can receive a
-              new AI proposal.
+              Atleti con onboarding completato e aree pronte a ricevere una
+              nuova proposta AI.
             </p>
           </div>
           <StatusBadge tone={readyToGenerate.length ? "accent" : "neutral"}>
-            {readyToGenerate.length} ready
+            {readyToGenerate.length} pronti
           </StatusBadge>
         </div>
         <div className="pf-table">
@@ -589,12 +600,12 @@ export default function AdminCyclesPage() {
                 <div>
                   <strong>{displayUser(athlete)}</strong>
                   <p className="pf-muted">
-                    {state.area.name} · {state.reason}
+                    {state.area.name} - {state.reason}
                   </p>
                   {!linkedProfessionalCanApprove && (
                     <p className="pf-muted">
-                      Assign a professional enabled for {state.area.name} before
-                      generating.
+                      Assegna un professionista abilitato per {state.area.name} prima
+                      di generare.
                     </p>
                   )}
                 </div>
@@ -611,15 +622,15 @@ export default function AdminCyclesPage() {
                   }
                   onClick={() => openAiPreview(athlete, state.area)}
                 >
-                  Preview AI
+                  Anteprima AI
                 </button>
               </article>
             );
           })}
           {!loading && readyToGenerate.length === 0 && (
             <EmptyState
-              title="Nothing to generate"
-              description="No completed athlete area is available for a new proposal right now."
+              title="Niente da generare"
+              description="Al momento nessuna area atleta completata e disponibile per una nuova proposta."
             />
           )}
         </div>
@@ -629,10 +640,10 @@ export default function AdminCyclesPage() {
         <article className="pf-panel">
           <div className="pf-panel-header">
             <div>
-              <h2>Ready to publish</h2>
+              <h2>Pronti da pubblicare</h2>
               <p className="pf-muted">
-                Professional checks are complete. Admin publication activates
-                the cycle.
+                I controlli dei professionisti sono completati. La pubblicazione
+                admin attiva il ciclo.
               </p>
             </div>
           </div>
@@ -643,11 +654,11 @@ export default function AdminCyclesPage() {
                   <div>
                     <h3>{cycle.area.name}</h3>
                     <p className="pf-muted">
-                      {displayUser(cycle.user)} · v{cycle.version} ·{" "}
+                      {displayUser(cycle.user)} - v{cycle.version} -{" "}
                       {formatDate(cycle.createdAt)}
                     </p>
                   </div>
-                  <StatusBadge tone="success">Ready</StatusBadge>
+                  <StatusBadge tone="success">Pronto</StatusBadge>
                 </div>
                 <div className="pf-actions">
                   <button
@@ -656,15 +667,15 @@ export default function AdminCyclesPage() {
                     disabled={busyKey === `publish:${cycle.id}`}
                     onClick={() => publishCycle(cycle.id)}
                   >
-                    Publish
+                    Pubblica
                   </button>
                 </div>
               </div>
             ))}
             {!loading && readyCycles.length === 0 && (
               <EmptyState
-                title="No cycle ready"
-                description="Approved cycles will appear here for one-click publication."
+                title="Nessun ciclo pronto"
+                description="I cicli approvati appariranno qui per la pubblicazione diretta."
               />
             )}
           </div>
@@ -673,9 +684,9 @@ export default function AdminCyclesPage() {
         <article className="pf-panel">
           <div className="pf-panel-header">
             <div>
-              <h2>Approval load</h2>
+              <h2>Carico approvazioni</h2>
               <p className="pf-muted">
-                Who needs to act before admin can publish.
+                Chi deve agire prima che l'admin possa pubblicare.
               </p>
             </div>
           </div>
@@ -687,23 +698,23 @@ export default function AdminCyclesPage() {
                     approval.professional.email}
                   <br />
                   <small>
-                      {displayUser(approval.questionSet.user)} · {approval.area.name}
-                    {approval.routingMismatch ? " · reassigned" : ""}
+                      {displayUser(approval.questionSet.user)} - {approval.area.name}
+                  {approval.routingMismatch ? " - riassegnato" : ""}
                   </small>
                 </span>
-                <StatusBadge tone="warning">Questionnaire</StatusBadge>
+                <StatusBadge tone="warning">Questionario</StatusBadge>
               </div>
             ))}
             {(dashboard?.pendingPlanItems ?? []).map((item) => (
               <div key={item.id} className="pf-metric-row">
                 <span>
-                  {item.professional?.email ?? "Unassigned professional"}
+                  {item.professional?.email ?? "Professionista non assegnato"}
                   <br />
                   <small>
-                    {displayUser(item.user)} · {item.area.name}
+                    {displayUser(item.user)} - {item.area.name}
                   </small>
                 </span>
-                <StatusBadge tone="warning">Plan item</StatusBadge>
+                <StatusBadge tone="warning">Attivita piano</StatusBadge>
               </div>
             ))}
             {!loading &&
@@ -712,8 +723,8 @@ export default function AdminCyclesPage() {
                 dashboard?.pendingPlanItems.length
               ) && (
                 <EmptyState
-                  title="No pending approval"
-                  description="Professionals have no open review tasks."
+                  title="Nessuna approvazione pendente"
+                  description="I professionisti non hanno revisioni aperte."
                 />
               )}
           </div>
@@ -723,10 +734,10 @@ export default function AdminCyclesPage() {
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
-            <h2>Athlete ownership</h2>
+            <h2>Assegnazione atleti</h2>
             <p className="pf-muted">
-              Assign one professional per athlete and area. Reassigning an area
-              replaces only that area owner.
+              Assegna un professionista per atleta e area. Riassegnando un'area
+              viene sostituito solo il responsabile di quell'area.
             </p>
           </div>
         </div>
@@ -757,8 +768,8 @@ export default function AdminCyclesPage() {
                   <div>
                     <h3>{displayUser(athlete)}</h3>
                     <p className="pf-muted pf-athlete-meta">
-                      {athlete.isActive ? "Enabled" : "Pending activation"} ·
-                      onboarding {athlete.onboarding.status.toLowerCase()} ·
+                      {athlete.isActive ? "Abilitato" : "In attesa attivazione"} -
+                      onboarding {formatStatus(athlete.onboarding.status)} -
                       ranking {athlete.latestSnapshot?.rankingGlobal ?? "-"}
                     </p>
                   </div>
@@ -772,8 +783,8 @@ export default function AdminCyclesPage() {
                     }
                   >
                     {!athlete.isActive
-                      ? "pending"
-                      : `${assignedCount}/${athlete.areaStates.length} assigned`}
+                      ? "in attesa"
+                      : `${assignedCount}/${athlete.areaStates.length} assegnati`}
                   </StatusBadge>
                 </div>
                 <div className="pf-ownership-fields">
@@ -832,8 +843,8 @@ export default function AdminCyclesPage() {
                     >
                       <option value="">
                         {eligibleProfessionals.length
-                          ? "Select professional"
-                          : "No professional enabled for this area"}
+                          ? "Seleziona professionista"
+                          : "Nessun professionista abilitato per questa area"}
                       </option>
                       {eligibleProfessionals.map((professional) => (
                         <option key={professional.id} value={professional.id}>
@@ -850,11 +861,11 @@ export default function AdminCyclesPage() {
                 >
                   {selectedAreaState?.linkedProfessional ? (
                     <>
-                      Current {selectedAreaState.area.name} owner:{" "}
+                      Responsabile attuale {selectedAreaState.area.name}:{" "}
                       {selectedAreaState.linkedProfessional.email}
                     </>
                   ) : (
-                    "No owner assigned for this area"
+                    "Nessun responsabile assegnato per questa area"
                   )}
                 </p>
                 <div className="pf-ownership-actions">
@@ -869,7 +880,7 @@ export default function AdminCyclesPage() {
                     }
                     onClick={() => assignProfessional(athlete.id)}
                   >
-                    Associate professional
+                    Associa professionista
                   </button>
                   <button
                     className="pf-button-secondary"
@@ -879,7 +890,7 @@ export default function AdminCyclesPage() {
                       setAthleteActive(athlete.id, !athlete.isActive)
                     }
                   >
-                    {athlete.isActive ? "Disable athlete" : "Enable athlete"}
+                    {athlete.isActive ? "Disabilita atleta" : "Abilita atleta"}
                   </button>
                 </div>
                 <div className="pf-area-strip">
@@ -901,10 +912,10 @@ export default function AdminCyclesPage() {
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
-            <h2>Professional competences</h2>
+            <h2>Competenze professionisti</h2>
             <p className="pf-muted">
-              Approval routing uses area competence. Keep it explicit and
-              visible.
+              L'instradamento delle approvazioni usa le competenze per area.
+              Mantienilo esplicito e visibile.
             </p>
           </div>
         </div>
@@ -915,8 +926,7 @@ export default function AdminCyclesPage() {
                 <div>
                   <h3>{professional.email}</h3>
                   <p className="pf-muted">
-                    {professional.professionalLinks.length} athlete
-                    {professional.professionalLinks.length === 1 ? "" : "s"}
+                    {professional.professionalLinks.length} atleti collegati
                   </p>
                 </div>
               </div>
@@ -948,7 +958,7 @@ export default function AdminCyclesPage() {
                 disabled={busyKey === `competences:${professional.id}`}
                 onClick={() => saveCompetences(professional.id)}
               >
-                Save competences
+                Salva competenze
               </button>
             </article>
           ))}
@@ -960,10 +970,10 @@ export default function AdminCyclesPage() {
           <section className="pf-modal">
             <div className="pf-panel-header">
               <div>
-                <p className="pf-eyebrow">AI preview</p>
-                <h2>Context sent to AI</h2>
+                <p className="pf-eyebrow">Anteprima AI</p>
+                <h2>Contesto inviato all'AI</h2>
                 <p className="pf-muted">
-                  {previewTarget.athlete.email} · {previewTarget.area.name} ·{" "}
+                  {previewTarget.athlete.email} - {previewTarget.area.name} -{" "}
                   {aiPreview.provider}/{aiPreview.model}
                 </p>
               </div>
@@ -972,13 +982,13 @@ export default function AdminCyclesPage() {
 
             <div className="pf-dashboard-grid">
               <article className="pf-review-section">
-                <h4>System instruction</h4>
+                <h4>Istruzione di sistema</h4>
                 <p className="pf-muted">
                   {aiPreview.inputJson.prompt?.system ?? "-"}
                 </p>
               </article>
               <article className="pf-review-section">
-                <h4>Generation rules</h4>
+                <h4>Regole di generazione</h4>
                 <pre className="pf-json-preview">
                   {JSON.stringify(
                     aiPreview.inputJson.prompt?.user?.constraints ?? {},
@@ -990,7 +1000,7 @@ export default function AdminCyclesPage() {
             </div>
 
             <article className="pf-review-section">
-              <h4>Athlete context</h4>
+              <h4>Contesto atleta</h4>
               <pre className="pf-json-preview">
                 {JSON.stringify(
                   aiPreview.inputJson.prompt?.user?.context ?? {},
@@ -1012,14 +1022,14 @@ export default function AdminCyclesPage() {
                   generateCycle(previewTarget.athlete.id, previewTarget.area.id)
                 }
               >
-                Confirm and send to AI
+                Conferma e invia all'AI
               </button>
               <button
                 className="pf-button-secondary"
                 type="button"
                 onClick={closeAiPreview}
               >
-                Cancel
+                Annulla
               </button>
             </div>
           </section>

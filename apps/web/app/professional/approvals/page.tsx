@@ -73,14 +73,14 @@ const formatDate = (value?: string) => {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime())
     ? "-"
-    : parsed.toLocaleDateString("en-US", {
+    : parsed.toLocaleDateString("it-IT", {
         month: "short",
         day: "2-digit",
         year: "numeric",
       });
 };
 
-export default function ProfessionalApprovalsPage() {
+export default function ProfessionalApprovazioniPage() {
   const [inbox, setInbox] = useState<InboxResponse>({
     planItems: [],
     questionApprovals: [],
@@ -130,11 +130,11 @@ export default function ProfessionalApprovalsPage() {
     });
     if (!response.ok) {
       if (response.status === 401) {
-        setAuthHint("Sign in with a professional account.");
+        setAuthHint("Accedi con un account professionista.");
       } else if (response.status === 403) {
-        setAuthHint("This workspace is reserved for professionals.");
+        setAuthHint("Questo ambiente e riservato ai professionisti.");
       } else {
-        setMessage(`Unable to load approvals: ${await readError(response)}`);
+        setMessage(`Impossibile caricare le approvazioni: ${await readError(response)}`);
       }
       setLoading(false);
       return;
@@ -168,7 +168,7 @@ export default function ProfessionalApprovalsPage() {
       },
     );
     if (!response.ok) {
-      setMessage(`Question approval failed: ${await readError(response)}`);
+      setMessage(`Approvazione questionario non riuscita: ${await readError(response)}`);
       setBusy(approvalId, false);
       return;
     }
@@ -182,7 +182,7 @@ export default function ProfessionalApprovalsPage() {
   ) => {
     const reason = rejectReasons[approvalId]?.trim();
     if (!reason) {
-      setMessage("A rejection reason is required.");
+      setMessage("Il motivo del rifiuto e obbligatorio.");
       return;
     }
     setBusy(approvalId, true);
@@ -196,7 +196,7 @@ export default function ProfessionalApprovalsPage() {
       },
     );
     if (!response.ok) {
-      setMessage(`Question rejection failed: ${await readError(response)}`);
+      setMessage(`Rifiuto questionario non riuscito: ${await readError(response)}`);
       setBusy(approvalId, false);
       return;
     }
@@ -214,7 +214,7 @@ export default function ProfessionalApprovalsPage() {
       },
     );
     if (!response.ok) {
-      setMessage(`Plan item approval failed: ${await readError(response)}`);
+      setMessage(`Approvazione attivita piano non riuscita: ${await readError(response)}`);
       setBusy(planItemId, false);
       return;
     }
@@ -225,7 +225,7 @@ export default function ProfessionalApprovalsPage() {
   const rejectPlanItem = async (planItemId: string) => {
     const reason = rejectReasons[planItemId]?.trim();
     if (!reason) {
-      setMessage("A rejection reason is required.");
+      setMessage("Il motivo del rifiuto e obbligatorio.");
       return;
     }
     setBusy(planItemId, true);
@@ -239,7 +239,7 @@ export default function ProfessionalApprovalsPage() {
       },
     );
     if (!response.ok) {
-      setMessage(`Plan item rejection failed: ${await readError(response)}`);
+      setMessage(`Rifiuto attivita piano non riuscito: ${await readError(response)}`);
       setBusy(planItemId, false);
       return;
     }
@@ -249,36 +249,36 @@ export default function ProfessionalApprovalsPage() {
 
   return (
     <ProductShell
-      eyebrow="Professional workspace"
-      title="Athlete review board"
-      description="Review every athlete with pending questionnaires and plan items in one place, then approve or reject without hunting through separate lists."
+      eyebrow="Ambiente professionista"
+      title="Revisione atleti"
+      description="Rivedi in un unico punto ogni atleta con questionari e attivita pendenti, poi approva o rifiuta senza cercare in liste separate."
       actions={
         <div className="pf-header-actions">
           <Link className="pf-button-secondary" href="/professional">
-            Athlete summary
+            Riepilogo atleti
           </Link>
           <button
             className="pf-button-secondary"
             type="button"
             onClick={() => loadInbox()}
           >
-            Refresh
+            Aggiorna
           </button>
         </div>
       }
       stats={[
         {
-          label: "Athletes with work",
+          label: "Atleti con lavoro",
           value: loading ? "..." : groups.length,
           tone: "accent",
         },
         {
-          label: "Questionnaires",
+          label: "Questionari",
           value: loading ? "..." : inbox.questionApprovals.length,
           tone: "warning",
         },
         {
-          label: "Plan items",
+          label: "Attivita piano",
           value: loading ? "..." : inbox.planItems.length,
           tone: "success",
         },
@@ -290,13 +290,13 @@ export default function ProfessionalApprovalsPage() {
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
-            <h2>Approval work by athlete</h2>
+            <h2>Approvazioni per atleta</h2>
             <p className="pf-muted">
-              Each block shows exactly what is blocking admin publication.
+              Ogni blocco mostra esattamente cosa blocca la pubblicazione admin.
             </p>
           </div>
           <StatusBadge tone={totalPending ? "warning" : "success"}>
-            {totalPending} pending
+            {totalPending} in attesa
           </StatusBadge>
         </div>
 
@@ -307,8 +307,8 @@ export default function ProfessionalApprovalsPage() {
                 <div>
                   <h3>{group.user.email}</h3>
                   <p className="pf-muted">
-                    {group.questions.length} questionnaire ·{" "}
-                    {group.plans.length} plan item
+                    {group.questions.length} questionari -{" "}
+                    {group.plans.length} attivita piano
                   </p>
                 </div>
                 <div className="pf-actions">
@@ -316,7 +316,7 @@ export default function ProfessionalApprovalsPage() {
                     className="pf-button-secondary"
                     href={`/professional/users/${group.user.id}/performance`}
                   >
-                    Profile
+                    Profilo
                   </Link>
                 </div>
               </div>
@@ -328,20 +328,20 @@ export default function ProfessionalApprovalsPage() {
                   <div key={approval.id} className="pf-review-section">
                     <div className="pf-card-top">
                       <div>
-                        <h4>{approval.area?.name ?? "Area"} questionnaire</h4>
+                        <h4>{approval.area?.name ?? "Area"} questionario</h4>
                         <p className="pf-muted">
-                          Cycle v
-                          {approval.questionSet.planRelease?.version ?? "-"} ·{" "}
+                          Ciclo v
+                          {approval.questionSet.planRelease?.version ?? "-"} -{" "}
                           {summary
                             ? formatDate(summary.createdAt)
-                            : "AI proposal"}
+                            : "Proposta AI"}
                         </p>
                       </div>
-                      <StatusBadge tone="warning">Pending</StatusBadge>
+                      <StatusBadge tone="warning">In attesa</StatusBadge>
                     </div>
                     {summary && (
                       <p className="pf-muted">
-                        AI summary: {summary.summaryText}
+                        Sintesi AI: {summary.summaryText}
                       </p>
                     )}
                     <div className="pf-stack compact">
@@ -353,13 +353,13 @@ export default function ProfessionalApprovalsPage() {
                           <span>
                             {question.options
                               .map((option) => option.label)
-                              .join(" · ")}
+                              .join(" - ")}
                           </span>
                         </div>
                       ))}
                     </div>
                     <label className="pf-field">
-                      Rejection reason
+                      Motivo del rifiuto
                       <input
                         className="pf-input"
                         value={rejectReasons[approval.id] ?? ""}
@@ -369,7 +369,7 @@ export default function ProfessionalApprovalsPage() {
                             [approval.id]: event.target.value,
                           }))
                         }
-                        placeholder="Required only if rejecting"
+                        placeholder="Obbligatorio solo in caso di rifiuto"
                       />
                     </label>
                     <div className="pf-actions">
@@ -381,7 +381,7 @@ export default function ProfessionalApprovalsPage() {
                           rejectQuestionSet(approval.questionSetId, approval.id)
                         }
                       >
-                        Reject questionnaire
+                        Rifiuta questionario
                       </button>
                       <button
                         className="pf-button"
@@ -394,7 +394,7 @@ export default function ProfessionalApprovalsPage() {
                           )
                         }
                       >
-                        Approve questionnaire
+                        Approva questionario
                       </button>
                     </div>
                   </div>
@@ -409,20 +409,20 @@ export default function ProfessionalApprovalsPage() {
                       <div>
                         <h4>{item.title}</h4>
                         <p className="pf-muted">
-                          {item.area?.name ?? "Area"} · Cycle v
+                          {item.area?.name ?? "Area"} - Ciclo v
                           {item.planRelease.version}
                         </p>
                       </div>
-                      <StatusBadge tone="warning">Proposed</StatusBadge>
+                      <StatusBadge tone="warning">Proposto</StatusBadge>
                     </div>
                     <p>{item.body}</p>
                     {summary && (
                       <p className="pf-muted">
-                        AI summary: {summary.summaryText}
+                        Sintesi AI: {summary.summaryText}
                       </p>
                     )}
                     <label className="pf-field">
-                      Rejection reason
+                      Motivo del rifiuto
                       <input
                         className="pf-input"
                         value={rejectReasons[item.id] ?? ""}
@@ -432,7 +432,7 @@ export default function ProfessionalApprovalsPage() {
                             [item.id]: event.target.value,
                           }))
                         }
-                        placeholder="Required only if rejecting"
+                        placeholder="Obbligatorio solo in caso di rifiuto"
                       />
                     </label>
                     <div className="pf-actions">
@@ -442,7 +442,7 @@ export default function ProfessionalApprovalsPage() {
                         disabled={busyIds[item.id]}
                         onClick={() => rejectPlanItem(item.id)}
                       >
-                        Reject plan item
+                        Rifiuta attivita
                       </button>
                       <button
                         className="pf-button"
@@ -450,7 +450,7 @@ export default function ProfessionalApprovalsPage() {
                         disabled={busyIds[item.id]}
                         onClick={() => approvePlanItem(item.id)}
                       >
-                        Approve plan item
+                        Approva attivita
                       </button>
                     </div>
                   </div>
@@ -461,8 +461,8 @@ export default function ProfessionalApprovalsPage() {
 
           {!loading && groups.length === 0 && (
             <EmptyState
-              title="No approval work"
-              description="No linked athlete has questionnaires or plan items awaiting your review."
+              title="Nessuna approvazione"
+              description="Nessun atleta collegato ha questionari o attivita in attesa di revisione."
             />
           )}
         </div>

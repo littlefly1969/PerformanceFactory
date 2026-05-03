@@ -27,7 +27,7 @@ const decodeBase64Url = (input: string) => {
 const getSecret = () => {
   const secret = process.env.ACCESS_TOKEN_SECRET || process.env.SESSION_SECRET;
   if (!secret && process.env.NODE_ENV === 'production') {
-    throw new Error('ACCESS_TOKEN_SECRET or SESSION_SECRET is required in production');
+    throw new Error('ACCESS_TOKEN_SECRET o SESSION_SECRET e obbligatorio in produzione');
   }
   return secret ?? 'dev-access-token-secret';
 };

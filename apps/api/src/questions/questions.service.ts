@@ -24,7 +24,7 @@ export class QuestionsService {
 
   private async resolveTargetUser(actor: Actor, userId?: string) {
     if (!actor?.id) {
-      throw new BadRequestException('Missing actor');
+      throw new BadRequestException('Attore mancante');
     }
 
     if (!userId || userId === actor.id) {
@@ -38,19 +38,19 @@ export class QuestionsService {
     if (actor.role === UserRole.PROFESSIONAL) {
       const allowed = await this.abac.canAccessUser(actor.id, userId);
       if (!allowed) {
-        throw new ForbiddenException('User not linked to professional');
+        throw new ForbiddenException('Utente non collegato al professionista');
       }
       return userId;
     }
 
-    throw new ForbiddenException('Not allowed to access other users');
+    throw new ForbiddenException('Non puoi accedere ad altri utenti');
   }
 
   async getCurrentQuestionSet(actor: Actor, userId?: string, areaId?: string) {
     const targetUserId = await this.resolveTargetUser(actor, userId);
     const isProfessional = actor.role === UserRole.PROFESSIONAL;
     if (!areaId) {
-      throw new BadRequestException('Missing area id');
+      throw new BadRequestException('ID area mancante');
     }
 
     if (actor.role === UserRole.PROFESSIONAL && targetUserId !== actor.id) {
@@ -60,7 +60,7 @@ export class QuestionsService {
         areaId,
       );
       if (!allowed) {
-        throw new ForbiddenException('Not allowed for this area');
+        throw new ForbiddenException('Operazione non consentita per questa area');
       }
     }
 
@@ -95,7 +95,7 @@ export class QuestionsService {
     });
 
     if (!questionSet) {
-      throw new NotFoundException('Question set not found');
+      throw new NotFoundException('Questionario non trovato');
     }
 
     return {
@@ -109,7 +109,7 @@ export class QuestionsService {
   async getQuestionSetHistory(actor: Actor, userId?: string, areaId?: string) {
     const targetUserId = await this.resolveTargetUser(actor, userId);
     if (!areaId) {
-      throw new BadRequestException('Missing area id');
+      throw new BadRequestException('ID area mancante');
     }
 
     if (actor.role === UserRole.PROFESSIONAL && targetUserId !== actor.id) {
@@ -119,7 +119,7 @@ export class QuestionsService {
         areaId,
       );
       if (!allowed) {
-        throw new ForbiddenException('Not allowed for this area');
+        throw new ForbiddenException('Operazione non consentita per questa area');
       }
     }
 
@@ -166,7 +166,7 @@ export class QuestionsService {
 
   async closeQuestionSet(actor: Actor, questionSetId: string) {
     if (!questionSetId) {
-      throw new BadRequestException('Missing question set id');
+      throw new BadRequestException('ID questionario mancante');
     }
 
     const questionSet = await this.prisma.questionSet.findUnique({
@@ -175,11 +175,11 @@ export class QuestionsService {
     });
 
     if (!questionSet) {
-      throw new NotFoundException('Question set not found');
+      throw new NotFoundException('Questionario non trovato');
     }
 
     if (actor.role === UserRole.USER && questionSet.userId !== actor.id) {
-      throw new ForbiddenException('Not allowed to close');
+      throw new ForbiddenException('Non puoi chiudere questo questionario');
     }
 
     if (actor.role === UserRole.PROFESSIONAL) {
@@ -188,12 +188,12 @@ export class QuestionsService {
         questionSet.userId,
       );
       if (!allowed) {
-        throw new ForbiddenException('User not linked to professional');
+        throw new ForbiddenException('Utente non collegato al professionista');
       }
     }
 
     if (questionSet.status !== 'PUBLISHED') {
-      throw new BadRequestException('Question set not published');
+      throw new BadRequestException('Questionario non pubblicato');
     }
 
     await this.orchestrator.createSnapshotFromQuestionSet(
@@ -206,7 +206,7 @@ export class QuestionsService {
 
   async getPendingApprovalsForProfessional(actor: Actor) {
     if (actor.role !== UserRole.PROFESSIONAL) {
-      throw new ForbiddenException('Only professionals can view approvals');
+      throw new ForbiddenException('Solo i professionisti possono vedere le approvazioni');
     }
 
     const areaIds = Array.from(await this.getAllowedAreaIds(actor.id));
@@ -253,12 +253,12 @@ export class QuestionsService {
     notes?: string,
   ) {
     if (actor.role !== UserRole.PROFESSIONAL) {
-      throw new ForbiddenException('Only professionals can approve');
+      throw new ForbiddenException('Solo i professionisti possono approvare');
     }
 
     const allowed = await this.abac.canAccessArea(actor.id, areaId);
     if (!allowed) {
-      throw new ForbiddenException('Not allowed for this area');
+      throw new ForbiddenException('Operazione non consentita per questa area');
     }
 
     const approval = await this.prisma.questionSetAreaApproval.findUnique({
@@ -272,19 +272,19 @@ export class QuestionsService {
     });
 
     if (!approval) {
-      throw new NotFoundException('Approval record not found');
+      throw new NotFoundException('Record approvazione non trovato');
     }
 
     if (approval.professionalId !== actor.id) {
-      throw new ForbiddenException('Not assigned to this professional');
+      throw new ForbiddenException('Non assegnato a questo professionista');
     }
 
     if (approval.status !== 'PENDING') {
-      throw new BadRequestException('Approval already decided');
+      throw new BadRequestException('Approvazione gia decisa');
     }
 
     if (approval.questionSet.status !== 'PENDING_APPROVAL') {
-      throw new BadRequestException('Question set not in approval');
+      throw new BadRequestException('Il questionario non e in approvazione');
     }
 
     const updated = await this.prisma.questionSetAreaApproval.update({
@@ -321,12 +321,12 @@ export class QuestionsService {
     notes?: string,
   ) {
     if (actor.role !== UserRole.PROFESSIONAL) {
-      throw new ForbiddenException('Only professionals can reject');
+      throw new ForbiddenException('Solo i professionisti possono rifiutare');
     }
 
     const allowed = await this.abac.canAccessArea(actor.id, areaId);
     if (!allowed) {
-      throw new ForbiddenException('Not allowed for this area');
+      throw new ForbiddenException('Operazione non consentita per questa area');
     }
 
     const approval = await this.prisma.questionSetAreaApproval.findUnique({
@@ -340,19 +340,19 @@ export class QuestionsService {
     });
 
     if (!approval) {
-      throw new NotFoundException('Approval record not found');
+      throw new NotFoundException('Record approvazione non trovato');
     }
 
     if (approval.professionalId !== actor.id) {
-      throw new ForbiddenException('Not assigned to this professional');
+      throw new ForbiddenException('Non assegnato a questo professionista');
     }
 
     if (approval.status !== 'PENDING') {
-      throw new BadRequestException('Approval already decided');
+      throw new BadRequestException('Approvazione gia decisa');
     }
 
     if (approval.questionSet.status !== 'PENDING_APPROVAL') {
-      throw new BadRequestException('Question set not in approval');
+      throw new BadRequestException('Il questionario non e in approvazione');
     }
 
     const updated = await this.prisma.questionSetAreaApproval.update({
@@ -388,7 +388,7 @@ export class QuestionsService {
     payload: { text?: string; objectiveRef?: string; orderIndex?: number },
   ) {
     if (actor.role !== UserRole.PROFESSIONAL) {
-      throw new ForbiddenException('Only professionals can update questions');
+      throw new ForbiddenException('Solo i professionisti possono aggiornare le domande');
     }
 
     const question = await this.prisma.question.findUnique({
@@ -402,16 +402,16 @@ export class QuestionsService {
     });
 
     if (!question || question.questionSetId !== questionSetId) {
-      throw new NotFoundException('Question not found');
+      throw new NotFoundException('Domanda non trovata');
     }
 
     if (question.questionSet.status !== 'PENDING_APPROVAL') {
-      throw new BadRequestException('Question set is not editable');
+      throw new BadRequestException('Il questionario non e modificabile');
     }
 
     const allowed = await this.abac.canAccessArea(actor.id, question.areaId);
     if (!allowed) {
-      throw new ForbiddenException('Not allowed for this area');
+      throw new ForbiddenException('Operazione non consentita per questa area');
     }
 
     return this.prisma.question.update({
@@ -432,7 +432,7 @@ export class QuestionsService {
     payload: { label?: string; score?: number },
   ) {
     if (actor.role !== UserRole.PROFESSIONAL) {
-      throw new ForbiddenException('Only professionals can update options');
+      throw new ForbiddenException('Solo i professionisti possono aggiornare le opzioni');
     }
 
     const question = await this.prisma.question.findUnique({
@@ -445,16 +445,16 @@ export class QuestionsService {
     });
 
     if (!question) {
-      throw new NotFoundException('Question not found');
+      throw new NotFoundException('Domanda non trovata');
     }
 
     if (question.questionSet.status !== 'PENDING_APPROVAL') {
-      throw new BadRequestException('Question set is not editable');
+      throw new BadRequestException('Il questionario non e modificabile');
     }
 
     const allowed = await this.abac.canAccessArea(actor.id, question.areaId);
     if (!allowed) {
-      throw new ForbiddenException('Not allowed for this area');
+      throw new ForbiddenException('Operazione non consentita per questa area');
     }
 
     return this.prisma.answerOption.update({

@@ -37,7 +37,7 @@ export class AdminController {
   ) {}
 
   @Get('dashboard')
-  @ApiOperation({ summary: 'Admin operations dashboard' })
+  @ApiOperation({ summary: 'Cruscotto operativo admin' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -46,7 +46,7 @@ export class AdminController {
   }
 
   @Post('orchestrator/run')
-  @ApiOperation({ summary: 'Run proposal cycle (admin only)' })
+  @ApiOperation({ summary: 'Esegui ciclo proposta (solo admin)' })
   @ApiBody({ type: RunCycleDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -65,7 +65,7 @@ export class AdminController {
   }
 
   @Post('orchestrator/preview')
-  @ApiOperation({ summary: 'Preview AI proposal context before generation' })
+  @ApiOperation({ summary: 'Anteprima contesto proposta AI prima della generazione' })
   @ApiBody({ type: RunCycleDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -74,14 +74,14 @@ export class AdminController {
     const userId = body.userIds?.[0];
     if (!userId || !body.areaId || body.runAllAreas) {
       throw new BadRequestException(
-        'Preview requires one user and one target area',
+        'L anteprima richiede un utente e un area target',
       );
     }
     return this.orchestrator.previewCycleProposalInput(userId, body.areaId);
   }
 
   @Patch('users/:userId/activate')
-  @ApiOperation({ summary: 'Enable a pending athlete account' })
+  @ApiOperation({ summary: 'Abilita account atleta in attesa' })
   @ApiParam({ name: 'userId' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -91,7 +91,7 @@ export class AdminController {
   }
 
   @Patch('users/:userId/deactivate')
-  @ApiOperation({ summary: 'Disable an athlete account' })
+  @ApiOperation({ summary: 'Disabilita account atleta' })
   @ApiParam({ name: 'userId' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -101,7 +101,7 @@ export class AdminController {
   }
 
   @Get('ai-settings')
-  @ApiOperation({ summary: 'Admin AI prompt and onboarding configuration' })
+  @ApiOperation({ summary: 'Configurazione prompt AI e onboarding admin' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -110,7 +110,7 @@ export class AdminController {
   }
 
   @Post('ai-prompts')
-  @ApiOperation({ summary: 'Create or update an AI prompt configuration' })
+  @ApiOperation({ summary: 'Crea o aggiorna una configurazione prompt AI' })
   @ApiBody({ type: UpsertAiPromptConfigDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -123,7 +123,7 @@ export class AdminController {
   }
 
   @Post('goal-prompt')
-  @ApiOperation({ summary: 'Create or update the athlete goal AI prompt' })
+  @ApiOperation({ summary: 'Crea o aggiorna il prompt AI obiettivo atleta' })
   @ApiBody({ type: UpsertGoalPromptConfigDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -137,7 +137,7 @@ export class AdminController {
 
   @Post('ai-area-configs')
   @ApiOperation({
-    summary: 'Create or update one AI generation configuration per area',
+    summary: 'Crea o aggiorna una configurazione generazione AI per area',
   })
   @ApiBody({ type: UpsertAiAreaGenerationConfigDto })
   @ApiCookieAuth()
@@ -151,7 +151,7 @@ export class AdminController {
   }
 
   @Post('onboarding-templates')
-  @ApiOperation({ summary: 'Create or update an onboarding question template' })
+  @ApiOperation({ summary: 'Crea o aggiorna un template domanda onboarding' })
   @ApiBody({ type: UpsertOnboardingTemplateDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -165,7 +165,7 @@ export class AdminController {
 
   @Post('maintenance/close-answered-questionnaires')
   @ApiOperation({
-    summary: 'Close published questionnaires that already have all answers',
+    summary: 'Chiudi i questionari pubblicati che hanno gia tutte le risposte',
   })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -175,7 +175,7 @@ export class AdminController {
   }
 
   @Post('cycles/:cycleId/publish')
-  @ApiOperation({ summary: 'Publish a cycle (admin only)' })
+  @ApiOperation({ summary: 'Pubblica un ciclo (solo admin)' })
   @ApiParam({ name: 'cycleId' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)

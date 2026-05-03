@@ -13,7 +13,7 @@ export class OnboardingController {
   constructor(private readonly onboarding: OnboardingService) {}
 
   @Get('questionnaire')
-  @ApiOperation({ summary: 'Get starter questionnaire for athlete onboarding' })
+  @ApiOperation({ summary: 'Ottieni questionario iniziale per onboarding atleta' })
   getQuestionnaire(@Req() req: { user?: { id: string; role: UserRole } }) {
     return this.onboarding.getQuestionnaire({
       id: req.user?.id ?? '',
@@ -22,7 +22,7 @@ export class OnboardingController {
   }
 
   @Get('status')
-  @ApiOperation({ summary: 'Get athlete onboarding status' })
+  @ApiOperation({ summary: 'Ottieni stato onboarding atleta' })
   getStatus(@Req() req: { user?: { id: string; role: UserRole } }) {
     return this.onboarding.getStatus({
       id: req.user?.id ?? '',
@@ -31,7 +31,7 @@ export class OnboardingController {
   }
 
   @Post('goal/validate')
-  @ApiOperation({ summary: 'Validate athlete performance goal before onboarding submit' })
+  @ApiOperation({ summary: 'Valida obiettivo performance atleta prima dell invio onboarding' })
   validateGoal(
     @Req() req: { user?: { id: string; role: UserRole } },
     @Body() body: { goalText?: string },
@@ -42,8 +42,26 @@ export class OnboardingController {
     );
   }
 
+  @Post('goal/refine')
+  @ApiOperation({ summary: 'Raffina obiettivo performance con chat AI' })
+  refineGoal(
+    @Req() req: { user?: { id: string; role: UserRole } },
+    @Body()
+    body: {
+      originalGoal?: string;
+      currentDraft?: string;
+      messages?: Array<{ role: 'user' | 'assistant'; content: string }>;
+      userReply?: string;
+    },
+  ) {
+    return this.onboarding.refineGoal(
+      { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },
+      body,
+    );
+  }
+
   @Post('submit')
-  @ApiOperation({ summary: 'Submit starter questionnaire and generate baseline profile' })
+  @ApiOperation({ summary: 'Invia questionario iniziale e genera profilo baseline' })
   submit(
     @Req() req: { user?: { id: string; role: UserRole } },
     @Body()

@@ -13,7 +13,7 @@ export class UserPlanController {
   constructor(private readonly userPlan: UserPlanService) {}
 
   @Get('plan/current')
-  @ApiOperation({ summary: 'Get current user active plan' })
+  @ApiOperation({ summary: 'Ottieni piano attivo corrente dell utente' })
   @ApiQuery({ name: 'areaId', required: true })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -26,7 +26,7 @@ export class UserPlanController {
   }
 
   @Get('plan/history')
-  @ApiOperation({ summary: 'Get user plan history' })
+  @ApiOperation({ summary: 'Ottieni storico piano utente' })
   @ApiQuery({ name: 'areaId', required: true })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -39,7 +39,7 @@ export class UserPlanController {
   }
 
   @Post('plan-items/:id/complete')
-  @ApiOperation({ summary: 'Complete a plan item' })
+  @ApiOperation({ summary: 'Completa una attivita piano' })
   @ApiParam({ name: 'id' })
   @ApiBody({ type: CompletePlanItemDto })
   @ApiCookieAuth()

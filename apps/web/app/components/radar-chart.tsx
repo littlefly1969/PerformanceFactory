@@ -39,8 +39,8 @@ export function RadarChart({ areas, max = 100 }: RadarChartProps) {
   if (!areas.length) {
     return (
       <div className="pf-radar-empty">
-        <strong>No performance profile yet</strong>
-        <span>Close a questionnaire to generate the first spider chart.</span>
+        <strong>Nessun profilo performance disponibile</strong>
+        <span>Chiudi un questionario per generare il primo grafico spider.</span>
       </div>
     );
   }
@@ -48,7 +48,7 @@ export function RadarChart({ areas, max = 100 }: RadarChartProps) {
   return (
     <div className="pf-radar-wrap">
       <div className="pf-radar-stage">
-        <svg className="pf-radar" viewBox="0 0 300 300" role="img" aria-label="Performance spider chart">
+        <svg className="pf-radar" viewBox="0 0 300 300" role="img" aria-label="Grafico spider performance">
           {rings.map((ring) => (
             <polygon
               key={ring}
@@ -96,8 +96,8 @@ export function RadarChart({ areas, max = 100 }: RadarChartProps) {
         ))}
       </div>
       <div className="pf-radar-legend">
-        <span><i className="real" /> Real</span>
-        <span><i className="potential" /> Potential</span>
+        <span><i className="real" /> Reale</span>
+        <span><i className="potential" /> Potenziale</span>
       </div>
     </div>
   );

@@ -12,7 +12,7 @@ export class AssignmentsService {
 
   async getMyAssignments(userId: string) {
     if (!userId) {
-      throw new BadRequestException('Missing user');
+      throw new BadRequestException('Utente mancante');
     }
 
     return this.prisma.userAssignment.findMany({
@@ -35,7 +35,7 @@ export class AssignmentsService {
 
   async completeAssignment(userId: string, assignmentId: string) {
     if (!userId || !assignmentId) {
-      throw new BadRequestException('Missing assignment');
+      throw new BadRequestException('Assegnazione mancante');
     }
 
     const assignment = await this.prisma.userAssignment.findUnique({
@@ -44,11 +44,11 @@ export class AssignmentsService {
     });
 
     if (!assignment) {
-      throw new NotFoundException('Assignment not found');
+      throw new NotFoundException('Assegnazione non trovata');
     }
 
     if (assignment.userId !== userId) {
-      throw new ForbiddenException('Not allowed to complete');
+      throw new ForbiddenException('Non puoi completare questa attivita');
     }
 
     return this.prisma.userAssignment.update({

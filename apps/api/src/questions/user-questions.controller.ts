@@ -12,7 +12,7 @@ export class UserQuestionsController {
   constructor(private readonly questions: QuestionsService) {}
 
   @Get('current')
-  @ApiOperation({ summary: 'Get current published question set for user' })
+  @ApiOperation({ summary: 'Ottieni questionario pubblicato corrente per utente' })
   @ApiQuery({ name: 'areaId', required: true })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -28,7 +28,7 @@ export class UserQuestionsController {
   }
 
   @Get('history')
-  @ApiOperation({ summary: 'Get question set history for user' })
+  @ApiOperation({ summary: 'Ottieni storico questionari for user' })
   @ApiQuery({ name: 'areaId', required: true })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)

@@ -150,7 +150,7 @@ export class InspectService {
     });
 
     if (!planRelease) {
-      throw new NotFoundException('Cycle not found');
+      throw new NotFoundException('Ciclo non trovato');
     }
 
     const latestSnapshot =
@@ -191,7 +191,7 @@ export class InspectService {
 
   async createUser(email: string, password: string, role: UserRole) {
     if (!email || !password || !role) {
-      throw new BadRequestException('Missing user fields');
+      throw new BadRequestException('Dati utente mancanti');
     }
 
     const existing = await this.prisma.user.findUnique({
@@ -199,7 +199,7 @@ export class InspectService {
       select: { id: true },
     });
     if (existing) {
-      throw new BadRequestException('User already exists');
+      throw new BadRequestException('Utente gia esistente');
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -225,7 +225,7 @@ export class InspectService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException('Utente non trovato');
     }
 
     const [
@@ -367,7 +367,7 @@ export class InspectService {
     areaId: string,
   ) {
     if (!professionalId || !userId || !areaId) {
-      throw new BadRequestException('Missing link fields');
+      throw new BadRequestException('Dati collegamento mancanti');
     }
 
     const [professional, user, competence] = await Promise.all([
@@ -386,14 +386,14 @@ export class InspectService {
     ]);
 
     if (!professional || professional.role !== UserRole.PROFESSIONAL) {
-      throw new BadRequestException('Invalid professional');
+      throw new BadRequestException('Professionista non valido');
     }
     if (!user || user.role !== UserRole.USER) {
-      throw new BadRequestException('Invalid user');
+      throw new BadRequestException('Utente non valido');
     }
     if (!competence) {
       throw new BadRequestException(
-        'Professional is not enabled for this area',
+        'Il professionista non e abilitato per questa area',
       );
     }
 
@@ -453,7 +453,7 @@ export class InspectService {
 
   async assignCompetences(professionalId: string, areaIds: string[]) {
     if (!professionalId || !areaIds?.length) {
-      throw new BadRequestException('Missing competence fields');
+      throw new BadRequestException('Dati competenze mancanti');
     }
 
     const professional = await this.prisma.user.findUnique({
@@ -461,7 +461,7 @@ export class InspectService {
       select: { id: true, role: true },
     });
     if (!professional || professional.role !== UserRole.PROFESSIONAL) {
-      throw new BadRequestException('Invalid professional');
+      throw new BadRequestException('Professionista non valido');
     }
 
     const areas = await this.prisma.area.findMany({
@@ -469,7 +469,7 @@ export class InspectService {
       select: { id: true },
     });
     if (areas.length !== areaIds.length) {
-      throw new BadRequestException('Invalid area ids');
+      throw new BadRequestException('ID area non validi');
     }
 
     const results = [] as Array<{ areaId: string }>;
@@ -501,7 +501,7 @@ export class InspectService {
     });
 
     if (!professional || professional.role !== 'PROFESSIONAL') {
-      throw new NotFoundException('Professional not found');
+      throw new NotFoundException('Professionista non trovato');
     }
 
     const [

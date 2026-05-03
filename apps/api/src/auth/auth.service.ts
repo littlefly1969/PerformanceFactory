@@ -30,15 +30,15 @@ export class AuthService {
   async validateUser(email: string, password: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Credenziali non valide');
     }
     if (user.isActive === false) {
-      throw new UnauthorizedException('Account pending admin activation');
+      throw new UnauthorizedException('Account in attesa di attivazione admin');
     }
 
     const ok = await bcrypt.compare(password, user.password);
     if (!ok) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('Credenziali non valide');
     }
 
     return user;
@@ -57,10 +57,10 @@ export class AuthService {
     const password = input.password ?? '';
 
     if (!firstName || !lastName || !email || !password) {
-      throw new BadRequestException('Missing athlete registration fields');
+      throw new BadRequestException('Dati registrazione atleta mancanti');
     }
     if (password.length < 8) {
-      throw new BadRequestException('Password must be at least 8 characters');
+      throw new BadRequestException('La password deve avere almeno 8 caratteri');
     }
 
     const existing = await this.prisma.user.findUnique({
@@ -68,7 +68,7 @@ export class AuthService {
       select: { id: true },
     });
     if (existing) {
-      throw new BadRequestException('User already exists');
+      throw new BadRequestException('Utente gia esistente');
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -158,7 +158,7 @@ export class AuthService {
   ) {
     const user = req.user as { id?: string; password?: string } | undefined;
     if (!user) {
-      throw new UnauthorizedException('Missing user');
+      throw new UnauthorizedException('Utente mancante');
     }
 
     const userId = user.id;

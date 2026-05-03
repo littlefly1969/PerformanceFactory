@@ -11,7 +11,7 @@ export class PlansController {
   constructor(private readonly plans: PlansService) {}
 
   @Get('current')
-  @ApiOperation({ summary: 'Get current improvement plan release' })
+  @ApiOperation({ summary: 'Ottieni rilascio piano miglioramento corrente' })
   @ApiQuery({ name: 'userId', required: false })
   @ApiQuery({ name: 'areaId', required: true })
   @ApiCookieAuth()
@@ -29,7 +29,7 @@ export class PlansController {
   }
 
   @Get('history')
-  @ApiOperation({ summary: 'Get improvement plan history' })
+  @ApiOperation({ summary: 'Ottieni storico piano miglioramento' })
   @ApiQuery({ name: 'userId', required: false })
   @ApiQuery({ name: 'areaId', required: true })
   @ApiCookieAuth()
@@ -47,7 +47,7 @@ export class PlansController {
   }
 
   @Get('approvals/pending')
-  @ApiOperation({ summary: 'List pending plan item approvals for professional' })
+  @ApiOperation({ summary: 'Elenca approvazioni attivita piano in attesa per professionista' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
   getPendingApprovals(@Req() req: { user?: { id: string; role: UserRole } }) {
@@ -58,7 +58,7 @@ export class PlansController {
   }
 
   @Post('items/:itemId/approve')
-  @ApiOperation({ summary: 'Approve a plan item (professional)' })
+  @ApiOperation({ summary: 'Approva una attivita piano (professionista)' })
   @ApiParam({ name: 'itemId' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
@@ -73,7 +73,7 @@ export class PlansController {
   }
 
   @Post('items/:itemId/reject')
-  @ApiOperation({ summary: 'Reject a plan item (professional)' })
+  @ApiOperation({ summary: 'Rifiuta una attivita piano (professionista)' })
   @ApiParam({ name: 'itemId' })
   @ApiBody({ type: PlanItemApprovalDto })
   @ApiCookieAuth()

@@ -28,7 +28,7 @@ export class GuidanceController {
   constructor(private readonly guidance: GuidanceService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create guidance content' })
+  @ApiOperation({ summary: 'Crea contenuto guida' })
   @ApiBody({ type: CreateGuidanceDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -38,7 +38,7 @@ export class GuidanceController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List guidance content' })
+  @ApiOperation({ summary: 'Elenca contenuti guida' })
   @ApiQuery({ name: 'areaId', required: false })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
@@ -47,7 +47,7 @@ export class GuidanceController {
   }
 
   @Post('assign')
-  @ApiOperation({ summary: 'Assign guidance to a user' })
+  @ApiOperation({ summary: 'Assegna guida a un utente' })
   @ApiBody({ type: AssignGuidanceDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)

@@ -23,15 +23,15 @@ export class AnswersService {
 
   async submitBatch(actor: Actor, input: SubmitAnswersDto) {
     if (!actor?.id) {
-      throw new BadRequestException('Missing actor');
+      throw new BadRequestException('Attore mancante');
     }
 
     if (actor.role !== UserRole.USER) {
-      throw new ForbiddenException('Only users can submit answers');
+      throw new ForbiddenException('Solo gli utenti atleta possono inviare risposte');
     }
 
     if (!input.questionSetId || !input.answers?.length) {
-      throw new BadRequestException('Missing answers');
+      throw new BadRequestException('Risposte mancanti');
     }
 
     const questionSet = await this.prisma.questionSet.findUnique({
@@ -50,15 +50,15 @@ export class AnswersService {
     });
 
     if (!questionSet) {
-      throw new NotFoundException('Question set not found');
+      throw new NotFoundException('Questionario non trovato');
     }
 
     if (questionSet.userId !== actor.id) {
-      throw new ForbiddenException('Not allowed to answer this set');
+      throw new ForbiddenException('Non puoi rispondere a questo questionario');
     }
 
     if (questionSet.status !== 'PUBLISHED') {
-      throw new BadRequestException('Question set is not published');
+      throw new BadRequestException('Il questionario non e pubblicato');
     }
 
     const questionMap = new Map(
@@ -69,19 +69,19 @@ export class AnswersService {
 
     for (const answer of input.answers) {
       if (!answer.questionId || !answer.answerOptionId) {
-        throw new BadRequestException('Missing answer fields');
+        throw new BadRequestException('Dati risposta mancanti');
       }
       if (seenQuestions.has(answer.questionId)) {
-        throw new BadRequestException('Duplicate question in payload');
+        throw new BadRequestException('Domanda duplicata nei dati inviati');
       }
       seenQuestions.add(answer.questionId);
       if (!questionMap.has(answer.questionId)) {
-        throw new BadRequestException('Invalid question for this set');
+        throw new BadRequestException('Domanda non valida per questo questionario');
       }
     }
 
     if (seenQuestions.size !== questionSet.questions.length) {
-      throw new BadRequestException('All questions must be answered');
+      throw new BadRequestException('Devi rispondere a tutte le domande');
     }
 
     const existing = await this.prisma.userAnswer.findMany({
@@ -90,7 +90,7 @@ export class AnswersService {
     });
 
     if (existing.length > 0) {
-      throw new BadRequestException('Answers already submitted');
+      throw new BadRequestException('Risposte gia inviate');
     }
 
     const data = input.answers.map((answer) => {
@@ -99,7 +99,7 @@ export class AnswersService {
         (item) => item.id === answer.answerOptionId,
       );
       if (!option) {
-        throw new BadRequestException('Invalid answer option');
+        throw new BadRequestException('Opzione risposta non valida');
       }
       return {
         userId: actor.id,
@@ -115,7 +115,7 @@ export class AnswersService {
         await this.orchestrator.createSnapshotFromQuestionSetInTransaction(
           tx,
           input.questionSetId,
-          'Questionnaire submitted',
+          'Questionario inviato',
         );
 
       return {

@@ -37,14 +37,14 @@ export class OrchestratorService {
     runAllAreas = true,
   ) {
     if (!actorId) {
-      throw new BadRequestException('Missing actor id');
+      throw new BadRequestException('ID attore mancante');
     }
     if (!userIds?.length) {
-      throw new BadRequestException('Missing user ids');
+      throw new BadRequestException('ID utenti mancanti');
     }
 
     if (areaId && runAllAreas) {
-      throw new BadRequestException('Choose single area or run all areas');
+      throw new BadRequestException('Scegli una sola area oppure esegui tutte le aree');
     }
 
     const areas = areaId
@@ -54,7 +54,7 @@ export class OrchestratorService {
         : [];
 
     if (areas.length === 0) {
-      throw new BadRequestException('No areas configured');
+      throw new BadRequestException('Nessuna area configurata');
     }
 
     const results: Array<{
@@ -81,14 +81,14 @@ export class OrchestratorService {
 
   private async loadArea(areaId: string) {
     if (!areaId) {
-      throw new BadRequestException('Missing area id');
+      throw new BadRequestException('ID area mancante');
     }
     const area = await this.prisma.area.findUnique({
       where: { id: areaId },
       select: { id: true, name: true },
     });
     if (!area) {
-      throw new BadRequestException('Invalid area');
+      throw new BadRequestException('Area non valida');
     }
     return [area];
   }
@@ -100,10 +100,10 @@ export class OrchestratorService {
     reason = 'Ciclo AI generato',
   ) {
     if (!userId) {
-      throw new BadRequestException('Missing user id');
+      throw new BadRequestException('ID utente mancante');
     }
     if (!actorId) {
-      throw new BadRequestException('Missing actor id');
+      throw new BadRequestException('ID attore mancante');
     }
 
     const proposalInput = await this.prepareCycleProposalInput(
@@ -121,7 +121,7 @@ export class OrchestratorService {
       });
 
       if (!user || user.role !== UserRole.USER || !user.isActive) {
-        throw new BadRequestException('Invalid user');
+        throw new BadRequestException('Utente non valido');
       }
 
       const existingPending = await tx.improvementPlanRelease.findFirst({
@@ -129,7 +129,7 @@ export class OrchestratorService {
         select: { id: true },
       });
       if (existingPending) {
-        throw new BadRequestException('Pending cycle already exists for area');
+        throw new BadRequestException('Esiste gia un ciclo in attesa per questa area');
       }
 
       await this.assertPreviousCycleCompleted(tx, userId, area.id);
@@ -249,7 +249,7 @@ export class OrchestratorService {
     });
 
     if (!user || user.role !== UserRole.USER || !user.isActive) {
-      throw new BadRequestException('Invalid user');
+      throw new BadRequestException('Utente non valido');
     }
 
     const existingPending = await this.prisma.improvementPlanRelease.findFirst({
@@ -257,7 +257,7 @@ export class OrchestratorService {
       select: { id: true },
     });
     if (existingPending) {
-      throw new BadRequestException('Pending cycle already exists for area');
+      throw new BadRequestException('Esiste gia un ciclo in attesa per questa area');
     }
 
     await this.assertPreviousCycleCompleted(this.prisma, userId, area.id);
@@ -269,7 +269,7 @@ export class OrchestratorService {
       });
       if (!consent) {
         throw new BadRequestException(
-          'AI consent is required for external AI proposals',
+          'Il consenso AI e obbligatorio per le proposte AI esterne',
         );
       }
     }
@@ -927,7 +927,7 @@ export class OrchestratorService {
 
     if (!link) {
       throw new BadRequestException(
-        `No professional linked to user for area ${area.name}`,
+        `Nessun professionista collegato all'utente per l'area ${area.name}`,
       );
     }
 
@@ -968,24 +968,24 @@ export class OrchestratorService {
       active.items.every((item) => item.status === 'COMPLETED');
     if (!allActivitiesCompleted) {
       throw new BadRequestException(
-        'Previous plan activity must be completed before generating a new cycle',
+        'L attivita del piano precedente deve essere completata prima di generare un nuovo ciclo',
       );
     }
 
     const questionnaire = active.questionSets[0];
     if (!questionnaire || questionnaire.status !== 'CLOSED') {
       throw new BadRequestException(
-        'Previous questionnaire must be completed before generating a new cycle',
+        'Il questionario precedente deve essere completato prima di generare un nuovo ciclo',
       );
     }
   }
 
   async publishCycle(planReleaseId: string, actorId: string) {
     if (!planReleaseId) {
-      throw new BadRequestException('Missing plan release id');
+      throw new BadRequestException('ID rilascio piano mancante');
     }
     if (!actorId) {
-      throw new BadRequestException('Missing actor id');
+      throw new BadRequestException('ID attore mancante');
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -1009,34 +1009,34 @@ export class OrchestratorService {
       });
 
       if (!plan) {
-        throw new BadRequestException('Plan release not found');
+        throw new BadRequestException('Rilascio piano non trovato');
       }
 
       if (plan.status !== 'PENDING_APPROVAL') {
-        throw new BadRequestException('Plan release not in approval');
+        throw new BadRequestException('Il rilascio piano non e in approvazione');
       }
 
       const allItemsApproved = plan.items.every(
         (item) => item.status === 'APPROVED',
       );
       if (!allItemsApproved) {
-        throw new BadRequestException('Not all plan items are approved');
+        throw new BadRequestException('Non tutte le attivita piano sono approvate');
       }
 
       const questionSet = plan.questionSets[0];
       if (!questionSet) {
-        throw new BadRequestException('Missing question set');
+        throw new BadRequestException('Questionario mancante');
       }
 
       if (questionSet.status !== 'PENDING_APPROVAL') {
-        throw new BadRequestException('Question set not in approval');
+        throw new BadRequestException('Il questionario non e in approvazione');
       }
 
       const allAreasApproved = questionSet.approvals.every(
         (approval) => approval.status === 'APPROVED',
       );
       if (!allAreasApproved) {
-        throw new BadRequestException('Not all question areas are approved');
+        throw new BadRequestException('Non tutte le aree del questionario sono approvate');
       }
 
       await tx.improvementPlanRelease.updateMany({
@@ -1084,7 +1084,7 @@ export class OrchestratorService {
 
   async createSnapshotFromQuestionSet(questionSetId: string, reason: string) {
     if (!questionSetId) {
-      throw new BadRequestException('Missing question set id');
+      throw new BadRequestException('ID questionario mancante');
     }
 
     return this.prisma.$transaction((tx) =>
@@ -1119,11 +1119,11 @@ export class OrchestratorService {
       });
 
       if (!questionSet) {
-        throw new BadRequestException('Question set not found');
+        throw new BadRequestException('Questionario non trovato');
       }
 
       if (questionSet.status !== 'PUBLISHED') {
-        throw new BadRequestException('Question set not published');
+        throw new BadRequestException('Questionario non pubblicato');
       }
 
       if (
@@ -1132,7 +1132,7 @@ export class OrchestratorService {
           (question) => question.areaId !== questionSet.areaId,
         )
       ) {
-        throw new BadRequestException('Question set contains multiple areas');
+        throw new BadRequestException('Il questionario contiene piu aree');
       }
 
       const scale = await this.loadScaleConfig(tx);
@@ -1151,7 +1151,7 @@ export class OrchestratorService {
       const scoresByArea = new Map<string, { total: number; count: number }>();
       for (const question of questionSet.questions) {
         if (!question.answers || question.answers.length === 0) {
-          throw new BadRequestException('Question set incomplete');
+          throw new BadRequestException('Questionario incompleto');
         }
         for (const answer of question.answers) {
           const entry = scoresByArea.get(question.areaId) ?? {
@@ -1216,7 +1216,7 @@ export class OrchestratorService {
 
   async refreshCycleReadiness(planReleaseId: string) {
     if (!planReleaseId) {
-      throw new BadRequestException('Missing plan release id');
+      throw new BadRequestException('ID rilascio piano mancante');
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -1271,13 +1271,13 @@ export class OrchestratorService {
   async rejectCycleProposal(
     planReleaseId: string,
     actorId: string,
-    rejectionReason = 'Cycle proposal rejected',
+    rejectionReason = 'Proposta ciclo rifiutata',
   ) {
     if (!planReleaseId) {
-      throw new BadRequestException('Missing plan release id');
+      throw new BadRequestException('ID rilascio piano mancante');
     }
     if (!actorId) {
-      throw new BadRequestException('Missing actor id');
+      throw new BadRequestException('ID attore mancante');
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -1291,7 +1291,7 @@ export class OrchestratorService {
       });
 
       if (!plan) {
-        throw new BadRequestException('Plan release not found');
+        throw new BadRequestException('Rilascio piano non trovato');
       }
 
       if (plan.status === 'REJECTED') {
@@ -1299,7 +1299,7 @@ export class OrchestratorService {
       }
 
       if (plan.status !== 'PENDING_APPROVAL') {
-        throw new BadRequestException('Plan release not in approval');
+        throw new BadRequestException('Il rilascio piano non e in approvazione');
       }
 
       const rejectedAt = new Date();

@@ -14,49 +14,49 @@ const demoAccounts = [
   },
   {
     group: "Atleta",
-    label: "Athlete",
+    label: "Atleta",
     email: "user@example.com",
     password: "password123",
   },
   {
     group: "Professionisti",
-    label: "General",
+    label: "Generale",
     email: "pro@example.com",
     password: "password123",
   },
   {
     group: "Professionisti",
-    label: "Tactical",
+    label: "Tecnico-tattico",
     email: "prof_TT@example.it",
     password: "password123",
   },
   {
     group: "Professionisti",
-    label: "Athletic",
+    label: "Preparazione atletica",
     email: "prof_AP@example.it",
     password: "password123",
   },
   {
     group: "Professionisti",
-    label: "Equipment",
+    label: "Attrezzatura",
     email: "prof_EQ@example.it",
     password: "password123",
   },
   {
     group: "Professionisti",
-    label: "Psychology",
+    label: "Psicologia",
     email: "prof_PT@example.it",
     password: "password123",
   },
   {
     group: "Professionisti",
-    label: "Nutrition",
+    label: "Nutrizione",
     email: "prof_NU@example.it",
     password: "password123",
   },
   {
     group: "Professionisti",
-    label: "Mental",
+    label: "Mental training",
     email: "prof_MT@example.it",
     password: "password123",
   },
@@ -111,14 +111,14 @@ export default function LoginPage() {
     });
 
     if (!response.ok) {
-      let errorMessage = "Credentials are not valid or the API is not reachable.";
+      let errorMessage = "Credenziali non valide oppure API non raggiungibile.";
       try {
         const data = (await response.json()) as { message?: string };
-        if (data.message === "Account pending admin activation") {
+        if (data.message === "Account in attesa di attivazione admin") {
           errorMessage = pendingAdminActivationMessage;
         }
       } catch {
-        // Keep the default login error when the API does not return JSON.
+        // Mantiene l'errore standard quando l'API non restituisce JSON.
       }
       setMessage(errorMessage);
       setLoading(false);
@@ -132,7 +132,7 @@ export default function LoginPage() {
       onboardingRequired?: boolean;
     };
     storeAccessToken(user.accessToken);
-    setMessage(`Signed in as ${user.email ?? "user"} (${user.role ?? "role"})`);
+    setMessage(`Accesso effettuato come ${user.email ?? "utente"} (${user.role ?? "ruolo"})`);
     setLoading(false);
 
     const destination =

@@ -1,8 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { LanguageToggle } from "@/app/components/language-provider";
 import { API_BASE, secureFetch } from "@/app/lib/api";
 
 export default function RegisterPage() {
@@ -53,100 +53,122 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="pf-login-page">
-      <section className="pf-login-hero">
-        <Link className="pf-brand" href="/">
-          <span className="pf-brand-mark">PF</span>
-          <span>
-            <strong>PerformanceFactory</strong>
-            <small>Registrazione atleta</small>
-          </span>
-        </Link>
-        <div>
-          <p className="pf-eyebrow">Nuovo utente</p>
-          <h1>Richiedi accesso atleta.</h1>
-          <p>
-            L account resta sospeso finche un amministratore non lo abilita e
-            assegna i coach per area.
+    <main className="pf-auth-screen">
+      <section className="pf-auth-brand-panel" aria-labelledby="pf-register-heading">
+        <div className="pf-auth-brand-content">
+          <Link
+            className="pf-auth-brand-lockup"
+            href="/"
+            aria-label="Performance Factory"
+          >
+            <Image
+              className="pf-auth-brand-logo"
+              src="/brand/performance-factory-horizontal-clean.png"
+              alt="Performance Factory"
+              width={900}
+              height={211}
+              priority
+            />
+          </Link>
+
+          <p className="pf-auth-eyebrow">PERFORMANCE FACTORY</p>
+          <h1 id="pf-register-heading" className="pf-auth-headline">
+            Valuta, monitora e migliora la tua performance
+          </h1>
+          <p className="pf-auth-copy">
+            Richiedi il tuo accesso atleta. L'account verra abilitato
+            dall'admin prima di entrare nell'ambiente Performance Factory.
           </p>
+
+          <ul
+            className="pf-auth-benefits"
+            aria-label="Vantaggi Performance Factory"
+          >
+            <li>Valutazione iniziale</li>
+            <li>Percorso su misura</li>
+            <li>Progressi sempre visibili</li>
+          </ul>
         </div>
       </section>
 
-      <section className="pf-login-panel">
-        <div className="pf-login-tools">
-          <LanguageToggle />
-        </div>
-        <div>
-          <p className="pf-eyebrow">Registrazione</p>
-          <h2>Dati nuovo atleta</h2>
-          <p className="pf-muted">
-            Inserisci le informazioni di base. Dopo la richiesta potrai tornare
-            al login.
-          </p>
-        </div>
+      <section className="pf-auth-panel">
+        <div className="pf-auth-panel-inner">
+          <div className="pf-auth-card pf-auth-card-register">
+            <div className="pf-auth-card-header">
+              <p className="pf-eyebrow">Nuovo percorso</p>
+              <h2>Crea nuovo utente</h2>
+              <p>
+                Inserisci le informazioni di base. Dopo la richiesta potrai
+                tornare al login.
+              </p>
+            </div>
 
-        <form className="pf-stack" onSubmit={onRegister}>
-          <div className="pf-two-col">
-            <label className="pf-field">
-              Nome
-              <input
-                className="pf-input"
-                value={firstName}
-                onChange={(event) => setFirstName(event.target.value)}
-                required
-              />
-            </label>
-            <label className="pf-field">
-              Cognome
-              <input
-                className="pf-input"
-                value={lastName}
-                onChange={(event) => setLastName(event.target.value)}
-                required
-              />
-            </label>
-          </div>
-          <label className="pf-field">
-            Email
-            <input
-              className="pf-input"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
-          </label>
-          <label className="pf-field">
-            Password
-            <input
-              className="pf-input"
-              type="password"
-              minLength={8}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-            />
-          </label>
-          <label className="pf-checkbox">
-            <input
-              type="checkbox"
-              checked={aiConsent}
-              onChange={(event) => setAiConsent(event.target.checked)}
-            />
-            Consento l uso dell AI per generare proposte e questionari
-            revisionati dai coach.
-          </label>
-          <div className="pf-actions">
-            <button className="pf-button" type="submit" disabled={registering}>
-              {registering ? "Creazione..." : "Crea nuovo utente"}
-            </button>
-            <Link className="pf-button-secondary" href="/login">
-              Torna al login
-            </Link>
-          </div>
-        </form>
+            <form className="pf-stack pf-auth-register-form" onSubmit={onRegister}>
+              <div className="pf-two-col">
+                <label className="pf-field">
+                  Nome
+                  <input
+                    className="pf-input"
+                    value={firstName}
+                    onChange={(event) => setFirstName(event.target.value)}
+                    required
+                  />
+                </label>
+                <label className="pf-field">
+                  Cognome
+                  <input
+                    className="pf-input"
+                    value={lastName}
+                    onChange={(event) => setLastName(event.target.value)}
+                    required
+                  />
+                </label>
+              </div>
+              <label className="pf-field">
+                Email
+                <input
+                  className="pf-input"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                />
+              </label>
+              <label className="pf-field">
+                Password
+                <input
+                  className="pf-input"
+                  type="password"
+                  minLength={8}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                />
+              </label>
+              <label className="pf-checkbox">
+                <input
+                  type="checkbox"
+                  checked={aiConsent}
+                  onChange={(event) => setAiConsent(event.target.checked)}
+                />
+                Consento l'uso dell'AI per generare proposte e questionari
+                revisionati dai coach.
+              </label>
+              <button className="pf-button" type="submit" disabled={registering}>
+                {registering ? "Creazione..." : "Crea nuovo utente"}
+              </button>
+            </form>
 
-        {message && <div className="pf-alert warning">{message}</div>}
+            <div className="pf-login-options">
+              <span>Hai gia un account?</span>
+              <Link className="pf-auth-text-link" href="/login">
+                Torna al login
+              </Link>
+            </div>
+
+            {message && <div className="pf-alert warning">{message}</div>}
+          </div>
+        </div>
       </section>
     </main>
   );

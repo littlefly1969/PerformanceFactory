@@ -13,7 +13,7 @@ export class RelationshipsController {
   constructor(private readonly relationships: RelationshipsService) {}
 
   @Post('link')
-  @ApiOperation({ summary: 'Link a user to a professional' })
+  @ApiOperation({ summary: 'Collega un utente a un professionista' })
   @ApiBody({ type: LinkUserDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -31,7 +31,7 @@ export class RelationshipsController {
   }
 
   @Get('my-users')
-  @ApiOperation({ summary: 'List linked users' })
+  @ApiOperation({ summary: 'Elenca utenti collegati' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.PROFESSIONAL)
@@ -40,7 +40,7 @@ export class RelationshipsController {
   }
 
   @Get('my-professionals')
-  @ApiOperation({ summary: 'List linked professionals' })
+  @ApiOperation({ summary: 'Elenca professionisti collegati' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.USER)

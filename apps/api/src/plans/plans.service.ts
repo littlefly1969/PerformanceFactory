@@ -24,7 +24,7 @@ export class PlansService {
 
   private async resolveTargetUser(actor: Actor, userId?: string) {
     if (!actor?.id) {
-      throw new BadRequestException('Missing actor');
+      throw new BadRequestException('Attore mancante');
     }
 
     if (!userId || userId === actor.id) {
@@ -38,18 +38,18 @@ export class PlansService {
     if (actor.role === UserRole.PROFESSIONAL) {
       const allowed = await this.abac.canAccessUser(actor.id, userId);
       if (!allowed) {
-        throw new ForbiddenException('User not linked to professional');
+        throw new ForbiddenException('Utente non collegato al professionista');
       }
       return userId;
     }
 
-    throw new ForbiddenException('Not allowed to access other users');
+    throw new ForbiddenException('Non puoi accedere ad altri utenti');
   }
 
   async getCurrentPlan(actor: Actor, userId?: string, areaId?: string) {
     const targetUserId = await this.resolveTargetUser(actor, userId);
     if (!areaId) {
-      throw new BadRequestException('Missing area id');
+      throw new BadRequestException('ID area mancante');
     }
 
     if (actor.role === UserRole.PROFESSIONAL && targetUserId !== actor.id) {
@@ -59,7 +59,7 @@ export class PlansService {
         areaId,
       );
       if (!allowed) {
-        throw new ForbiddenException('Not allowed for this area');
+        throw new ForbiddenException('Operazione non consentita per questa area');
       }
     }
 
@@ -94,7 +94,7 @@ export class PlansService {
     });
 
     if (!plan) {
-      throw new NotFoundException('Plan release not found');
+      throw new NotFoundException('Rilascio piano non trovato');
     }
 
     const filteredForUser =
@@ -108,7 +108,7 @@ export class PlansService {
   async getPlanHistory(actor: Actor, userId?: string, areaId?: string) {
     const targetUserId = await this.resolveTargetUser(actor, userId);
     if (!areaId) {
-      throw new BadRequestException('Missing area id');
+      throw new BadRequestException('ID area mancante');
     }
 
     if (actor.role === UserRole.PROFESSIONAL && targetUserId !== actor.id) {
@@ -118,7 +118,7 @@ export class PlansService {
         areaId,
       );
       if (!allowed) {
-        throw new ForbiddenException('Not allowed for this area');
+        throw new ForbiddenException('Operazione non consentita per questa area');
       }
     }
 
@@ -166,7 +166,7 @@ export class PlansService {
 
   async getPendingApprovalsForProfessional(actor: Actor) {
     if (actor.role !== UserRole.PROFESSIONAL) {
-      throw new ForbiddenException('Only professionals can view approvals');
+      throw new ForbiddenException('Solo i professionisti possono vedere le approvazioni');
     }
 
     const [linkedUsers, areas] = await Promise.all([
@@ -211,7 +211,7 @@ export class PlansService {
 
   async approvePlanItem(actor: Actor, planItemId: string) {
     if (actor.role !== UserRole.PROFESSIONAL) {
-      throw new ForbiddenException('Only professionals can approve');
+      throw new ForbiddenException('Solo i professionisti possono approvare');
     }
 
     const planItem = await this.prisma.planItem.findUnique({
@@ -226,7 +226,7 @@ export class PlansService {
     });
 
     if (!planItem) {
-      throw new NotFoundException('Plan item not found');
+      throw new NotFoundException('Attivita piano non trovata');
     }
 
     const allowed = await this.abac.canAccessUserArea(
@@ -235,7 +235,7 @@ export class PlansService {
       planItem.areaId,
     );
     if (!allowed) {
-      throw new ForbiddenException('Not allowed for this plan item');
+      throw new ForbiddenException('Operazione non consentita per questa attivita piano');
     }
 
     const updated = await this.prisma.planItem.update({
@@ -259,7 +259,7 @@ export class PlansService {
 
   async rejectPlanItem(actor: Actor, planItemId: string, reason?: string) {
     if (actor.role !== UserRole.PROFESSIONAL) {
-      throw new ForbiddenException('Only professionals can reject');
+      throw new ForbiddenException('Solo i professionisti possono rifiutare');
     }
 
     const planItem = await this.prisma.planItem.findUnique({
@@ -274,7 +274,7 @@ export class PlansService {
     });
 
     if (!planItem) {
-      throw new NotFoundException('Plan item not found');
+      throw new NotFoundException('Attivita piano non trovata');
     }
 
     const allowed = await this.abac.canAccessUserArea(
@@ -283,7 +283,7 @@ export class PlansService {
       planItem.areaId,
     );
     if (!allowed) {
-      throw new ForbiddenException('Not allowed for this plan item');
+      throw new ForbiddenException('Operazione non consentita per questa attivita piano');
     }
 
     const updated = await this.prisma.planItem.update({
@@ -301,7 +301,7 @@ export class PlansService {
       await this.orchestrator.rejectCycleProposal(
         planItem.planReleaseId,
         actor.id,
-        reason ?? 'Plan item rejected',
+        reason ?? 'Attivita piano rifiutata',
       );
     }
 

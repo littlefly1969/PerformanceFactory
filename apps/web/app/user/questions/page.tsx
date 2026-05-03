@@ -41,6 +41,15 @@ type Snapshot = {
 };
 type Area = { id: string; name: string };
 
+const formatStatus = (status: string) =>
+  ({
+    ACTIVE: "attivo",
+    COMPLETED: "completato",
+    CLOSED: "chiuso",
+    PENDING: "in attesa",
+    PUBLISHED: "pubblicato",
+  })[status] ?? status.replace(/_/g, " ").toLowerCase();
+
 export default function UserQuestionsPage() {
   const [questionSet, setQuestionSet] = useState<QuestionSet | null>(null);
   const [selected, setSelected] = useState<Record<string, string>>({});
@@ -49,7 +58,7 @@ export default function UserQuestionsPage() {
   const [authHint, setAuthHint] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [areas, setAreas] = useState<Area[]>([]);
+  const [areas, setAree] = useState<Area[]>([]);
   const [areaId, setAreaId] = useState("");
   const [questionSetsByArea, setQuestionSetsByArea] = useState<
     Record<string, QuestionSet | null>
@@ -65,15 +74,15 @@ export default function UserQuestionsPage() {
     return `${Math.round((answeredCount / totalQuestions) * 100)}%`;
   }, [answeredCount, totalQuestions]);
 
-  const loadAreas = async () => {
+  const loadAree = async () => {
     const response = await secureFetch(`${API_BASE}/areas`, {
       credentials: "include",
     });
     if (response.ok) {
-      const loadedAreas = (await response.json()) as Area[];
-      setAreas(loadedAreas);
+      const loadedAree = (await response.json()) as Area[];
+      setAree(loadedAree);
       const entries = await Promise.all(
-        loadedAreas.map(async (area) => {
+        loadedAree.map(async (area) => {
           const questionResponse = await secureFetch(
             `${API_BASE}/user/questions/current?areaId=${encodeURIComponent(area.id)}`,
             { credentials: "include" },
@@ -96,11 +105,11 @@ export default function UserQuestionsPage() {
       setAreaId(
         (current) =>
           current ||
-          (requestedAreaId && loadedAreas.some((area) => area.id === requestedAreaId)
+          (requestedAreaId && loadedAree.some((area) => area.id === requestedAreaId)
             ? requestedAreaId
             : "") ||
           firstOpen?.[0] ||
-          loadedAreas[0]?.id ||
+          loadedAree[0]?.id ||
           "",
       );
     }
@@ -116,7 +125,7 @@ export default function UserQuestionsPage() {
 
     if (!selectedAreaId) {
       setQuestionSet(null);
-      setMessage("Select an area to load the questionnaire.");
+      setMessage("Seleziona un'area per caricare il questionario.");
       setLoading(false);
       return;
     }
@@ -129,11 +138,11 @@ export default function UserQuestionsPage() {
     if (!response.ok) {
       setQuestionSet(null);
       if (response.status === 401) {
-        setAuthHint("Sign in to answer your questionnaire.");
+        setAuthHint("Accedi per rispondere al questionario.");
       } else if (response.status === 404) {
-        setMessage("No published questionnaire is available for this area.");
+        setMessage("Non c'e un questionario pubblicato disponibile per questa area.");
       } else {
-        setMessage("Unable to load the questionnaire.");
+        setMessage("Impossibile caricare il questionario.");
       }
       setLoading(false);
       return;
@@ -153,7 +162,7 @@ export default function UserQuestionsPage() {
   useEffect(() => {
     void (async () => {
       if (!(await redirectIfOnboardingRequired())) {
-        await loadAreas();
+        await loadAree();
       }
     })();
   }, []);
@@ -176,7 +185,7 @@ export default function UserQuestionsPage() {
     }));
 
     if (answers.some((answer) => !answer.answerOptionId)) {
-      setMessage("Answer all questions before submitting.");
+      setMessage("Rispondi a tutte le domande prima dell'invio.");
       return;
     }
 
@@ -188,7 +197,7 @@ export default function UserQuestionsPage() {
     });
 
     if (!response.ok) {
-      setMessage("Answers could not be submitted. They may already exist.");
+      setMessage("Le risposte non possono essere inviate. Potrebbero esistere gia.");
       return;
     }
 
@@ -206,41 +215,41 @@ export default function UserQuestionsPage() {
     setQuestionSet((current) =>
       current ? { ...current, status: "CLOSED" } : current,
     );
-    setMessage("Answers submitted. Questionnaire closed and profile updated.");
-    await loadAreas();
+    setMessage("Risposte inviate. Questionario chiuso e profilo aggiornato.");
+    await loadAree();
   };
 
   return (
     <ProductShell
-      eyebrow="Athlete workspace"
-      title="Area check-ins"
-      description="Questionnaires are grouped by area. Submitting all answers closes the check-in and updates your profile automatically."
+      eyebrow="Ambiente atleta"
+      title="Check-in per area"
+      description="I questionari sono raggruppati per area. L'invio di tutte le risposte chiude il check-in e aggiorna automaticamente il profilo."
       actions={
         <button
           className="pf-button-secondary"
           type="button"
-          onClick={() => loadAreas()}
+          onClick={() => loadAree()}
         >
-          Refresh areas
+          Aggiorna aree
         </button>
       }
       stats={[
         {
-          label: "Answered",
+          label: "Risposte",
           value: `${answeredCount}/${totalQuestions}`,
           tone: "accent",
         },
-        { label: "Progress", value: progress, tone: "success" },
-        { label: "Status", value: questionSet?.status ?? "-", tone: "warning" },
+        { label: "Avanzamento", value: progress, tone: "success" },
+        { label: "Stato", value: questionSet?.status ?? "-", tone: "warning" },
       ]}
     >
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
-            <h2>Areas</h2>
+            <h2>Aree</h2>
             <p className="pf-muted">
-              A highlighted area has a published questionnaire waiting for
-              answers.
+              Le aree evidenziate hanno un questionario pubblicato in attesa
+              di risposta.
             </p>
           </div>
         </div>
@@ -259,12 +268,12 @@ export default function UserQuestionsPage() {
                   <strong>{area.name}</strong>
                   <small>
                     {set
-                      ? `${set.questions.length} questions ready`
-                      : "No questionnaire"}
+                      ? `${set.questions.length} domande pronte`
+                      : "Nessun questionario"}
                   </small>
                 </span>
                 <StatusBadge tone={set ? "warning" : "neutral"}>
-                  {set ? "To answer" : "Empty"}
+                  {set ? "Da rispondere" : "Vuoto"}
                 </StatusBadge>
               </button>
             );
@@ -275,9 +284,9 @@ export default function UserQuestionsPage() {
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
-            <h2>Current check-in</h2>
+            <h2>Check-in corrente</h2>
             <p className="pf-muted">
-              Choose the option that best reflects your current execution.
+              Scegli l'opzione che descrive meglio la tua esecuzione attuale.
             </p>
           </div>
           <button
@@ -285,7 +294,7 @@ export default function UserQuestionsPage() {
             type="button"
             onClick={() => loadQuestionSet()}
           >
-            Refresh
+            Aggiorna
           </button>
         </div>
 
@@ -303,7 +312,7 @@ export default function UserQuestionsPage() {
                   <p className="pf-muted">{question.area?.name ?? "Area"}</p>
                 </div>
                 {selected[question.id] && (
-                  <StatusBadge tone="success">Answered</StatusBadge>
+                  <StatusBadge tone="success">Risposte</StatusBadge>
                 )}
               </div>
               <div className="pf-grid">
@@ -332,11 +341,11 @@ export default function UserQuestionsPage() {
 
           {!loading && !questionSet && (
             <EmptyState
-              title={areaId ? "No questionnaire available" : "Select an area"}
+              title={areaId ? "Nessun questionario disponibile" : "Seleziona un'area"}
               description={
                 areaId
-                  ? "A professional-approved questionnaire has not been published for this area yet."
-                  : "Choose an area to load the current questionnaire."
+                  ? "Per questa area non e ancora stato pubblicato un questionario approvato dal professionista."
+                  : "Scegli un'area per caricare il questionario corrente."
               }
             />
           )}
@@ -350,7 +359,7 @@ export default function UserQuestionsPage() {
               onClick={handleSubmit}
               disabled={submitted}
             >
-              {submitted ? "Submitted and closed" : "Submit and close"}
+              {submitted ? "Inviato e chiuso" : "Invia e chiudi"}
             </button>
             {snapshot && (
               <StatusBadge tone="success">
@@ -379,7 +388,7 @@ export default function UserQuestionsPage() {
                   <p className="pf-muted">{set.questions.length} domande</p>
                 </div>
                 <StatusBadge tone={set.status === "CLOSED" ? "success" : "warning"}>
-                  {set.status.toLowerCase()}
+                  {formatStatus(set.status)}
                 </StatusBadge>
               </div>
               <div className="pf-stack">

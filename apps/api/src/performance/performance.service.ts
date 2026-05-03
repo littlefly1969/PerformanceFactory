@@ -22,7 +22,7 @@ export class PerformanceService {
 
   private async resolveTargetUser(actor: Actor, userId?: string) {
     if (!actor?.id) {
-      throw new BadRequestException('Missing actor');
+      throw new BadRequestException('Attore mancante');
     }
 
     if (!userId || userId === actor.id) {
@@ -36,12 +36,12 @@ export class PerformanceService {
     if (actor.role === UserRole.PROFESSIONAL) {
       const allowed = await this.abac.canAccessUser(actor.id, userId);
       if (!allowed) {
-        throw new ForbiddenException('User not linked to professional');
+        throw new ForbiddenException('Utente non collegato al professionista');
       }
       return userId;
     }
 
-    throw new ForbiddenException('Not allowed to access other users');
+    throw new ForbiddenException('Non puoi accedere ad altri utenti');
   }
 
   async getCurrentProfile(actor: Actor, userId?: string) {
@@ -73,7 +73,7 @@ export class PerformanceService {
     });
 
     if (!snapshot) {
-      throw new NotFoundException('Performance profile not found');
+      throw new NotFoundException('Profilo performance non trovato');
     }
 
     if (!allowedAreaIds) {

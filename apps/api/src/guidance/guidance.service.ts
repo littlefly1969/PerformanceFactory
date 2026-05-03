@@ -23,7 +23,7 @@ export class GuidanceService {
 
   async createGuidance(input: CreateGuidanceDto) {
     if (!input.areaId || !input.title || !input.body) {
-      throw new BadRequestException('Missing guidance fields');
+      throw new BadRequestException('Dati guida mancanti');
     }
 
     const area = await this.prisma.area.findUnique({
@@ -32,7 +32,7 @@ export class GuidanceService {
     });
 
     if (!area) {
-      throw new BadRequestException('Invalid area');
+      throw new BadRequestException('Area non valida');
     }
 
     return this.prisma.guidanceContent.create({
@@ -70,11 +70,11 @@ export class GuidanceService {
 
   async assignGuidance(actor: Actor, input: AssignGuidanceDto) {
     if (!actor?.id) {
-      throw new BadRequestException('Missing actor');
+      throw new BadRequestException('Attore mancante');
     }
 
     if (!input.userId || !input.contentId) {
-      throw new BadRequestException('Missing assignment fields');
+      throw new BadRequestException('Dati assegnazione mancanti');
     }
 
     const [user, content] = await Promise.all([
@@ -89,17 +89,17 @@ export class GuidanceService {
     ]);
 
     if (!user || user.role !== UserRole.USER) {
-      throw new BadRequestException('Invalid user');
+      throw new BadRequestException('Utente non valido');
     }
 
     if (!content) {
-      throw new BadRequestException('Invalid guidance content');
+      throw new BadRequestException('Contenuto guida non valido');
     }
 
     if (actor.role === UserRole.PROFESSIONAL) {
       const allowed = await this.abac.canAccessUser(actor.id, user.id);
       if (!allowed) {
-        throw new ForbiddenException('User not linked to professional');
+        throw new ForbiddenException('Utente non collegato al professionista');
       }
     }
 

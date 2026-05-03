@@ -26,7 +26,7 @@ async function buildSessionStore() {
   const redisUrl = process.env.REDIS_URL;
   if (!redisUrl) {
     if (process.env.NODE_ENV === 'production') {
-      throw new Error('REDIS_URL is required in production');
+      throw new Error('REDIS_URL e obbligatorio in produzione');
     }
     return undefined;
   }
@@ -46,7 +46,7 @@ async function buildSessionStore() {
     const RedisStore =
       connectRedisModule.RedisStore ?? connectRedisModule.default;
     if (!RedisStore) {
-      throw new Error('RedisStore export not found');
+      throw new Error('Export RedisStore non trovato');
     }
 
     const client = redisModule.createClient({ url: redisUrl });
@@ -101,7 +101,7 @@ async function bootstrap() {
 
   const sessionSecret = process.env.SESSION_SECRET;
   if (process.env.NODE_ENV === 'production' && !sessionSecret) {
-    throw new Error('SESSION_SECRET is required in production');
+    throw new Error('SESSION_SECRET e obbligatorio in produzione');
   }
 
   const sessionStore = await buildSessionStore();

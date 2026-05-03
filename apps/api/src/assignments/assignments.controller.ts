@@ -12,7 +12,7 @@ export class AssignmentsController {
   constructor(private readonly assignments: AssignmentsService) {}
 
   @Get('my')
-  @ApiOperation({ summary: 'List current user assignments' })
+  @ApiOperation({ summary: 'Elenca assegnazioni utente correnti' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.USER)
@@ -21,7 +21,7 @@ export class AssignmentsController {
   }
 
   @Post(':id/complete')
-  @ApiOperation({ summary: 'Complete an assignment' })
+  @ApiOperation({ summary: 'Completa una assegnazione' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.USER)

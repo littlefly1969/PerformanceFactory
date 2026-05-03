@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { LanguageToggle } from "@/app/components/language-provider";
 import { API_BASE, clearAccessToken, secureFetch } from "@/app/lib/api";
 
 type NavItem = {
@@ -35,18 +34,18 @@ type CurrentUser = {
 
 const roleNav: Record<string, NavItem[]> = {
   USER: [
-    { href: "/user", label: "Dashboard" },
-    { href: "/user/plan", label: "Plan" },
-    { href: "/user/questions", label: "Check-in" },
+    { href: "/user", label: "Cruscotto" },
+    { href: "/user/plan", label: "Piano" },
+    { href: "/user/questions", label: "Questionari" },
     { href: "/user/performance", label: "Performance" },
   ],
   PROFESSIONAL: [
-    { href: "/professional", label: "Athletes" },
-    { href: "/professional/approvals", label: "Approvals" },
+    { href: "/professional", label: "Atleti" },
+    { href: "/professional/approvals", label: "Approvazioni" },
   ],
   ADMIN: [
-    { href: "/admin/cycles", label: "Operations" },
-    { href: "/admin/ai-config", label: "AI config" },
+    { href: "/admin/cycles", label: "Operazioni" },
+    { href: "/admin/ai-config", label: "Config AI" },
   ],
 };
 
@@ -167,7 +166,7 @@ export function ProductShell({
         </Link>
         <div className="pf-topbar-right">
           {resolvedNav.length > 0 && (
-            <nav className="pf-nav" aria-label="Workspace navigation">
+            <nav className="pf-nav" aria-label="Navigazione ambiente">
               {resolvedNav.map((item) => (
                 <Link
                   key={item.href}
@@ -179,16 +178,15 @@ export function ProductShell({
               ))}
             </nav>
           )}
-          <LanguageToggle />
           <div className="pf-userbar">
-            <span>{authChecked ? (me?.email ?? "Account") : "Loading..."}</span>
+            <span>{authChecked ? (me?.email ?? "Account") : "Caricamento..."}</span>
             <button
               className="pf-button-secondary"
               type="button"
               onClick={logout}
               disabled={loggingOut}
             >
-              {loggingOut ? "Exiting..." : "Logout"}
+              {loggingOut ? "Uscita..." : "Esci"}
             </button>
           </div>
         </div>
@@ -205,7 +203,7 @@ export function ProductShell({
         </header>
 
         {stats && stats.length > 0 && (
-          <section className="pf-stats" aria-label="Page summary">
+          <section className="pf-stats" aria-label="Riepilogo pagina">
             {stats.map((stat) => (
               <article
                 key={stat.label}

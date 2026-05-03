@@ -18,7 +18,7 @@ type StarterQuestion = {
   required: boolean;
   options: Array<{ value: string | number; label: string }>;
 };
-type StarterQuestionnaire = {
+type StarterQuestionario = {
   required: boolean;
   status: string;
   goalText?: string;
@@ -53,10 +53,18 @@ type GoalValidation = {
   nextStep?: string | null;
   rejectionReason?: string | null;
 };
+type GoalChatMessage = {
+  role: "assistant" | "user";
+  content: string;
+};
+type GoalRefinement = GoalValidation & {
+  assistantMessage: string;
+  refinedGoalText: string;
+};
 type MessageTone = "success" | "warning";
 
 export default function OnboardingPage() {
-  const [questionnaire, setQuestionnaire] = useState<StarterQuestionnaire | null>(null);
+  const [questionnaire, setQuestionario] = useState<StarterQuestionario | null>(null);
   const [goalText, setGoalText] = useState("");
   const [goalValidation, setGoalValidation] =
     useState<GoalValidation | null>(null);
@@ -67,10 +75,16 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [validatingGoal, setValidatingGoal] = useState(false);
+  const [goalModalOpen, setGoalModalOpen] = useState(false);
+  const [goalChatMessages, setGoalChatMessages] = useState<GoalChatMessage[]>([]);
+  const [goalChatInput, setGoalChatInput] = useState("");
+  const [refinedGoalDraft, setRefinedGoalDraft] = useState("");
+  const [refiningGoal, setRefiningGoal] = useState(false);
+  const [goalAssistantClosed, setGoalAssistantClosed] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const redirectTimeout = useRef<number | null>(null);
 
-  const radarAreas = useMemo(
+  const radarAree = useMemo(
     () =>
       result?.areas.map((area) => ({
         id: area.areaId,
@@ -90,18 +104,18 @@ export default function OnboardingPage() {
       )
     : false;
 
-  const loadQuestionnaire = async () => {
+  const loadQuestionario = async () => {
     setLoading(true);
     setMessage(null);
     const response = await secureFetch(`${API_BASE}/onboarding/questionnaire`);
     if (!response.ok) {
       setMessageTone("warning");
-      setMessage(response.status === 401 ? "Login required." : "Unable to load starter questionnaire.");
+      setMessage(response.status === 401 ? "Accesso richiesto." : "Impossibile caricare il questionario iniziale.");
       setLoading(false);
       return;
     }
-    const data = (await response.json()) as StarterQuestionnaire;
-    setQuestionnaire(data);
+    const data = (await response.json()) as StarterQuestionario;
+    setQuestionario(data);
     setGoalText(data.goalText ?? "");
     if (
       (data.validationStatus === "OK" || data.validationStatus === "NEEDS_ANAMNESIS") &&
@@ -119,10 +133,11 @@ export default function OnboardingPage() {
         questionsToUser: data.questionsToUser ?? [],
         nextStep: data.nextStep ?? null,
       });
+      setGoalAssistantClosed(true);
     }
     if (!data.required) {
       setMessageTone("success");
-      setMessage("Starter questionnaire already completed.");
+      setMessage("Questionario iniziale gia completato.");
     }
     setLoading(false);
   };
@@ -130,10 +145,62 @@ export default function OnboardingPage() {
   const readError = async (response: Response) => {
     try {
       const data = (await response.json()) as { message?: string };
-      return data.message ?? "Starter questionnaire could not be saved.";
+      return data.message ?? "Il questionario iniziale non puo essere salvato.";
     } catch {
-      return "Starter questionnaire could not be saved.";
+      return "Il questionario iniziale non puo essere salvato.";
     }
+  };
+
+  const openGoalAssistant = (
+    validation: GoalValidation,
+    refinedDraft = goalText,
+  ) => {
+    const assistantMessage = [
+      validation.userMessage,
+      validation.questionsToUser?.length
+        ? validation.questionsToUser.join("\n")
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+    setRefinedGoalDraft(
+      validation.suggestedReformulatedGoal?.trim() || refinedDraft,
+    );
+    setGoalChatMessages([
+      {
+        role: "assistant",
+        content:
+          assistantMessage ||
+          "Mi serve qualche informazione in piu per rendere l'obiettivo utilizzabile.",
+      },
+    ]);
+    setGoalChatInput("");
+    setGoalModalOpen(true);
+  };
+
+  const openGoalConfirmation = (
+    validation: GoalValidation,
+    refinedDraft = goalText,
+  ) => {
+    const draft =
+      validation.suggestedReformulatedGoal?.trim() ||
+      refinedDraft.trim() ||
+      goalText.trim();
+    setRefinedGoalDraft(draft);
+    setGoalChatMessages([
+      {
+        role: "assistant",
+        content: [
+          validation.userMessage ||
+            "L'obiettivo e valido e puo essere usato per proseguire.",
+          "Vuoi aggiungere altri dettagli utili all'obiettivo prima di continuare? Puoi aggiungere solo informazioni sull'obiettivo, ad esempio risultato desiderato, misura, scadenza o punto di partenza.",
+          "Se non vuoi aggiungere altro, conferma l'obiettivo e prosegui con il questionario.",
+        ].join("\n\n"),
+      },
+    ]);
+    setGoalChatInput("");
+    setGoalAssistantClosed(false);
+    setGoalModalOpen(true);
   };
 
   const validateGoal = async () => {
@@ -146,6 +213,19 @@ export default function OnboardingPage() {
         interpretedGoal: "",
         userMessage:
           "Scrivi un obiettivo piu concreto legato a sport, allenamento o performance.",
+        rejectionReason: "Obiettivo troppo breve.",
+      });
+      openGoalAssistant({
+        status: "GOAL_NEEDS_REFORMULATION",
+        accepted: false,
+        canProceedToAnamnesis: false,
+        interpretedGoal: "",
+        userMessage:
+          "Scrivi un obiettivo piu concreto legato a sport, allenamento o performance.",
+        questionsToUser: [
+          "Quale sport o attivita vuoi migliorare?",
+          "Quale aspetto della performance vuoi cambiare?",
+        ],
         rejectionReason: "Obiettivo troppo breve.",
       });
       return;
@@ -167,12 +247,80 @@ export default function OnboardingPage() {
     const validation = (await response.json()) as GoalValidation;
     setGoalValidation(validation);
     setMessageTone(validation.canProceedToAnamnesis ? "success" : "warning");
-    setMessage(validation.userMessage);
+    if (validation.canProceedToAnamnesis) {
+      setMessage(validation.userMessage);
+      openGoalConfirmation(validation, trimmed);
+    } else {
+      setMessage(null);
+      openGoalAssistant(validation);
+    }
     setValidatingGoal(false);
   };
 
+  const refineGoal = async () => {
+    const userReply = goalChatInput.trim();
+    if (!userReply || refiningGoal) {
+      return;
+    }
+
+    const nextMessages: GoalChatMessage[] = [
+      ...goalChatMessages,
+      { role: "user", content: userReply },
+    ];
+    setGoalChatMessages(nextMessages);
+    setGoalChatInput("");
+    setRefiningGoal(true);
+    const response = await secureFetch(`${API_BASE}/onboarding/goal/refine`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        originalGoal: goalText,
+        currentDraft: refinedGoalDraft || goalText,
+        messages: goalChatMessages,
+        userReply,
+      }),
+    });
+    if (!response.ok) {
+      const errorText = await readError(response);
+      setGoalChatMessages((current) => [
+        ...current,
+        { role: "assistant", content: errorText },
+      ]);
+      setRefiningGoal(false);
+      return;
+    }
+
+    const refinement = (await response.json()) as GoalRefinement;
+    setRefinedGoalDraft(refinement.refinedGoalText);
+    setGoalValidation(refinement);
+    setGoalChatMessages((current) => [
+      ...current,
+      {
+        role: "assistant",
+        content: refinement.assistantMessage || refinement.userMessage,
+      },
+    ]);
+    if (refinement.canProceedToAnamnesis) {
+      setMessageTone("success");
+      setMessage(refinement.userMessage);
+    }
+    setRefiningGoal(false);
+  };
+
+  const useRefinedGoal = () => {
+    const nextGoal = refinedGoalDraft.trim();
+    if (!nextGoal || !goalValidation?.canProceedToAnamnesis) {
+      return;
+    }
+    setGoalText(nextGoal);
+    setGoalModalOpen(false);
+    setGoalAssistantClosed(true);
+    setMessageTone("success");
+    setMessage(goalValidation.userMessage);
+  };
+
   useEffect(() => {
-    void loadQuestionnaire();
+    void loadQuestionario();
 
     return () => {
       if (redirectTimeout.current) {
@@ -184,7 +332,7 @@ export default function OnboardingPage() {
   const submit = async () => {
     if (!questionnaire || !completed) {
       setMessageTone("warning");
-      setMessage("Answer all questions before continuing.");
+      setMessage("Rispondi a tutte le domande prima di continuare.");
       return;
     }
 
@@ -221,19 +369,19 @@ export default function OnboardingPage() {
 
   return (
     <ProductShell
-      eyebrow="Athlete onboarding"
-      title="Starter performance questionnaire"
-      description="Complete this baseline before opening the athlete workspace. It creates your first spider chart and initial area profile."
+      eyebrow="Onboarding atleta"
+      title="Questionario iniziale di performance"
+      description="Completa questa baseline prima di accedere all'ambiente atleta. Crea il primo grafico spider e il profilo iniziale per area."
       actions={
         result ? (
           <button className="pf-button" type="button" onClick={() => { window.location.href = "/user"; }}>
-            Enter workspace
+            Entra nell'ambiente
           </button>
         ) : null
       }
       stats={[
-        { label: "Status", value: loading ? "..." : questionnaire?.status ?? "-", tone: questionnaire?.required ? "warning" : "success" },
-        { label: "Answered", value: questionnaire ? `${Object.keys(answers).length}/${questionnaire.questions.length}` : "-", tone: "accent" },
+        { label: "Stato", value: loading ? "..." : questionnaire?.status ?? "-", tone: questionnaire?.required ? "warning" : "success" },
+        { label: "Risposte", value: questionnaire ? `${Object.keys(answers).length}/${questionnaire.questions.length}` : "-", tone: "accent" },
         { label: "Obiettivo", value: goalText.trim() ? "OK" : "-", tone: goalText.trim() ? "success" : "warning" },
       ]}
     >
@@ -243,8 +391,8 @@ export default function OnboardingPage() {
         <article className="pf-panel">
           <div className="pf-panel-header">
             <div>
-              <h2>{questionnaire?.title ?? "Questionnaire"}</h2>
-              <p className="pf-muted">{questionnaire?.description ?? "Loading..."}</p>
+              <h2>{questionnaire?.title ?? "Questionario"}</h2>
+              <p className="pf-muted">{questionnaire?.description ?? "Caricamento..."}</p>
             </div>
             {questionnaire && <StatusBadge tone={questionnaire.required ? "warning" : "success"}>{questionnaire.status}</StatusBadge>}
           </div>
@@ -268,6 +416,7 @@ export default function OnboardingPage() {
                 onChange={(event) => {
                   setGoalText(event.target.value);
                   setGoalValidation(null);
+                  setGoalAssistantClosed(false);
                 }}
                 placeholder="Esempio: voglio migliorare continuita, prevenire cali fisici e arrivare piu preparato alle gare."
               />
@@ -289,20 +438,60 @@ export default function OnboardingPage() {
                 {goalValidation && !goalValidation.canProceedToAnamnesis && (
                   <StatusBadge tone="warning">Non consono</StatusBadge>
                 )}
+                {goalValidation?.canProceedToAnamnesis && (
+                  <button
+                    className="pf-button-secondary"
+                    type="button"
+                    onClick={() =>
+                      openGoalConfirmation(
+                        goalValidation,
+                        refinedGoalDraft || goalText,
+                      )
+                    }
+                  >
+                    Riapri assistente AI
+                  </button>
+                )}
               </div>
-              {goalValidation?.interpretedGoal && (
+              {goalValidation?.canProceedToAnamnesis && goalAssistantClosed && (
+                <div className="pf-goal-validated-summary">
+                  <div>
+                    <span>Obiettivo validato</span>
+                    <strong>{goalValidation.interpretedGoal}</strong>
+                  </div>
+                  <button
+                    className="pf-button-secondary"
+                    type="button"
+                    onClick={() =>
+                      openGoalConfirmation(
+                        goalValidation,
+                        refinedGoalDraft || goalText,
+                      )
+                    }
+                  >
+                    Aggiungi dettagli
+                  </button>
+                </div>
+              )}
+              {goalValidation?.canProceedToAnamnesis &&
+                !goalAssistantClosed &&
+                goalValidation?.interpretedGoal && (
                 <div className="pf-alert success">
                   <strong>Cosa ha capito l AI</strong>
                   <p>{goalValidation.interpretedGoal}</p>
                 </div>
               )}
-              {goalValidation?.suggestedReformulatedGoal && (
+              {goalValidation?.canProceedToAnamnesis &&
+                !goalAssistantClosed &&
+                goalValidation?.suggestedReformulatedGoal && (
                 <div className="pf-alert warning">
                   <strong>Proposta di riformulazione</strong>
                   <p>{goalValidation.suggestedReformulatedGoal}</p>
                 </div>
               )}
-              {goalValidation?.questionsToUser?.length ? (
+              {goalValidation?.canProceedToAnamnesis &&
+              !goalAssistantClosed &&
+              goalValidation?.questionsToUser?.length ? (
                 <div className="pf-alert warning">
                   <strong>Domande utili</strong>
                   <ul>
@@ -312,11 +501,6 @@ export default function OnboardingPage() {
                   </ul>
                 </div>
               ) : null}
-              {goalValidation && !goalValidation.canProceedToAnamnesis && (
-                <div className="pf-alert warning">
-                  {goalValidation.userMessage}
-                </div>
-              )}
             </article>
             {questionnaire?.questions.map((question) => (
               <article key={question.id} className="pf-card">
@@ -397,11 +581,11 @@ export default function OnboardingPage() {
 
           {questionnaire?.required === false ? (
             <button className="pf-button" type="button" onClick={() => { window.location.href = "/user"; }}>
-              Continue to workspace
+              Continua all'ambiente
             </button>
           ) : (
             <button className="pf-button" type="button" disabled={!completed || submitting} onClick={submit}>
-              {redirecting ? "Opening workspace..." : submitting ? "Saving..." : "Create baseline"}
+              {redirecting ? "Apertura ambiente..." : submitting ? "Salvataggio..." : "Crea baseline"}
             </button>
           )}
         </article>
@@ -409,13 +593,94 @@ export default function OnboardingPage() {
         <aside className="pf-panel">
           <div className="pf-panel-header">
             <div>
-              <h2>Baseline preview</h2>
-              <p className="pf-muted">The spider appears after saving the starter questionnaire.</p>
+              <h2>Anteprima baseline</h2>
+              <p className="pf-muted">Il grafico spider appare dopo il salvataggio del questionario iniziale.</p>
             </div>
           </div>
-          <RadarChart areas={radarAreas} />
+          <RadarChart areas={radarAree} />
         </aside>
       </section>
+      {goalModalOpen && (
+        <div className="pf-modal-backdrop" role="dialog" aria-modal="true">
+          <section className="pf-modal pf-goal-modal">
+            <div className="pf-panel-header">
+              <div>
+                <p className="pf-eyebrow">Assistente obiettivo</p>
+                <h2>Definisci meglio il tuo obiettivo</h2>
+                <p className="pf-muted">
+                  Rispondi solo alle informazioni richieste. L'AI mantiene il
+                  contesto gia scritto e aggiorna progressivamente la bozza.
+                </p>
+              </div>
+              <button
+                className="pf-button-secondary"
+                type="button"
+                onClick={() => {
+                  setGoalModalOpen(false);
+                  if (goalValidation?.canProceedToAnamnesis) {
+                    setGoalAssistantClosed(true);
+                  }
+                }}
+              >
+                Chiudi
+              </button>
+            </div>
+
+            <div className="pf-goal-draft">
+              <span>Bozza obiettivo</span>
+              <strong>{refinedGoalDraft || goalText}</strong>
+            </div>
+
+            <div className="pf-goal-chat">
+              {goalChatMessages.map((item, index) => (
+                <div
+                  key={`${item.role}-${index}`}
+                  className={`pf-goal-message ${item.role}`}
+                >
+                  <span>{item.role === "assistant" ? "AI" : "Tu"}</span>
+                  <p>{item.content}</p>
+                </div>
+              ))}
+            </div>
+
+            <label className="pf-field">
+              {goalValidation?.canProceedToAnamnesis
+                ? "Aggiungi dettagli all'obiettivo"
+                : "Risposta"}
+              <textarea
+                className="pf-textarea"
+                rows={3}
+                value={goalChatInput}
+                onChange={(event) => setGoalChatInput(event.target.value)}
+                placeholder={
+                  goalValidation?.canProceedToAnamnesis
+                    ? "Opzionale: aggiungi un dettaglio su risultato, misura, scadenza o punto di partenza."
+                    : "Rispondi solo alla domanda dell'AI, senza riscrivere tutto."
+                }
+              />
+            </label>
+
+            <div className="pf-actions">
+              <button
+                className="pf-button-secondary"
+                type="button"
+                disabled={refiningGoal || !goalChatInput.trim()}
+                onClick={refineGoal}
+              >
+                {refiningGoal ? "Analisi..." : "Invia risposta"}
+              </button>
+              <button
+                className="pf-button"
+                type="button"
+                disabled={!goalValidation?.canProceedToAnamnesis}
+                onClick={useRefinedGoal}
+              >
+                Conferma e chiudi
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </ProductShell>
   );
 }

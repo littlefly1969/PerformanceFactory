@@ -54,7 +54,7 @@ const formatDate = (value?: string) => {
   if (Number.isNaN(parsed.getTime())) {
     return "-";
   }
-  return parsed.toLocaleDateString("en-US", {
+  return parsed.toLocaleDateString("it-IT", {
     month: "short",
     day: "2-digit",
     year: "numeric",
@@ -77,7 +77,7 @@ export default function ProfessionalDashboardPage() {
     [selectedUserId, users],
   );
 
-  const radarAreas = useMemo(
+  const radarAree = useMemo(
     () =>
       snapshot?.areas.map((area) => ({
         id: area.areaId,
@@ -89,14 +89,14 @@ export default function ProfessionalDashboardPage() {
   );
 
   const highestGap = useMemo(() => {
-    const sorted = radarAreas
+    const sorted = radarAree
       .map((area) => ({
         ...area,
         gap: Math.max(0, area.potential - area.real),
       }))
       .sort((a, b) => b.gap - a.gap);
     return sorted[0] ?? null;
-  }, [radarAreas]);
+  }, [radarAree]);
 
   const totalPending = useMemo(
     () => inbox.planItems.length + inbox.questionApprovals.length,
@@ -117,13 +117,13 @@ export default function ProfessionalDashboardPage() {
     ]);
 
     if (usersRes.status === 401 || inboxRes.status === 401) {
-      setMessage("Sign in as a professional to open this workspace.");
+      setMessage("Accedi con un account professionista per aprire questo ambiente.");
       setLoading(false);
       return;
     }
 
     if (!usersRes.ok) {
-      setMessage("Unable to load linked athletes.");
+      setMessage("Impossibile caricare gli atleti collegati.");
       setLoading(false);
       return;
     }
@@ -165,36 +165,36 @@ export default function ProfessionalDashboardPage() {
 
   return (
     <ProductShell
-      eyebrow="Professional workspace"
-      title="Athlete summary"
-      description="See linked athletes, pending approval load, performance profile, and jump into the right operational page without searching."
+      eyebrow="Ambiente professionista"
+      title="Riepilogo atleti"
+      description="Vedi atleti collegati, approvazioni pendenti, profilo performance e accesso rapido alle aree operative."
       actions={
         <div className="pf-header-actions">
           <Link className="pf-button" href="/professional/approvals">
-            Review queue
+            Coda revisioni
           </Link>
           <button
             className="pf-button-secondary"
             type="button"
             onClick={() => loadDashboard()}
           >
-            Refresh
+            Aggiorna
           </button>
         </div>
       }
       stats={[
         {
-          label: "Linked athletes",
+          label: "Atleti collegati",
           value: loading ? "..." : users.length,
           tone: "accent",
         },
         {
-          label: "Pending reviews",
+          label: "Revisioni in attesa",
           value: loading ? "..." : totalPending,
           tone: "warning",
         },
         {
-          label: "Current ranking",
+          label: "Ranking corrente",
           value: snapshot?.rankingGlobal ?? "-",
           tone: "success",
         },
@@ -206,10 +206,10 @@ export default function ProfessionalDashboardPage() {
         <article className="pf-panel pf-focus-panel">
           <div className="pf-panel-header">
             <div>
-              <h2>{selectedUser?.email ?? "Selected athlete"}</h2>
+              <h2>{selectedUser?.email ?? "Atleta selezionato"}</h2>
               <p className="pf-muted">
-                Performance profile visible only for linked athletes and
-                competent areas.
+                Profilo performance visibile solo per atleti collegati e
+                aree di competenza.
               </p>
             </div>
             {snapshot && (
@@ -218,38 +218,38 @@ export default function ProfessionalDashboardPage() {
               </StatusBadge>
             )}
           </div>
-          <RadarChart areas={radarAreas} />
+          <RadarChart areas={radarAree} />
         </article>
 
         <aside className="pf-panel">
           <div className="pf-panel-header">
             <div>
-              <h2>Coaching focus</h2>
+              <h2>Focus coaching</h2>
               <p className="pf-muted">
-                Highest opportunity area and pending review load.
+                Area con maggiore opportunita e carico revisioni pendenti.
               </p>
             </div>
           </div>
           {highestGap ? (
             <div className="pf-stack">
               <div className="pf-score-card">
-                <span>Largest gap</span>
+                <span>Gap principale</span>
                 <strong>{highestGap.label}</strong>
                 <p className="pf-muted">
-                  Real {highestGap.real.toFixed(0)} · Potential{" "}
-                  {highestGap.potential.toFixed(0)} · Gap{" "}
+                  Reale {highestGap.real.toFixed(0)} - Potenziale{" "}
+                  {highestGap.potential.toFixed(0)} - Gap{" "}
                   {highestGap.gap.toFixed(0)}
                 </p>
               </div>
               <div className="pf-actions">
-                <Link className="pf-button" href="/professional/approvals">Review approvals</Link>
+                <Link className="pf-button" href="/professional/approvals">Rivedi approvazioni</Link>
                 {selectedUserId && (
                   <>
                     <Link
                       className="pf-button-secondary"
                       href={`/professional/users/${selectedUserId}/performance`}
                     >
-                      Full profile
+                      Profilo completo
                     </Link>
                     <Link
                       className="pf-button-secondary"
@@ -269,8 +269,8 @@ export default function ProfessionalDashboardPage() {
             </div>
           ) : (
             <EmptyState
-              title="No performance snapshot"
-              description="The athlete needs to close a published questionnaire before a profile is available."
+              title="Nessuno snapshot performance"
+              description="L'atleta deve chiudere un questionario pubblicato prima che il profilo sia disponibile."
             />
           )}
         </aside>
@@ -279,9 +279,9 @@ export default function ProfessionalDashboardPage() {
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
-            <h2>Roster</h2>
+            <h2>Elenco atleti</h2>
             <p className="pf-muted">
-              Linked athletes available to this professional.
+              Atleti collegati disponibili per questo professionista.
             </p>
           </div>
         </div>
@@ -309,16 +309,16 @@ export default function ProfessionalDashboardPage() {
                   tone={pendingPlan + pendingQuestions ? "warning" : "success"}
                 >
                   {pendingPlan + pendingQuestions
-                    ? `${pendingPlan + pendingQuestions} pending`
-                    : "Clear"}
+                    ? `${pendingPlan + pendingQuestions} in attesa`
+                    : "Libero"}
                 </StatusBadge>
               </button>
             );
           })}
           {!loading && users.length === 0 && (
             <EmptyState
-              title="No linked athletes"
-              description="Link athletes from the admin workspace or seed demo data."
+              title="Nessun atleta collegato"
+              description="Collega atleti dall'ambiente admin o dai dati demo."
             />
           )}
         </div>

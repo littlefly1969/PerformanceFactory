@@ -24,7 +24,7 @@ export class ProfessionalService {
 
   async getApprovalsInbox(actor: Actor) {
     if (actor.role !== UserRole.PROFESSIONAL) {
-      throw new ForbiddenException('Only professionals can access inbox');
+      throw new ForbiddenException('Solo i professionisti possono accedere alla coda');
     }
 
     const [linkedUsers, areas] = await Promise.all([
@@ -176,11 +176,11 @@ export class ProfessionalService {
     approvalId?: string,
   ) {
     if (actor.role !== UserRole.PROFESSIONAL) {
-      throw new ForbiddenException('Only professionals can approve');
+      throw new ForbiddenException('Solo i professionisti possono approvare');
     }
 
     if (!questionSetId) {
-      throw new BadRequestException('Missing question set id');
+      throw new BadRequestException('ID questionario mancante');
     }
 
     let approval: {
@@ -219,7 +219,7 @@ export class ProfessionalService {
 
       if (pending.length > 1) {
         throw new BadRequestException(
-          'Multiple approvals pending; specify approvalId',
+          'Piu approvazioni in attesa: specifica approvalId',
         );
       }
 
@@ -239,15 +239,15 @@ export class ProfessionalService {
     }
 
     if (!approval) {
-      throw new NotFoundException('Approval record not found');
+      throw new NotFoundException('Record approvazione non trovato');
     }
 
     if (approval.status !== 'PENDING') {
-      throw new BadRequestException('Approval already decided');
+      throw new BadRequestException('Approvazione gia decisa');
     }
 
     if (approval.questionSet.status !== 'PENDING_APPROVAL') {
-      throw new BadRequestException('Question set not in approval');
+      throw new BadRequestException('Il questionario non e in approvazione');
     }
 
     const allowed = await this.abac.canAccessUserArea(
@@ -256,7 +256,7 @@ export class ProfessionalService {
       approval.areaId,
     );
     if (!allowed) {
-      throw new ForbiddenException('Not allowed for this area');
+      throw new ForbiddenException('Operazione non consentita per questa area');
     }
 
     const updated = await this.prisma.questionSetAreaApproval.update({
@@ -287,14 +287,14 @@ export class ProfessionalService {
     approvalId?: string,
   ) {
     if (actor.role !== UserRole.PROFESSIONAL) {
-      throw new ForbiddenException('Only professionals can reject');
+      throw new ForbiddenException('Solo i professionisti possono rifiutare');
     }
     if (!rejectionReason) {
-      throw new BadRequestException('Missing rejection reason');
+      throw new BadRequestException('Motivo del rifiuto mancante');
     }
 
     if (!questionSetId) {
-      throw new BadRequestException('Missing question set id');
+      throw new BadRequestException('ID questionario mancante');
     }
 
     let approval: {
@@ -333,7 +333,7 @@ export class ProfessionalService {
 
       if (pending.length > 1) {
         throw new BadRequestException(
-          'Multiple approvals pending; specify approvalId',
+          'Piu approvazioni in attesa: specifica approvalId',
         );
       }
 
@@ -353,15 +353,15 @@ export class ProfessionalService {
     }
 
     if (!approval) {
-      throw new NotFoundException('Approval record not found');
+      throw new NotFoundException('Record approvazione non trovato');
     }
 
     if (approval.status !== 'PENDING') {
-      throw new BadRequestException('Approval already decided');
+      throw new BadRequestException('Approvazione gia decisa');
     }
 
     if (approval.questionSet.status !== 'PENDING_APPROVAL') {
-      throw new BadRequestException('Question set not in approval');
+      throw new BadRequestException('Il questionario non e in approvazione');
     }
 
     const allowed = await this.abac.canAccessUserArea(
@@ -370,7 +370,7 @@ export class ProfessionalService {
       approval.areaId,
     );
     if (!allowed) {
-      throw new ForbiddenException('Not allowed for this area');
+      throw new ForbiddenException('Operazione non consentita per questa area');
     }
 
     const updated = await this.prisma.questionSetAreaApproval.update({
@@ -397,7 +397,7 @@ export class ProfessionalService {
 
   async approvePlanItem(actor: Actor, planItemId: string) {
     if (actor.role !== UserRole.PROFESSIONAL) {
-      throw new ForbiddenException('Only professionals can approve');
+      throw new ForbiddenException('Solo i professionisti possono approvare');
     }
 
     const planItem = await this.prisma.planItem.findUnique({
@@ -412,15 +412,15 @@ export class ProfessionalService {
     });
 
     if (!planItem) {
-      throw new NotFoundException('Plan item not found');
+      throw new NotFoundException('Attivita piano non trovata');
     }
 
     if (planItem.status !== 'PROPOSED') {
-      throw new BadRequestException('Plan item already decided');
+      throw new BadRequestException('Attivita piano gia decisa');
     }
 
     if (planItem.planRelease.status !== 'PENDING_APPROVAL') {
-      throw new BadRequestException('Plan release not in approval');
+      throw new BadRequestException('Il rilascio piano non e in approvazione');
     }
 
     const allowed = await this.abac.canAccessUserArea(
@@ -429,7 +429,7 @@ export class ProfessionalService {
       planItem.areaId,
     );
     if (!allowed) {
-      throw new ForbiddenException('Not allowed for this plan item');
+      throw new ForbiddenException('Operazione non consentita per questa attivita piano');
     }
 
     const updated = await this.prisma.planItem.update({
@@ -457,10 +457,10 @@ export class ProfessionalService {
     rejectionReason: string,
   ) {
     if (actor.role !== UserRole.PROFESSIONAL) {
-      throw new ForbiddenException('Only professionals can reject');
+      throw new ForbiddenException('Solo i professionisti possono rifiutare');
     }
     if (!rejectionReason) {
-      throw new BadRequestException('Missing rejection reason');
+      throw new BadRequestException('Motivo del rifiuto mancante');
     }
 
     const planItem = await this.prisma.planItem.findUnique({
@@ -475,15 +475,15 @@ export class ProfessionalService {
     });
 
     if (!planItem) {
-      throw new NotFoundException('Plan item not found');
+      throw new NotFoundException('Attivita piano non trovata');
     }
 
     if (planItem.status !== 'PROPOSED') {
-      throw new BadRequestException('Plan item already decided');
+      throw new BadRequestException('Attivita piano gia decisa');
     }
 
     if (planItem.planRelease.status !== 'PENDING_APPROVAL') {
-      throw new BadRequestException('Plan release not in approval');
+      throw new BadRequestException('Il rilascio piano non e in approvazione');
     }
 
     const allowed = await this.abac.canAccessUserArea(
@@ -492,7 +492,7 @@ export class ProfessionalService {
       planItem.areaId,
     );
     if (!allowed) {
-      throw new ForbiddenException('Not allowed for this plan item');
+      throw new ForbiddenException('Operazione non consentita per questa attivita piano');
     }
 
     const updated = await this.prisma.planItem.update({
@@ -519,7 +519,7 @@ export class ProfessionalService {
 
   async getCycleStatus(actor: Actor, cycleId: string) {
     if (!cycleId) {
-      throw new BadRequestException('Missing cycle id');
+      throw new BadRequestException('ID ciclo mancante');
     }
 
     const plan = await this.prisma.improvementPlanRelease.findUnique({
@@ -551,13 +551,13 @@ export class ProfessionalService {
     });
 
     if (!plan) {
-      throw new NotFoundException('Cycle not found');
+      throw new NotFoundException('Ciclo non trovato');
     }
 
     if (actor.role === UserRole.PROFESSIONAL) {
       const allowed = await this.abac.canAccessUser(actor.id, plan.userId);
       if (!allowed) {
-        throw new ForbiddenException('Not allowed for this user');
+        throw new ForbiddenException('Operazione non consentita per questo utente');
       }
     }
 

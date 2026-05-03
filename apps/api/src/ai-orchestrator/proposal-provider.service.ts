@@ -172,6 +172,12 @@ export type GoalValidationInput = {
   areas: AiAreaInput[];
   onboardingProfile?: unknown;
   onboardingAnswers?: unknown;
+  refinementContext?: {
+    originalGoal: string;
+    currentDraft: string;
+    messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+    userReply: string;
+  };
 };
 
 export type GoalValidationStatus =
@@ -301,7 +307,7 @@ export class AiProposalProviderService {
     if (provider === 'stub' || provider === 'openai' || provider === 'gemini') {
       return provider;
     }
-    throw new BadRequestException(`Unsupported AI_PROVIDER: ${provider}`);
+    throw new BadRequestException(`AI_PROVIDER non supportato: ${provider}`);
   }
 
   private generateStubProposal(
@@ -354,7 +360,7 @@ export class AiProposalProviderService {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       throw new BadRequestException(
-        'OPENAI_API_KEY is required for AI_PROVIDER=openai',
+        'OPENAI_API_KEY e obbligatoria per AI_PROVIDER=openai',
       );
     }
 
@@ -391,7 +397,7 @@ export class AiProposalProviderService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new BadRequestException(`OpenAI proposal failed: ${errorText}`);
+      throw new BadRequestException(`Proposta OpenAI non riuscita: ${errorText}`);
     }
 
     const payload = (await response.json()) as {
@@ -406,7 +412,7 @@ export class AiProposalProviderService {
         .find((text): text is string => !!text);
 
     if (!outputText) {
-      throw new BadRequestException('OpenAI proposal response is empty');
+      throw new BadRequestException('La risposta proposta OpenAI e vuota');
     }
 
     const parsed = this.parseProposalJson(outputText, 'OpenAI');
@@ -429,7 +435,7 @@ export class AiProposalProviderService {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new BadRequestException(
-        'GEMINI_API_KEY is required for AI_PROVIDER=gemini',
+        'GEMINI_API_KEY e obbligatoria per AI_PROVIDER=gemini',
       );
     }
 
@@ -470,7 +476,7 @@ export class AiProposalProviderService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new BadRequestException(`Gemini proposal failed: ${errorText}`);
+      throw new BadRequestException(`Proposta Gemini non riuscita: ${errorText}`);
     }
 
     const payload = (await response.json()) as {
@@ -489,9 +495,9 @@ export class AiProposalProviderService {
       const reason =
         payload.promptFeedback?.blockReason ??
         payload.candidates?.[0]?.finishReason ??
-        'empty response';
+        'risposta vuota';
       throw new BadRequestException(
-        `Gemini proposal response is empty: ${reason}`,
+        `La risposta proposta Gemini e vuota: ${reason}`,
       );
     }
 
@@ -514,7 +520,7 @@ export class AiProposalProviderService {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       throw new BadRequestException(
-        'OPENAI_API_KEY is required for AI_PROVIDER=openai',
+        'OPENAI_API_KEY e obbligatoria per AI_PROVIDER=openai',
       );
     }
 
@@ -551,7 +557,7 @@ export class AiProposalProviderService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new BadRequestException(`OpenAI goal prompts failed: ${errorText}`);
+      throw new BadRequestException(`Prompt obiettivo OpenAI non riusciti: ${errorText}`);
     }
 
     const payload = (await response.json()) as {
@@ -565,7 +571,7 @@ export class AiProposalProviderService {
         .map((content) => content.text)
         .find((text): text is string => !!text);
     if (!outputText) {
-      throw new BadRequestException('OpenAI goal prompt response is empty');
+      throw new BadRequestException('La risposta prompt obiettivo OpenAI e vuota');
     }
 
     return this.normalizeGoalAreaPrompts(
@@ -584,7 +590,7 @@ export class AiProposalProviderService {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       throw new BadRequestException(
-        'OPENAI_API_KEY is required for AI_PROVIDER=openai',
+        'OPENAI_API_KEY e obbligatoria per AI_PROVIDER=openai',
       );
     }
 
@@ -618,7 +624,7 @@ export class AiProposalProviderService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new BadRequestException(`OpenAI goal validation failed: ${errorText}`);
+      throw new BadRequestException(`Validazione obiettivo OpenAI non riuscita: ${errorText}`);
     }
 
     const payload = (await response.json()) as {
@@ -632,7 +638,7 @@ export class AiProposalProviderService {
         .map((content) => content.text)
         .find((text): text is string => !!text);
     if (!outputText) {
-      throw new BadRequestException('OpenAI goal validation response is empty');
+      throw new BadRequestException('La risposta validazione obiettivo OpenAI e vuota');
     }
     return this.normalizeGoalValidation(
       input,
@@ -650,7 +656,7 @@ export class AiProposalProviderService {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new BadRequestException(
-        'GEMINI_API_KEY is required for AI_PROVIDER=gemini',
+        'GEMINI_API_KEY e obbligatoria per AI_PROVIDER=gemini',
       );
     }
 
@@ -687,7 +693,7 @@ export class AiProposalProviderService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new BadRequestException(`Gemini goal prompts failed: ${errorText}`);
+      throw new BadRequestException(`Prompt obiettivo Gemini non riusciti: ${errorText}`);
     }
 
     const payload = (await response.json()) as {
@@ -700,8 +706,8 @@ export class AiProposalProviderService {
       .join('');
     if (!outputText) {
       throw new BadRequestException(
-        `Gemini goal prompt response is empty: ${
-          payload.promptFeedback?.blockReason ?? 'empty response'
+        `La risposta prompt obiettivo Gemini e vuota: ${
+          payload.promptFeedback?.blockReason ?? 'risposta vuota'
         }`,
       );
     }
@@ -722,7 +728,7 @@ export class AiProposalProviderService {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       throw new BadRequestException(
-        'GEMINI_API_KEY is required for AI_PROVIDER=gemini',
+        'GEMINI_API_KEY e obbligatoria per AI_PROVIDER=gemini',
       );
     }
 
@@ -761,7 +767,7 @@ export class AiProposalProviderService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new BadRequestException(`Gemini goal validation failed: ${errorText}`);
+      throw new BadRequestException(`Validazione obiettivo Gemini non riuscita: ${errorText}`);
     }
 
     const payload = (await response.json()) as {
@@ -774,8 +780,8 @@ export class AiProposalProviderService {
       .join('');
     if (!outputText) {
       throw new BadRequestException(
-        `Gemini goal validation response is empty: ${
-          payload.promptFeedback?.blockReason ?? 'empty response'
+        `La risposta validazione obiettivo Gemini e vuota: ${
+          payload.promptFeedback?.blockReason ?? 'risposta vuota'
         }`,
       );
     }
@@ -833,7 +839,7 @@ export class AiProposalProviderService {
       }));
 
     if (planItems.length === 0 || questions.length !== QUESTIONS_PER_AREA) {
-      throw new BadRequestException(`${provider} proposal failed validation`);
+      throw new BadRequestException(`Validazione proposta ${provider} non riuscita`);
     }
 
     const proposal = {
@@ -930,6 +936,7 @@ export class AiProposalProviderService {
         'Tecnico-tattica',
       ],
       athleteGoal: input.goalText,
+      refinementContext: input.refinementContext ?? null,
       datiAnamnestici: input.onboardingProfile ?? null,
       storicoRisposte: input.onboardingAnswers ?? null,
       availableAreas: input.areas,
@@ -941,11 +948,11 @@ export class AiProposalProviderService {
         'UNSAFE',
       ],
       decisionRules: {
-        OK: 'Obiettivo sportivo/performance, chiaro, sicuro, personale, misurabile e dati sufficienti per generare prompt area.',
+        OK: 'Obiettivo sportivo/performance, chiaro, sicuro, personale e misurabile nei suoi elementi essenziali. Non servono ancora frequenza di allenamento, dieta, abitudini o anamnesi: quei dati arrivano dopo nei questionari.',
         NEEDS_ANAMNESIS:
-          'Obiettivo valido ma mancano dati personali indispensabili.',
+          'Usalo solo se l obiettivo cita dolore, trauma, patologie, sintomi o rischio concreto che richiede dati personali prima di procedere.',
         GOAL_NEEDS_REFORMULATION:
-          'Obiettivo potenzialmente coerente ma troppo vago, generico, non misurabile o troppo orientato a battere altri.',
+          'Obiettivo potenzialmente coerente ma troppo vago, generico, non misurabile, senza sport/attivita, senza risultato desiderato o troppo orientato a battere altri.',
         OUT_OF_SCOPE:
           'Obiettivo non collegato a sport, performance, benessere funzionale o miglioramento personale.',
         UNSAFE:
@@ -959,6 +966,11 @@ export class AiProposalProviderService {
       outputRules: [
         'Rispondi solo in JSON valido.',
         'Il campo status governa il flusso.',
+        'Se refinementContext e presente, conserva le parti gia utili dell obiettivo originale e della bozza corrente, integra solo le nuove risposte dell utente e non chiedere di riscrivere tutto.',
+        'La fase corrente serve SOLO a definire l obiettivo, non a fare anamnesi, onboarding, piano di allenamento o questionario sulle abitudini.',
+        'Se mancano informazioni, fai al massimo 3 domande specifiche e brevi in questions_to_user, riferite solo a: sport/attivita, risultato concreto desiderato, criterio di misura, orizzonte temporale, punto di partenza espresso come prestazione attuale.',
+        'Non chiedere quante volte si allena, quanto spesso si allena, quanto mangia, cosa mangia, dieta, sonno, stress, disponibilita settimanale, attrezzatura, infortuni o dettagli sul metodo per raggiungere l obiettivo. Questi dati appartengono ai questionari successivi.',
+        'Se l obiettivo e gia comprensibile ma mancano dettagli sul metodo o sulle abitudini, considera status=OK e lascia che i questionari raccolgano quei dati.',
         'Se status diverso da OK, area_prompts deve avere tutti i valori null.',
         'Se status OK, compila tutti i sei prompt area.',
         'Ogni prompt area deve essere utilizzabile da un modulo AI specialistico e contenere role, objective, required_inputs, initial_questionnaire, exercise_generation_rules, feedback_questions, progression_rules, measurement_indicators, safety_limits, output_format.',
@@ -1231,7 +1243,7 @@ export class AiProposalProviderService {
       };
     } catch {
       throw new BadRequestException(
-        `${providerName} proposal response is not valid JSON`,
+        `La risposta proposta ${providerName} non e un JSON valido`,
       );
     }
   }
@@ -1243,7 +1255,7 @@ export class AiProposalProviderService {
       };
     } catch {
       throw new BadRequestException(
-        `${providerName} goal prompt response is not valid JSON`,
+        `La risposta prompt obiettivo ${providerName} non e un JSON valido`,
       );
     }
   }
@@ -1262,7 +1274,7 @@ export class AiProposalProviderService {
       };
     } catch {
       throw new BadRequestException(
-        `${providerName} goal validation response is not valid JSON`,
+        `La risposta validazione obiettivo ${providerName} non e un JSON valido`,
       );
     }
   }
@@ -1311,9 +1323,9 @@ export class AiProposalProviderService {
       interpretedGoal,
       userMessage,
       suggestedReformulatedGoal: parsed.suggested_reformulated_goal ?? null,
-      questionsToUser: Array.isArray(parsed.questions_to_user)
-        ? parsed.questions_to_user.filter((item): item is string => typeof item === 'string')
-        : [],
+      questionsToUser: this.normalizeGoalClarificationQuestions(
+        parsed.questions_to_user,
+      ),
       normalizedGoal,
       goalEvaluation,
       nextStep: parsed.next_step ?? (accepted ? 'Procedere con il percorso.' : 'Attendere nuovo obiettivo.'),
@@ -1348,6 +1360,22 @@ export class AiProposalProviderService {
       return improvement;
     }
     return null;
+  }
+
+  private normalizeGoalClarificationQuestions(questions?: unknown) {
+    if (!Array.isArray(questions)) {
+      return [];
+    }
+
+    const forbiddenPattern =
+      /\b(quante volte|quanto spesso|frequenza|giorni alla settimana|ore alla settimana|ti alleni|allenamenti|sessioni|mangi|mangiare|alimentazione|dieta|calorie|proteine|carboidrati|sonno|dormi|stress|attrezzatura|infortuni|dolore)\b/i;
+
+    return questions
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .filter((item) => !forbiddenPattern.test(item))
+      .slice(0, 3);
   }
 
   private normalizeAreaPromptsFromValidation(
@@ -1520,7 +1548,7 @@ export class AiProposalProviderService {
     }));
 
     if (areaPrompts.some((item) => !item.promptText.trim())) {
-      throw new BadRequestException(`${provider} goal prompts failed validation`);
+      throw new BadRequestException(`Validazione prompt obiettivo ${provider} non riuscita`);
     }
 
     return {

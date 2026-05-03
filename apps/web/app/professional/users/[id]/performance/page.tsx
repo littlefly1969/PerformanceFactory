@@ -34,7 +34,7 @@ type PlanItem = {
   completedAt?: string | null;
   completionRating?: number | null;
 };
-type Plan = {
+type Piano = {
   id: string;
   areaId: string;
   version: number;
@@ -64,25 +64,32 @@ const formatDate = (value?: string) => {
   if (Number.isNaN(parsed.getTime())) {
     return "-";
   }
-  return parsed.toLocaleDateString("en-US", {
+  return parsed.toLocaleDateString("it-IT", {
     month: "short",
     day: "2-digit",
     year: "numeric",
   });
 };
-const cleanStatus = (status: string) => status.replace(/_/g, " ").toLowerCase();
+const cleanStato = (status: string) =>
+  ({
+    ACTIVE: "attivo",
+    COMPLETED: "completato",
+    CLOSED: "chiuso",
+    PENDING: "in attesa",
+    PUBLISHED: "pubblicato",
+  })[status] ?? status.replace(/_/g, " ").toLowerCase();
 
 export default function ProfessionalUserPerformancePage() {
   const params = useParams();
   const userId = typeof params?.id === "string" ? params.id : "";
   const [current, setCurrent] = useState<Snapshot | null>(null);
   const [history, setHistory] = useState<Snapshot[]>([]);
-  const [planHistory, setPlanHistory] = useState<Plan[]>([]);
+  const [planHistory, setPianoHistory] = useState<Piano[]>([]);
   const [questionHistory, setQuestionHistory] = useState<QuestionSet[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const radarAreas = useMemo(
+  const radarAree = useMemo(
     () =>
       current?.areas.map((area) => ({
         id: area.areaId,
@@ -104,7 +111,7 @@ export default function ProfessionalUserPerformancePage() {
     [history],
   );
 
-  const loadProfile = async () => {
+  const loadProfilo = async () => {
     if (!userId) {
       return;
     }
@@ -125,8 +132,8 @@ export default function ProfessionalUserPerformancePage() {
     if (!currentRes.ok || !historyRes.ok) {
       setMessage(
         currentRes.status === 403 || historyRes.status === 403
-          ? "You are not allowed to view this athlete profile."
-          : "Unable to load performance profile.",
+          ? "Non sei autorizzato a vedere il profilo di questo atleta."
+          : "Impossibile caricare il profilo performance.",
       );
       setLoading(false);
       return;
@@ -138,7 +145,7 @@ export default function ProfessionalUserPerformancePage() {
     setHistory(nextHistory);
     const areaHistories = await Promise.all(
       nextCurrent.areas.map(async (area) => {
-        const [plansRes, questionsRes] = await Promise.all([
+        const [plansRes, domandeRes] = await Promise.all([
           secureFetch(
             `${API_BASE}/plans/history${query}&areaId=${encodeURIComponent(area.areaId)}`,
             { credentials: "include" },
@@ -149,38 +156,38 @@ export default function ProfessionalUserPerformancePage() {
           ),
         ]);
         return {
-          plans: plansRes.ok ? ((await plansRes.json()) as Plan[]) : [],
-          questions: questionsRes.ok
-            ? ((await questionsRes.json()) as QuestionSet[])
+          plans: plansRes.ok ? ((await plansRes.json()) as Piano[]) : [],
+          questions: domandeRes.ok
+            ? ((await domandeRes.json()) as QuestionSet[])
             : [],
         };
       }),
     );
-    setPlanHistory(areaHistories.flatMap((entry) => entry.plans));
+    setPianoHistory(areaHistories.flatMap((entry) => entry.plans));
     setQuestionHistory(areaHistories.flatMap((entry) => entry.questions));
     setLoading(false);
   };
 
   useEffect(() => {
-    void loadProfile();
+    void loadProfilo();
   }, [userId]);
 
   return (
     <ProductShell
-      eyebrow="Professional workspace"
-      title="Athlete performance profile"
-      description="Read-only performance history for a linked athlete, filtered by your assigned areas."
+      eyebrow="Ambiente professionista"
+      title="Profilo performance atleta"
+      description="Storico performance in sola lettura per un atleta collegato, filtrato sulle aree assegnate."
       actions={
         <div className="pf-header-actions">
           <Link className="pf-button-secondary" href="/professional">
-            Back to athletes
+            Torna agli atleti
           </Link>
           <button
             className="pf-button-secondary"
             type="button"
-            onClick={() => loadProfile()}
+            onClick={() => loadProfilo()}
           >
-            Refresh
+            Aggiorna
           </button>
         </div>
       }
@@ -191,12 +198,12 @@ export default function ProfessionalUserPerformancePage() {
           tone: "accent",
         },
         {
-          label: "Visible areas",
+          label: "Aree visibili",
           value: loading ? "..." : (current?.areas.length ?? "-"),
           tone: "success",
         },
         {
-          label: "Snapshots",
+          label: "Snapshot",
           value: loading ? "..." : history.length,
           tone: "warning",
         },
@@ -208,9 +215,9 @@ export default function ProfessionalUserPerformancePage() {
         <article className="pf-panel pf-focus-panel">
           <div className="pf-panel-header">
             <div>
-              <h2>Current snapshot</h2>
+              <h2>Snapshot corrente</h2>
               <p className="pf-muted">
-                R/P values are visible only for the areas assigned to you.
+                I valori R/P sono visibili solo per le aree assegnate a te.
               </p>
             </div>
             {current && (
@@ -219,14 +226,14 @@ export default function ProfessionalUserPerformancePage() {
               </StatusBadge>
             )}
           </div>
-          <RadarChart areas={radarAreas} />
+          <RadarChart areas={radarAree} />
         </article>
 
         <aside className="pf-panel">
           <div className="pf-panel-header">
             <div>
-              <h2>Area values</h2>
-              <p className="pf-muted">Current real and potential scores.</p>
+              <h2>Valori area</h2>
+              <p className="pf-muted">Punteggi reali e potenziali correnti.</p>
             </div>
           </div>
           <div className="pf-stack">
@@ -240,8 +247,8 @@ export default function ProfessionalUserPerformancePage() {
             ))}
             {!loading && !current && (
               <EmptyState
-                title="No snapshot"
-                description="The athlete has no published performance snapshot yet."
+                title="Nessuno snapshot"
+                description="L'atleta non ha ancora uno snapshot performance pubblicato."
               />
             )}
           </div>
@@ -251,9 +258,9 @@ export default function ProfessionalUserPerformancePage() {
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
-            <h2>Snapshot history</h2>
+            <h2>Storico snapshot</h2>
             <p className="pf-muted">
-              Historical ranking and generation reason.
+              Ranking storico e motivo della generazione.
             </p>
           </div>
         </div>
@@ -272,8 +279,8 @@ export default function ProfessionalUserPerformancePage() {
           ))}
           {!loading && sortedHistory.length === 0 && (
             <EmptyState
-              title="No history"
-              description="Snapshots appear after each closed cycle."
+              title="Nessuno storico"
+              description="Gli snapshot appaiono dopo ogni ciclo chiuso."
             />
           )}
         </div>
@@ -297,7 +304,7 @@ export default function ProfessionalUserPerformancePage() {
                   <p className="pf-muted">{formatDate(plan.createdAt)}</p>
                 </div>
                 <StatusBadge tone={plan.status === "ACTIVE" ? "accent" : "neutral"}>
-                  {cleanStatus(plan.status)}
+                  {cleanStato(plan.status)}
                 </StatusBadge>
               </div>
               <div className="pf-stack">
@@ -306,9 +313,9 @@ export default function ProfessionalUserPerformancePage() {
                     <span>
                       <strong>{item.title}</strong>
                       <small>
-                        {cleanStatus(item.status)}
-                        {item.completedAt ? ` · completed ${formatDate(item.completedAt)}` : ""}
-                        {item.completionRating ? ` · rating ${item.completionRating}` : ""}
+                        {cleanStato(item.status)}
+                        {item.completedAt ? ` - completato ${formatDate(item.completedAt)}` : ""}
+                        {item.completionRating ? ` - voto ${item.completionRating}` : ""}
                       </small>
                     </span>
                     <p className="pf-muted">{item.body}</p>
@@ -318,7 +325,7 @@ export default function ProfessionalUserPerformancePage() {
             </article>
           ))}
           {!loading && planHistory.length === 0 && (
-            <EmptyState title="No plan history" description="Published plan history will appear here." />
+            <EmptyState title="Nessuno storico piani" description="Lo storico dei piani pubblicati apparira qui." />
           )}
         </div>
       </section>
@@ -338,10 +345,10 @@ export default function ProfessionalUserPerformancePage() {
               <div className="pf-card-top">
                 <div>
                   <h3>{formatDate(set.createdAt)}</h3>
-                  <p className="pf-muted">{set.questions.length} questions</p>
+                  <p className="pf-muted">{set.questions.length} domande</p>
                 </div>
                 <StatusBadge tone={set.status === "CLOSED" ? "success" : "warning"}>
-                  {cleanStatus(set.status)}
+                  {cleanStato(set.status)}
                 </StatusBadge>
               </div>
               <div className="pf-stack">
@@ -354,7 +361,7 @@ export default function ProfessionalUserPerformancePage() {
                     <div key={question.id} className="pf-work-row">
                       <span>
                         <strong>{question.orderIndex}. {question.text}</strong>
-                        <small>{answerLabel ?? "No answer recorded"}</small>
+                        <small>{answerLabel ?? "Nessuna risposta registrata"}</small>
                       </span>
                     </div>
                   );
@@ -363,7 +370,7 @@ export default function ProfessionalUserPerformancePage() {
             </article>
           ))}
           {!loading && questionHistory.length === 0 && (
-            <EmptyState title="No questionnaire history" description="Questionnaire history will appear here." />
+            <EmptyState title="Nessuno storico questionari" description="Lo storico dei questionari apparira qui." />
           )}
         </div>
       </section>

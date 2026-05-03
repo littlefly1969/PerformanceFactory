@@ -4,7 +4,7 @@ import { LanguageProvider } from "@/app/components/language-provider";
 
 export const metadata: Metadata = {
   title: "PerformanceFactory",
-  description: "Performance planning and review platform",
+  description: "Piattaforma per pianificazione e revisione della performance",
 };
 
 export default function RootLayout({

@@ -30,7 +30,7 @@ export class QuestionsController {
   constructor(private readonly questions: QuestionsService) {}
 
   @Get('current')
-  @ApiOperation({ summary: 'Get current open question set' })
+  @ApiOperation({ summary: 'Ottieni questionario aperto corrente' })
   @ApiQuery({ name: 'userId', required: false })
   @ApiQuery({ name: 'areaId', required: true })
   @ApiCookieAuth()
@@ -48,7 +48,7 @@ export class QuestionsController {
   }
 
   @Get('history')
-  @ApiOperation({ summary: 'Get question set history' })
+  @ApiOperation({ summary: 'Ottieni storico questionari' })
   @ApiQuery({ name: 'userId', required: false })
   @ApiQuery({ name: 'areaId', required: true })
   @ApiCookieAuth()
@@ -66,7 +66,7 @@ export class QuestionsController {
   }
 
   @Post(':setId/close')
-  @ApiOperation({ summary: 'Close a question set' })
+  @ApiOperation({ summary: 'Chiudi un questionario' })
   @ApiParam({ name: 'setId' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
@@ -81,7 +81,7 @@ export class QuestionsController {
   }
 
   @Get('approvals/pending')
-  @ApiOperation({ summary: 'List pending question approvals for professional' })
+  @ApiOperation({ summary: 'Elenca approvazioni questionari in attesa per professionista' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
   getPendingApprovals(@Req() req: { user?: { id: string; role: UserRole } }) {
@@ -92,7 +92,7 @@ export class QuestionsController {
   }
 
   @Post(':setId/areas/:areaId/approve')
-  @ApiOperation({ summary: 'Approve a question set area' })
+  @ApiOperation({ summary: 'Approva area questionario' })
   @ApiParam({ name: 'setId' })
   @ApiParam({ name: 'areaId' })
   @ApiBody({ type: AreaApprovalDto })
@@ -113,7 +113,7 @@ export class QuestionsController {
   }
 
   @Post(':setId/areas/:areaId/reject')
-  @ApiOperation({ summary: 'Reject a question set area' })
+  @ApiOperation({ summary: 'Rifiuta area questionario' })
   @ApiParam({ name: 'setId' })
   @ApiParam({ name: 'areaId' })
   @ApiBody({ type: AreaApprovalDto })
@@ -134,7 +134,7 @@ export class QuestionsController {
   }
 
   @Patch(':setId/questions/:questionId')
-  @ApiOperation({ summary: 'Update a question (professional only)' })
+  @ApiOperation({ summary: 'Aggiorna una domanda (solo professionista)' })
   @ApiParam({ name: 'setId' })
   @ApiParam({ name: 'questionId' })
   @ApiBody({ type: UpdateQuestionDto })
@@ -155,7 +155,7 @@ export class QuestionsController {
   }
 
   @Patch('questions/:questionId/options/:optionId')
-  @ApiOperation({ summary: 'Update an answer option (professional only)' })
+  @ApiOperation({ summary: 'Aggiorna una opzione risposta (solo professionista)' })
   @ApiParam({ name: 'questionId' })
   @ApiParam({ name: 'optionId' })
   @ApiBody({ type: UpdateAnswerOptionDto })

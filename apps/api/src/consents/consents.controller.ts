@@ -20,14 +20,14 @@ export class ConsentsController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Post('ai')
-  @ApiOperation({ summary: 'Grant AI consent' })
+  @ApiOperation({ summary: 'Concedi consenso AI' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.USER)
   async grantAiConsent(@Req() req: { user?: { id: string } }) {
     const userId = req.user?.id ?? '';
     if (!userId) {
-      throw new BadRequestException('Missing user');
+      throw new BadRequestException('Utente mancante');
     }
 
     const existing = await this.prisma.consent.findFirst({

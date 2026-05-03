@@ -10,7 +10,7 @@ export class PerformanceController {
   constructor(private readonly performance: PerformanceService) {}
 
   @Get('profile/current')
-  @ApiOperation({ summary: 'Get current performance profile snapshot' })
+  @ApiOperation({ summary: 'Ottieni snapshot corrente profilo performance' })
   @ApiQuery({ name: 'userId', required: false })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
@@ -25,7 +25,7 @@ export class PerformanceController {
   }
 
   @Get('profile/history')
-  @ApiOperation({ summary: 'Get performance profile history' })
+  @ApiOperation({ summary: 'Ottieni storico profilo performance' })
   @ApiQuery({ name: 'userId', required: false })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)

@@ -150,7 +150,7 @@ export default function AdminAiConfigPage() {
       credentials: "include",
     });
     if (!response.ok) {
-      setMessage(`Configuration load failed: ${await readError(response)}`);
+      setMessage(`Caricamento configurazione non riuscito: ${await readError(response)}`);
       return;
     }
     const data = (await response.json()) as Settings;
@@ -172,13 +172,13 @@ export default function AdminAiConfigPage() {
       body: JSON.stringify(promptDraft),
     });
     if (!response.ok) {
-      setMessage(`Prompt save failed: ${await readError(response)}`);
+      setMessage(`Salvataggio prompt non riuscito: ${await readError(response)}`);
       setBusyKey(null);
       return;
     }
     setPromptDraft(emptyPrompt);
     await loadSettings();
-    setMessage("Prompt configuration saved.");
+    setMessage("Configurazione prompt salvata.");
     setBusyKey(null);
   };
 
@@ -192,7 +192,7 @@ export default function AdminAiConfigPage() {
       body: JSON.stringify(goalPromptDraft),
     });
     if (!response.ok) {
-      setMessage(`Goal prompt save failed: ${await readError(response)}`);
+      setMessage(`Salvataggio prompt obiettivo non riuscito: ${await readError(response)}`);
       setBusyKey(null);
       return;
     }
@@ -207,7 +207,7 @@ export default function AdminAiConfigPage() {
       try {
         optionsJson = JSON.parse(templateOptionsText);
       } catch {
-        setMessage("Options JSON is not valid.");
+        setMessage("Il JSON delle opzioni non e valido.");
         return;
       }
     }
@@ -225,14 +225,14 @@ export default function AdminAiConfigPage() {
       }),
     });
     if (!response.ok) {
-      setMessage(`Template save failed: ${await readError(response)}`);
+      setMessage(`Salvataggio domanda non riuscito: ${await readError(response)}`);
       setBusyKey(null);
       return;
     }
     setTemplateDraft(emptyTemplate);
     setTemplateOptionsText("");
     await loadSettings();
-    setMessage("Onboarding question saved.");
+    setMessage("Domanda onboarding salvata.");
     setBusyKey(null);
   };
 
@@ -241,7 +241,7 @@ export default function AdminAiConfigPage() {
     try {
       questionnaireLayoutJson = JSON.parse(areaConfigLayoutText);
     } catch {
-      setMessage("Questionnaire layout JSON is not valid.");
+      setMessage("Il JSON del layout questionario non e valido.");
       return;
     }
 
@@ -250,7 +250,7 @@ export default function AdminAiConfigPage() {
       Array.isArray(questionnaireLayoutJson) ||
       typeof questionnaireLayoutJson !== "object"
     ) {
-      setMessage("Questionnaire layout must be a JSON object.");
+      setMessage("Il layout questionario deve essere un oggetto JSON.");
       return;
     }
 
@@ -266,12 +266,12 @@ export default function AdminAiConfigPage() {
       }),
     });
     if (!response.ok) {
-      setMessage(`Area AI config save failed: ${await readError(response)}`);
+      setMessage(`Salvataggio configurazione AI area non riuscito: ${await readError(response)}`);
       setBusyKey(null);
       return;
     }
     await loadSettings();
-    setMessage("Area AI configuration saved.");
+    setMessage("Configurazione AI area salvata.");
     setBusyKey(null);
   };
 
@@ -292,7 +292,7 @@ export default function AdminAiConfigPage() {
       description="Configura prompt base per livello e area, e mantieni modificabili le domande generali e specifiche di onboarding."
       actions={
         <button className="pf-button-secondary" type="button" onClick={loadSettings}>
-          Refresh
+          Aggiorna
         </button>
       }
       stats={[
@@ -369,7 +369,7 @@ export default function AdminAiConfigPage() {
             disabled={busyKey === "goal-prompt"}
             onClick={saveGoalPrompt}
           >
-            Save prompt obiettivo
+            Salva prompt obiettivo
           </button>
         </div>
       </section>
@@ -470,18 +470,18 @@ export default function AdminAiConfigPage() {
               disabled={busyKey === "prompt" || promptNeedsNewName}
               onClick={savePrompt}
             >
-              {promptIdentityChanged ? "Create new prompt" : "Save prompt"}
+              {promptIdentityChanged ? "Crea nuovo prompt" : "Salva prompt"}
             </button>
             {promptNeedsNewName && (
               <p className="pf-muted">
-                Area or level changes create a new prompt, so assign a new
-                unique name before saving.
+                Le modifiche ad area o livello creano un nuovo prompt, quindi assegna un nuovo
+                nome univoco prima di salvare.
               </p>
             )}
             {promptIdentityChanged && (
               <p className="pf-muted">
-                Changing name, area, or athlete level creates a new prompt. The
-                active prompt for the same area and level will be replaced.
+                Modificare nome, area o livello atleta crea un nuovo prompt. Il
+                prompt attivo per la stessa area e livello verra sostituito.
               </p>
             )}
           </div>
@@ -505,19 +505,19 @@ export default function AdminAiConfigPage() {
                 <span>
                   <strong>{prompt.name}</strong>
                   <small>
-                    {prompt.area?.name ?? "Globale"} · {prompt.athleteLevel} ·
+                    {prompt.area?.name ?? "Globale"} - {prompt.athleteLevel} -
                     v{prompt.version ?? 1}
                   </small>
                 </span>
                 <StatusBadge tone={prompt.isActive ? "success" : "neutral"}>
-                  {prompt.isActive ? "active" : "off"}
+                  {prompt.isActive ? "attivo" : "spento"}
                 </StatusBadge>
               </button>
             ))}
             {!promptConfigs.length && (
               <EmptyState
-                title="No prompt"
-                description="Create at least one global baseline prompt."
+                title="Nessun prompt"
+                description="Crea almeno un prompt globale baseline."
               />
             )}
           </div>
@@ -606,7 +606,7 @@ export default function AdminAiConfigPage() {
               disabled={busyKey === "area-config" || !areaConfigDraft.areaId}
               onClick={saveAreaConfig}
             >
-              Save area AI config
+              Salva configurazione AI area
             </button>
           </div>
 
@@ -622,13 +622,13 @@ export default function AdminAiConfigPage() {
                   <strong>{config.area?.name ?? "Area"}</strong>
                   <small>Contesto, formato risposta e layout questionario</small>
                 </span>
-                <StatusBadge tone="success">unique</StatusBadge>
+                <StatusBadge tone="success">unico</StatusBadge>
               </button>
             ))}
             {!areaGenerationConfigs.length && (
               <EmptyState
-                title="No area config"
-                description="Refresh to create default area configurations."
+                title="Nessuna configurazione area"
+                description="Aggiorna per creare le configurazioni area predefinite."
               />
             )}
           </div>
@@ -802,7 +802,7 @@ export default function AdminAiConfigPage() {
               disabled={busyKey === "template"}
               onClick={saveTemplate}
             >
-              Save question
+              Salva domanda
             </button>
           </div>
 
@@ -820,11 +820,11 @@ export default function AdminAiConfigPage() {
                     {template.scope === "GENERAL"
                       ? "Generale"
                       : template.area?.name ?? "Area"}{" "}
-                    · {template.inputType} · order {template.orderIndex}
+                    - {template.inputType} - order {template.orderIndex}
                   </small>
                 </span>
                 <StatusBadge tone={template.isActive ? "success" : "neutral"}>
-                  {template.isActive ? "active" : "off"}
+                  {template.isActive ? "attiva" : "spenta"}
                 </StatusBadge>
               </button>
             ))}

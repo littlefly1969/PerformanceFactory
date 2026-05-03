@@ -12,7 +12,7 @@ export class ProfessionalController {
   constructor(private readonly professional: ProfessionalService) {}
 
   @Get('approvals')
-  @ApiOperation({ summary: 'Professional approval inbox' })
+  @ApiOperation({ summary: 'Coda approvazioni professionista' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
   getApprovals(@Req() req: { user?: { id: string; role: UserRole } }) {
@@ -23,7 +23,7 @@ export class ProfessionalController {
   }
 
   @Post('questionsets/:id/approve')
-  @ApiOperation({ summary: 'Approve a question set (per-area)' })
+  @ApiOperation({ summary: 'Approva un questionario (per area)' })
   @ApiParam({ name: 'id' })
   @ApiBody({ type: ApprovalDto, required: false })
   @ApiCookieAuth()
@@ -41,7 +41,7 @@ export class ProfessionalController {
   }
 
   @Post('questionsets/:id/reject')
-  @ApiOperation({ summary: 'Reject a question set (per-area)' })
+  @ApiOperation({ summary: 'Rifiuta un questionario (per area)' })
   @ApiParam({ name: 'id' })
   @ApiBody({ type: RejectionDto })
   @ApiCookieAuth()
@@ -60,7 +60,7 @@ export class ProfessionalController {
   }
 
   @Post('plan-items/:id/approve')
-  @ApiOperation({ summary: 'Approve a plan item (per-area)' })
+  @ApiOperation({ summary: 'Approva una attivita piano (per area)' })
   @ApiParam({ name: 'id' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
@@ -75,7 +75,7 @@ export class ProfessionalController {
   }
 
   @Post('plan-items/:id/reject')
-  @ApiOperation({ summary: 'Reject a plan item (per-area)' })
+  @ApiOperation({ summary: 'Rifiuta una attivita piano (per area)' })
   @ApiParam({ name: 'id' })
   @ApiBody({ type: RejectionDto })
   @ApiCookieAuth()

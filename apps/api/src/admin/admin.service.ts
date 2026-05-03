@@ -356,15 +356,15 @@ export class AdminService {
             ? pending
               ? 'Pending approval already exists'
               : !user.isActive
-                ? 'Athlete pending admin activation'
+                ? 'Atleta in attesa di attivazione admin'
               : !activeActivitiesCompleted
-                ? 'Previous activity is not completed'
-                : 'Previous questionnaire is not completed'
+                ? 'Attivita precedente non completata'
+                : 'Questionario precedente non completato'
             : generationReady
               ? active
-                ? 'Ready for next cycle'
-                : 'Ready for first AI proposal'
-              : 'Onboarding not completed',
+                ? 'Pronto per il prossimo ciclo'
+                : 'Pronto per la prima proposta AI'
+              : 'Onboarding non completato',
         };
       });
 
@@ -402,7 +402,7 @@ export class AdminService {
 
   async setUserActive(userId: string, isActive: boolean) {
     if (!userId) {
-      throw new BadRequestException('Missing user id');
+      throw new BadRequestException('ID utente mancante');
     }
 
     const user = await this.prisma.user.findUnique({
@@ -410,7 +410,7 @@ export class AdminService {
       select: { id: true, role: true },
     });
     if (!user || user.role !== UserRole.USER) {
-      throw new NotFoundException('Athlete not found');
+      throw new NotFoundException('Atleta non trovato');
     }
 
     return this.prisma.user.update({
@@ -554,7 +554,7 @@ export class AdminService {
     const basePrompt = body.basePrompt?.trim();
     const isActive = body.isActive ?? true;
     if (!actorId || !name || !basePrompt) {
-      throw new BadRequestException('Missing goal prompt fields');
+      throw new BadRequestException('Dati prompt obiettivo mancanti');
     }
 
     if (body.id) {
@@ -563,7 +563,7 @@ export class AdminService {
         select: { id: true, name: true },
       });
       if (!existing) {
-        throw new NotFoundException('Goal prompt configuration not found');
+        throw new NotFoundException('Configurazione prompt obiettivo non trovata');
       }
 
       return this.prisma.$transaction(async (tx) => {
@@ -613,7 +613,7 @@ export class AdminService {
     const isActive = body.isActive ?? true;
 
     if (!actorId || !name || !basePrompt || !athleteLevel) {
-      throw new BadRequestException('Missing prompt configuration fields');
+      throw new BadRequestException('Dati configurazione prompt mancanti');
     }
     if (areaId) {
       const area = await this.prisma.area.findUnique({
@@ -621,7 +621,7 @@ export class AdminService {
         select: { id: true },
       });
       if (!area) {
-        throw new BadRequestException('Invalid area');
+        throw new BadRequestException('Area non valida');
       }
     }
 
@@ -642,7 +642,7 @@ export class AdminService {
         },
       });
       if (!existing) {
-        throw new NotFoundException('Prompt configuration not found');
+        throw new NotFoundException('Configurazione prompt non trovata');
       }
 
       const identityChanged =
@@ -651,12 +651,12 @@ export class AdminService {
         existing.athleteLevel !== athleteLevel;
 
       if (duplicateName && duplicateName.id !== existing.id) {
-        throw new BadRequestException('Prompt name already exists');
+        throw new BadRequestException('Nome prompt gia esistente');
       }
 
       if (identityChanged) {
         if (duplicateName) {
-          throw new BadRequestException('Prompt name already exists');
+          throw new BadRequestException('Nome prompt gia esistente');
         }
         return this.createAiPromptConfig({
           name,
@@ -687,7 +687,7 @@ export class AdminService {
     }
 
     if (duplicateName) {
-      throw new BadRequestException('Prompt name already exists');
+      throw new BadRequestException('Nome prompt gia esistente');
     }
 
     return this.createAiPromptConfig({
@@ -762,7 +762,7 @@ export class AdminService {
     const responseFormatPrompt = body.responseFormatPrompt?.trim();
 
     if (!actorId || !areaId || !initialContext || !responseFormatPrompt) {
-      throw new BadRequestException('Missing area AI configuration fields');
+      throw new BadRequestException('Dati configurazione AI area mancanti');
     }
     if (
       body.questionnaireLayoutJson === undefined ||
@@ -770,7 +770,7 @@ export class AdminService {
       Array.isArray(body.questionnaireLayoutJson) ||
       typeof body.questionnaireLayoutJson !== 'object'
     ) {
-      throw new BadRequestException('Questionnaire layout must be a JSON object');
+      throw new BadRequestException('Il layout questionario deve essere un oggetto JSON');
     }
 
     const area = await this.prisma.area.findUnique({
@@ -778,7 +778,7 @@ export class AdminService {
       select: { id: true },
     });
     if (!area) {
-      throw new BadRequestException('Invalid area');
+      throw new BadRequestException('Area non valida');
     }
 
     if (body.id) {
@@ -787,7 +787,7 @@ export class AdminService {
         select: { id: true, areaId: true },
       });
       if (!existing) {
-        throw new NotFoundException('Area AI configuration not found');
+        throw new NotFoundException('Configurazione AI area non trovata');
       }
       if (existing.areaId !== areaId) {
         throw new BadRequestException(
@@ -824,14 +824,14 @@ export class AdminService {
     const key = body.key?.trim();
     const label = body.label?.trim();
     if (!actorId || !key || !label || !body.scope || !body.inputType) {
-      throw new BadRequestException('Missing onboarding template fields');
+      throw new BadRequestException('Dati template onboarding mancanti');
     }
 
     if (
       body.scope === OnboardingQuestionScope.AREA &&
       !body.areaId
     ) {
-      throw new BadRequestException('Area questions require an area');
+      throw new BadRequestException('Le domande area richiedono un area');
     }
     if (body.areaId) {
       const area = await this.prisma.area.findUnique({
@@ -839,7 +839,7 @@ export class AdminService {
         select: { id: true },
       });
       if (!area) {
-        throw new BadRequestException('Invalid area');
+        throw new BadRequestException('Area non valida');
       }
     }
 
@@ -867,7 +867,7 @@ export class AdminService {
         select: { id: true },
       });
       if (!existing) {
-        throw new NotFoundException('Onboarding template not found');
+        throw new NotFoundException('Template onboarding non trovato');
       }
       return this.prisma.onboardingQuestionTemplate.update({
         where: { id: body.id },
@@ -916,7 +916,7 @@ export class AdminService {
     for (const set of closable) {
       const result = await this.orchestrator.createSnapshotFromQuestionSet(
         set.id,
-        'Questionnaire submitted',
+        'Questionario inviato',
       );
       closed.push({
         questionSetId: set.id,

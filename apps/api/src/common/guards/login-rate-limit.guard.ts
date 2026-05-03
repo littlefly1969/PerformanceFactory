@@ -41,7 +41,7 @@ export class LoginRateLimitGuard implements CanActivate {
     bucket.count += 1;
     buckets.set(key, bucket);
     if (bucket.count > MAX_ATTEMPTS) {
-      throw new HttpException('Too many login attempts', HttpStatus.TOO_MANY_REQUESTS);
+      throw new HttpException('Troppi tentativi di accesso', HttpStatus.TOO_MANY_REQUESTS);
     }
     return true;
   }

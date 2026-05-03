@@ -41,11 +41,11 @@ export class RelationshipsService {
     areaId?: string,
   ) {
     if (!professionalId) {
-      throw new BadRequestException('Missing professional id');
+      throw new BadRequestException('ID professionista mancante');
     }
 
     if ((!userId && !userEmail) || !areaId) {
-      throw new BadRequestException('Missing user or area identifier');
+      throw new BadRequestException('Identificativo utente o area mancante');
     }
 
     const [professional, user, competence] = await Promise.all([
@@ -59,15 +59,15 @@ export class RelationshipsService {
     ]);
 
     if (!professional || professional.role !== UserRole.PROFESSIONAL) {
-      throw new BadRequestException('Invalid professional');
+      throw new BadRequestException('Professionista non valido');
     }
 
     if (!user || user.role !== UserRole.USER) {
-      throw new BadRequestException('Invalid user');
+      throw new BadRequestException('Utente non valido');
     }
     if (!competence) {
       throw new BadRequestException(
-        'Professional is not enabled for this area',
+        'Il professionista non e abilitato per questa area',
       );
     }
 

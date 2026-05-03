@@ -9,7 +9,7 @@ export class AreasController {
   constructor(private readonly areas: AreasService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List available areas' })
+  @ApiOperation({ summary: 'Elenca aree disponibili' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
   list() {

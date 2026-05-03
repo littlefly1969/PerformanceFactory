@@ -47,6 +47,11 @@ type OnboardingAnswer = {
   value: string | number | boolean | null;
 };
 
+type GoalChatMessage = {
+  role: 'user' | 'assistant';
+  content: string;
+};
+
 @Injectable()
 export class OnboardingService {
   constructor(
@@ -56,10 +61,10 @@ export class OnboardingService {
 
   private assertAthlete(actor: Actor) {
     if (!actor.id) {
-      throw new BadRequestException('Missing actor');
+      throw new BadRequestException('Attore mancante');
     }
     if (actor.role !== UserRole.USER) {
-      throw new ForbiddenException('Only athletes use onboarding');
+      throw new ForbiddenException('Solo gli atleti usano l onboarding');
     }
   }
 
@@ -167,6 +172,86 @@ export class OnboardingService {
     };
   }
 
+  async refineGoal(
+    actor: Actor,
+    input: {
+      originalGoal?: string;
+      currentDraft?: string;
+      messages?: GoalChatMessage[];
+      userReply?: string;
+    },
+  ) {
+    this.assertAthlete(actor);
+    const originalGoal = (input.originalGoal ?? '').trim();
+    const currentDraft = (input.currentDraft ?? originalGoal).trim();
+    const userReply = (input.userReply ?? '').trim();
+    const messages = (input.messages ?? [])
+      .filter(
+        (message) =>
+          (message.role === 'user' || message.role === 'assistant') &&
+          message.content.trim(),
+      )
+      .slice(-10)
+      .map((message) => ({
+        role: message.role,
+        content: message.content.trim(),
+      }));
+
+    if (!originalGoal || originalGoal.length < 10) {
+      throw new BadRequestException('Inserisci prima un obiettivo iniziale.');
+    }
+    if (!userReply || userReply.length < 2) {
+      throw new BadRequestException('Scrivi una risposta per definire meglio l obiettivo.');
+    }
+
+    const refinedGoalInput = [
+      `Obiettivo originale: ${originalGoal}`,
+      currentDraft ? `Bozza corrente: ${currentDraft}` : '',
+      `Nuova risposta utente: ${userReply}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const goalPromptConfig = await this.loadGoalPromptConfig();
+    const areas = await this.loadConfiguredAreas();
+    const validation = await this.aiProvider.validatePerformanceGoal({
+      userId: actor.id,
+      goalText: refinedGoalInput,
+      basePrompt: goalPromptConfig.basePrompt,
+      areas,
+      refinementContext: {
+        originalGoal,
+        currentDraft,
+        messages,
+        userReply,
+      },
+    });
+    const refinedGoalText =
+      validation.suggestedReformulatedGoal?.trim() ||
+      validation.interpretedGoal?.trim() ||
+      currentDraft ||
+      originalGoal;
+
+    await this.saveGoalValidation(actor.id, refinedGoalText, validation, false);
+
+    return {
+      status: validation.status,
+      accepted: validation.accepted,
+      canProceedToAnamnesis:
+        validation.status === 'OK' || validation.status === 'NEEDS_ANAMNESIS',
+      interpretedGoal: validation.interpretedGoal,
+      userMessage: validation.userMessage,
+      assistantMessage: validation.questionsToUser.length
+        ? `${validation.userMessage}\n\n${validation.questionsToUser.join('\n')}`
+        : validation.userMessage,
+      suggestedReformulatedGoal: validation.suggestedReformulatedGoal,
+      refinedGoalText,
+      questionsToUser: validation.questionsToUser,
+      normalizedGoal: validation.normalizedGoal,
+      rejectionReason: validation.rejectionReason,
+      nextStep: validation.nextStep,
+    };
+  }
+
   async submit(
     actor: Actor,
     goalTextInput: string,
@@ -175,14 +260,14 @@ export class OnboardingService {
     this.assertAthlete(actor);
     const goalText = goalTextInput.trim();
     if (goalText.length < 10) {
-      throw new BadRequestException('Performance goal is required');
+      throw new BadRequestException('L obiettivo performance e obbligatorio');
     }
     const templates = await this.loadActiveTemplates();
     const answerMap = new Map(answers.map((answer) => [answer.questionId, answer.value]));
     const normalizedAnswers = templates.map((template) => {
       const value = answerMap.get(template.id);
       if (template.required && this.isEmpty(value)) {
-        throw new BadRequestException(`Missing answer for ${template.key}`);
+        throw new BadRequestException(`Risposta mancante per ${template.key}`);
       }
       if (this.isEmpty(value)) {
         return { template, value: null, score: null };
@@ -241,7 +326,7 @@ export class OnboardingService {
     }
 
     if (areaScores.size === 0) {
-      throw new BadRequestException('At least one scored area question is required');
+      throw new BadRequestException('Serve almeno una domanda area con punteggio');
     }
 
     const scoredAreas = Array.from(areaScores.values()).map((area) => {
@@ -354,7 +439,7 @@ export class OnboardingService {
         data: {
           userId: actor.id,
           rankingGlobal,
-          reason: 'Starter questionnaire baseline',
+          reason: 'Baseline questionario iniziale',
           areas: {
             create: scoredAreas.map((area) => ({
               areaId: area.areaId,
@@ -611,7 +696,7 @@ export class OnboardingService {
       return numeric;
     }
     if (template.inputType === OnboardingInputType.SCORE) {
-      throw new BadRequestException(`Invalid score for ${template.key}`);
+      throw new BadRequestException(`Punteggio non valido per ${template.key}`);
     }
     return null;
   }

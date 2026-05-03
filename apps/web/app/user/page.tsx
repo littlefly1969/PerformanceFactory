@@ -24,7 +24,7 @@ type Snapshot = {
 type Area = { id: string; name: string };
 type Professional = { id: string; email: string };
 
-type Plan = {
+type Piano = {
   id: string;
   version: number;
   areaId: string;
@@ -46,7 +46,7 @@ type QuestionSet = {
 
 type AreaWorkspace = {
   area: Area;
-  plan?: Plan;
+  plan?: Piano;
   questionSet?: QuestionSet;
 };
 
@@ -58,7 +58,7 @@ const formatDate = (value?: string) => {
   if (Number.isNaN(parsed.getTime())) {
     return "-";
   }
-  return parsed.toLocaleDateString("en-US", { month: "short", day: "2-digit", year: "numeric" });
+  return parsed.toLocaleDateString("it-IT", { month: "short", day: "2-digit", year: "numeric" });
 };
 
 const avg = (items: number[]) => {
@@ -70,13 +70,13 @@ const avg = (items: number[]) => {
 
 export default function AthleteDashboardPage() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [areas, setAreas] = useState<Area[]>([]);
+  const [areas, setAree] = useState<Area[]>([]);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [workspace, setWorkspace] = useState<AreaWorkspace[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const radarAreas = useMemo(
+  const radarAree = useMemo(
     () =>
       snapshot?.areas.map((area) => ({
         id: area.areaId,
@@ -87,8 +87,8 @@ export default function AthleteDashboardPage() {
     [snapshot],
   );
 
-  const realAverage = useMemo(() => avg(radarAreas.map((area) => area.real)), [radarAreas]);
-  const potentialAverage = useMemo(() => avg(radarAreas.map((area) => area.potential)), [radarAreas]);
+  const realAverage = useMemo(() => avg(radarAree.map((area) => area.real)), [radarAree]);
+  const potentialAverage = useMemo(() => avg(radarAree.map((area) => area.potential)), [radarAree]);
   const activeItems = useMemo(
     () => workspace.flatMap((item) => item.plan?.items.filter((planItem) => planItem.status === "ACTIVE") ?? []),
     [workspace],
@@ -113,18 +113,18 @@ export default function AthleteDashboardPage() {
     ]);
 
     if (areasRes.status === 401 || prosRes.status === 401 || profileRes.status === 401) {
-      setMessage("Sign in as an athlete to open this workspace.");
+      setMessage("Accedi come atleta per aprire questo ambiente.");
       setLoading(false);
       return;
     }
 
-    const loadedAreas = areasRes.ok ? ((await areasRes.json()) as Area[]) : [];
-    setAreas(loadedAreas);
+    const loadedAree = areasRes.ok ? ((await areasRes.json()) as Area[]) : [];
+    setAree(loadedAree);
     setProfessionals(prosRes.ok ? ((await prosRes.json()) as Professional[]) : []);
     setSnapshot(profileRes.ok ? ((await profileRes.json()) as Snapshot) : null);
 
     const rows = await Promise.all(
-      loadedAreas.map(async (area) => {
+      loadedAree.map(async (area) => {
         const [planRes, questionRes] = await Promise.all([
           secureFetch(`${API_BASE}/user/plan/current?areaId=${encodeURIComponent(area.id)}`, { credentials: "include" }),
           secureFetch(`${API_BASE}/user/questions/current?areaId=${encodeURIComponent(area.id)}`, { credentials: "include" }),
@@ -132,7 +132,7 @@ export default function AthleteDashboardPage() {
 
         return {
           area,
-          plan: planRes.ok ? ((await planRes.json()) as Plan) : undefined,
+          plan: planRes.ok ? ((await planRes.json()) as Piano) : undefined,
           questionSet: questionRes.ok ? ((await questionRes.json()) as QuestionSet) : undefined,
         };
       }),
@@ -148,18 +148,18 @@ export default function AthleteDashboardPage() {
 
   return (
     <ProductShell
-      eyebrow="Athlete workspace"
-      title="My performance dashboard"
-      description="A personal view of current profile, active work, open check-ins, and the professional team around the athlete."
+      eyebrow="Ambiente atleta"
+      title="Cruscotto performance"
+      description="Vista personale di profilo corrente, lavoro attivo, check-in aperti e team professionale."
       actions={
         <button className="pf-button-secondary" type="button" onClick={() => loadDashboard()}>
-          Refresh
+          Aggiorna
         </button>
       }
       stats={[
-        { label: "Real average", value: loading ? "..." : realAverage || "-", tone: "accent" },
-        { label: "Potential average", value: loading ? "..." : potentialAverage || "-", tone: "success" },
-        { label: "Active work", value: loading ? "..." : activeItems.length, tone: "warning" },
+        { label: "Media reale", value: loading ? "..." : realAverage || "-", tone: "accent" },
+        { label: "Media potenziale", value: loading ? "..." : potentialAverage || "-", tone: "success" },
+        { label: "Lavoro attivo", value: loading ? "..." : activeItems.length, tone: "warning" },
       ]}
     >
       {message && <div className="pf-alert warning">{message}</div>}
@@ -168,39 +168,39 @@ export default function AthleteDashboardPage() {
         <article className="pf-panel pf-focus-panel">
           <div className="pf-panel-header">
             <div>
-              <h2>Performance spider</h2>
+              <h2>Grafico spider performance</h2>
               <p className="pf-muted">
-                Real shows current execution. Potential shows the next reachable level.
+                Reale mostra l'esecuzione corrente. Potenziale mostra il prossimo livello raggiungibile.
               </p>
             </div>
             {snapshot && <StatusBadge tone="success">{formatDate(snapshot.createdAt)}</StatusBadge>}
           </div>
-          <RadarChart areas={radarAreas} />
+          <RadarChart areas={radarAree} />
         </article>
 
         <aside className="pf-panel">
           <div className="pf-panel-header">
             <div>
-              <h2>Next actions</h2>
-              <p className="pf-muted">What needs attention now.</p>
+              <h2>Prossime azioni</h2>
+              <p className="pf-muted">Cosa richiede attenzione ora.</p>
             </div>
           </div>
           <div className="pf-stack">
             <div className="pf-metric-row">
-              <Link href="/user/plan">Active plan items</Link>
+              <Link href="/user/plan">Attivita piano attive</Link>
               <strong>{activeItems.length}</strong>
             </div>
             <div className="pf-metric-row">
-              <Link href="/user/questions">Open questionnaires</Link>
+              <Link href="/user/questions">Questionari aperti</Link>
               <strong>{openQuestionSets.length}</strong>
             </div>
             <div className="pf-metric-row">
-              <Link href="/user/performance">Performance history</Link>
+              <Link href="/user/performance">Storico performance</Link>
               <strong>{professionals.length}</strong>
             </div>
             <div className="pf-actions">
-              <Link className="pf-button" href="/user/plan">Open plan</Link>
-              <Link className="pf-button-secondary" href="/user/questions">Answer check-in</Link>
+              <Link className="pf-button" href="/user/plan">Apri piano</Link>
+              <Link className="pf-button-secondary" href="/user/questions">Rispondi al check-in</Link>
             </div>
           </div>
         </aside>
@@ -209,8 +209,8 @@ export default function AthleteDashboardPage() {
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
-            <h2>Area focus</h2>
-            <p className="pf-muted">Current state by area with direct access to work and check-ins.</p>
+            <h2>Focus per area</h2>
+            <p className="pf-muted">Stato corrente per area con accesso diretto a lavoro e check-in.</p>
           </div>
         </div>
         <div className="pf-grid">
@@ -223,11 +223,11 @@ export default function AthleteDashboardPage() {
                   <div>
                     <h3>{row.area.name}</h3>
                     <p className="pf-muted">
-                      Real {profile?.realR.toFixed(0) ?? "-"} · Potential {profile?.potentialP.toFixed(0) ?? "-"}
+                      Reale {profile?.realR.toFixed(0) ?? "-"} - Potenziale {profile?.potentialP.toFixed(0) ?? "-"}
                     </p>
                   </div>
                   <StatusBadge tone={active.length ? "accent" : "neutral"}>
-                    {active.length ? `${active.length} active` : "No active work"}
+                    {active.length ? `${active.length} attive` : "Nessun lavoro attivo"}
                   </StatusBadge>
                 </div>
                 {active[0] && (
@@ -238,10 +238,10 @@ export default function AthleteDashboardPage() {
                 )}
                 <div className="pf-row">
                   <Link href={`/user/questions?areaId=${encodeURIComponent(row.area.id)}`}>
-                    Questionnaire
+                    Questionario
                   </Link>
                   <StatusBadge tone={row.questionSet ? "warning" : "neutral"}>
-                    {row.questionSet ? `${row.questionSet.questions.length} questions` : "Not available"}
+                    {row.questionSet ? `${row.questionSet.questions.length} domande` : "Non disponibile"}
                   </StatusBadge>
                 </div>
                 <div className="pf-actions">
@@ -256,7 +256,7 @@ export default function AthleteDashboardPage() {
             );
           })}
           {!loading && areas.length === 0 && (
-            <EmptyState title="No areas configured" description="Seed areas before using the athlete workspace." />
+            <EmptyState title="Nessuna area configurata" description="Configura le aree prima di usare l'ambiente atleta." />
           )}
         </div>
       </section>

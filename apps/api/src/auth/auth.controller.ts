@@ -12,7 +12,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('login')
-  @ApiOperation({ summary: 'Login with session cookie' })
+  @ApiOperation({ summary: 'Accesso con cookie sessione' })
   @UseGuards(LoginRateLimitGuard, LocalAuthGuard)
   async login(
     @Req()
@@ -25,14 +25,14 @@ export class AuthController {
   }
 
   @Post('register-athlete')
-  @ApiOperation({ summary: 'Register a new athlete pending admin activation' })
+  @ApiOperation({ summary: 'Registra un nuovo atleta in attesa di attivazione admin' })
   @ApiBody({ type: RegisterAthleteDto })
   registerAthlete(@Body() body: RegisterAthleteDto) {
     return this.authService.registerAthlete(body);
   }
 
   @Post('logout')
-  @ApiOperation({ summary: 'Logout and destroy session' })
+  @ApiOperation({ summary: 'Esci e distruggi la sessione' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
   async logout(@Req() req: { logout: (cb: (err?: unknown) => void) => void }) {
@@ -40,7 +40,7 @@ export class AuthController {
   }
 
   @Get('me')
-  @ApiOperation({ summary: 'Current user' })
+  @ApiOperation({ summary: 'Utente corrente' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
   async me(@Req() req: { user?: unknown }) {
@@ -61,7 +61,7 @@ export class AuthController {
   }
 
   @Get('token')
-  @ApiOperation({ summary: 'Issue short-lived bearer token from active secure session' })
+  @ApiOperation({ summary: 'Emetti token bearer breve da sessione sicura attiva' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
   token(@Req() req: { user?: unknown }) {

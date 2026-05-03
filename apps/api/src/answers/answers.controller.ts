@@ -11,7 +11,7 @@ export class AnswersController {
   constructor(private readonly answers: AnswersService) {}
 
   @Post('batch')
-  @ApiOperation({ summary: 'Submit a batch of answers' })
+  @ApiOperation({ summary: 'Invia un gruppo di risposte' })
   @ApiBody({ type: SubmitAnswersDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)

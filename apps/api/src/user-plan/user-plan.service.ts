@@ -14,10 +14,10 @@ export class UserPlanService {
 
   async getCurrentPlan(userId: string, areaId?: string) {
     if (!userId) {
-      throw new BadRequestException('Missing user');
+      throw new BadRequestException('Utente mancante');
     }
     if (!areaId) {
-      throw new BadRequestException('Missing area id');
+      throw new BadRequestException('ID area mancante');
     }
 
     const plan = await this.prisma.improvementPlanRelease.findFirst({
@@ -52,7 +52,7 @@ export class UserPlanService {
     });
 
     if (!plan) {
-      throw new NotFoundException('Active plan not found');
+      throw new NotFoundException('Piano attivo non trovato');
     }
 
     return plan;
@@ -60,10 +60,10 @@ export class UserPlanService {
 
   async getPlanHistory(userId: string, areaId?: string) {
     if (!userId) {
-      throw new BadRequestException('Missing user');
+      throw new BadRequestException('Utente mancante');
     }
     if (!areaId) {
-      throw new BadRequestException('Missing area id');
+      throw new BadRequestException('ID area mancante');
     }
 
     return this.prisma.improvementPlanRelease.findMany({
@@ -103,7 +103,7 @@ export class UserPlanService {
     input: CompletePlanItemDto = {},
   ) {
     if (!userId || !planItemId) {
-      throw new BadRequestException('Missing plan item');
+      throw new BadRequestException('Attivita piano mancante');
     }
 
     if (
@@ -111,7 +111,7 @@ export class UserPlanService {
       (!Number.isFinite(input.completionRating) ||
         !Number.isInteger(input.completionRating))
     ) {
-      throw new BadRequestException('Invalid completion rating');
+      throw new BadRequestException('Valutazione completamento non valida');
     }
 
     const planItem = await this.prisma.planItem.findUnique({
@@ -124,23 +124,23 @@ export class UserPlanService {
     });
 
     if (!planItem) {
-      throw new NotFoundException('Plan item not found');
+      throw new NotFoundException('Attivita piano non trovata');
     }
 
     if (planItem.planRelease.userId !== userId) {
-      throw new ForbiddenException('Not allowed to complete');
+      throw new ForbiddenException('Non puoi completare questa attivita');
     }
 
     if (planItem.planRelease.status !== 'ACTIVE') {
-      throw new BadRequestException('Plan is not active');
+      throw new BadRequestException('Il piano non e attivo');
     }
 
     if (planItem.status === 'COMPLETED') {
-      throw new ConflictException('Plan item already completed');
+      throw new ConflictException('Attivita piano gia completata');
     }
 
     if (planItem.status !== 'ACTIVE') {
-      throw new BadRequestException('Plan item not active');
+      throw new BadRequestException('Attivita piano non attiva');
     }
 
     const data: {
