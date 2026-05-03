@@ -23,6 +23,9 @@ type StarterQuestionnaire = {
   status: string;
   goalText?: string;
   interpretedGoal?: string | null;
+  suggestedReformulatedGoal?: string | null;
+  questionsToUser?: string[];
+  nextStep?: string | null;
   validationStatus?: string;
   validationMessage?: string | null;
   title: string;
@@ -40,9 +43,14 @@ type SubmitResult = {
   areas: Array<{ areaId: string; areaName: string; realR: number; potentialP: number }>;
 };
 type GoalValidation = {
+  status: "OK" | "NEEDS_ANAMNESIS" | "GOAL_NEEDS_REFORMULATION" | "OUT_OF_SCOPE" | "UNSAFE";
   accepted: boolean;
+  canProceedToAnamnesis: boolean;
   interpretedGoal: string;
   userMessage: string;
+  suggestedReformulatedGoal?: string | null;
+  questionsToUser?: string[];
+  nextStep?: string | null;
   rejectionReason?: string | null;
 };
 type MessageTone = "success" | "warning";
@@ -74,7 +82,7 @@ export default function OnboardingPage() {
   );
 
   const completed = questionnaire
-    ? goalValidation?.accepted === true &&
+    ? goalValidation?.canProceedToAnamnesis === true &&
       questionnaire.questions.every(
         (question) =>
           !question.required ||
@@ -95,13 +103,21 @@ export default function OnboardingPage() {
     const data = (await response.json()) as StarterQuestionnaire;
     setQuestionnaire(data);
     setGoalText(data.goalText ?? "");
-    if (data.validationStatus === "ACCEPTED" && data.interpretedGoal) {
+    if (
+      (data.validationStatus === "OK" || data.validationStatus === "NEEDS_ANAMNESIS") &&
+      data.interpretedGoal
+    ) {
       setGoalValidation({
-        accepted: true,
+        status: data.validationStatus,
+        accepted: data.validationStatus === "OK",
+        canProceedToAnamnesis: true,
         interpretedGoal: data.interpretedGoal,
         userMessage:
           data.validationMessage ??
           `Ho capito questo obiettivo: ${data.interpretedGoal}`,
+        suggestedReformulatedGoal: data.suggestedReformulatedGoal ?? null,
+        questionsToUser: data.questionsToUser ?? [],
+        nextStep: data.nextStep ?? null,
       });
     }
     if (!data.required) {
@@ -124,7 +140,9 @@ export default function OnboardingPage() {
     const trimmed = goalText.trim();
     if (trimmed.length < 10) {
       setGoalValidation({
+        status: "GOAL_NEEDS_REFORMULATION",
         accepted: false,
+        canProceedToAnamnesis: false,
         interpretedGoal: "",
         userMessage:
           "Scrivi un obiettivo piu concreto legato a sport, allenamento o performance.",
@@ -148,7 +166,7 @@ export default function OnboardingPage() {
     }
     const validation = (await response.json()) as GoalValidation;
     setGoalValidation(validation);
-    setMessageTone(validation.accepted ? "success" : "warning");
+    setMessageTone(validation.canProceedToAnamnesis ? "success" : "warning");
     setMessage(validation.userMessage);
     setValidatingGoal(false);
   };
@@ -262,10 +280,13 @@ export default function OnboardingPage() {
                 >
                   {validatingGoal ? "Validazione..." : "Valida obiettivo"}
                 </button>
-                {goalValidation?.accepted && (
+                {goalValidation?.status === "OK" && (
                   <StatusBadge tone="success">Obiettivo valido</StatusBadge>
                 )}
-                {goalValidation && !goalValidation.accepted && (
+                {goalValidation?.status === "NEEDS_ANAMNESIS" && (
+                  <StatusBadge tone="success">Serve anamnesi</StatusBadge>
+                )}
+                {goalValidation && !goalValidation.canProceedToAnamnesis && (
                   <StatusBadge tone="warning">Non consono</StatusBadge>
                 )}
               </div>
@@ -275,7 +296,23 @@ export default function OnboardingPage() {
                   <p>{goalValidation.interpretedGoal}</p>
                 </div>
               )}
-              {goalValidation && !goalValidation.accepted && (
+              {goalValidation?.suggestedReformulatedGoal && (
+                <div className="pf-alert warning">
+                  <strong>Proposta di riformulazione</strong>
+                  <p>{goalValidation.suggestedReformulatedGoal}</p>
+                </div>
+              )}
+              {goalValidation?.questionsToUser?.length ? (
+                <div className="pf-alert warning">
+                  <strong>Domande utili</strong>
+                  <ul>
+                    {goalValidation.questionsToUser.map((question) => (
+                      <li key={question}>{question}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {goalValidation && !goalValidation.canProceedToAnamnesis && (
                 <div className="pf-alert warning">
                   {goalValidation.userMessage}
                 </div>

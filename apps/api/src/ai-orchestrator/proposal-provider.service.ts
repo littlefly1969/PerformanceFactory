@@ -169,7 +169,17 @@ export type GoalValidationInput = {
   userId: string;
   goalText: string;
   basePrompt: string;
+  areas: AiAreaInput[];
+  onboardingProfile?: unknown;
+  onboardingAnswers?: unknown;
 };
+
+export type GoalValidationStatus =
+  | 'OK'
+  | 'NEEDS_ANAMNESIS'
+  | 'GOAL_NEEDS_REFORMULATION'
+  | 'OUT_OF_SCOPE'
+  | 'UNSAFE';
 
 export type GoalValidationResult = {
   provider: AiProvider;
@@ -177,10 +187,21 @@ export type GoalValidationResult = {
   promptVersion: string;
   promptHash: string;
   inputJson: Record<string, unknown>;
+  status: GoalValidationStatus;
   accepted: boolean;
   interpretedGoal: string;
   userMessage: string;
+  suggestedReformulatedGoal: string | null;
+  questionsToUser: string[];
+  normalizedGoal: Record<string, unknown> | null;
+  goalEvaluation: Record<string, unknown>;
+  nextStep: string;
   rejectionReason: string | null;
+  areaPrompts: Array<{
+    areaId: string;
+    areaName: string;
+    promptText: string;
+  }>;
 };
 
 const PROMPT_VERSION = 'cycle-proposal-v2';
@@ -897,24 +918,50 @@ export class AiProposalProviderService {
 
   private buildGoalValidationTask(input: GoalValidationInput) {
     return {
-      task: 'Valuta se l obiettivo dichiarato dall atleta e lecito, pertinente allo sport, coerente con lo spirito PerformanceFactory e utilizzabile per generare un percorso di performance.',
+      task: 'Valida l obiettivo iniziale Performance Factory e, solo se status=OK, genera prompt specialistici per le aree ufficiali.',
+      platformPrinciple:
+        'Performance Factory promuove il miglioramento personale rispetto al punto di partenza, non il confronto tossico con gli altri.',
+      officialAreas: [
+        'Preparazione atletica',
+        'Equipaggiamento',
+        'Mental training',
+        'Nutrizione',
+        'Fisioterapia',
+        'Tecnico-tattica',
+      ],
       athleteGoal: input.goalText,
-      acceptanceCriteria: [
-        'deve riguardare sport, prestazione, benessere funzionale, continuita di allenamento o miglioramento misurabile',
-        'deve poter essere trasformato in lavoro pratico e monitorabile',
-        'deve essere sicuro, etico e revisionabile da professionisti',
+      datiAnamnestici: input.onboardingProfile ?? null,
+      storicoRisposte: input.onboardingAnswers ?? null,
+      availableAreas: input.areas,
+      statuses: [
+        'OK',
+        'NEEDS_ANAMNESIS',
+        'GOAL_NEEDS_REFORMULATION',
+        'OUT_OF_SCOPE',
+        'UNSAFE',
       ],
-      rejectWhen: [
-        'fuori tema rispetto a sport o performance',
-        'richiede diagnosi, terapia medica, pratiche non sicure o illecite',
-        'punta a danneggiare se stessi o altri',
-        'e troppo vago per orientare un percorso',
-        'contiene contenuti offensivi, illegali o incompatibili con il servizio',
+      decisionRules: {
+        OK: 'Obiettivo sportivo/performance, chiaro, sicuro, personale, misurabile e dati sufficienti per generare prompt area.',
+        NEEDS_ANAMNESIS:
+          'Obiettivo valido ma mancano dati personali indispensabili.',
+        GOAL_NEEDS_REFORMULATION:
+          'Obiettivo potenzialmente coerente ma troppo vago, generico, non misurabile o troppo orientato a battere altri.',
+        OUT_OF_SCOPE:
+          'Obiettivo non collegato a sport, performance, benessere funzionale o miglioramento personale.',
+        UNSAFE:
+          'Obiettivo rischioso, illecito, clinicamente improprio, doping, restrizioni estreme o ignora dolore/trauma/sintomi.',
+      },
+      healthLimits: [
+        'Nutrizione: solo educazione sportiva generale, idratazione, timing, recupero, energia disponibile; niente diete cliniche, grammature obbligatorie, farmaci o gestione DCA.',
+        'Fisioterapia: prevenzione, mobilita, recupero e monitoraggio prudente; niente diagnosi o protocolli terapeutici.',
+        'Per dolore acuto, trauma, sintomi neurologici, dolore toracico, svenimenti, disturbi alimentari, patologie note o farmaci, suggerire valutazione professionale.',
       ],
-      responseInstructions: [
-        'Se accetti, spiega in una frase cosa hai capito dell obiettivo.',
-        'Se rifiuti, scrivi un messaggio breve e diretto per l utente, senza dettagli tecnici.',
-        'Rispondi in italiano.',
+      outputRules: [
+        'Rispondi solo in JSON valido.',
+        'Il campo status governa il flusso.',
+        'Se status diverso da OK, area_prompts deve avere tutti i valori null.',
+        'Se status OK, compila tutti i sei prompt area.',
+        'Ogni prompt area deve essere utilizzabile da un modulo AI specialistico e contenere role, objective, required_inputs, initial_questionnaire, exercise_generation_rules, feedback_questions, progression_rules, measurement_indicators, safety_limits, output_format.',
       ],
     };
   }
@@ -922,28 +969,155 @@ export class AiProposalProviderService {
   private buildGoalValidationJsonSchema(options?: {
     includePropertyOrdering?: boolean;
   }) {
+    const goalEvaluationSchema = {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'original_goal',
+        'is_sport_related',
+        'is_self_improvement_oriented',
+        'is_clear',
+        'is_measurable',
+        'is_safe',
+        'is_legal',
+        'main_issues',
+        'reasoning_summary',
+      ],
+      properties: {
+        original_goal: { type: 'string' },
+        is_sport_related: { type: 'boolean' },
+        is_self_improvement_oriented: { type: 'boolean' },
+        is_clear: { type: 'boolean' },
+        is_measurable: { type: 'boolean' },
+        is_safe: { type: 'boolean' },
+        is_legal: { type: 'boolean' },
+        main_issues: { type: 'array', items: { type: 'string' } },
+        reasoning_summary: { type: 'string' },
+      },
+    };
+    const normalizedGoalSchema = {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'sport_or_activity',
+        'performance_dimension',
+        'current_level_assumption',
+        'desired_improvement',
+        'time_horizon',
+        'measurement_criteria',
+        'constraints_to_check',
+      ],
+      properties: {
+        sport_or_activity: { type: ['string', 'null'] },
+        performance_dimension: { type: ['string', 'null'] },
+        current_level_assumption: { type: ['string', 'null'] },
+        desired_improvement: { type: ['string', 'null'] },
+        time_horizon: { type: ['string', 'null'] },
+        measurement_criteria: { type: 'array', items: { type: 'string' } },
+        constraints_to_check: { type: 'array', items: { type: 'string' } },
+      },
+    };
+    const areaPromptSchema = {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'role',
+        'objective',
+        'required_inputs',
+        'initial_questionnaire',
+        'exercise_generation_rules',
+        'feedback_questions',
+        'progression_rules',
+        'measurement_indicators',
+        'safety_limits',
+        'output_format',
+      ],
+      properties: {
+        role: { type: 'string' },
+        objective: { type: 'string' },
+        required_inputs: { type: 'array', items: { type: 'string' } },
+        initial_questionnaire: { type: 'array', items: { type: 'string' } },
+        exercise_generation_rules: { type: 'array', items: { type: 'string' } },
+        feedback_questions: { type: 'array', items: { type: 'string' } },
+        progression_rules: { type: 'array', items: { type: 'string' } },
+        measurement_indicators: { type: 'array', items: { type: 'string' } },
+        safety_limits: { type: 'array', items: { type: 'string' } },
+        output_format: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {},
+        },
+      },
+    };
+    const nullableAreaPromptSchema = {
+      anyOf: [areaPromptSchema, { type: 'null' }],
+    };
     return {
       type: 'object',
       additionalProperties: false,
       required: [
-        'accepted',
-        'interpretedGoal',
-        'userMessage',
-        'rejectionReason',
+        'status',
+        'goal_evaluation',
+        'message_to_user',
+        'suggested_reformulated_goal',
+        'questions_to_user',
+        'normalized_goal',
+        'area_prompts',
+        'next_step',
       ],
       properties: {
-        accepted: { type: 'boolean' },
-        interpretedGoal: { type: 'string' },
-        userMessage: { type: 'string' },
-        rejectionReason: { type: ['string', 'null'] },
+        status: {
+          type: 'string',
+          enum: [
+            'OK',
+            'NEEDS_ANAMNESIS',
+            'GOAL_NEEDS_REFORMULATION',
+            'OUT_OF_SCOPE',
+            'UNSAFE',
+          ],
+        },
+        goal_evaluation: goalEvaluationSchema,
+        message_to_user: { type: 'string' },
+        suggested_reformulated_goal: { type: ['string', 'null'] },
+        questions_to_user: {
+          type: 'array',
+          items: { type: 'string' },
+          maxItems: 5,
+        },
+        normalized_goal: normalizedGoalSchema,
+        area_prompts: {
+          type: 'object',
+          additionalProperties: false,
+          required: [
+            'preparazione_atletica',
+            'equipaggiamento',
+            'mental_training',
+            'nutrizione',
+            'fisioterapia',
+            'tecnico_tattica',
+          ],
+          properties: {
+            preparazione_atletica: nullableAreaPromptSchema,
+            equipaggiamento: nullableAreaPromptSchema,
+            mental_training: nullableAreaPromptSchema,
+            nutrizione: nullableAreaPromptSchema,
+            fisioterapia: nullableAreaPromptSchema,
+            tecnico_tattica: nullableAreaPromptSchema,
+          },
+        },
+        next_step: { type: 'string' },
       },
       ...(options?.includePropertyOrdering
         ? {
             propertyOrdering: [
-              'accepted',
-              'interpretedGoal',
-              'userMessage',
-              'rejectionReason',
+              'status',
+              'goal_evaluation',
+              'message_to_user',
+              'suggested_reformulated_goal',
+              'questions_to_user',
+              'normalized_goal',
+              'area_prompts',
+              'next_step',
             ],
           }
         : {}),
@@ -1077,10 +1251,14 @@ export class AiProposalProviderService {
   private parseGoalValidationJson(outputText: string, providerName: string) {
     try {
       return JSON.parse(outputText) as {
-        accepted?: boolean;
-        interpretedGoal?: string;
-        userMessage?: string;
-        rejectionReason?: string | null;
+        status?: GoalValidationStatus;
+        goal_evaluation?: Record<string, unknown>;
+        message_to_user?: string;
+        suggested_reformulated_goal?: string | null;
+        questions_to_user?: string[];
+        normalized_goal?: Record<string, unknown>;
+        area_prompts?: Record<string, unknown>;
+        next_step?: string;
       };
     } catch {
       throw new BadRequestException(
@@ -1094,38 +1272,130 @@ export class AiProposalProviderService {
     provider: AiProvider,
     model: string,
     parsed: {
-      accepted?: boolean;
-      interpretedGoal?: string;
-      userMessage?: string;
-      rejectionReason?: string | null;
+      status?: GoalValidationStatus;
+      goal_evaluation?: Record<string, unknown>;
+      message_to_user?: string;
+      suggested_reformulated_goal?: string | null;
+      questions_to_user?: string[];
+      normalized_goal?: Record<string, unknown>;
+      area_prompts?: Record<string, unknown>;
+      next_step?: string;
     },
     inputJson: Record<string, unknown>,
   ): GoalValidationResult {
-    const accepted = parsed.accepted === true;
+    const status = this.normalizeGoalStatus(parsed.status);
+    const accepted = status === 'OK';
+    const goalEvaluation = parsed.goal_evaluation ?? {};
+    const normalizedGoal = parsed.normalized_goal ?? {};
     const interpretedGoal =
-      parsed.interpretedGoal?.trim() ||
+      this.readNormalizedGoalText(normalizedGoal) ||
       (accepted
         ? `L obiettivo riguarda: ${input.goalText}`
         : 'Obiettivo non utilizzabile per il percorso.');
     const userMessage =
-      parsed.userMessage?.trim() ||
+      parsed.message_to_user?.trim() ||
       (accepted
         ? `Ho capito questo obiettivo: ${interpretedGoal}`
         : 'Quanto richiesto non e consono a un percorso di performance sportiva.');
+    const areaPrompts = accepted
+      ? this.normalizeAreaPromptsFromValidation(input, parsed.area_prompts ?? {})
+      : [];
     return {
       provider,
       model,
       promptVersion: GOAL_VALIDATION_VERSION,
       promptHash: this.hashJson(inputJson),
       inputJson,
+      status,
       accepted,
       interpretedGoal,
       userMessage,
+      suggestedReformulatedGoal: parsed.suggested_reformulated_goal ?? null,
+      questionsToUser: Array.isArray(parsed.questions_to_user)
+        ? parsed.questions_to_user.filter((item): item is string => typeof item === 'string')
+        : [],
+      normalizedGoal,
+      goalEvaluation,
+      nextStep: parsed.next_step ?? (accepted ? 'Procedere con il percorso.' : 'Attendere nuovo obiettivo.'),
       rejectionReason: accepted
         ? null
-        : parsed.rejectionReason?.trim() ||
+        : parsed.suggested_reformulated_goal ||
           'Obiettivo non pertinente o non consono.',
+      areaPrompts,
     };
+  }
+
+  private normalizeGoalStatus(status?: string): GoalValidationStatus {
+    if (
+      status === 'OK' ||
+      status === 'NEEDS_ANAMNESIS' ||
+      status === 'GOAL_NEEDS_REFORMULATION' ||
+      status === 'OUT_OF_SCOPE' ||
+      status === 'UNSAFE'
+    ) {
+      return status;
+    }
+    return 'GOAL_NEEDS_REFORMULATION';
+  }
+
+  private readNormalizedGoalText(normalizedGoal: Record<string, unknown>) {
+    const sport = normalizedGoal.sport_or_activity;
+    const improvement = normalizedGoal.desired_improvement;
+    if (typeof sport === 'string' && typeof improvement === 'string') {
+      return `${sport}: ${improvement}`;
+    }
+    if (typeof improvement === 'string') {
+      return improvement;
+    }
+    return null;
+  }
+
+  private normalizeAreaPromptsFromValidation(
+    input: GoalValidationInput,
+    areaPrompts: Record<string, unknown>,
+  ) {
+    return input.areas.map((area) => {
+      const key = this.areaPromptKey(area.name);
+      const prompt = areaPrompts[key] ?? areaPrompts[this.fallbackAreaPromptKey(area.name)];
+      return {
+        areaId: area.id,
+        areaName: area.name,
+        promptText:
+          prompt && typeof prompt === 'object'
+            ? JSON.stringify(prompt)
+            : this.buildFallbackGoalAreaPrompt(input.goalText, area.name),
+      };
+    });
+  }
+
+  private areaPromptKey(areaName: string) {
+    const normalized = areaName.toLowerCase();
+    if (normalized.includes('athletic')) {
+      return 'preparazione_atletica';
+    }
+    if (normalized.includes('equipment')) {
+      return 'equipaggiamento';
+    }
+    if (normalized.includes('mental')) {
+      return 'mental_training';
+    }
+    if (normalized.includes('nutrition')) {
+      return 'nutrizione';
+    }
+    if (normalized.includes('physio')) {
+      return 'fisioterapia';
+    }
+    if (normalized.includes('technical') || normalized.includes('tactical')) {
+      return 'tecnico_tattica';
+    }
+    return this.fallbackAreaPromptKey(areaName);
+  }
+
+  private fallbackAreaPromptKey(areaName: string) {
+    return areaName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '');
   }
 
   private buildStubGoalValidation(input: GoalValidationInput) {
@@ -1137,18 +1407,95 @@ export class AiProposalProviderService {
       );
     if (rejected) {
       return {
-        accepted: false,
-        interpretedGoal: 'Obiettivo non utilizzabile per il percorso.',
-        userMessage:
+        status: 'UNSAFE' as GoalValidationStatus,
+        goal_evaluation: {
+          original_goal: input.goalText,
+          is_sport_related: false,
+          is_self_improvement_oriented: false,
+          is_clear: false,
+          is_measurable: false,
+          is_safe: false,
+          is_legal: false,
+          main_issues: ['Obiettivo fuori tema o non sicuro'],
+          reasoning_summary:
+            'L obiettivo non e utilizzabile in un percorso Performance Factory.',
+        },
+        message_to_user:
           'Quanto richiesto non e consono a un percorso di performance sportiva.',
-        rejectionReason: 'Obiettivo fuori tema o non sicuro.',
+        suggested_reformulated_goal: null,
+        questions_to_user: [],
+        normalized_goal: {
+          sport_or_activity: null,
+          performance_dimension: null,
+          current_level_assumption: null,
+          desired_improvement: null,
+          time_horizon: null,
+          measurement_criteria: [],
+          constraints_to_check: [],
+        },
+        area_prompts: {},
+        next_step: 'Attendere un nuovo obiettivo sicuro e pertinente.',
       };
     }
+    const hasOnboarding = input.onboardingProfile || input.onboardingAnswers;
     return {
-      accepted: true,
-      interpretedGoal: input.goalText.trim(),
-      userMessage: `Ho capito questo obiettivo: ${input.goalText.trim()}`,
-      rejectionReason: null,
+      status: (hasOnboarding ? 'OK' : 'NEEDS_ANAMNESIS') as GoalValidationStatus,
+      goal_evaluation: {
+        original_goal: input.goalText,
+        is_sport_related: true,
+        is_self_improvement_oriented: true,
+        is_clear: true,
+        is_measurable: true,
+        is_safe: true,
+        is_legal: true,
+        main_issues: hasOnboarding ? [] : ['Mancano dati anamnestici'],
+        reasoning_summary:
+          'Obiettivo coerente con Performance Factory e orientato al miglioramento personale.',
+      },
+      message_to_user: hasOnboarding
+        ? `Ho capito questo obiettivo: ${input.goalText.trim()}`
+        : 'Obiettivo potenzialmente valido. Completa l anamnesi per personalizzare il percorso.',
+      suggested_reformulated_goal: null,
+      questions_to_user: hasOnboarding
+        ? []
+        : [
+            'Qual e il tuo livello attuale?',
+            'Hai limitazioni, dolori o infortuni da considerare?',
+            'Quanto tempo puoi dedicare al percorso?',
+          ],
+      normalized_goal: {
+        sport_or_activity: null,
+        performance_dimension: null,
+        current_level_assumption: null,
+        desired_improvement: input.goalText.trim(),
+        time_horizon: null,
+        measurement_criteria: [],
+        constraints_to_check: [],
+      },
+      area_prompts: hasOnboarding
+        ? Object.fromEntries(
+            input.areas.map((area) => [
+              this.areaPromptKey(area.name),
+              {
+                role: `Modulo ${area.name}`,
+                objective: `Personalizzare il lavoro ${area.name} rispetto all obiettivo: ${input.goalText.trim()}`,
+                required_inputs: ['obiettivo normalizzato', 'anamnesi', 'storico risposte'],
+                initial_questionnaire: [],
+                exercise_generation_rules: [
+                  'Genera azioni concrete, misurabili e progressive.',
+                ],
+                feedback_questions: [],
+                progression_rules: ['Progredisci in modo prudente.'],
+                measurement_indicators: ['aderenza', 'qualita esecuzione', 'progresso percepito'],
+                safety_limits: ['Non fare diagnosi o prescrizioni cliniche.'],
+                output_format: {},
+              },
+            ]),
+          )
+        : {},
+      next_step: hasOnboarding
+        ? 'Congelare obiettivo e generare prompt area.'
+        : 'Avviare anamnesi.',
     };
   }
 

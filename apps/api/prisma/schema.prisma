@@ -104,6 +104,11 @@ model UserPerformanceGoal {
   userId            String    @unique
   goalText          String
   interpretedGoal   String?
+  normalizedGoal    Json?
+  goalEvaluation    Json?
+  suggestedReformulatedGoal String?
+  questionsToUser   Json?
+  nextStep          String?
   validationStatus  String    @default("PENDING")
   validationMessage String?
   rejectionReason   String?

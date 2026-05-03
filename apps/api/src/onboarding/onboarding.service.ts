@@ -10,7 +10,10 @@ import {
   UserRole,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { AiProposalProviderService } from '../ai-orchestrator/proposal-provider.service';
+import {
+  AiProposalProviderService,
+  GoalValidationResult,
+} from '../ai-orchestrator/proposal-provider.service';
 
 type Actor = {
   id: string;
@@ -71,18 +74,28 @@ export class OnboardingService {
       select: {
         goalText: true,
         interpretedGoal: true,
+        normalizedGoal: true,
+        goalEvaluation: true,
+        suggestedReformulatedGoal: true,
+        questionsToUser: true,
+        nextStep: true,
         validationStatus: true,
         validationMessage: true,
         updatedAt: true,
       },
     });
     return {
-      required: assessment?.status !== 'COMPLETED' || !goal,
+      required: assessment?.status !== 'COMPLETED' || goal?.validationStatus !== 'OK',
       status: assessment?.status ?? 'PENDING',
       completedAt: assessment?.completedAt ?? null,
       updatedAt: assessment?.updatedAt ?? null,
       goalText: goal?.goalText ?? '',
       interpretedGoal: goal?.interpretedGoal ?? null,
+      normalizedGoal: goal?.normalizedGoal ?? null,
+      goalEvaluation: goal?.goalEvaluation ?? null,
+      suggestedReformulatedGoal: goal?.suggestedReformulatedGoal ?? null,
+      questionsToUser: goal?.questionsToUser ?? [],
+      nextStep: goal?.nextStep ?? null,
       validationStatus: goal?.validationStatus ?? 'PENDING',
       validationMessage: goal?.validationMessage ?? null,
       goalUpdatedAt: goal?.updatedAt ?? null,
@@ -129,39 +142,28 @@ export class OnboardingService {
     }
 
     const goalPromptConfig = await this.loadGoalPromptConfig();
+    const areas = await this.loadConfiguredAreas();
     const validation = await this.aiProvider.validatePerformanceGoal({
       userId: actor.id,
       goalText,
       basePrompt: goalPromptConfig.basePrompt,
+      areas,
     });
 
-    if (!validation.accepted) {
-      await this.prisma.userPerformanceGoal.upsert({
-        where: { userId: actor.id },
-        update: {
-          goalText,
-          interpretedGoal: validation.interpretedGoal,
-          validationStatus: 'REJECTED',
-          validationMessage: validation.userMessage,
-          rejectionReason: validation.rejectionReason,
-          frozenAt: null,
-        },
-        create: {
-          userId: actor.id,
-          goalText,
-          interpretedGoal: validation.interpretedGoal,
-          validationStatus: 'REJECTED',
-          validationMessage: validation.userMessage,
-          rejectionReason: validation.rejectionReason,
-        },
-      });
-    }
+    await this.saveGoalValidation(actor.id, goalText, validation, false);
 
     return {
+      status: validation.status,
       accepted: validation.accepted,
+      canProceedToAnamnesis:
+        validation.status === 'OK' || validation.status === 'NEEDS_ANAMNESIS',
       interpretedGoal: validation.interpretedGoal,
       userMessage: validation.userMessage,
+      suggestedReformulatedGoal: validation.suggestedReformulatedGoal,
+      questionsToUser: validation.questionsToUser,
+      normalizedGoal: validation.normalizedGoal,
       rejectionReason: validation.rejectionReason,
+      nextStep: validation.nextStep,
     };
   }
 
@@ -174,33 +176,6 @@ export class OnboardingService {
     const goalText = goalTextInput.trim();
     if (goalText.length < 10) {
       throw new BadRequestException('Performance goal is required');
-    }
-    const validation = await this.aiProvider.validatePerformanceGoal({
-      userId: actor.id,
-      goalText,
-      basePrompt: (await this.loadGoalPromptConfig()).basePrompt,
-    });
-    if (!validation.accepted) {
-      await this.prisma.userPerformanceGoal.upsert({
-        where: { userId: actor.id },
-        update: {
-          goalText,
-          interpretedGoal: validation.interpretedGoal,
-          validationStatus: 'REJECTED',
-          validationMessage: validation.userMessage,
-          rejectionReason: validation.rejectionReason,
-          frozenAt: null,
-        },
-        create: {
-          userId: actor.id,
-          goalText,
-          interpretedGoal: validation.interpretedGoal,
-          validationStatus: 'REJECTED',
-          validationMessage: validation.userMessage,
-          rejectionReason: validation.rejectionReason,
-        },
-      });
-      throw new BadRequestException(validation.userMessage);
     }
     const templates = await this.loadActiveTemplates();
     const answerMap = new Map(answers.map((answer) => [answer.questionId, answer.value]));
@@ -283,35 +258,18 @@ export class OnboardingService {
       scoredAreas.reduce((sum, area) => sum + area.realR, 0) /
         scoredAreas.length,
     );
-    const configuredAreas = await this.prisma.area.findMany({
-      select: { id: true, name: true },
-      orderBy: { name: 'asc' },
-    });
-
-    const goal = await this.prisma.userPerformanceGoal.upsert({
-      where: { userId: actor.id },
-      update: {
-        goalText,
-        interpretedGoal: validation.interpretedGoal,
-        validationStatus: 'ACCEPTED',
-        validationMessage: validation.userMessage,
-        rejectionReason: null,
-        frozenAt: new Date(),
-      },
-      create: {
-        userId: actor.id,
-        goalText,
-        interpretedGoal: validation.interpretedGoal,
-        validationStatus: 'ACCEPTED',
-        validationMessage: validation.userMessage,
-        frozenAt: new Date(),
-      },
-      select: { id: true, goalText: true, interpretedGoal: true },
-    });
-
-    const generated = await this.aiProvider.generateGoalAreaPrompts({
+    const configuredAreas = await this.loadConfiguredAreas();
+    const onboardingAnswersForAi = normalizedAnswers.map((answer) => ({
+      key: answer.template.key,
+      scope: answer.template.scope,
+      areaId: answer.template.areaId,
+      label: answer.template.label,
+      value: answer.value,
+      score: answer.score,
+    }));
+    const validation = await this.aiProvider.validatePerformanceGoal({
       userId: actor.id,
-      goalText: validation.interpretedGoal,
+      goalText,
       basePrompt: (await this.loadGoalPromptConfig()).basePrompt,
       areas: configuredAreas.length
         ? configuredAreas
@@ -320,14 +278,42 @@ export class OnboardingService {
             name: area.areaName,
           })),
       onboardingProfile: profile,
-      onboardingAnswers: normalizedAnswers.map((answer) => ({
-        key: answer.template.key,
-        scope: answer.template.scope,
-        areaId: answer.template.areaId,
-        label: answer.template.label,
-        value: answer.value,
-        score: answer.score,
-      })),
+      onboardingAnswers: onboardingAnswersForAi,
+    });
+    if (validation.status !== 'OK') {
+      await this.saveGoalValidation(actor.id, goalText, validation, false);
+      throw new BadRequestException(validation.userMessage);
+    }
+
+    const goal = await this.prisma.userPerformanceGoal.upsert({
+      where: { userId: actor.id },
+      update: {
+        goalText,
+        interpretedGoal: validation.interpretedGoal,
+        normalizedGoal: validation.normalizedGoal as Prisma.InputJsonValue,
+        goalEvaluation: validation.goalEvaluation as Prisma.InputJsonValue,
+        suggestedReformulatedGoal: validation.suggestedReformulatedGoal,
+        questionsToUser: validation.questionsToUser as Prisma.InputJsonValue,
+        nextStep: validation.nextStep,
+        validationStatus: validation.status,
+        validationMessage: validation.userMessage,
+        rejectionReason: null,
+        frozenAt: new Date(),
+      },
+      create: {
+        userId: actor.id,
+        goalText,
+        interpretedGoal: validation.interpretedGoal,
+        normalizedGoal: validation.normalizedGoal as Prisma.InputJsonValue,
+        goalEvaluation: validation.goalEvaluation as Prisma.InputJsonValue,
+        suggestedReformulatedGoal: validation.suggestedReformulatedGoal,
+        questionsToUser: validation.questionsToUser as Prisma.InputJsonValue,
+        nextStep: validation.nextStep,
+        validationStatus: validation.status,
+        validationMessage: validation.userMessage,
+        frozenAt: new Date(),
+      },
+      select: { id: true, goalText: true, interpretedGoal: true },
     });
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -406,7 +392,7 @@ export class OnboardingService {
         });
       }
 
-      for (const prompt of generated.areaPrompts) {
+      for (const prompt of validation.areaPrompts) {
         await tx.userAreaPromptInstruction.upsert({
           where: {
             userId_areaId: { userId: actor.id, areaId: prompt.areaId },
@@ -414,22 +400,22 @@ export class OnboardingService {
           update: {
             goalId: goal.id,
             promptText: prompt.promptText,
-            provider: generated.provider,
-            model: generated.model,
-            promptVersion: generated.promptVersion,
-            promptHash: generated.promptHash,
-            inputJson: generated.inputJson as Prisma.InputJsonValue,
+            provider: validation.provider,
+            model: validation.model,
+            promptVersion: validation.promptVersion,
+            promptHash: validation.promptHash,
+            inputJson: validation.inputJson as Prisma.InputJsonValue,
           },
           create: {
             userId: actor.id,
             areaId: prompt.areaId,
             goalId: goal.id,
             promptText: prompt.promptText,
-            provider: generated.provider,
-            model: generated.model,
-            promptVersion: generated.promptVersion,
-            promptHash: generated.promptHash,
-            inputJson: generated.inputJson as Prisma.InputJsonValue,
+            provider: validation.provider,
+            model: validation.model,
+            promptVersion: validation.promptVersion,
+            promptHash: validation.promptHash,
+            inputJson: validation.inputJson as Prisma.InputJsonValue,
           },
         });
       }
@@ -449,7 +435,7 @@ export class OnboardingService {
 
     return {
       ...result,
-      generatedAreaPrompts: generated.areaPrompts.map((prompt) => ({
+      generatedAreaPrompts: validation.areaPrompts.map((prompt) => ({
         areaId: prompt.areaId,
         areaName: prompt.areaName,
       })),
@@ -467,6 +453,51 @@ export class OnboardingService {
         config?.basePrompt ??
         'Genera prompt operativi per area partendo dall obiettivo atleta e dal suo profilo. Rispondi in italiano, in modo pratico e revisionabile.',
     };
+  }
+
+  private async loadConfiguredAreas() {
+    return this.prisma.area.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  private async saveGoalValidation(
+    userId: string,
+    goalText: string,
+    validation: GoalValidationResult,
+    freeze: boolean,
+  ) {
+    return this.prisma.userPerformanceGoal.upsert({
+      where: { userId },
+      update: {
+        goalText,
+        interpretedGoal: validation.interpretedGoal,
+        normalizedGoal: validation.normalizedGoal as Prisma.InputJsonValue,
+        goalEvaluation: validation.goalEvaluation as Prisma.InputJsonValue,
+        suggestedReformulatedGoal: validation.suggestedReformulatedGoal,
+        questionsToUser: validation.questionsToUser as Prisma.InputJsonValue,
+        nextStep: validation.nextStep,
+        validationStatus: validation.status,
+        validationMessage: validation.userMessage,
+        rejectionReason: validation.rejectionReason,
+        frozenAt: freeze ? new Date() : null,
+      },
+      create: {
+        userId,
+        goalText,
+        interpretedGoal: validation.interpretedGoal,
+        normalizedGoal: validation.normalizedGoal as Prisma.InputJsonValue,
+        goalEvaluation: validation.goalEvaluation as Prisma.InputJsonValue,
+        suggestedReformulatedGoal: validation.suggestedReformulatedGoal,
+        questionsToUser: validation.questionsToUser as Prisma.InputJsonValue,
+        nextStep: validation.nextStep,
+        validationStatus: validation.status,
+        validationMessage: validation.userMessage,
+        rejectionReason: validation.rejectionReason,
+        frozenAt: freeze ? new Date() : null,
+      },
+    });
   }
 
   private async loadActiveTemplates(): Promise<TemplateRecord[]> {
