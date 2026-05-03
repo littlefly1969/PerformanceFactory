@@ -21,6 +21,7 @@ type StarterQuestion = {
 type StarterQuestionnaire = {
   required: boolean;
   status: string;
+  goalText?: string;
   title: string;
   description: string;
   options: StarterOption[];
@@ -35,6 +36,7 @@ type MessageTone = "success" | "warning";
 
 export default function OnboardingPage() {
   const [questionnaire, setQuestionnaire] = useState<StarterQuestionnaire | null>(null);
+  const [goalText, setGoalText] = useState("");
   const [answers, setAnswers] = useState<Record<string, string | number>>({});
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -56,7 +58,8 @@ export default function OnboardingPage() {
   );
 
   const completed = questionnaire
-    ? questionnaire.questions.every(
+    ? goalText.trim().length >= 10 &&
+      questionnaire.questions.every(
         (question) =>
           !question.required ||
           (answers[question.id] !== undefined && answers[question.id] !== ""),
@@ -75,6 +78,7 @@ export default function OnboardingPage() {
     }
     const data = (await response.json()) as StarterQuestionnaire;
     setQuestionnaire(data);
+    setGoalText(data.goalText ?? "");
     if (!data.required) {
       setMessageTone("success");
       setMessage("Starter questionnaire already completed.");
@@ -105,6 +109,7 @@ export default function OnboardingPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        goalText,
         answers: questionnaire.questions.map((question) => ({
           questionId: question.id,
           value: answers[question.id],
@@ -144,7 +149,7 @@ export default function OnboardingPage() {
       stats={[
         { label: "Status", value: loading ? "..." : questionnaire?.status ?? "-", tone: questionnaire?.required ? "warning" : "success" },
         { label: "Answered", value: questionnaire ? `${Object.keys(answers).length}/${questionnaire.questions.length}` : "-", tone: "accent" },
-        { label: "Access", value: result || questionnaire?.required === false ? "Ready" : "Locked", tone: result ? "success" : "warning" },
+        { label: "Obiettivo", value: goalText.trim() ? "OK" : "-", tone: goalText.trim() ? "success" : "warning" },
       ]}
     >
       {message && <div className={`pf-alert ${messageTone}`}>{message}</div>}
@@ -160,6 +165,25 @@ export default function OnboardingPage() {
           </div>
 
           <div className="pf-stack">
+            <article className="pf-card">
+              <div className="pf-card-top">
+                <div>
+                  <h3>Obiettivo personale</h3>
+                  <p className="pf-muted">
+                    Descrivi perche stai usando PerformanceFactory. Questo testo
+                    personalizza i prompt AI per ogni area.
+                  </p>
+                </div>
+                {goalText.trim().length >= 10 && <StatusBadge tone="success">OK</StatusBadge>}
+              </div>
+              <textarea
+                className="pf-textarea"
+                rows={4}
+                value={goalText}
+                onChange={(event) => setGoalText(event.target.value)}
+                placeholder="Esempio: voglio migliorare continuita, prevenire cali fisici e arrivare piu preparato alle gare."
+              />
+            </article>
             {questionnaire?.questions.map((question) => (
               <article key={question.id} className="pf-card">
                 <div className="pf-card-top">

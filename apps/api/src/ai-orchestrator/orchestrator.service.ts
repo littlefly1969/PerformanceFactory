@@ -282,6 +282,7 @@ export class OrchestratorService {
       onboardingAssessment,
       currentState,
       areaGenerationConfig,
+      userAreaPromptInstruction,
     ] = await Promise.all([
       this.prisma.performanceProfileSnapshot.findFirst({
         where: { userId },
@@ -317,11 +318,24 @@ export class OrchestratorService {
         select: { level: true, score: true },
       }),
       this.loadAreaGenerationConfig(area.id),
+      this.prisma.userAreaPromptInstruction.findUnique({
+        where: { userId_areaId: { userId, areaId: area.id } },
+        select: {
+          promptText: true,
+          promptVersion: true,
+          updatedAt: true,
+          goal: { select: { goalText: true } },
+        },
+      }),
     ]);
 
     const nextVersion = (lastPlan?.version ?? 0) + 1;
     const areaLevel = currentState?.level ?? this.levelFromSnapshot(previousSnapshot, area.id);
-    const promptConfigs = await this.loadPromptConfigs(area.id, areaLevel);
+    const promptConfigs = await this.loadPromptConfigs(
+      userId,
+      area.id,
+      areaLevel,
+    );
     const context = this.buildAiCycleContext({
       userId,
       area,
@@ -334,6 +348,7 @@ export class OrchestratorService {
       areaLevel,
       promptConfigs,
       areaGenerationConfig,
+      userAreaPromptInstruction,
     });
 
     return {
@@ -425,6 +440,12 @@ export class OrchestratorService {
     areaLevel: string;
     promptConfigs: Awaited<ReturnType<OrchestratorService['loadPromptConfigs']>>;
     areaGenerationConfig: Awaited<ReturnType<OrchestratorService['loadAreaGenerationConfig']>>;
+    userAreaPromptInstruction: {
+      promptText: string;
+      promptVersion: string;
+      updatedAt: Date;
+      goal: { goalText: string };
+    } | null;
   }): CycleProposalInput['context'] {
     const latestAreas =
       input.previousSnapshot?.areas.map((area) => ({
@@ -447,6 +468,7 @@ export class OrchestratorService {
 
     return {
       athlete: {
+        performanceGoal: input.userAreaPromptInstruction?.goal.goalText ?? null,
         generalAnamnesis: this.buildGeneralAnamnesis(
           input.onboardingAssessment?.profileJson ?? null,
           onboardingAnswers,
@@ -525,6 +547,13 @@ export class OrchestratorService {
           version: config.version,
           basePrompt: config.basePrompt,
         })),
+        userAreaPromptInstruction: input.userAreaPromptInstruction
+          ? {
+              promptVersion: input.userAreaPromptInstruction.promptVersion,
+              updatedAt: input.userAreaPromptInstruction.updatedAt.toISOString(),
+              basePrompt: input.userAreaPromptInstruction.promptText,
+            }
+          : null,
         planItemRequirements: [
           'Fonda ogni attivita sui punteggi dell area target, sulle note di completamento precedenti e sui motivi di rifiuto gia presenti.',
           'Ogni attivita deve essere abbastanza concreta da poter essere eseguita dall atleta senza spiegazioni aggiuntive.',
@@ -643,7 +672,35 @@ export class OrchestratorService {
     });
   }
 
-  private async loadPromptConfigs(areaId: string, athleteLevel: string) {
+  private async loadPromptConfigs(
+    userId: string,
+    areaId: string,
+    athleteLevel: string,
+  ) {
+    const userAreaPrompt = await this.prisma.userAreaPromptInstruction.findUnique({
+      where: { userId_areaId: { userId, areaId } },
+      select: {
+        id: true,
+        promptText: true,
+        promptVersion: true,
+        updatedAt: true,
+        area: { select: { id: true, name: true } },
+      },
+    });
+    if (userAreaPrompt) {
+      return [
+        {
+          id: userAreaPrompt.id,
+          name: 'obiettivo-area-utente',
+          basePrompt: userAreaPrompt.promptText,
+          areaId,
+          athleteLevel,
+          version: 1,
+          area: userAreaPrompt.area,
+        },
+      ];
+    }
+
     const levels = [athleteLevel, 'BASELINE'];
     return this.prisma.aiPromptConfig.findMany({
       where: {

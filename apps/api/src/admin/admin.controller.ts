@@ -26,6 +26,7 @@ import { AdminService } from './admin.service';
 import { UpsertAiPromptConfigDto } from './dto/upsert-ai-prompt-config.dto';
 import { UpsertAiAreaGenerationConfigDto } from './dto/upsert-ai-area-generation-config.dto';
 import { UpsertOnboardingTemplateDto } from './dto/upsert-onboarding-template.dto';
+import { UpsertGoalPromptConfigDto } from './dto/upsert-goal-prompt-config.dto';
 
 @ApiTags('admin-cycles')
 @Controller('admin')
@@ -119,6 +120,19 @@ export class AdminController {
     @Body() body: UpsertAiPromptConfigDto,
   ) {
     return this.admin.upsertAiPromptConfig(body, req.user?.id ?? '');
+  }
+
+  @Post('goal-prompt')
+  @ApiOperation({ summary: 'Create or update the athlete goal AI prompt' })
+  @ApiBody({ type: UpsertGoalPromptConfigDto })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  upsertGoalPrompt(
+    @Req() req: { user?: { id: string } },
+    @Body() body: UpsertGoalPromptConfigDto,
+  ) {
+    return this.admin.upsertGoalPromptConfig(body, req.user?.id ?? '');
   }
 
   @Post('ai-area-configs')

@@ -59,6 +59,8 @@ model User {
   kpiDaily             KpiDaily[]
   aiInteractions       AiInteraction[]
   onboardingAssessment UserOnboardingAssessment?
+  performanceGoal      UserPerformanceGoal?
+  userAreaPromptInstructions UserAreaPromptInstruction[]
 
   performanceProfileSnapshots PerformanceProfileSnapshot[]
   planReleases                ImprovementPlanRelease[]
@@ -80,6 +82,8 @@ model User {
   updatedAreaGenerationConfigs AiAreaGenerationConfig[]     @relation("AiAreaGenerationConfigUpdatedBy")
   createdOnboardingTemplates  OnboardingQuestionTemplate[] @relation("OnboardingTemplateCreatedBy")
   updatedOnboardingTemplates  OnboardingQuestionTemplate[] @relation("OnboardingTemplateUpdatedBy")
+  createdGoalPromptConfigs    AiGoalPromptConfig[]         @relation("AiGoalPromptConfigCreatedBy")
+  updatedGoalPromptConfigs    AiGoalPromptConfig[]         @relation("AiGoalPromptConfigUpdatedBy")
 }
 
 model UserOnboardingAssessment {
@@ -93,6 +97,34 @@ model UserOnboardingAssessment {
   updatedAt   DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id])
+}
+
+model UserPerformanceGoal {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  goalText  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+  areaPromptInstructions UserAreaPromptInstruction[]
+}
+
+model AiGoalPromptConfig {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  basePrompt  String
+  version     Int      @default(1)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  createdBy User? @relation("AiGoalPromptConfigCreatedBy", fields: [createdById], references: [id])
+  updatedBy User? @relation("AiGoalPromptConfigUpdatedBy", fields: [updatedById], references: [id])
+
+  @@index([isActive, version])
 }
 
 model OnboardingQuestionTemplate {
@@ -155,6 +187,29 @@ model AiAreaGenerationConfig {
   updatedBy User? @relation("AiAreaGenerationConfigUpdatedBy", fields: [updatedById], references: [id])
 }
 
+model UserAreaPromptInstruction {
+  id            String   @id @default(uuid())
+  userId        String
+  areaId        String
+  goalId        String
+  promptText    String
+  provider      String
+  model         String
+  promptVersion String
+  promptHash    String
+  inputJson     Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+  area Area @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  goal UserPerformanceGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, areaId])
+  @@index([goalId])
+  @@index([userId, updatedAt])
+}
+
 model DataAccessAudit {
   id           String   @id @default(uuid())
   actorId      String
@@ -205,6 +260,7 @@ model Area {
   onboardingQuestionTemplates OnboardingQuestionTemplate[]
   aiPromptConfigs             AiPromptConfig[]
   aiAreaGenerationConfig      AiAreaGenerationConfig?
+  userAreaPromptInstructions  UserAreaPromptInstruction[]
 }
 
 model FeedbackEntry {

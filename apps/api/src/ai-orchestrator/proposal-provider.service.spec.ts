@@ -18,6 +18,7 @@ const input: CycleProposalInput = {
   previousSnapshot: null,
   context: {
     athlete: {
+      performanceGoal: 'Improve match readiness',
       generalAnamnesis: null,
       targetAreaAnamnesis: null,
       areaLevel: 'BASELINE',
@@ -31,6 +32,7 @@ const input: CycleProposalInput = {
     guidance: {
       areaGenerationConfig: null,
       adminPromptInstructions: [],
+      userAreaPromptInstruction: null,
       planItemRequirements: [
         'Make the work practical, measurable, and reviewable.',
       ],

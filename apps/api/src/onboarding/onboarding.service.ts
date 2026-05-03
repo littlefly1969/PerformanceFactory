@@ -10,6 +10,7 @@ import {
   UserRole,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { AiProposalProviderService } from '../ai-orchestrator/proposal-provider.service';
 
 type Actor = {
   id: string;
@@ -45,7 +46,10 @@ type OnboardingAnswer = {
 
 @Injectable()
 export class OnboardingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly aiProvider: AiProposalProviderService,
+  ) {}
 
   private assertAthlete(actor: Actor) {
     if (!actor.id) {
@@ -62,11 +66,17 @@ export class OnboardingService {
       where: { userId: actor.id },
       select: { status: true, completedAt: true, updatedAt: true },
     });
+    const goal = await this.prisma.userPerformanceGoal.findUnique({
+      where: { userId: actor.id },
+      select: { goalText: true, updatedAt: true },
+    });
     return {
-      required: assessment?.status !== 'COMPLETED',
+      required: assessment?.status !== 'COMPLETED' || !goal,
       status: assessment?.status ?? 'PENDING',
       completedAt: assessment?.completedAt ?? null,
       updatedAt: assessment?.updatedAt ?? null,
+      goalText: goal?.goalText ?? '',
+      goalUpdatedAt: goal?.updatedAt ?? null,
     };
   }
 
@@ -98,9 +108,14 @@ export class OnboardingService {
 
   async submit(
     actor: Actor,
+    goalTextInput: string,
     answers: OnboardingAnswer[],
   ) {
     this.assertAthlete(actor);
+    const goalText = goalTextInput.trim();
+    if (goalText.length < 10) {
+      throw new BadRequestException('Performance goal is required');
+    }
     const templates = await this.loadActiveTemplates();
     const answerMap = new Map(answers.map((answer) => [answer.questionId, answer.value]));
     const normalizedAnswers = templates.map((template) => {
@@ -182,8 +197,41 @@ export class OnboardingService {
       scoredAreas.reduce((sum, area) => sum + area.realR, 0) /
         scoredAreas.length,
     );
+    const configuredAreas = await this.prisma.area.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
 
-    return this.prisma.$transaction(async (tx) => {
+    const goal = await this.prisma.userPerformanceGoal.upsert({
+      where: { userId: actor.id },
+      update: { goalText },
+      create: { userId: actor.id, goalText },
+      select: { id: true, goalText: true },
+    });
+
+    const goalPromptConfig = await this.loadGoalPromptConfig();
+    const generated = await this.aiProvider.generateGoalAreaPrompts({
+      userId: actor.id,
+      goalText,
+      basePrompt: goalPromptConfig.basePrompt,
+      areas: configuredAreas.length
+        ? configuredAreas
+        : scoredAreas.map((area) => ({
+            id: area.areaId,
+            name: area.areaName,
+          })),
+      onboardingProfile: profile,
+      onboardingAnswers: normalizedAnswers.map((answer) => ({
+        key: answer.template.key,
+        scope: answer.template.scope,
+        areaId: answer.template.areaId,
+        label: answer.template.label,
+        value: answer.value,
+        score: answer.score,
+      })),
+    });
+
+    const result = await this.prisma.$transaction(async (tx) => {
       await tx.userOnboardingAssessment.upsert({
         where: { userId: actor.id },
         update: {
@@ -259,13 +307,63 @@ export class OnboardingService {
         });
       }
 
+      for (const prompt of generated.areaPrompts) {
+        await tx.userAreaPromptInstruction.upsert({
+          where: {
+            userId_areaId: { userId: actor.id, areaId: prompt.areaId },
+          },
+          update: {
+            goalId: goal.id,
+            promptText: prompt.promptText,
+            provider: generated.provider,
+            model: generated.model,
+            promptVersion: generated.promptVersion,
+            promptHash: generated.promptHash,
+            inputJson: generated.inputJson as Prisma.InputJsonValue,
+          },
+          create: {
+            userId: actor.id,
+            areaId: prompt.areaId,
+            goalId: goal.id,
+            promptText: prompt.promptText,
+            provider: generated.provider,
+            model: generated.model,
+            promptVersion: generated.promptVersion,
+            promptHash: generated.promptHash,
+            inputJson: generated.inputJson as Prisma.InputJsonValue,
+          },
+        });
+      }
+
       return {
         status: 'COMPLETED',
         snapshot,
         profile,
         areas: scoredAreas,
+        goal,
       };
     });
+
+    return {
+      ...result,
+      generatedAreaPrompts: generated.areaPrompts.map((prompt) => ({
+        areaId: prompt.areaId,
+        areaName: prompt.areaName,
+      })),
+    };
+  }
+
+  private async loadGoalPromptConfig() {
+    const config = await this.prisma.aiGoalPromptConfig.findFirst({
+      where: { isActive: true },
+      orderBy: [{ version: 'desc' }, { updatedAt: 'desc' }],
+      select: { basePrompt: true },
+    });
+    return {
+      basePrompt:
+        config?.basePrompt ??
+        'Genera prompt operativi per area partendo dall obiettivo atleta e dal suo profilo. Rispondi in italiano, in modo pratico e revisionabile.',
+    };
   }
 
   private async loadActiveTemplates(): Promise<TemplateRecord[]> {

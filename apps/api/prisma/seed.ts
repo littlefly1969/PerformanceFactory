@@ -346,6 +346,26 @@ async function main() {
     },
   });
 
+  await prisma.aiGoalPromptConfig.upsert({
+    where: { id: 'goal-prompt-default' },
+    update: {
+      name: 'obiettivo',
+      isActive: true,
+      basePrompt:
+        'Sei un assistente senior di sport performance. Riceverai l obiettivo dichiarato dall atleta, il profilo di onboarding e l elenco delle aree. Genera un prompt operativo personalizzato per ogni area, in italiano, pratico, misurabile, coerente con l obiettivo e sempre revisionabile da un professionista. Non inventare dati non presenti, diagnosi o promesse di risultato.',
+      updatedById: admin.id,
+    },
+    create: {
+      id: 'goal-prompt-default',
+      name: 'obiettivo',
+      isActive: true,
+      basePrompt:
+        'Sei un assistente senior di sport performance. Riceverai l obiettivo dichiarato dall atleta, il profilo di onboarding e l elenco delle aree. Genera un prompt operativo personalizzato per ogni area, in italiano, pratico, misurabile, coerente con l obiettivo e sempre revisionabile da un professionista. Non inventare dati non presenti, diagnosi o promesse di risultato.',
+      createdById: admin.id,
+      updatedById: admin.id,
+    },
+  });
+
   for (const area of areaRecords) {
     await prisma.aiAreaGenerationConfig.upsert({
       where: { areaId: area.id },
@@ -408,6 +428,7 @@ async function main() {
     scaleCount,
     onboardingTemplateCount,
     promptConfigCount,
+    goalPromptConfigCount,
   ] =
     await Promise.all([
       prisma.user.count(),
@@ -417,10 +438,11 @@ async function main() {
       prisma.performanceScaleConfig.count(),
       prisma.onboardingQuestionTemplate.count(),
       prisma.aiPromptConfig.count(),
+      prisma.aiGoalPromptConfig.count(),
     ]);
 
   console.log(
-    `[seed] done users=${userCount} areas=${areaCount} competences=${competenceCount} links=${linkCount} scales=${scaleCount} onboardingTemplates=${onboardingTemplateCount} promptConfigs=${promptConfigCount} admin=${admin.email}`,
+    `[seed] done users=${userCount} areas=${areaCount} competences=${competenceCount} links=${linkCount} scales=${scaleCount} onboardingTemplates=${onboardingTemplateCount} promptConfigs=${promptConfigCount} goalPromptConfigs=${goalPromptConfigCount} admin=${admin.email}`,
   );
 }
 

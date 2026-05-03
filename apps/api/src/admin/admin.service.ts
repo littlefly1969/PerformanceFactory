@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UpsertAiPromptConfigDto } from './dto/upsert-ai-prompt-config.dto';
 import { UpsertAiAreaGenerationConfigDto } from './dto/upsert-ai-area-generation-config.dto';
 import { UpsertOnboardingTemplateDto } from './dto/upsert-onboarding-template.dto';
+import { UpsertGoalPromptConfigDto } from './dto/upsert-goal-prompt-config.dto';
 import { OrchestratorService } from '../ai-orchestrator/orchestrator.service';
 
 const DEFAULT_INITIAL_CONTEXT =
@@ -30,6 +31,9 @@ const DEFAULT_QUESTIONNAIRE_LAYOUT_JSON = {
     focus: 'aderenza o esecuzione osservabile del lavoro proposto',
   },
 };
+
+const DEFAULT_GOAL_PROMPT =
+  'Sei un assistente senior di sport performance. Riceverai l obiettivo dichiarato dall atleta, il profilo di onboarding e l elenco delle aree. Genera un prompt operativo personalizzato per ogni area, in italiano, pratico, misurabile, coerente con l obiettivo e sempre revisionabile da un professionista. Non inventare dati non presenti, diagnosi o promesse di risultato.';
 
 @Injectable()
 export class AdminService {
@@ -422,8 +426,9 @@ export class AdminService {
       orderBy: { name: 'asc' },
     });
     await this.ensureAreaGenerationConfigs(areas.map((area) => area.id));
+    await this.ensureGoalPromptConfig();
 
-    const [promptConfigs, areaGenerationConfigs, onboardingTemplates] = await Promise.all([
+    const [promptConfigs, goalPromptConfig, areaGenerationConfigs, onboardingTemplates] = await Promise.all([
       this.prisma.aiPromptConfig.findMany({
         select: {
           id: true,
@@ -438,6 +443,19 @@ export class AdminService {
           area: { select: { id: true, name: true } },
         },
         orderBy: [{ areaId: 'asc' }, { athleteLevel: 'asc' }, { version: 'desc' }],
+      }),
+      this.prisma.aiGoalPromptConfig.findFirst({
+        where: { isActive: true },
+        select: {
+          id: true,
+          name: true,
+          basePrompt: true,
+          version: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: [{ version: 'desc' }, { updatedAt: 'desc' }],
       }),
       this.prisma.aiAreaGenerationConfig.findMany({
         select: {
@@ -475,6 +493,7 @@ export class AdminService {
       areas,
       levels: ['BASELINE', 'STABLE', 'ADVANCED'],
       promptConfigs,
+      goalPromptConfig,
       areaGenerationConfigs,
       onboardingTemplates,
       inputTypes: Object.values(OnboardingInputType),
@@ -496,6 +515,78 @@ export class AdminService {
         questionnaireLayoutJson: DEFAULT_QUESTIONNAIRE_LAYOUT_JSON,
       })),
       skipDuplicates: true,
+    });
+  }
+
+  private async ensureGoalPromptConfig() {
+    await this.prisma.aiGoalPromptConfig.upsert({
+      where: { id: 'goal-prompt-default' },
+      update: {},
+      create: {
+        id: 'goal-prompt-default',
+        name: 'obiettivo',
+        basePrompt: DEFAULT_GOAL_PROMPT,
+        isActive: true,
+      },
+    });
+  }
+
+  async upsertGoalPromptConfig(
+    body: UpsertGoalPromptConfigDto,
+    actorId: string,
+  ) {
+    const name = body.name?.trim() || 'obiettivo';
+    const basePrompt = body.basePrompt?.trim();
+    const isActive = body.isActive ?? true;
+    if (!actorId || !name || !basePrompt) {
+      throw new BadRequestException('Missing goal prompt fields');
+    }
+
+    if (body.id) {
+      const existing = await this.prisma.aiGoalPromptConfig.findUnique({
+        where: { id: body.id },
+        select: { id: true, name: true },
+      });
+      if (!existing) {
+        throw new NotFoundException('Goal prompt configuration not found');
+      }
+
+      return this.prisma.$transaction(async (tx) => {
+        if (isActive) {
+          await tx.aiGoalPromptConfig.updateMany({
+            where: { isActive: true, id: { not: body.id } },
+            data: { isActive: false },
+          });
+        }
+        return tx.aiGoalPromptConfig.update({
+          where: { id: body.id },
+          data: {
+            name,
+            basePrompt,
+            isActive,
+            version: { increment: 1 },
+            updatedById: actorId,
+          },
+        });
+      });
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      if (isActive) {
+        await tx.aiGoalPromptConfig.updateMany({
+          where: { isActive: true },
+          data: { isActive: false },
+        });
+      }
+      return tx.aiGoalPromptConfig.create({
+        data: {
+          name,
+          basePrompt,
+          isActive,
+          createdById: actorId,
+          updatedById: actorId,
+        },
+      });
     });
   }
 

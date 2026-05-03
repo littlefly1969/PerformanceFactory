@@ -19,6 +19,13 @@ type PromptConfig = {
   isActive: boolean;
   area?: Area | null;
 };
+type GoalPromptConfig = {
+  id?: string;
+  name: string;
+  basePrompt: string;
+  version?: number;
+  isActive: boolean;
+};
 type AreaGenerationConfig = {
   id?: string;
   areaId: string;
@@ -45,6 +52,7 @@ type Settings = {
   areas: Area[];
   levels: string[];
   promptConfigs: PromptConfig[];
+  goalPromptConfig?: GoalPromptConfig | null;
   areaGenerationConfigs: AreaGenerationConfig[];
   onboardingTemplates: OnboardingTemplate[];
   inputTypes: OnboardingTemplate["inputType"][];
@@ -56,6 +64,12 @@ const emptyPrompt: PromptConfig = {
   basePrompt: "",
   areaId: null,
   athleteLevel: "BASELINE",
+  isActive: true,
+};
+
+const emptyGoalPrompt: GoalPromptConfig = {
+  name: "obiettivo",
+  basePrompt: "",
   isActive: true,
 };
 
@@ -94,6 +108,8 @@ const stringifyOptions = (value: unknown) =>
 export default function AdminAiConfigPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [promptDraft, setPromptDraft] = useState<PromptConfig>(emptyPrompt);
+  const [goalPromptDraft, setGoalPromptDraft] =
+    useState<GoalPromptConfig>(emptyGoalPrompt);
   const [areaConfigDraft, setAreaConfigDraft] =
     useState<AreaGenerationConfig>(emptyAreaConfig);
   const [areaConfigLayoutText, setAreaConfigLayoutText] = useState("");
@@ -106,6 +122,7 @@ export default function AdminAiConfigPage() {
   const areas = settings?.areas ?? [];
   const levels = settings?.levels ?? ["BASELINE", "STABLE", "ADVANCED"];
   const promptConfigs = settings?.promptConfigs ?? [];
+  const goalPromptConfig = settings?.goalPromptConfig ?? null;
   const areaGenerationConfigs = settings?.areaGenerationConfigs ?? [];
   const templates = settings?.onboardingTemplates ?? [];
   const activePromptCount = useMemo(
@@ -136,7 +153,9 @@ export default function AdminAiConfigPage() {
       setMessage(`Configuration load failed: ${await readError(response)}`);
       return;
     }
-    setSettings((await response.json()) as Settings);
+    const data = (await response.json()) as Settings;
+    setSettings(data);
+    setGoalPromptDraft(data.goalPromptConfig ?? emptyGoalPrompt);
   };
 
   useEffect(() => {
@@ -160,6 +179,25 @@ export default function AdminAiConfigPage() {
     setPromptDraft(emptyPrompt);
     await loadSettings();
     setMessage("Prompt configuration saved.");
+    setBusyKey(null);
+  };
+
+  const saveGoalPrompt = async () => {
+    setBusyKey("goal-prompt");
+    setMessage(null);
+    const response = await secureFetch(`${API_BASE}/admin/goal-prompt`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(goalPromptDraft),
+    });
+    if (!response.ok) {
+      setMessage(`Goal prompt save failed: ${await readError(response)}`);
+      setBusyKey(null);
+      return;
+    }
+    await loadSettings();
+    setMessage("Prompt obiettivo salvato.");
     setBusyKey(null);
   };
 
@@ -258,7 +296,7 @@ export default function AdminAiConfigPage() {
         </button>
       }
       stats={[
-        { label: "Prompt attivi", value: activePromptCount, tone: "accent" },
+        { label: "Prompt obiettivo", value: goalPromptConfig ? `v${goalPromptConfig.version ?? 1}` : "-", tone: "accent" },
         {
           label: "Domande anamnesi",
           value: templates.filter((template) => template.isActive).length,
@@ -269,14 +307,81 @@ export default function AdminAiConfigPage() {
     >
       {message && <div className="pf-alert warning">{message}</div>}
 
+      <section className="pf-panel">
+        <div className="pf-panel-header">
+          <div>
+            <h2>Prompt obiettivo</h2>
+            <p className="pf-muted">
+              Prompt usato per trasformare l obiettivo dichiarato dall atleta in
+              istruzioni personalizzate per ogni area e utente.
+            </p>
+          </div>
+          {goalPromptConfig && (
+            <StatusBadge tone={goalPromptConfig.isActive ? "success" : "neutral"}>
+              v{goalPromptConfig.version ?? 1}
+            </StatusBadge>
+          )}
+        </div>
+        <div className="pf-stack">
+          <label className="pf-field">
+            Nome
+            <input
+              className="pf-input"
+              value={goalPromptDraft.name}
+              onChange={(event) =>
+                setGoalPromptDraft((prev) => ({
+                  ...prev,
+                  name: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label className="pf-field">
+            Prompt
+            <textarea
+              className="pf-textarea"
+              rows={7}
+              value={goalPromptDraft.basePrompt}
+              onChange={(event) =>
+                setGoalPromptDraft((prev) => ({
+                  ...prev,
+                  basePrompt: event.target.value,
+                }))
+              }
+            />
+          </label>
+          <label className="pf-checkbox">
+            <input
+              type="checkbox"
+              checked={goalPromptDraft.isActive}
+              onChange={(event) =>
+                setGoalPromptDraft((prev) => ({
+                  ...prev,
+                  isActive: event.target.checked,
+                }))
+              }
+            />
+            Attivo
+          </label>
+          <button
+            className="pf-button"
+            type="button"
+            disabled={busyKey === "goal-prompt"}
+            onClick={saveGoalPrompt}
+          >
+            Save prompt obiettivo
+          </button>
+        </div>
+      </section>
+
       <section className="pf-dashboard-grid">
         <article className="pf-panel">
           <div className="pf-panel-header">
             <div>
               <h2>Prompt base</h2>
               <p className="pf-muted">
-                Il prompt globale e quello d area vengono aggiunti al prompt di
-                sistema durante generazione e preview AI.
+                Compatibilita legacy: usato solo quando l atleta non ha ancora
+                prompt area personalizzati generati dall obiettivo.
               </p>
             </div>
           </div>

@@ -138,11 +138,17 @@ export class AuthService {
     if (!userId || role !== UserRole.USER) {
       return false;
     }
-    const onboarding = await this.prisma.userOnboardingAssessment.findUnique({
-      where: { userId },
-      select: { status: true },
-    });
-    return onboarding?.status !== 'COMPLETED';
+    const [onboarding, goal] = await Promise.all([
+      this.prisma.userOnboardingAssessment.findUnique({
+        where: { userId },
+        select: { status: true },
+      }),
+      this.prisma.userPerformanceGoal.findUnique({
+        where: { userId },
+        select: { id: true },
+      }),
+    ]);
+    return onboarding?.status !== 'COMPLETED' || !goal;
   }
 
   async login(

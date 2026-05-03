@@ -36,11 +36,13 @@ export class OnboardingController {
     @Req() req: { user?: { id: string; role: UserRole } },
     @Body()
     body: {
+      goalText?: string;
       answers?: Array<{ questionId: string; value: string | number | boolean | null }>;
     },
   ) {
     return this.onboarding.submit(
       { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },
+      body.goalText ?? '',
       body.answers ?? [],
     );
   }

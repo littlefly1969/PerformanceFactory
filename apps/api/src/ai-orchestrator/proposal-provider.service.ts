@@ -28,6 +28,7 @@ export type AiSnapshotInput = {
 
 export type AiCycleContext = {
   athlete: {
+    performanceGoal?: string | null;
     generalAnamnesis: unknown;
     targetAreaAnamnesis: unknown;
     areaLevel: string;
@@ -93,6 +94,11 @@ export type AiCycleContext = {
       version: number;
       basePrompt: string;
     }>;
+    userAreaPromptInstruction: {
+      promptVersion: string;
+      updatedAt: string;
+      basePrompt: string;
+    } | null;
     planItemRequirements: string[];
     questionnaireRequirements: string[];
     safetyRules: string[];
@@ -137,7 +143,30 @@ export type CycleProposal = {
   }>;
 };
 
+export type GoalAreaPromptInput = {
+  userId: string;
+  goalText: string;
+  basePrompt: string;
+  areas: AiAreaInput[];
+  onboardingProfile: unknown;
+  onboardingAnswers: unknown;
+};
+
+export type GoalAreaPromptResult = {
+  provider: AiProvider;
+  model: string;
+  promptVersion: string;
+  promptHash: string;
+  inputJson: Record<string, unknown>;
+  areaPrompts: Array<{
+    areaId: string;
+    areaName: string;
+    promptText: string;
+  }>;
+};
+
 const PROMPT_VERSION = 'cycle-proposal-v2';
+const GOAL_PROMPT_VERSION = 'goal-area-prompts-v1';
 const QUESTIONS_PER_AREA = 3;
 const EXTERNAL_AI_PROVIDERS: AiProvider[] = ['openai', 'gemini'];
 const SYSTEM_PROMPT =
@@ -177,6 +206,28 @@ export class AiProposalProviderService {
       promptVersion: PROMPT_VERSION,
       promptHash: this.hashJson(inputJson),
       inputJson,
+    };
+  }
+
+  async generateGoalAreaPrompts(
+    input: GoalAreaPromptInput,
+  ): Promise<GoalAreaPromptResult> {
+    const provider = this.resolveProvider();
+    const model = this.resolveModel(provider);
+    const inputJson = this.buildGoalPromptAuditInput(input);
+    if (provider === 'openai') {
+      return this.generateOpenAiGoalAreaPrompts(input, inputJson);
+    }
+    if (provider === 'gemini') {
+      return this.generateGeminiGoalAreaPrompts(input, inputJson);
+    }
+    return {
+      provider,
+      model,
+      promptVersion: GOAL_PROMPT_VERSION,
+      promptHash: this.hashJson(inputJson),
+      inputJson,
+      areaPrompts: this.buildStubGoalAreaPrompts(input),
     };
   }
 
@@ -395,6 +446,148 @@ export class AiProposalProviderService {
     );
   }
 
+  private async generateOpenAiGoalAreaPrompts(
+    input: GoalAreaPromptInput,
+    inputJson: Record<string, unknown>,
+  ): Promise<GoalAreaPromptResult> {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new BadRequestException(
+        'OPENAI_API_KEY is required for AI_PROVIDER=openai',
+      );
+    }
+
+    const model = this.resolveModel('openai');
+    this.logDebugPrompt('openai', model, inputJson);
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        input: [
+          {
+            role: 'system',
+            content: input.basePrompt,
+          },
+          {
+            role: 'user',
+            content: JSON.stringify(this.buildGoalPromptTask(input)),
+          },
+        ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'goal_area_prompts',
+            strict: true,
+            schema: this.buildGoalAreaPromptJsonSchema(),
+          },
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new BadRequestException(`OpenAI goal prompts failed: ${errorText}`);
+    }
+
+    const payload = (await response.json()) as {
+      output_text?: string;
+      output?: Array<{ content?: Array<{ text?: string }> }>;
+    };
+    const outputText =
+      payload.output_text ??
+      payload.output
+        ?.flatMap((item) => item.content ?? [])
+        .map((content) => content.text)
+        .find((text): text is string => !!text);
+    if (!outputText) {
+      throw new BadRequestException('OpenAI goal prompt response is empty');
+    }
+
+    return this.normalizeGoalAreaPrompts(
+      input,
+      'openai',
+      model,
+      this.parseGoalAreaPromptJson(outputText, 'OpenAI'),
+      inputJson,
+    );
+  }
+
+  private async generateGeminiGoalAreaPrompts(
+    input: GoalAreaPromptInput,
+    inputJson: Record<string, unknown>,
+  ): Promise<GoalAreaPromptResult> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new BadRequestException(
+        'GEMINI_API_KEY is required for AI_PROVIDER=gemini',
+      );
+    }
+
+    const model = this.resolveModel('gemini');
+    this.logDebugPrompt('gemini', model, inputJson);
+    const modelName = model.startsWith('models/')
+      ? model.slice('models/'.length)
+      : model;
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: input.basePrompt }] },
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: JSON.stringify(this.buildGoalPromptTask(input)) }],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            responseJsonSchema: this.buildGoalAreaPromptJsonSchema({
+              includePropertyOrdering: true,
+            }),
+          },
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new BadRequestException(`Gemini goal prompts failed: ${errorText}`);
+    }
+
+    const payload = (await response.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      promptFeedback?: { blockReason?: string };
+    };
+    const outputText = payload.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text)
+      .filter((text): text is string => !!text)
+      .join('');
+    if (!outputText) {
+      throw new BadRequestException(
+        `Gemini goal prompt response is empty: ${
+          payload.promptFeedback?.blockReason ?? 'empty response'
+        }`,
+      );
+    }
+
+    return this.normalizeGoalAreaPrompts(
+      input,
+      'gemini',
+      model,
+      this.parseGoalAreaPromptJson(outputText, 'Gemini'),
+      inputJson,
+    );
+  }
+
   private normalizeProposal(
     input: CycleProposalInput,
     provider: AiProvider,
@@ -496,6 +689,65 @@ export class AiProposalProviderService {
     };
   }
 
+  private buildGoalPromptTask(input: GoalAreaPromptInput) {
+    return {
+      task: 'Genera un prompt operativo personalizzato per ogni area di performance dell atleta.',
+      language: 'Italiano',
+      athleteGoal: input.goalText,
+      onboardingProfile: input.onboardingProfile,
+      onboardingAnswers: input.onboardingAnswers,
+      areas: input.areas,
+      constraints: {
+        onePromptPerArea: true,
+        promptUse:
+          'Ogni prompt verra usato come istruzione stabile nei cicli AI futuri per quella specifica coppia atleta-area.',
+        eachPromptMustInclude: [
+          'interpretazione dell obiettivo atleta per l area',
+          'priorita di lavoro',
+          'vincoli di sicurezza e revisione professionale',
+          'criteri per rendere esercizi e questionari coerenti con l obiettivo',
+        ],
+        avoid: [
+          'diagnosi mediche',
+          'promesse di risultato',
+          'dati non presenti nel contesto',
+        ],
+      },
+    };
+  }
+
+  private buildGoalAreaPromptJsonSchema(options?: {
+    includePropertyOrdering?: boolean;
+  }) {
+    const itemSchema = {
+      type: 'object',
+      additionalProperties: false,
+      required: ['areaId', 'promptText'],
+      properties: {
+        areaId: { type: 'string' },
+        promptText: { type: 'string' },
+      },
+      ...(options?.includePropertyOrdering
+        ? { propertyOrdering: ['areaId', 'promptText'] }
+        : {}),
+    };
+    return {
+      type: 'object',
+      additionalProperties: false,
+      required: ['areaPrompts'],
+      properties: {
+        areaPrompts: {
+          type: 'array',
+          minItems: 1,
+          items: itemSchema,
+        },
+      },
+      ...(options?.includePropertyOrdering
+        ? { propertyOrdering: ['areaPrompts'] }
+        : {}),
+    };
+  }
+
   private buildModelContext(context: AiCycleContext) {
     const { guidance: _guidance, ...modelContext } = context;
     void _guidance;
@@ -576,6 +828,69 @@ export class AiProposalProviderService {
     }
   }
 
+  private parseGoalAreaPromptJson(outputText: string, providerName: string) {
+    try {
+      return JSON.parse(outputText) as {
+        areaPrompts?: Array<{ areaId?: string; promptText?: string }>;
+      };
+    } catch {
+      throw new BadRequestException(
+        `${providerName} goal prompt response is not valid JSON`,
+      );
+    }
+  }
+
+  private normalizeGoalAreaPrompts(
+    input: GoalAreaPromptInput,
+    provider: AiProvider,
+    model: string,
+    parsed: { areaPrompts?: Array<{ areaId?: string; promptText?: string }> },
+    inputJson: Record<string, unknown>,
+  ): GoalAreaPromptResult {
+    const promptsByArea = new Map(
+      (parsed.areaPrompts ?? [])
+        .filter((item) => item.areaId && item.promptText)
+        .map((item) => [item.areaId as string, item.promptText as string]),
+    );
+    const areaPrompts = input.areas.map((area) => ({
+      areaId: area.id,
+      areaName: area.name,
+      promptText:
+        promptsByArea.get(area.id) ??
+        this.buildFallbackGoalAreaPrompt(input.goalText, area.name),
+    }));
+
+    if (areaPrompts.some((item) => !item.promptText.trim())) {
+      throw new BadRequestException(`${provider} goal prompts failed validation`);
+    }
+
+    return {
+      provider,
+      model,
+      promptVersion: GOAL_PROMPT_VERSION,
+      promptHash: this.hashJson(inputJson),
+      inputJson,
+      areaPrompts,
+    };
+  }
+
+  private buildStubGoalAreaPrompts(input: GoalAreaPromptInput) {
+    return input.areas.map((area) => ({
+      areaId: area.id,
+      areaName: area.name,
+      promptText: this.buildFallbackGoalAreaPrompt(input.goalText, area.name),
+    }));
+  }
+
+  private buildFallbackGoalAreaPrompt(goalText: string, areaName: string) {
+    return [
+      `Personalizza ogni proposta per l area ${areaName} rispetto all obiettivo dichiarato dall atleta: ${goalText}.`,
+      'Prioritizza attivita pratiche, misurabili e progressive che avvicinano l atleta a questo obiettivo.',
+      'Le domande di monitoraggio devono verificare aderenza ed esecuzione osservabile collegate all obiettivo.',
+      'Mantieni il lavoro revisionabile da un professionista e non inventare diagnosi, dati o vincoli non presenti.',
+    ].join(' ');
+  }
+
   private logDebugPrompt(
     provider: AiProvider,
     model: string,
@@ -622,6 +937,16 @@ export class AiProposalProviderService {
         system: this.buildSystemPrompt(input),
         user: providerPrompt,
         responseJsonSchema: this.buildProposalJsonSchema(),
+      },
+    };
+  }
+
+  private buildGoalPromptAuditInput(input: GoalAreaPromptInput) {
+    return {
+      prompt: {
+        system: input.basePrompt,
+        user: this.buildGoalPromptTask(input),
+        responseJsonSchema: this.buildGoalAreaPromptJsonSchema(),
       },
     };
   }
