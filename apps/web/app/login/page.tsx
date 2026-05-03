@@ -1,8 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { LanguageToggle } from "@/app/components/language-provider";
 import { API_BASE, secureFetch, storeAccessToken } from "@/app/lib/api";
 
 const demoAccounts = [
@@ -62,13 +62,30 @@ const demoAccounts = [
   },
 ];
 
-const groupedAccounts = demoAccounts.reduce(
-  (groups, account) => {
-    groups[account.group] = [...(groups[account.group] ?? []), account];
-    return groups;
+const demoAccessAccounts = [
+  {
+    label: "Admin demo",
+    account: demoAccounts.find(
+      (account) => account.email === "admin@example.com",
+    )!,
   },
-  {} as Record<string, typeof demoAccounts>,
-);
+  {
+    label: "Atleta demo",
+    account: demoAccounts.find(
+      (account) => account.email === "user@example.com",
+    )!,
+  },
+];
+
+const coachDemoAccounts = demoAccounts
+  .filter((account) => account.group === "Professionisti")
+  .map((account) => ({
+    label: `${account.label} coach`,
+    account,
+  }));
+
+const pendingAdminActivationMessage =
+  "L'admin sta valutando la tua richiesta e ti accettera.";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -94,7 +111,16 @@ export default function LoginPage() {
     });
 
     if (!response.ok) {
-      setMessage("Credentials are not valid or the API is not reachable.");
+      let errorMessage = "Credentials are not valid or the API is not reachable.";
+      try {
+        const data = (await response.json()) as { message?: string };
+        if (data.message === "Account pending admin activation") {
+          errorMessage = pendingAdminActivationMessage;
+        }
+      } catch {
+        // Keep the default login error when the API does not return JSON.
+      }
+      setMessage(errorMessage);
       setLoading(false);
       return;
     }
@@ -123,105 +149,132 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="pf-login-page">
-      <section className="pf-login-hero">
-        <Link className="pf-brand" href="/">
-          <span className="pf-brand-mark">PF</span>
-          <span>
-            <strong>PerformanceFactory</strong>
-            <small>AI performance workflow</small>
-          </span>
-        </Link>
-        <div>
-          <p className="pf-eyebrow">Secure workspace</p>
-          <h1>Entra nel flusso corretto per il tuo ruolo.</h1>
-          <p>
-            Atleti, professionisti e admin vedono solo le azioni che servono
-            davvero: onboarding, review, generazione AI e pubblicazione dei
-            cicli restano separati e tracciati.
+    <main className="pf-auth-screen">
+      <section className="pf-auth-brand-panel" aria-labelledby="pf-auth-heading">
+        <div className="pf-auth-brand-content">
+          <Link
+            className="pf-auth-brand-lockup"
+            href="/"
+            aria-label="Performance Factory"
+          >
+            <Image
+              className="pf-auth-brand-logo"
+              src="/brand/performance-factory-horizontal-clean.png"
+              alt="Performance Factory"
+              width={900}
+              height={211}
+              priority
+            />
+          </Link>
+
+          <p className="pf-auth-eyebrow">PERFORMANCE FACTORY</p>
+          <h1 id="pf-auth-heading" className="pf-auth-headline">
+            Valuta, monitora e migliora la tua performance
+          </h1>
+          <p className="pf-auth-copy">
+            Un unico spazio per iniziare il tuo percorso, seguire i progressi e
+            costruire un piano personalizzato.
           </p>
-        </div>
-        <div className="pf-login-proof">
-          <span>AI su richiesta admin</span>
-          <span>Approvazione professionista</span>
-          <span>Pubblicazione controllata</span>
+
+          <ul
+            className="pf-auth-benefits"
+            aria-label="Vantaggi Performance Factory"
+          >
+            <li>Valutazione iniziale</li>
+            <li>Percorso su misura</li>
+            <li>Progressi sempre visibili</li>
+          </ul>
         </div>
       </section>
 
-      <section className="pf-login-panel">
-        <div className="pf-login-tools">
-          <LanguageToggle />
-        </div>
-        <div>
-          <p className="pf-eyebrow">Sign in</p>
-          <h2>Accedi alla tua area</h2>
-          <p className="pf-muted">
-            Usa le credenziali reali oppure una scorciatoia seed per provare il
-            flusso.
-          </p>
-        </div>
+      <section className="pf-auth-panel">
+        <div className="pf-auth-panel-inner">
+          <div className="pf-auth-card">
+            <div className="pf-auth-card-header">
+              <p className="pf-eyebrow">Bentornato</p>
+              <h2>Accedi alla tua area</h2>
+              <p>Inserisci le tue credenziali per continuare.</p>
+            </div>
 
-        <form className="pf-stack" onSubmit={onSubmit}>
-          <label className="pf-field">
-            Email
-            <input
-              className="pf-input"
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
-          </label>
-          <label className="pf-field">
-            Password
-            <input
-              className="pf-input"
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-            />
-          </label>
-          <button className="pf-button" type="submit" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
-        </form>
+            <form className="pf-stack" onSubmit={onSubmit}>
+              <label className="pf-field">
+                Email
+                <input
+                  className="pf-input"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  required
+                />
+              </label>
+              <label className="pf-field">
+                Password
+                <input
+                  className="pf-input"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                />
+              </label>
+              <div className="pf-login-options">
+                <label className="pf-remember">
+                  <input type="checkbox" />
+                  Ricordami
+                </label>
+                <Link className="pf-auth-text-link" href="/register">
+                  Crea nuovo utente
+                </Link>
+              </div>
+              <button className="pf-button" type="submit" disabled={loading}>
+                {loading ? "Accesso in corso..." : "Accedi"}
+              </button>
+            </form>
 
-        <div className="pf-seed-panel">
-          <div>
-            <p className="pf-eyebrow">Nuovo utente</p>
-            <h2>Richiedi accesso atleta</h2>
-            <p className="pf-muted">
-              Apri la pagina di registrazione dedicata per inserire i dati del
-              nuovo atleta.
-            </p>
+            {message && <div className="pf-alert warning">{message}</div>}
           </div>
-          <Link className="pf-button-secondary" href="/register">
-            Crea nuovo utente
-          </Link>
-        </div>
 
-        <div className="pf-seed-panel">
-          {Object.entries(groupedAccounts).map(([group, accounts]) => (
-            <div key={group} className="pf-seed-group">
-              <strong>{group}</strong>
-              <div className="pf-role-grid">
-                {accounts.map((account) => (
-                  <button
-                    key={account.email}
-                    className="pf-button-secondary"
-                    type="button"
-                    onClick={() => fill(account)}
-                  >
-                    {account.label}
-                  </button>
-                ))}
+          <div className="pf-auth-demo-card">
+            <div>
+              <p className="pf-eyebrow">Accesso demo</p>
+              <p>Solo per test interno</p>
+            </div>
+            <div className="pf-demo-groups">
+              <div className="pf-demo-group">
+                <span>Base</span>
+                <div className="pf-demo-actions">
+                  {demoAccessAccounts.map(({ label, account }) => (
+                    <button
+                      key={account.email}
+                      className="pf-button-secondary"
+                      type="button"
+                      onClick={() => fill(account)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="pf-demo-group">
+                <span>Coach aree</span>
+                <div className="pf-demo-actions coach">
+                  {coachDemoAccounts.map(({ label, account }) => (
+                    <button
+                      key={account.email}
+                      className="pf-button-secondary"
+                      type="button"
+                      onClick={() => fill(account)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
-          ))}
+          </div>
         </div>
-
-        {message && <div className="pf-alert warning">{message}</div>}
       </section>
     </main>
   );

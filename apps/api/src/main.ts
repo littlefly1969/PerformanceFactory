@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import {
@@ -82,6 +83,7 @@ async function bootstrap() {
   app.enableCors({
     origin: getCsvEnv('WEB_ORIGIN', 'http://127.0.0.1:3000'),
     credentials: true,
+    methods: ['GET', 'HEAD', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
   });
 
   app.use(cookieParser());

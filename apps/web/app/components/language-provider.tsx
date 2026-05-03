@@ -429,8 +429,16 @@ const dictionary: Record<string, string> = {
 
 const LanguageContext = createContext<LanguageContextValue | null>(null);
 
+const translatedValues = new Set(Object.values(dictionary));
+
+const escapeRegExp = (value: string) =>
+  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const translate = (language: Language, value: string) => {
   if (language === "en") {
+    return value;
+  }
+  if (translatedValues.has(value)) {
     return value;
   }
   const exact = dictionary[value];
@@ -439,7 +447,13 @@ const translate = (language: Language, value: string) => {
   }
   return Object.entries(dictionary)
     .sort((a, b) => b[0].length - a[0].length)
-    .reduce((next, [source, target]) => next.replaceAll(source, target), value);
+    .reduce((next, [source, target]) => {
+      const pattern = new RegExp(
+        `(?<![\\p{L}\\p{N}_])${escapeRegExp(source)}(?![\\p{L}\\p{N}_])`,
+        "gu",
+      );
+      return next.replace(pattern, target);
+    }, value);
 };
 
 function translateElement(root: ParentNode, language: Language) {

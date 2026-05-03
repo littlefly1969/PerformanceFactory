@@ -730,7 +730,7 @@ export default function AdminCyclesPage() {
             </p>
           </div>
         </div>
-        <div className="pf-grid">
+        <div className="pf-grid pf-ownership-grid">
           {athletes.map((athlete) => {
             const selectedAreaId =
               selectedAreaByAthlete[athlete.id] ??
@@ -752,11 +752,11 @@ export default function AdminCyclesPage() {
             ).length;
 
             return (
-              <article key={athlete.id} className="pf-card">
-                <div className="pf-card-top">
+              <article key={athlete.id} className="pf-card pf-ownership-card">
+                <div className="pf-card-top pf-ownership-header">
                   <div>
                     <h3>{displayUser(athlete)}</h3>
-                    <p className="pf-muted">
+                    <p className="pf-muted pf-athlete-meta">
                       {athlete.isActive ? "Enabled" : "Pending activation"} ·
                       onboarding {athlete.onboarding.status.toLowerCase()} ·
                       ranking {athlete.latestSnapshot?.rankingGlobal ?? "-"}
@@ -776,98 +776,112 @@ export default function AdminCyclesPage() {
                       : `${assignedCount}/${athlete.areaStates.length} assigned`}
                   </StatusBadge>
                 </div>
-                <label className="pf-field">
-                  Ambito
-                  <select
-                    className="pf-select"
-                    value={selectedAreaId}
-                    onChange={(event) => {
-                      const nextAreaId = event.target.value;
-                      setSelectedAreaByAthlete((prev) => ({
-                        ...prev,
-                        [athlete.id]: nextAreaId,
-                      }));
-                      setSelectedProfessionalByAthlete((prev) => {
-                        const currentProfessionalId =
-                          prev[selectionKey(athlete.id, nextAreaId)] ?? "";
-                        if (
-                          currentProfessionalId &&
-                          !professionalCanHandleArea(
-                            currentProfessionalId,
-                            nextAreaId,
-                          )
-                        ) {
-                          return {
-                            ...prev,
-                            [selectionKey(athlete.id, nextAreaId)]: "",
-                          };
-                        }
-                        return prev;
-                      });
-                    }}
-                  >
-                    {athlete.areaStates.map((state) => (
-                      <option key={state.area.id} value={state.area.id}>
-                        {state.area.name}
+                <div className="pf-ownership-fields">
+                  <label className="pf-field">
+                    Ambito
+                    <select
+                      className="pf-select"
+                      value={selectedAreaId}
+                      onChange={(event) => {
+                        const nextAreaId = event.target.value;
+                        setSelectedAreaByAthlete((prev) => ({
+                          ...prev,
+                          [athlete.id]: nextAreaId,
+                        }));
+                        setSelectedProfessionalByAthlete((prev) => {
+                          const currentProfessionalId =
+                            prev[selectionKey(athlete.id, nextAreaId)] ?? "";
+                          if (
+                            currentProfessionalId &&
+                            !professionalCanHandleArea(
+                              currentProfessionalId,
+                              nextAreaId,
+                            )
+                          ) {
+                            return {
+                              ...prev,
+                              [selectionKey(athlete.id, nextAreaId)]: "",
+                            };
+                          }
+                          return prev;
+                        });
+                      }}
+                    >
+                      {athlete.areaStates.map((state) => (
+                        <option key={state.area.id} value={state.area.id}>
+                          {state.area.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="pf-field">
+                    Professionista abilitato
+                    <select
+                      className="pf-select"
+                      value={
+                        selectedProfessionalStillEligible
+                          ? selectedProfessionalId
+                          : ""
+                      }
+                      onChange={(event) =>
+                        setSelectedProfessionalByAthlete((prev) => ({
+                          ...prev,
+                          [selectedKey]: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">
+                        {eligibleProfessionals.length
+                          ? "Select professional"
+                          : "No professional enabled for this area"}
                       </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="pf-field">
-                  Professionista abilitato
-                  <select
-                    className="pf-select"
-                    value={
-                      selectedProfessionalStillEligible
-                        ? selectedProfessionalId
-                        : ""
+                      {eligibleProfessionals.map((professional) => (
+                        <option key={professional.id} value={professional.id}>
+                          {professional.email}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <p
+                  className={`pf-muted pf-owner-note ${
+                    selectedAreaState?.linkedProfessional ? "" : "empty"
+                  }`}
+                >
+                  {selectedAreaState?.linkedProfessional ? (
+                    <>
+                      Current {selectedAreaState.area.name} owner:{" "}
+                      {selectedAreaState.linkedProfessional.email}
+                    </>
+                  ) : (
+                    "No owner assigned for this area"
+                  )}
+                </p>
+                <div className="pf-ownership-actions">
+                  <button
+                    className="pf-button"
+                    type="button"
+                    disabled={
+                      busyKey === `link:${athlete.id}` ||
+                      !selectedAreaId ||
+                      !selectedProfessionalByAthlete[selectedKey] ||
+                      !selectedProfessionalStillEligible
                     }
-                    onChange={(event) =>
-                      setSelectedProfessionalByAthlete((prev) => ({
-                        ...prev,
-                        [selectedKey]: event.target.value,
-                      }))
+                    onClick={() => assignProfessional(athlete.id)}
+                  >
+                    Associate professional
+                  </button>
+                  <button
+                    className="pf-button-secondary"
+                    type="button"
+                    disabled={busyKey === `active:${athlete.id}`}
+                    onClick={() =>
+                      setAthleteActive(athlete.id, !athlete.isActive)
                     }
                   >
-                    <option value="">
-                      {eligibleProfessionals.length
-                        ? "Select professional"
-                        : "No professional enabled for this area"}
-                    </option>
-                    {eligibleProfessionals.map((professional) => (
-                      <option key={professional.id} value={professional.id}>
-                        {professional.email}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {selectedAreaState?.linkedProfessional && (
-                  <p className="pf-muted">
-                    Current {selectedAreaState.area.name} owner:{" "}
-                    {selectedAreaState.linkedProfessional.email}
-                  </p>
-                )}
-                <button
-                  className="pf-button"
-                  type="button"
-                  disabled={
-                    busyKey === `link:${athlete.id}` ||
-                    !selectedAreaId ||
-                    !selectedProfessionalByAthlete[selectedKey] ||
-                    !selectedProfessionalStillEligible
-                  }
-                  onClick={() => assignProfessional(athlete.id)}
-                >
-                  Associate professional
-                </button>
-                <button
-                  className="pf-button-secondary"
-                  type="button"
-                  disabled={busyKey === `active:${athlete.id}`}
-                  onClick={() => setAthleteActive(athlete.id, !athlete.isActive)}
-                >
-                  {athlete.isActive ? "Disable athlete" : "Enable athlete"}
-                </button>
+                    {athlete.isActive ? "Disable athlete" : "Enable athlete"}
+                  </button>
+                </div>
                 <div className="pf-area-strip">
                   {athlete.areaStates.map((state) => (
                     <span

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ProductShell, StatusBadge } from "@/app/components/product-shell";
 import { RadarChart } from "@/app/components/radar-chart";
 import { API_BASE, secureFetch } from "@/app/lib/api";
@@ -31,14 +31,18 @@ type SubmitResult = {
   status: string;
   areas: Array<{ areaId: string; areaName: string; realR: number; potentialP: number }>;
 };
+type MessageTone = "success" | "warning";
 
 export default function OnboardingPage() {
   const [questionnaire, setQuestionnaire] = useState<StarterQuestionnaire | null>(null);
   const [answers, setAnswers] = useState<Record<string, string | number>>({});
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [messageTone, setMessageTone] = useState<MessageTone>("warning");
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [redirecting, setRedirecting] = useState(false);
+  const redirectTimeout = useRef<number | null>(null);
 
   const radarAreas = useMemo(
     () =>
@@ -64,6 +68,7 @@ export default function OnboardingPage() {
     setMessage(null);
     const response = await secureFetch(`${API_BASE}/onboarding/questionnaire`);
     if (!response.ok) {
+      setMessageTone("warning");
       setMessage(response.status === 401 ? "Login required." : "Unable to load starter questionnaire.");
       setLoading(false);
       return;
@@ -71,6 +76,7 @@ export default function OnboardingPage() {
     const data = (await response.json()) as StarterQuestionnaire;
     setQuestionnaire(data);
     if (!data.required) {
+      setMessageTone("success");
       setMessage("Starter questionnaire already completed.");
     }
     setLoading(false);
@@ -78,10 +84,17 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     void loadQuestionnaire();
+
+    return () => {
+      if (redirectTimeout.current) {
+        window.clearTimeout(redirectTimeout.current);
+      }
+    };
   }, []);
 
   const submit = async () => {
     if (!questionnaire || !completed) {
+      setMessageTone("warning");
       setMessage("Answer all questions before continuing.");
       return;
     }
@@ -100,13 +113,20 @@ export default function OnboardingPage() {
     });
 
     if (!response.ok) {
+      setMessageTone("warning");
       setMessage("Starter questionnaire could not be saved.");
       setSubmitting(false);
       return;
     }
 
     setResult((await response.json()) as SubmitResult);
+    setMessageTone("success");
+    setMessage("Anamnesi iniziale creata. Apertura ambiente atleta...");
     setSubmitting(false);
+    setRedirecting(true);
+    redirectTimeout.current = window.setTimeout(() => {
+      window.location.href = "/user";
+    }, 1200);
   };
 
   return (
@@ -127,7 +147,7 @@ export default function OnboardingPage() {
         { label: "Access", value: result || questionnaire?.required === false ? "Ready" : "Locked", tone: result ? "success" : "warning" },
       ]}
     >
-      {message && <div className="pf-alert warning">{message}</div>}
+      {message && <div className={`pf-alert ${messageTone}`}>{message}</div>}
 
       <section className="pf-dashboard-grid">
         <article className="pf-panel">
@@ -223,7 +243,7 @@ export default function OnboardingPage() {
             </button>
           ) : (
             <button className="pf-button" type="button" disabled={!completed || submitting} onClick={submit}>
-              {submitting ? "Saving..." : "Create baseline"}
+              {redirecting ? "Opening workspace..." : submitting ? "Saving..." : "Create baseline"}
             </button>
           )}
         </article>
