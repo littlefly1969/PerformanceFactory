@@ -30,6 +30,18 @@ export class OnboardingController {
     });
   }
 
+  @Post('goal/validate')
+  @ApiOperation({ summary: 'Validate athlete performance goal before onboarding submit' })
+  validateGoal(
+    @Req() req: { user?: { id: string; role: UserRole } },
+    @Body() body: { goalText?: string },
+  ) {
+    return this.onboarding.validateGoal(
+      { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },
+      body.goalText ?? '',
+    );
+  }
+
   @Post('submit')
   @ApiOperation({ summary: 'Submit starter questionnaire and generate baseline profile' })
   submit(

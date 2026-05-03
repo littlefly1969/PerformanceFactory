@@ -68,7 +68,13 @@ export class OnboardingService {
     });
     const goal = await this.prisma.userPerformanceGoal.findUnique({
       where: { userId: actor.id },
-      select: { goalText: true, updatedAt: true },
+      select: {
+        goalText: true,
+        interpretedGoal: true,
+        validationStatus: true,
+        validationMessage: true,
+        updatedAt: true,
+      },
     });
     return {
       required: assessment?.status !== 'COMPLETED' || !goal,
@@ -76,6 +82,9 @@ export class OnboardingService {
       completedAt: assessment?.completedAt ?? null,
       updatedAt: assessment?.updatedAt ?? null,
       goalText: goal?.goalText ?? '',
+      interpretedGoal: goal?.interpretedGoal ?? null,
+      validationStatus: goal?.validationStatus ?? 'PENDING',
+      validationMessage: goal?.validationMessage ?? null,
       goalUpdatedAt: goal?.updatedAt ?? null,
     };
   }
@@ -106,6 +115,56 @@ export class OnboardingService {
     };
   }
 
+  async validateGoal(actor: Actor, goalTextInput: string) {
+    this.assertAthlete(actor);
+    const goalText = goalTextInput.trim();
+    if (goalText.length < 10) {
+      return {
+        accepted: false,
+        interpretedGoal: '',
+        userMessage:
+          'Scrivi un obiettivo piu concreto legato a sport, allenamento o performance.',
+        rejectionReason: 'Obiettivo troppo breve.',
+      };
+    }
+
+    const goalPromptConfig = await this.loadGoalPromptConfig();
+    const validation = await this.aiProvider.validatePerformanceGoal({
+      userId: actor.id,
+      goalText,
+      basePrompt: goalPromptConfig.basePrompt,
+    });
+
+    if (!validation.accepted) {
+      await this.prisma.userPerformanceGoal.upsert({
+        where: { userId: actor.id },
+        update: {
+          goalText,
+          interpretedGoal: validation.interpretedGoal,
+          validationStatus: 'REJECTED',
+          validationMessage: validation.userMessage,
+          rejectionReason: validation.rejectionReason,
+          frozenAt: null,
+        },
+        create: {
+          userId: actor.id,
+          goalText,
+          interpretedGoal: validation.interpretedGoal,
+          validationStatus: 'REJECTED',
+          validationMessage: validation.userMessage,
+          rejectionReason: validation.rejectionReason,
+        },
+      });
+    }
+
+    return {
+      accepted: validation.accepted,
+      interpretedGoal: validation.interpretedGoal,
+      userMessage: validation.userMessage,
+      rejectionReason: validation.rejectionReason,
+    };
+  }
+
   async submit(
     actor: Actor,
     goalTextInput: string,
@@ -115,6 +174,33 @@ export class OnboardingService {
     const goalText = goalTextInput.trim();
     if (goalText.length < 10) {
       throw new BadRequestException('Performance goal is required');
+    }
+    const validation = await this.aiProvider.validatePerformanceGoal({
+      userId: actor.id,
+      goalText,
+      basePrompt: (await this.loadGoalPromptConfig()).basePrompt,
+    });
+    if (!validation.accepted) {
+      await this.prisma.userPerformanceGoal.upsert({
+        where: { userId: actor.id },
+        update: {
+          goalText,
+          interpretedGoal: validation.interpretedGoal,
+          validationStatus: 'REJECTED',
+          validationMessage: validation.userMessage,
+          rejectionReason: validation.rejectionReason,
+          frozenAt: null,
+        },
+        create: {
+          userId: actor.id,
+          goalText,
+          interpretedGoal: validation.interpretedGoal,
+          validationStatus: 'REJECTED',
+          validationMessage: validation.userMessage,
+          rejectionReason: validation.rejectionReason,
+        },
+      });
+      throw new BadRequestException(validation.userMessage);
     }
     const templates = await this.loadActiveTemplates();
     const answerMap = new Map(answers.map((answer) => [answer.questionId, answer.value]));
@@ -204,16 +290,29 @@ export class OnboardingService {
 
     const goal = await this.prisma.userPerformanceGoal.upsert({
       where: { userId: actor.id },
-      update: { goalText },
-      create: { userId: actor.id, goalText },
-      select: { id: true, goalText: true },
+      update: {
+        goalText,
+        interpretedGoal: validation.interpretedGoal,
+        validationStatus: 'ACCEPTED',
+        validationMessage: validation.userMessage,
+        rejectionReason: null,
+        frozenAt: new Date(),
+      },
+      create: {
+        userId: actor.id,
+        goalText,
+        interpretedGoal: validation.interpretedGoal,
+        validationStatus: 'ACCEPTED',
+        validationMessage: validation.userMessage,
+        frozenAt: new Date(),
+      },
+      select: { id: true, goalText: true, interpretedGoal: true },
     });
 
-    const goalPromptConfig = await this.loadGoalPromptConfig();
     const generated = await this.aiProvider.generateGoalAreaPrompts({
       userId: actor.id,
-      goalText,
-      basePrompt: goalPromptConfig.basePrompt,
+      goalText: validation.interpretedGoal,
+      basePrompt: (await this.loadGoalPromptConfig()).basePrompt,
       areas: configuredAreas.length
         ? configuredAreas
         : scoredAreas.map((area) => ({
@@ -341,6 +440,10 @@ export class OnboardingService {
         profile,
         areas: scoredAreas,
         goal,
+        goalValidation: {
+          interpretedGoal: validation.interpretedGoal,
+          userMessage: validation.userMessage,
+        },
       };
     });
 

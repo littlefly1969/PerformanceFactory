@@ -165,8 +165,27 @@ export type GoalAreaPromptResult = {
   }>;
 };
 
+export type GoalValidationInput = {
+  userId: string;
+  goalText: string;
+  basePrompt: string;
+};
+
+export type GoalValidationResult = {
+  provider: AiProvider;
+  model: string;
+  promptVersion: string;
+  promptHash: string;
+  inputJson: Record<string, unknown>;
+  accepted: boolean;
+  interpretedGoal: string;
+  userMessage: string;
+  rejectionReason: string | null;
+};
+
 const PROMPT_VERSION = 'cycle-proposal-v2';
 const GOAL_PROMPT_VERSION = 'goal-area-prompts-v1';
+const GOAL_VALIDATION_VERSION = 'goal-validation-v1';
 const QUESTIONS_PER_AREA = 3;
 const EXTERNAL_AI_PROVIDERS: AiProvider[] = ['openai', 'gemini'];
 const SYSTEM_PROMPT =
@@ -229,6 +248,27 @@ export class AiProposalProviderService {
       inputJson,
       areaPrompts: this.buildStubGoalAreaPrompts(input),
     };
+  }
+
+  async validatePerformanceGoal(
+    input: GoalValidationInput,
+  ): Promise<GoalValidationResult> {
+    const provider = this.resolveProvider();
+    const model = this.resolveModel(provider);
+    const inputJson = this.buildGoalValidationAuditInput(input);
+    if (provider === 'openai') {
+      return this.validateOpenAiPerformanceGoal(input, inputJson);
+    }
+    if (provider === 'gemini') {
+      return this.validateGeminiPerformanceGoal(input, inputJson);
+    }
+    return this.normalizeGoalValidation(
+      input,
+      provider,
+      model,
+      this.buildStubGoalValidation(input),
+      inputJson,
+    );
   }
 
   static requiresUserConsent(provider = process.env.AI_PROVIDER ?? 'stub') {
@@ -516,6 +556,72 @@ export class AiProposalProviderService {
     );
   }
 
+  private async validateOpenAiPerformanceGoal(
+    input: GoalValidationInput,
+    inputJson: Record<string, unknown>,
+  ): Promise<GoalValidationResult> {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new BadRequestException(
+        'OPENAI_API_KEY is required for AI_PROVIDER=openai',
+      );
+    }
+
+    const model = this.resolveModel('openai');
+    this.logDebugPrompt('openai', model, inputJson);
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        input: [
+          { role: 'system', content: input.basePrompt },
+          {
+            role: 'user',
+            content: JSON.stringify(this.buildGoalValidationTask(input)),
+          },
+        ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'goal_validation',
+            strict: true,
+            schema: this.buildGoalValidationJsonSchema(),
+          },
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new BadRequestException(`OpenAI goal validation failed: ${errorText}`);
+    }
+
+    const payload = (await response.json()) as {
+      output_text?: string;
+      output?: Array<{ content?: Array<{ text?: string }> }>;
+    };
+    const outputText =
+      payload.output_text ??
+      payload.output
+        ?.flatMap((item) => item.content ?? [])
+        .map((content) => content.text)
+        .find((text): text is string => !!text);
+    if (!outputText) {
+      throw new BadRequestException('OpenAI goal validation response is empty');
+    }
+    return this.normalizeGoalValidation(
+      input,
+      'openai',
+      model,
+      this.parseGoalValidationJson(outputText, 'OpenAI'),
+      inputJson,
+    );
+  }
+
   private async generateGeminiGoalAreaPrompts(
     input: GoalAreaPromptInput,
     inputJson: Record<string, unknown>,
@@ -584,6 +690,79 @@ export class AiProposalProviderService {
       'gemini',
       model,
       this.parseGoalAreaPromptJson(outputText, 'Gemini'),
+      inputJson,
+    );
+  }
+
+  private async validateGeminiPerformanceGoal(
+    input: GoalValidationInput,
+    inputJson: Record<string, unknown>,
+  ): Promise<GoalValidationResult> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new BadRequestException(
+        'GEMINI_API_KEY is required for AI_PROVIDER=gemini',
+      );
+    }
+
+    const model = this.resolveModel('gemini');
+    this.logDebugPrompt('gemini', model, inputJson);
+    const modelName = model.startsWith('models/')
+      ? model.slice('models/'.length)
+      : model;
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: input.basePrompt }] },
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                { text: JSON.stringify(this.buildGoalValidationTask(input)) },
+              ],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            responseJsonSchema: this.buildGoalValidationJsonSchema({
+              includePropertyOrdering: true,
+            }),
+          },
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new BadRequestException(`Gemini goal validation failed: ${errorText}`);
+    }
+
+    const payload = (await response.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      promptFeedback?: { blockReason?: string };
+    };
+    const outputText = payload.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text)
+      .filter((text): text is string => !!text)
+      .join('');
+    if (!outputText) {
+      throw new BadRequestException(
+        `Gemini goal validation response is empty: ${
+          payload.promptFeedback?.blockReason ?? 'empty response'
+        }`,
+      );
+    }
+    return this.normalizeGoalValidation(
+      input,
+      'gemini',
+      model,
+      this.parseGoalValidationJson(outputText, 'Gemini'),
       inputJson,
     );
   }
@@ -716,6 +895,61 @@ export class AiProposalProviderService {
     };
   }
 
+  private buildGoalValidationTask(input: GoalValidationInput) {
+    return {
+      task: 'Valuta se l obiettivo dichiarato dall atleta e lecito, pertinente allo sport, coerente con lo spirito PerformanceFactory e utilizzabile per generare un percorso di performance.',
+      athleteGoal: input.goalText,
+      acceptanceCriteria: [
+        'deve riguardare sport, prestazione, benessere funzionale, continuita di allenamento o miglioramento misurabile',
+        'deve poter essere trasformato in lavoro pratico e monitorabile',
+        'deve essere sicuro, etico e revisionabile da professionisti',
+      ],
+      rejectWhen: [
+        'fuori tema rispetto a sport o performance',
+        'richiede diagnosi, terapia medica, pratiche non sicure o illecite',
+        'punta a danneggiare se stessi o altri',
+        'e troppo vago per orientare un percorso',
+        'contiene contenuti offensivi, illegali o incompatibili con il servizio',
+      ],
+      responseInstructions: [
+        'Se accetti, spiega in una frase cosa hai capito dell obiettivo.',
+        'Se rifiuti, scrivi un messaggio breve e diretto per l utente, senza dettagli tecnici.',
+        'Rispondi in italiano.',
+      ],
+    };
+  }
+
+  private buildGoalValidationJsonSchema(options?: {
+    includePropertyOrdering?: boolean;
+  }) {
+    return {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'accepted',
+        'interpretedGoal',
+        'userMessage',
+        'rejectionReason',
+      ],
+      properties: {
+        accepted: { type: 'boolean' },
+        interpretedGoal: { type: 'string' },
+        userMessage: { type: 'string' },
+        rejectionReason: { type: ['string', 'null'] },
+      },
+      ...(options?.includePropertyOrdering
+        ? {
+            propertyOrdering: [
+              'accepted',
+              'interpretedGoal',
+              'userMessage',
+              'rejectionReason',
+            ],
+          }
+        : {}),
+    };
+  }
+
   private buildGoalAreaPromptJsonSchema(options?: {
     includePropertyOrdering?: boolean;
   }) {
@@ -840,6 +1074,84 @@ export class AiProposalProviderService {
     }
   }
 
+  private parseGoalValidationJson(outputText: string, providerName: string) {
+    try {
+      return JSON.parse(outputText) as {
+        accepted?: boolean;
+        interpretedGoal?: string;
+        userMessage?: string;
+        rejectionReason?: string | null;
+      };
+    } catch {
+      throw new BadRequestException(
+        `${providerName} goal validation response is not valid JSON`,
+      );
+    }
+  }
+
+  private normalizeGoalValidation(
+    input: GoalValidationInput,
+    provider: AiProvider,
+    model: string,
+    parsed: {
+      accepted?: boolean;
+      interpretedGoal?: string;
+      userMessage?: string;
+      rejectionReason?: string | null;
+    },
+    inputJson: Record<string, unknown>,
+  ): GoalValidationResult {
+    const accepted = parsed.accepted === true;
+    const interpretedGoal =
+      parsed.interpretedGoal?.trim() ||
+      (accepted
+        ? `L obiettivo riguarda: ${input.goalText}`
+        : 'Obiettivo non utilizzabile per il percorso.');
+    const userMessage =
+      parsed.userMessage?.trim() ||
+      (accepted
+        ? `Ho capito questo obiettivo: ${interpretedGoal}`
+        : 'Quanto richiesto non e consono a un percorso di performance sportiva.');
+    return {
+      provider,
+      model,
+      promptVersion: GOAL_VALIDATION_VERSION,
+      promptHash: this.hashJson(inputJson),
+      inputJson,
+      accepted,
+      interpretedGoal,
+      userMessage,
+      rejectionReason: accepted
+        ? null
+        : parsed.rejectionReason?.trim() ||
+          'Obiettivo non pertinente o non consono.',
+    };
+  }
+
+  private buildStubGoalValidation(input: GoalValidationInput) {
+    const normalized = input.goalText.toLowerCase();
+    const rejected =
+      input.goalText.trim().length < 10 ||
+      ['violenza', 'droga', 'doping', 'scommesse', 'soldi facili'].some(
+        (term) => normalized.includes(term),
+      );
+    if (rejected) {
+      return {
+        accepted: false,
+        interpretedGoal: 'Obiettivo non utilizzabile per il percorso.',
+        userMessage:
+          'Quanto richiesto non e consono a un percorso di performance sportiva.',
+        rejectionReason: 'Obiettivo fuori tema o non sicuro.',
+      };
+    }
+    return {
+      accepted: true,
+      interpretedGoal: input.goalText.trim(),
+      userMessage: `Ho capito questo obiettivo: ${input.goalText.trim()}`,
+      rejectionReason: null,
+    };
+  }
+
   private normalizeGoalAreaPrompts(
     input: GoalAreaPromptInput,
     provider: AiProvider,
@@ -947,6 +1259,16 @@ export class AiProposalProviderService {
         system: input.basePrompt,
         user: this.buildGoalPromptTask(input),
         responseJsonSchema: this.buildGoalAreaPromptJsonSchema(),
+      },
+    };
+  }
+
+  private buildGoalValidationAuditInput(input: GoalValidationInput) {
+    return {
+      prompt: {
+        system: input.basePrompt,
+        user: this.buildGoalValidationTask(input),
+        responseJsonSchema: this.buildGoalValidationJsonSchema(),
       },
     };
   }

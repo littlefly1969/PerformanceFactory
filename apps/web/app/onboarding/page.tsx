@@ -22,6 +22,9 @@ type StarterQuestionnaire = {
   required: boolean;
   status: string;
   goalText?: string;
+  interpretedGoal?: string | null;
+  validationStatus?: string;
+  validationMessage?: string | null;
   title: string;
   description: string;
   options: StarterOption[];
@@ -30,19 +33,32 @@ type StarterQuestionnaire = {
 
 type SubmitResult = {
   status: string;
+  goalValidation?: {
+    interpretedGoal: string;
+    userMessage: string;
+  };
   areas: Array<{ areaId: string; areaName: string; realR: number; potentialP: number }>;
+};
+type GoalValidation = {
+  accepted: boolean;
+  interpretedGoal: string;
+  userMessage: string;
+  rejectionReason?: string | null;
 };
 type MessageTone = "success" | "warning";
 
 export default function OnboardingPage() {
   const [questionnaire, setQuestionnaire] = useState<StarterQuestionnaire | null>(null);
   const [goalText, setGoalText] = useState("");
+  const [goalValidation, setGoalValidation] =
+    useState<GoalValidation | null>(null);
   const [answers, setAnswers] = useState<Record<string, string | number>>({});
   const [result, setResult] = useState<SubmitResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [messageTone, setMessageTone] = useState<MessageTone>("warning");
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [validatingGoal, setValidatingGoal] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const redirectTimeout = useRef<number | null>(null);
 
@@ -58,7 +74,7 @@ export default function OnboardingPage() {
   );
 
   const completed = questionnaire
-    ? goalText.trim().length >= 10 &&
+    ? goalValidation?.accepted === true &&
       questionnaire.questions.every(
         (question) =>
           !question.required ||
@@ -79,11 +95,62 @@ export default function OnboardingPage() {
     const data = (await response.json()) as StarterQuestionnaire;
     setQuestionnaire(data);
     setGoalText(data.goalText ?? "");
+    if (data.validationStatus === "ACCEPTED" && data.interpretedGoal) {
+      setGoalValidation({
+        accepted: true,
+        interpretedGoal: data.interpretedGoal,
+        userMessage:
+          data.validationMessage ??
+          `Ho capito questo obiettivo: ${data.interpretedGoal}`,
+      });
+    }
     if (!data.required) {
       setMessageTone("success");
       setMessage("Starter questionnaire already completed.");
     }
     setLoading(false);
+  };
+
+  const readError = async (response: Response) => {
+    try {
+      const data = (await response.json()) as { message?: string };
+      return data.message ?? "Starter questionnaire could not be saved.";
+    } catch {
+      return "Starter questionnaire could not be saved.";
+    }
+  };
+
+  const validateGoal = async () => {
+    const trimmed = goalText.trim();
+    if (trimmed.length < 10) {
+      setGoalValidation({
+        accepted: false,
+        interpretedGoal: "",
+        userMessage:
+          "Scrivi un obiettivo piu concreto legato a sport, allenamento o performance.",
+        rejectionReason: "Obiettivo troppo breve.",
+      });
+      return;
+    }
+
+    setValidatingGoal(true);
+    setMessage(null);
+    const response = await secureFetch(`${API_BASE}/onboarding/goal/validate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ goalText: trimmed }),
+    });
+    if (!response.ok) {
+      setMessageTone("warning");
+      setMessage("Validazione obiettivo non disponibile.");
+      setValidatingGoal(false);
+      return;
+    }
+    const validation = (await response.json()) as GoalValidation;
+    setGoalValidation(validation);
+    setMessageTone(validation.accepted ? "success" : "warning");
+    setMessage(validation.userMessage);
+    setValidatingGoal(false);
   };
 
   useEffect(() => {
@@ -119,7 +186,7 @@ export default function OnboardingPage() {
 
     if (!response.ok) {
       setMessageTone("warning");
-      setMessage("Starter questionnaire could not be saved.");
+      setMessage(await readError(response));
       setSubmitting(false);
       return;
     }
@@ -180,9 +247,39 @@ export default function OnboardingPage() {
                 className="pf-textarea"
                 rows={4}
                 value={goalText}
-                onChange={(event) => setGoalText(event.target.value)}
+                onChange={(event) => {
+                  setGoalText(event.target.value);
+                  setGoalValidation(null);
+                }}
                 placeholder="Esempio: voglio migliorare continuita, prevenire cali fisici e arrivare piu preparato alle gare."
               />
+              <div className="pf-actions">
+                <button
+                  className="pf-button-secondary"
+                  type="button"
+                  disabled={validatingGoal || goalText.trim().length < 10}
+                  onClick={validateGoal}
+                >
+                  {validatingGoal ? "Validazione..." : "Valida obiettivo"}
+                </button>
+                {goalValidation?.accepted && (
+                  <StatusBadge tone="success">Obiettivo valido</StatusBadge>
+                )}
+                {goalValidation && !goalValidation.accepted && (
+                  <StatusBadge tone="warning">Non consono</StatusBadge>
+                )}
+              </div>
+              {goalValidation?.interpretedGoal && (
+                <div className="pf-alert success">
+                  <strong>Cosa ha capito l AI</strong>
+                  <p>{goalValidation.interpretedGoal}</p>
+                </div>
+              )}
+              {goalValidation && !goalValidation.accepted && (
+                <div className="pf-alert warning">
+                  {goalValidation.userMessage}
+                </div>
+              )}
             </article>
             {questionnaire?.questions.map((question) => (
               <article key={question.id} className="pf-card">
