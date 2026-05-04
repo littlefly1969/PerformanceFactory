@@ -63,12 +63,20 @@ export class AuthService {
       throw new BadRequestException('La password deve avere almeno 8 caratteri');
     }
 
-    const existing = await this.prisma.user.findUnique({
-      where: { email },
-      select: { id: true },
-    });
-    if (existing) {
-      throw new BadRequestException('Utente gia esistente');
+    const [existingUser, existingIdentity] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { email },
+        select: { id: true },
+      }),
+      this.prisma.authIdentity.findFirst({
+        where: { email },
+        select: { id: true },
+      }),
+    ]);
+    if (existingUser || existingIdentity) {
+      throw new BadRequestException(
+        'Non e possibile registrarsi: la mail e gia presente nel sistema',
+      );
     }
 
     const passwordHash = await bcrypt.hash(password, 10);

@@ -282,16 +282,9 @@ export class GoogleOidcService {
       where: { email },
     });
     if (existingUser) {
-      if (process.env.GOOGLE_OIDC_AUTO_LINK_VERIFIED_EMAIL !== 'true') {
-        throw new UnauthorizedException(
-          'Email gia registrata: collega Google dopo accesso tradizionale',
-        );
-      }
-      if (!existingUser.isActive) {
-        throw new UnauthorizedException('Account in attesa di attivazione admin');
-      }
-      await this.createIdentity(existingUser.id, claims);
-      return existingUser;
+      throw new UnauthorizedException(
+        'Non e possibile usare Google: la mail e gia presente nel sistema',
+      );
     }
 
     if (mode !== 'register') {
