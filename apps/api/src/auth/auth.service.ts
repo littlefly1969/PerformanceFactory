@@ -161,6 +161,13 @@ export class AuthService {
       throw new UnauthorizedException('Utente mancante');
     }
 
+    return this.createApplicationSession(req, user);
+  }
+
+  async createApplicationSession(
+    req: SessionCarrier,
+    user: { id?: string; password?: string },
+  ) {
     const userId = user.id;
     if (userId) {
       if (req.session) {
