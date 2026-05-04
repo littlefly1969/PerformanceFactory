@@ -60,6 +60,27 @@ export class OnboardingController {
     );
   }
 
+  @Post('specialist-questions/generate')
+  @ApiOperation({
+    summary:
+      'Genera e salva domande specialistiche personalizzate per area dopo anamnesi generale',
+  })
+  generateSpecialistQuestions(
+    @Req() req: { user?: { id: string; role: UserRole } },
+    @Body()
+    body: {
+      answers?: Array<{
+        questionId: string;
+        value: string | number | boolean | null;
+      }>;
+    },
+  ) {
+    return this.onboarding.generateSpecialistQuestions(
+      { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },
+      body.answers ?? [],
+    );
+  }
+
   @Post('submit')
   @ApiOperation({ summary: 'Invia questionario iniziale e genera profilo baseline' })
   submit(

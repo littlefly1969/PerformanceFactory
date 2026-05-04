@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   AiProposalProviderService,
   GoalValidationResult,
+  SpecialistOnboardingQuestionResult,
 } from '../ai-orchestrator/proposal-provider.service';
 
 type Actor = {
@@ -110,12 +111,12 @@ export class OnboardingService {
   async getQuestionnaire(actor: Actor) {
     this.assertAthlete(actor);
     const status = await this.getStatus(actor);
-    const templates = await this.loadActiveTemplates();
+    const templates = await this.loadQuestionnaireQuestions(actor.id);
     return {
       ...status,
       title: 'Anamnesi iniziale di performance',
       description:
-        'Le risposte generali e per area creano la baseline iniziale e diventano contesto stabile per i cicli AI futuri.',
+        'Le risposte generali creano il profilo iniziale; poi l AI genera tre domande specialistiche per ogni area in base all obiettivo.',
       options: STARTER_OPTIONS,
       questions: templates.map((template) => ({
         id: template.id,
@@ -252,6 +253,78 @@ export class OnboardingService {
     };
   }
 
+  async generateSpecialistQuestions(
+    actor: Actor,
+    answers: OnboardingAnswer[],
+  ) {
+    this.assertAthlete(actor);
+    const goal = await this.prisma.userPerformanceGoal.findUnique({
+      where: { userId: actor.id },
+      select: {
+        goalText: true,
+        interpretedGoal: true,
+        normalizedGoal: true,
+        validationStatus: true,
+      },
+    });
+    if (
+      !goal ||
+      (goal.validationStatus !== 'OK' &&
+        goal.validationStatus !== 'NEEDS_ANAMNESIS')
+    ) {
+      throw new BadRequestException(
+        'Valida prima un obiettivo utilizzabile per generare le domande specialistiche',
+      );
+    }
+
+    const generalTemplates = await this.loadActiveGeneralTemplates();
+    const normalizedGeneralAnswers = this.normalizeAnswersForQuestions(
+      generalTemplates,
+      answers,
+    );
+    const profile = this.buildGeneralProfile(normalizedGeneralAnswers);
+    const areas = await this.loadConfiguredAreas();
+    if (!areas.length) {
+      throw new BadRequestException('Nessuna area configurata');
+    }
+
+    const generated =
+      await this.aiProvider.generateSpecialistOnboardingQuestions({
+        userId: actor.id,
+        goalText: goal.goalText,
+        interpretedGoal: goal.interpretedGoal ?? goal.goalText,
+        normalizedGoal: goal.normalizedGoal,
+        generalProfile: profile,
+        generalAnswers: normalizedGeneralAnswers.map((answer) =>
+          this.serializeAnswer(answer),
+        ),
+        areas,
+      });
+
+    await this.saveSpecialistQuestions(actor.id, generated);
+
+    const questions = await this.loadQuestionnaireQuestions(actor.id);
+    return {
+      generated: true,
+      provider: generated.provider,
+      model: generated.model,
+      promptVersion: generated.promptVersion,
+      questions: questions.map((template) => ({
+        id: template.id,
+        key: template.key,
+        scope: template.scope,
+        areaId: template.areaId,
+        areaName: template.area?.name ?? null,
+        text: template.label,
+        helpText: template.helpText,
+        inputType: template.inputType,
+        required: template.required,
+        orderIndex: template.orderIndex,
+        options: this.normalizeOptions(template.optionsJson),
+      })),
+    };
+  }
+
   async submit(
     actor: Actor,
     goalTextInput: string,
@@ -262,34 +335,12 @@ export class OnboardingService {
     if (goalText.length < 10) {
       throw new BadRequestException('L obiettivo performance e obbligatorio');
     }
-    const templates = await this.loadActiveTemplates();
-    const answerMap = new Map(answers.map((answer) => [answer.questionId, answer.value]));
-    const normalizedAnswers = templates.map((template) => {
-      const value = answerMap.get(template.id);
-      if (template.required && this.isEmpty(value)) {
-        throw new BadRequestException(`Risposta mancante per ${template.key}`);
-      }
-      if (this.isEmpty(value)) {
-        return { template, value: null, score: null };
-      }
-      return {
-        template,
-        value,
-        score: this.scoreAnswer(template, value),
-      };
-    });
-
-    const profile = Object.fromEntries(
-      normalizedAnswers
-        .filter((answer) => answer.template.scope === OnboardingQuestionScope.GENERAL)
-        .map((answer) => [
-          answer.template.key,
-          {
-            label: answer.template.label,
-            value: answer.value,
-          },
-        ]),
+    const templates = await this.loadQuestionnaireQuestions(actor.id);
+    const normalizedAnswers = this.normalizeAnswersForQuestions(
+      templates,
+      answers,
     );
+    const profile = this.buildGeneralProfile(normalizedAnswers);
 
     const areaScores = new Map<
       string,
@@ -326,7 +377,9 @@ export class OnboardingService {
     }
 
     if (areaScores.size === 0) {
-      throw new BadRequestException('Serve almeno una domanda area con punteggio');
+      throw new BadRequestException(
+        'Genera e completa le domande specialistiche per area prima di salvare',
+      );
     }
 
     const scoredAreas = Array.from(areaScores.values()).map((area) => {
@@ -344,14 +397,9 @@ export class OnboardingService {
         scoredAreas.length,
     );
     const configuredAreas = await this.loadConfiguredAreas();
-    const onboardingAnswersForAi = normalizedAnswers.map((answer) => ({
-      key: answer.template.key,
-      scope: answer.template.scope,
-      areaId: answer.template.areaId,
-      label: answer.template.label,
-      value: answer.value,
-      score: answer.score,
-    }));
+    const onboardingAnswersForAi = normalizedAnswers.map((answer) =>
+      this.serializeAnswer(answer),
+    );
     const validation = await this.aiProvider.validatePerformanceGoal({
       userId: actor.id,
       goalText,
@@ -407,13 +455,7 @@ export class OnboardingService {
         update: {
           status: 'COMPLETED',
           answersJson: normalizedAnswers.map((answer) => ({
-            questionId: answer.template.id,
-            key: answer.template.key,
-            scope: answer.template.scope,
-            areaId: answer.template.areaId,
-            label: answer.template.label,
-            value: answer.value,
-            score: answer.score,
+            ...this.serializeAnswer(answer),
           })) as Prisma.InputJsonValue,
           profileJson: profile as Prisma.InputJsonValue,
           completedAt: new Date(),
@@ -422,13 +464,7 @@ export class OnboardingService {
           userId: actor.id,
           status: 'COMPLETED',
           answersJson: normalizedAnswers.map((answer) => ({
-            questionId: answer.template.id,
-            key: answer.template.key,
-            scope: answer.template.scope,
-            areaId: answer.template.areaId,
-            label: answer.template.label,
-            value: answer.value,
-            score: answer.score,
+            ...this.serializeAnswer(answer),
           })) as Prisma.InputJsonValue,
           profileJson: profile as Prisma.InputJsonValue,
           completedAt: new Date(),
@@ -585,9 +621,107 @@ export class OnboardingService {
     });
   }
 
-  private async loadActiveTemplates(): Promise<TemplateRecord[]> {
+  private normalizeAnswersForQuestions(
+    questions: TemplateRecord[],
+    answers: OnboardingAnswer[],
+  ) {
+    const answerMap = new Map(
+      answers.map((answer) => [answer.questionId, answer.value]),
+    );
+    return questions.map((template) => {
+      const value = answerMap.get(template.id);
+      if (template.required && this.isEmpty(value)) {
+        throw new BadRequestException(`Risposta mancante per ${template.key}`);
+      }
+      if (this.isEmpty(value)) {
+        return { template, value: null, score: null };
+      }
+      return {
+        template,
+        value,
+        score: this.scoreAnswer(template, value),
+      };
+    });
+  }
+
+  private buildGeneralProfile(
+    normalizedAnswers: Array<{
+      template: TemplateRecord;
+      value: string | number | boolean | null;
+      score: number | null;
+    }>,
+  ) {
+    return Object.fromEntries(
+      normalizedAnswers
+        .filter(
+          (answer) =>
+            answer.template.scope === OnboardingQuestionScope.GENERAL,
+        )
+        .map((answer) => [
+          answer.template.key,
+          {
+            label: answer.template.label,
+            value: answer.value,
+          },
+        ]),
+    );
+  }
+
+  private serializeAnswer(answer: {
+    template: TemplateRecord;
+    value: string | number | boolean | null;
+    score: number | null;
+  }) {
+    return {
+      questionId: answer.template.id,
+      key: answer.template.key,
+      scope: answer.template.scope,
+      areaId: answer.template.areaId,
+      label: answer.template.label,
+      value: answer.value,
+      score: answer.score,
+    };
+  }
+
+  private async saveSpecialistQuestions(
+    userId: string,
+    generated: SpecialistOnboardingQuestionResult,
+  ) {
+    await this.prisma.$transaction(async (tx) => {
+      await tx.userOnboardingQuestion.deleteMany({ where: { userId } });
+      for (const area of generated.areaQuestions) {
+        for (const question of area.questions) {
+          await tx.userOnboardingQuestion.create({
+            data: {
+              userId,
+              areaId: area.areaId,
+              text: question.text,
+              orderIndex: question.orderIndex,
+              inputType: OnboardingInputType.SCORE,
+              optionsJson: STARTER_OPTIONS as Prisma.InputJsonValue,
+              provider: generated.provider,
+              model: generated.model,
+              promptVersion: generated.promptVersion,
+              promptHash: generated.promptHash,
+              inputJson: generated.inputJson as Prisma.InputJsonValue,
+            },
+          });
+        }
+      }
+    });
+  }
+
+  private async loadQuestionnaireQuestions(userId: string) {
+    const [general, specialist] = await Promise.all([
+      this.loadActiveGeneralTemplates(),
+      this.loadSpecialistQuestionRecords(userId),
+    ]);
+    return [...general, ...specialist];
+  }
+
+  private async loadActiveGeneralTemplates(): Promise<TemplateRecord[]> {
     const templates = await this.prisma.onboardingQuestionTemplate.findMany({
-      where: { isActive: true },
+      where: { isActive: true, scope: OnboardingQuestionScope.GENERAL },
       select: {
         id: true,
         key: true,
@@ -601,16 +735,11 @@ export class OnboardingService {
         orderIndex: true,
         area: { select: { id: true, name: true } },
       },
-      orderBy: [{ scope: 'asc' }, { areaId: 'asc' }, { orderIndex: 'asc' }],
+      orderBy: [{ orderIndex: 'asc' }],
     });
     if (templates.length > 0) {
       return templates;
     }
-
-    const areas = await this.prisma.area.findMany({
-      select: { id: true, name: true },
-      orderBy: { name: 'asc' },
-    });
     return [
       {
         id: 'fallback_height_cm',
@@ -638,20 +767,38 @@ export class OnboardingService {
         orderIndex: 2,
         area: null,
       },
-      ...areas.map((area, index) => ({
-        id: `fallback_${area.id}`,
-        key: `area_${area.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
-        scope: OnboardingQuestionScope.AREA,
-        areaId: area.id,
-        label: `Valuta il livello iniziale per ${area.name}`,
-        helpText: null,
-        inputType: OnboardingInputType.SCORE,
-        optionsJson: STARTER_OPTIONS as Prisma.JsonArray,
-        required: true,
-        orderIndex: 100 + index,
-        area,
-      })),
     ];
+  }
+
+  private async loadSpecialistQuestionRecords(
+    userId: string,
+  ): Promise<TemplateRecord[]> {
+    const questions = await this.prisma.userOnboardingQuestion.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        areaId: true,
+        text: true,
+        inputType: true,
+        optionsJson: true,
+        orderIndex: true,
+        area: { select: { id: true, name: true } },
+      },
+      orderBy: [{ area: { name: 'asc' } }, { orderIndex: 'asc' }],
+    });
+    return questions.map((question) => ({
+      id: question.id,
+      key: `specialist_${question.areaId}_${question.orderIndex}`,
+      scope: OnboardingQuestionScope.AREA,
+      areaId: question.areaId,
+      label: question.text,
+      helpText: null,
+      inputType: question.inputType,
+      optionsJson: question.optionsJson,
+      required: true,
+      orderIndex: 1000 + question.orderIndex,
+      area: question.area,
+    }));
   }
 
   private isEmpty(value: unknown) {

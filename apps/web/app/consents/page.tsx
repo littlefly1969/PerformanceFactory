@@ -138,31 +138,37 @@ export default function ConsentsPage() {
                     <li key={paragraph}>{paragraph}</li>
                   ))}
                 </ul>
+                {document.type === "PRIVACY" && (
+                  <label className="pf-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={privacyAccepted}
+                      onChange={(event) =>
+                        setPrivacyAccepted(event.target.checked)
+                      }
+                    />
+                    Accetto l'informativa privacy e il trattamento dei dati
+                    necessario all'uso della piattaforma.
+                  </label>
+                )}
+                {document.type === "AI_ASSISTANT" && (
+                  <label className="pf-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={aiAssistantAccepted}
+                      onChange={(event) =>
+                        setAiAssistantAccepted(event.target.checked)
+                      }
+                    />
+                    Acconsento esplicitamente all'utilizzo dell'assistente AI e
+                    comprendo i suoi limiti.
+                  </label>
+                )}
               </article>
             ))}
 
             <article className="pf-card">
               <div className="pf-stack">
-                <label className="pf-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={privacyAccepted}
-                    onChange={(event) => setPrivacyAccepted(event.target.checked)}
-                  />
-                  Accetto l'informativa privacy e il trattamento dei dati
-                  necessario all'uso della piattaforma.
-                </label>
-                <label className="pf-checkbox">
-                  <input
-                    type="checkbox"
-                    checked={aiAssistantAccepted}
-                    onChange={(event) =>
-                      setAiAssistantAccepted(event.target.checked)
-                    }
-                  />
-                  Acconsento esplicitamente all'utilizzo dell'assistente AI e
-                  comprendo i suoi limiti.
-                </label>
                 <button
                   className="pf-button"
                   type="button"

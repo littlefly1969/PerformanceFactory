@@ -75,6 +75,8 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [validatingGoal, setValidatingGoal] = useState(false);
+  const [generatingSpecialistQuestions, setGeneratingSpecialistQuestions] =
+    useState(false);
   const [goalModalOpen, setGoalModalOpen] = useState(false);
   const [goalChatMessages, setGoalChatMessages] = useState<GoalChatMessage[]>([]);
   const [goalChatInput, setGoalChatInput] = useState("");
@@ -95,8 +97,32 @@ export default function OnboardingPage() {
     [result],
   );
 
+  const goalIsValidated = goalValidation?.canProceedToAnamnesis === true;
+  const generalQuestions = useMemo(
+    () =>
+      questionnaire?.questions.filter(
+        (question) => question.scope === "GENERAL",
+      ) ?? [],
+    [questionnaire?.questions],
+  );
+  const specialistQuestions = useMemo(
+    () =>
+      questionnaire?.questions.filter((question) => question.scope === "AREA") ??
+      [],
+    [questionnaire?.questions],
+  );
+  const specialistQuestionsGenerated = specialistQuestions.length > 0;
+  const generalComplete =
+    goalIsValidated &&
+    generalQuestions.length > 0 &&
+    generalQuestions.every(
+      (question) =>
+        !question.required ||
+        (answers[question.id] !== undefined && answers[question.id] !== ""),
+    );
   const completed = questionnaire
-    ? goalValidation?.canProceedToAnamnesis === true &&
+    ? goalIsValidated &&
+      specialistQuestionsGenerated &&
       questionnaire.questions.every(
         (question) =>
           !question.required ||
@@ -319,6 +345,48 @@ export default function OnboardingPage() {
     setMessage(goalValidation.userMessage);
   };
 
+  const generateSpecialistQuestions = async () => {
+    if (!questionnaire || !generalComplete) {
+      setMessageTone("warning");
+      setMessage(
+        "Completa prima obiettivo valido e anamnesi generale per generare le domande specialistiche.",
+      );
+      return;
+    }
+    setGeneratingSpecialistQuestions(true);
+    setMessage(null);
+    const response = await secureFetch(
+      `${API_BASE}/onboarding/specialist-questions/generate`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          answers: generalQuestions.map((question) => ({
+            questionId: question.id,
+            value: answers[question.id],
+          })),
+        }),
+      },
+    );
+    if (!response.ok) {
+      setMessageTone("warning");
+      setMessage(await readError(response));
+      setGeneratingSpecialistQuestions(false);
+      return;
+    }
+    const data = (await response.json()) as {
+      questions: StarterQuestion[];
+    };
+    setQuestionario((current) =>
+      current ? { ...current, questions: data.questions } : current,
+    );
+    setMessageTone("success");
+    setMessage(
+      "Domande specialistiche generate in base all'obiettivo e salvate sulla base dati.",
+    );
+    setGeneratingSpecialistQuestions(false);
+  };
+
   useEffect(() => {
     void loadQuestionario();
 
@@ -382,7 +450,11 @@ export default function OnboardingPage() {
       stats={[
         { label: "Stato", value: loading ? "..." : questionnaire?.status ?? "-", tone: questionnaire?.required ? "warning" : "success" },
         { label: "Risposte", value: questionnaire ? `${Object.keys(answers).length}/${questionnaire.questions.length}` : "-", tone: "accent" },
-        { label: "Obiettivo", value: goalText.trim() ? "OK" : "-", tone: goalText.trim() ? "success" : "warning" },
+        {
+          label: "Obiettivo",
+          value: goalIsValidated ? "Obiettivo valido" : goalText.trim() ? "Da validare" : "-",
+          tone: goalIsValidated ? "success" : "warning",
+        },
       ]}
     >
       {message && <div className={`pf-alert ${messageTone}`}>{message}</div>}
@@ -401,58 +473,44 @@ export default function OnboardingPage() {
             <article className="pf-card">
               <div className="pf-card-top">
                 <div>
-                  <h3>Obiettivo personale</h3>
+                  <h3>Obiettivo</h3>
                   <p className="pf-muted">
-                    Descrivi perche stai usando PerformanceFactory. Questo testo
-                    personalizza i prompt AI per ogni area.
+                    Definisci l'obiettivo da cui parte l'anamnesi iniziale di
+                    performance.
                   </p>
                 </div>
-                {goalText.trim().length >= 10 && <StatusBadge tone="success">OK</StatusBadge>}
-              </div>
-              <textarea
-                className="pf-textarea"
-                rows={4}
-                value={goalText}
-                onChange={(event) => {
-                  setGoalText(event.target.value);
-                  setGoalValidation(null);
-                  setGoalAssistantClosed(false);
-                }}
-                placeholder="Esempio: voglio migliorare continuita, prevenire cali fisici e arrivare piu preparato alle gare."
-              />
-              <div className="pf-actions">
-                <button
-                  className="pf-button-secondary"
-                  type="button"
-                  disabled={validatingGoal || goalText.trim().length < 10}
-                  onClick={validateGoal}
-                >
-                  {validatingGoal ? "Validazione..." : "Valida obiettivo"}
-                </button>
-                {goalValidation?.status === "OK" && (
+                {goalIsValidated && (
                   <StatusBadge tone="success">Obiettivo valido</StatusBadge>
                 )}
-                {goalValidation?.status === "NEEDS_ANAMNESIS" && (
-                  <StatusBadge tone="success">Serve anamnesi</StatusBadge>
-                )}
-                {goalValidation && !goalValidation.canProceedToAnamnesis && (
-                  <StatusBadge tone="warning">Non consono</StatusBadge>
-                )}
-                {goalValidation?.canProceedToAnamnesis && (
+              </div>
+              {!goalIsValidated && (
+                <textarea
+                  className="pf-textarea"
+                  rows={4}
+                  value={goalText}
+                  onChange={(event) => {
+                    setGoalText(event.target.value);
+                    setGoalValidation(null);
+                    setGoalAssistantClosed(false);
+                  }}
+                  placeholder="Esempio: voglio migliorare continuita, prevenire cali fisici e arrivare piu preparato alle gare."
+                />
+              )}
+              {!goalIsValidated && (
+                <div className="pf-actions">
                   <button
                     className="pf-button-secondary"
                     type="button"
-                    onClick={() =>
-                      openGoalConfirmation(
-                        goalValidation,
-                        refinedGoalDraft || goalText,
-                      )
-                    }
+                    disabled={validatingGoal || goalText.trim().length < 10}
+                    onClick={validateGoal}
                   >
-                    Riapri assistente AI
+                    {validatingGoal ? "Validazione..." : "Valida obiettivo"}
                   </button>
-                )}
-              </div>
+                  {goalValidation && !goalValidation.canProceedToAnamnesis && (
+                    <StatusBadge tone="warning">Non consono</StatusBadge>
+                  )}
+                </div>
+              )}
               {goalValidation?.canProceedToAnamnesis && goalAssistantClosed && (
                 <div className="pf-goal-validated-summary">
                   <div>
@@ -502,7 +560,10 @@ export default function OnboardingPage() {
                 </div>
               ) : null}
             </article>
-            {questionnaire?.questions.map((question) => (
+            {questionnaire?.questions.map((question) => {
+              const questionLocked =
+                specialistQuestionsGenerated && question.scope === "GENERAL";
+              return (
               <article key={question.id} className="pf-card">
                 <div className="pf-card-top">
                   <div>
@@ -520,7 +581,11 @@ export default function OnboardingPage() {
                   <textarea
                     className="pf-textarea"
                     value={String(answers[question.id] ?? "")}
+                    readOnly={questionLocked}
                     onChange={(event) =>
+                      questionLocked
+                        ? undefined
+                        :
                       setAnswers((prev) => ({
                         ...prev,
                         [question.id]: event.target.value,
@@ -534,7 +599,11 @@ export default function OnboardingPage() {
                     className="pf-input"
                     type="number"
                     value={String(answers[question.id] ?? "")}
+                    readOnly={questionLocked}
                     onChange={(event) =>
+                      questionLocked
+                        ? undefined
+                        :
                       setAnswers((prev) => ({
                         ...prev,
                         [question.id]: Number(event.target.value),
@@ -546,6 +615,7 @@ export default function OnboardingPage() {
                   <select
                     className="pf-select"
                     value={String(answers[question.id] ?? "")}
+                    disabled={questionLocked}
                     onChange={(event) =>
                       setAnswers((prev) => ({
                         ...prev,
@@ -568,6 +638,7 @@ export default function OnboardingPage() {
                         key={String(option.value)}
                         type="button"
                         className={answers[question.id] === option.value ? "pf-button" : "pf-button-secondary"}
+                        disabled={questionLocked}
                         onClick={() => setAnswers((prev) => ({ ...prev, [question.id]: option.value }))}
                       >
                         {option.label}
@@ -576,17 +647,52 @@ export default function OnboardingPage() {
                   </div>
                 )}
               </article>
-            ))}
+              );
+            })}
           </div>
+
+          {questionnaire &&
+            goalIsValidated &&
+            !specialistQuestionsGenerated && (
+              <div className="pf-submit-row">
+                <article className="pf-card pf-next-step-card">
+                  <div className="pf-card-top">
+                    <div>
+                      <h3>Domande specialistiche AI</h3>
+                      <p className="pf-muted">
+                        Dopo l'anamnesi generale, l'AI genera tre domande per
+                        ogni area in base all'obiettivo validato e alle risposte
+                        appena date.
+                      </p>
+                    </div>
+                    <StatusBadge tone={generalComplete ? "accent" : "warning"}>
+                      {generalComplete ? "Pronte" : "Completa generale"}
+                    </StatusBadge>
+                  </div>
+                  <button
+                    className="pf-button"
+                    type="button"
+                    disabled={!generalComplete || generatingSpecialistQuestions}
+                    onClick={generateSpecialistQuestions}
+                  >
+                    {generatingSpecialistQuestions
+                      ? "Generazione..."
+                      : "Genera domande specialistiche"}
+                  </button>
+                </article>
+              </div>
+            )}
 
           {questionnaire?.required === false ? (
             <button className="pf-button" type="button" onClick={() => { window.location.href = "/user"; }}>
               Continua all'ambiente
             </button>
           ) : (
-            <button className="pf-button" type="button" disabled={!completed || submitting} onClick={submit}>
-              {redirecting ? "Apertura ambiente..." : submitting ? "Salvataggio..." : "Crea baseline"}
-            </button>
+            <div className="pf-submit-row">
+              <button className="pf-button" type="button" disabled={!completed || submitting} onClick={submit}>
+                {redirecting ? "Apertura ambiente..." : submitting ? "Salvataggio..." : "Crea la performance"}
+              </button>
+            </div>
           )}
         </article>
 

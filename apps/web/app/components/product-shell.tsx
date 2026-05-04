@@ -124,8 +124,10 @@ export function ProductShell({
       setMe(data);
       setAuthChecked(true);
 
-      if (data.consentRequired && pathname !== "/consents") {
-        window.location.href = "/consents";
+      if (data.consentRequired) {
+        if (pathname !== "/consents") {
+          window.location.href = "/consents";
+        }
         return;
       }
 

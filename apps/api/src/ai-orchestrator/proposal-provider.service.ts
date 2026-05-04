@@ -210,9 +210,34 @@ export type GoalValidationResult = {
   }>;
 };
 
+export type SpecialistOnboardingQuestionInput = {
+  userId: string;
+  goalText: string;
+  interpretedGoal: string;
+  normalizedGoal?: unknown;
+  generalProfile: unknown;
+  generalAnswers: unknown;
+  areas: AiAreaInput[];
+};
+
+export type SpecialistOnboardingQuestionResult = {
+  provider: AiProvider;
+  model: string;
+  promptVersion: string;
+  promptHash: string;
+  inputJson: Record<string, unknown>;
+  areaQuestions: Array<{
+    areaId: string;
+    areaName: string;
+    questions: Array<{ text: string; orderIndex: number }>;
+  }>;
+};
+
 const PROMPT_VERSION = 'cycle-proposal-v2';
 const GOAL_PROMPT_VERSION = 'goal-area-prompts-v1';
 const GOAL_VALIDATION_VERSION = 'goal-validation-v1';
+const SPECIALIST_ONBOARDING_QUESTIONS_VERSION =
+  'specialist-onboarding-questions-v1';
 const QUESTIONS_PER_AREA = 3;
 const EXTERNAL_AI_PROVIDERS: AiProvider[] = ['openai', 'gemini'];
 const SYSTEM_PROMPT =
@@ -294,6 +319,27 @@ export class AiProposalProviderService {
       provider,
       model,
       this.buildStubGoalValidation(input),
+      inputJson,
+    );
+  }
+
+  async generateSpecialistOnboardingQuestions(
+    input: SpecialistOnboardingQuestionInput,
+  ): Promise<SpecialistOnboardingQuestionResult> {
+    const provider = this.resolveProvider();
+    const model = this.resolveModel(provider);
+    const inputJson = this.buildSpecialistOnboardingQuestionAuditInput(input);
+    if (provider === 'openai') {
+      return this.generateOpenAiSpecialistOnboardingQuestions(input, inputJson);
+    }
+    if (provider === 'gemini') {
+      return this.generateGeminiSpecialistOnboardingQuestions(input, inputJson);
+    }
+    return this.normalizeSpecialistOnboardingQuestions(
+      input,
+      provider,
+      model,
+      this.buildStubSpecialistOnboardingQuestions(input),
       inputJson,
     );
   }
@@ -583,6 +629,83 @@ export class AiProposalProviderService {
     );
   }
 
+  private async generateOpenAiSpecialistOnboardingQuestions(
+    input: SpecialistOnboardingQuestionInput,
+    inputJson: Record<string, unknown>,
+  ): Promise<SpecialistOnboardingQuestionResult> {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new BadRequestException(
+        'OPENAI_API_KEY e obbligatoria per AI_PROVIDER=openai',
+      );
+    }
+
+    const model = this.resolveModel('openai');
+    this.logDebugPrompt('openai', model, inputJson);
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        input: [
+          {
+            role: 'system',
+            content:
+              'Genera domande anamnestiche specialistiche per sport performance. Rispondi solo con JSON valido, in italiano, senza diagnosi o prescrizioni cliniche.',
+          },
+          {
+            role: 'user',
+            content: JSON.stringify(
+              this.buildSpecialistOnboardingQuestionTask(input),
+            ),
+          },
+        ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'specialist_onboarding_questions',
+            strict: true,
+            schema: this.buildSpecialistOnboardingQuestionJsonSchema(),
+          },
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new BadRequestException(
+        `Domande specialistiche OpenAI non riuscite: ${errorText}`,
+      );
+    }
+
+    const payload = (await response.json()) as {
+      output_text?: string;
+      output?: Array<{ content?: Array<{ text?: string }> }>;
+    };
+    const outputText =
+      payload.output_text ??
+      payload.output
+        ?.flatMap((item) => item.content ?? [])
+        .map((content) => content.text)
+        .find((text): text is string => !!text);
+    if (!outputText) {
+      throw new BadRequestException(
+        'La risposta domande specialistiche OpenAI e vuota',
+      );
+    }
+
+    return this.normalizeSpecialistOnboardingQuestions(
+      input,
+      'openai',
+      model,
+      this.parseSpecialistOnboardingQuestionJson(outputText, 'OpenAI'),
+      inputJson,
+    );
+  }
+
   private async validateOpenAiPerformanceGoal(
     input: GoalValidationInput,
     inputJson: Record<string, unknown>,
@@ -717,6 +840,94 @@ export class AiProposalProviderService {
       'gemini',
       model,
       this.parseGoalAreaPromptJson(outputText, 'Gemini'),
+      inputJson,
+    );
+  }
+
+  private async generateGeminiSpecialistOnboardingQuestions(
+    input: SpecialistOnboardingQuestionInput,
+    inputJson: Record<string, unknown>,
+  ): Promise<SpecialistOnboardingQuestionResult> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new BadRequestException(
+        'GEMINI_API_KEY e obbligatoria per AI_PROVIDER=gemini',
+      );
+    }
+
+    const model = this.resolveModel('gemini');
+    this.logDebugPrompt('gemini', model, inputJson);
+    const modelName = model.startsWith('models/')
+      ? model.slice('models/'.length)
+      : model;
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [
+              {
+                text:
+                  'Genera domande anamnestiche specialistiche per sport performance. Rispondi solo con JSON valido, in italiano, senza diagnosi o prescrizioni cliniche.',
+              },
+            ],
+          },
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  text: JSON.stringify(
+                    this.buildSpecialistOnboardingQuestionTask(input),
+                  ),
+                },
+              ],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            responseJsonSchema:
+              this.buildSpecialistOnboardingQuestionJsonSchema({
+                includePropertyOrdering: true,
+              }),
+          },
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new BadRequestException(
+        `Domande specialistiche Gemini non riuscite: ${errorText}`,
+      );
+    }
+
+    const payload = (await response.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      promptFeedback?: { blockReason?: string };
+    };
+    const outputText = payload.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text)
+      .filter((text): text is string => !!text)
+      .join('');
+    if (!outputText) {
+      throw new BadRequestException(
+        `La risposta domande specialistiche Gemini e vuota: ${
+          payload.promptFeedback?.blockReason ?? 'risposta vuota'
+        }`,
+      );
+    }
+
+    return this.normalizeSpecialistOnboardingQuestions(
+      input,
+      'gemini',
+      model,
+      this.parseSpecialistOnboardingQuestionJson(outputText, 'Gemini'),
       inputJson,
     );
   }
@@ -919,6 +1130,40 @@ export class AiProposalProviderService {
           'dati non presenti nel contesto',
         ],
       },
+    };
+  }
+
+  private buildSpecialistOnboardingQuestionTask(
+    input: SpecialistOnboardingQuestionInput,
+  ) {
+    return {
+      task:
+        'Genera esattamente tre domande anamnestiche specialistiche per ciascuna area ufficiale. Le domande saranno mostrate all atleta dopo l anamnesi generale.',
+      language: 'Italiano',
+      athleteGoal: input.goalText,
+      interpretedGoal: input.interpretedGoal,
+      normalizedGoal: input.normalizedGoal ?? null,
+      generalProfile: input.generalProfile,
+      generalAnswers: input.generalAnswers,
+      areas: input.areas,
+      constraints: {
+        questionsPerArea: QUESTIONS_PER_AREA,
+        questionType:
+          'Domande SCORE a risposta su scala, formulate per misurare livello iniziale, vincoli, priorita o rischio operativo della specifica area.',
+        personalization:
+          'Ogni domanda deve essere coerente con obiettivo, dati generali e atleta specifico; non usare domande generiche uguali per tutti.',
+        areaSpecificity:
+          'Ogni domanda deve citare o riflettere chiaramente il lavoro della propria area, evitando duplicazioni tra aree.',
+        avoid: [
+          'diagnosi mediche',
+          'prescrizioni cliniche',
+          'richieste di dati non necessari',
+          'promesse di risultato',
+          'domande gia presenti nell anamnesi generale',
+        ],
+      },
+      outputShape:
+        'Restituisci areaQuestions: array con areaId e questions. Ogni questions contiene tre oggetti con text e orderIndex 1..3.',
     };
   }
 
@@ -1168,6 +1413,55 @@ export class AiProposalProviderService {
     };
   }
 
+  private buildSpecialistOnboardingQuestionJsonSchema(options?: {
+    includePropertyOrdering?: boolean;
+  }) {
+    const questionSchema = {
+      type: 'object',
+      additionalProperties: false,
+      required: ['text', 'orderIndex'],
+      properties: {
+        text: { type: 'string' },
+        orderIndex: { type: 'integer', minimum: 1, maximum: 3 },
+      },
+      ...(options?.includePropertyOrdering
+        ? { propertyOrdering: ['text', 'orderIndex'] }
+        : {}),
+    };
+    const areaSchema = {
+      type: 'object',
+      additionalProperties: false,
+      required: ['areaId', 'questions'],
+      properties: {
+        areaId: { type: 'string' },
+        questions: {
+          type: 'array',
+          minItems: QUESTIONS_PER_AREA,
+          maxItems: QUESTIONS_PER_AREA,
+          items: questionSchema,
+        },
+      },
+      ...(options?.includePropertyOrdering
+        ? { propertyOrdering: ['areaId', 'questions'] }
+        : {}),
+    };
+    return {
+      type: 'object',
+      additionalProperties: false,
+      required: ['areaQuestions'],
+      properties: {
+        areaQuestions: {
+          type: 'array',
+          minItems: 1,
+          items: areaSchema,
+        },
+      },
+      ...(options?.includePropertyOrdering
+        ? { propertyOrdering: ['areaQuestions'] }
+        : {}),
+    };
+  }
+
   private buildModelContext(context: AiCycleContext) {
     const { guidance: _guidance, ...modelContext } = context;
     void _guidance;
@@ -1256,6 +1550,24 @@ export class AiProposalProviderService {
     } catch {
       throw new BadRequestException(
         `La risposta prompt obiettivo ${providerName} non e un JSON valido`,
+      );
+    }
+  }
+
+  private parseSpecialistOnboardingQuestionJson(
+    outputText: string,
+    providerName: string,
+  ) {
+    try {
+      return JSON.parse(outputText) as {
+        areaQuestions?: Array<{
+          areaId?: string;
+          questions?: Array<{ text?: string; orderIndex?: number }>;
+        }>;
+      };
+    } catch {
+      throw new BadRequestException(
+        `La risposta domande specialistiche ${providerName} non e un JSON valido`,
       );
     }
   }
@@ -1561,6 +1873,78 @@ export class AiProposalProviderService {
     };
   }
 
+  private normalizeSpecialistOnboardingQuestions(
+    input: SpecialistOnboardingQuestionInput,
+    provider: AiProvider,
+    model: string,
+    parsed: {
+      areaQuestions?: Array<{
+        areaId?: string;
+        questions?: Array<{ text?: string; orderIndex?: number }>;
+      }>;
+    },
+    inputJson: Record<string, unknown>,
+  ): SpecialistOnboardingQuestionResult {
+    const parsedByArea = new Map(
+      (parsed.areaQuestions ?? [])
+        .filter((item) => item.areaId)
+        .map((item) => [item.areaId as string, item.questions ?? []]),
+    );
+    const areaQuestions = input.areas.map((area) => {
+      const normalizedQuestions = (parsedByArea.get(area.id) ?? [])
+        .filter((question) => question.text?.trim())
+        .slice(0, QUESTIONS_PER_AREA)
+        .map((question, index) => ({
+          text: question.text!.trim(),
+          orderIndex:
+            typeof question.orderIndex === 'number'
+              ? Math.max(1, Math.min(QUESTIONS_PER_AREA, question.orderIndex))
+              : index + 1,
+        }));
+      const questions =
+        normalizedQuestions.length === QUESTIONS_PER_AREA
+          ? normalizedQuestions
+          : this.buildFallbackSpecialistQuestions(input, area);
+      return {
+        areaId: area.id,
+        areaName: area.name,
+        questions,
+      };
+    });
+
+    return {
+      provider,
+      model,
+      promptVersion: SPECIALIST_ONBOARDING_QUESTIONS_VERSION,
+      promptHash: this.hashJson(inputJson),
+      inputJson,
+      areaQuestions,
+    };
+  }
+
+  private buildStubSpecialistOnboardingQuestions(
+    input: SpecialistOnboardingQuestionInput,
+  ) {
+    return {
+      areaQuestions: input.areas.map((area) => ({
+        areaId: area.id,
+        questions: this.buildFallbackSpecialistQuestions(input, area),
+      })),
+    };
+  }
+
+  private buildFallbackSpecialistQuestions(
+    input: SpecialistOnboardingQuestionInput,
+    area: AiAreaInput,
+  ) {
+    const goal = input.interpretedGoal || input.goalText;
+    return [
+      `Per ${area.name}, quanto il tuo livello attuale supporta l obiettivo: ${goal}?`,
+      `Per ${area.name}, quanto sono chiari vincoli o difficolta che possono influenzare questo obiettivo?`,
+      `Per ${area.name}, quanto riesci a mantenere continuita nelle azioni utili a questo obiettivo?`,
+    ].map((text, index) => ({ text, orderIndex: index + 1 }));
+  }
+
   private buildStubGoalAreaPrompts(input: GoalAreaPromptInput) {
     return input.areas.map((area) => ({
       areaId: area.id,
@@ -1634,6 +2018,19 @@ export class AiProposalProviderService {
         system: input.basePrompt,
         user: this.buildGoalPromptTask(input),
         responseJsonSchema: this.buildGoalAreaPromptJsonSchema(),
+      },
+    };
+  }
+
+  private buildSpecialistOnboardingQuestionAuditInput(
+    input: SpecialistOnboardingQuestionInput,
+  ) {
+    return {
+      prompt: {
+        system:
+          'Genera domande anamnestiche specialistiche personalizzate per area.',
+        user: this.buildSpecialistOnboardingQuestionTask(input),
+        responseJsonSchema: this.buildSpecialistOnboardingQuestionJsonSchema(),
       },
     };
   }

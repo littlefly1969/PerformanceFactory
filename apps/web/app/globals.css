@@ -350,6 +350,22 @@ a {
   justify-content: flex-start;
 }
 
+.pf-submit-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 42px;
+  padding-top: 28px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.pf-submit-row > .pf-button {
+  min-width: 300px;
+}
+
+.pf-next-step-card {
+  width: 100%;
+}
+
 .pf-button,
 .pf-button-secondary,
 .pf-button-danger {
@@ -2246,6 +2262,47 @@ body {
   border-radius: 10px;
   font-weight: 900;
   text-transform: none;
+}
+
+.pf-google-button {
+  width: fit-content;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  gap: 8px;
+  border: 1px solid #747775;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #1f1f1f;
+  cursor: pointer;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  padding: 7px 12px;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.pf-google-button:hover {
+  background: #f8fafd;
+  border-color: #5f6368;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.3);
+}
+
+.pf-google-button:focus-visible {
+  outline: 2px solid var(--pf-accent);
+  outline-offset: 3px;
+}
+
+.pf-google-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
 }
 
 .pf-auth-register-form {

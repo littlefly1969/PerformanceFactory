@@ -4,7 +4,14 @@ import { useEffect } from "react";
 import Image from "next/image";
 import { API_BASE, secureFetch } from "@/app/lib/api";
 
-const destinationFor = (role?: string, onboardingRequired?: boolean) => {
+const destinationFor = (
+  role?: string,
+  onboardingRequired?: boolean,
+  consentRequired?: boolean,
+) => {
+  if (consentRequired) {
+    return "/consents";
+  }
   if (role === "USER") {
     return onboardingRequired ? "/onboarding" : "/user";
   }
@@ -32,8 +39,13 @@ export default function Home() {
       const me = (await response.json()) as {
         role?: string;
         onboardingRequired?: boolean;
+        consentRequired?: boolean;
       };
-      window.location.href = destinationFor(me.role, me.onboardingRequired);
+      window.location.href = destinationFor(
+        me.role,
+        me.onboardingRequired,
+        me.consentRequired,
+      );
     };
 
     void route();

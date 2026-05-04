@@ -60,6 +60,7 @@ model User {
   kpiDaily             KpiDaily[]
   aiInteractions       AiInteraction[]
   onboardingAssessment UserOnboardingAssessment?
+  onboardingQuestions  UserOnboardingQuestion[]
   performanceGoal      UserPerformanceGoal?
   userAreaPromptInstructions UserAreaPromptInstruction[]
 
@@ -181,6 +182,30 @@ model OnboardingQuestionTemplate {
   @@index([scope, areaId, isActive, orderIndex])
 }
 
+model UserOnboardingQuestion {
+  id            String                @id @default(uuid())
+  userId        String
+  areaId        String
+  text          String
+  orderIndex    Int
+  inputType     OnboardingInputType   @default(SCORE)
+  optionsJson   Json?
+  provider      String
+  model         String
+  promptVersion String
+  promptHash    String
+  inputJson     Json
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  area Area @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, areaId, orderIndex])
+  @@index([userId, areaId])
+  @@index([areaId])
+}
+
 model AiPromptConfig {
   id           String   @id @default(uuid())
   name         String   @unique
@@ -288,6 +313,7 @@ model Area {
   questionSetApprovals        QuestionSetAreaApproval[]        @relation("QuestionSetAreaArea")
   professionalUserLinks       ProfessionalUserLink[]
   onboardingQuestionTemplates OnboardingQuestionTemplate[]
+  userOnboardingQuestions     UserOnboardingQuestion[]
   aiPromptConfigs             AiPromptConfig[]
   aiAreaGenerationConfig      AiAreaGenerationConfig?
   userAreaPromptInstructions  UserAreaPromptInstruction[]
