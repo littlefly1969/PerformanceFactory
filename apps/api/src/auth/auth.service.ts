@@ -7,6 +7,7 @@ import * as bcrypt from 'bcrypt';
 import { Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { signAccessToken } from '../common/auth-token';
+import { ConsentsService } from '../consents/consents.service';
 
 export type SafeUser = {
   id: string;
@@ -25,7 +26,10 @@ type SessionCarrier = {
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly consents?: ConsentsService,
+  ) {}
 
   async validateUser(email: string, password: string) {
     const user = await this.prisma.user.findUnique({
@@ -60,6 +64,10 @@ export class AuthService {
     email: string;
     password: string;
     aiConsent?: boolean;
+    privacyAccepted?: boolean;
+    aiAssistantAccepted?: boolean;
+    ipAddress?: string | null;
+    userAgent?: string | null;
   }) {
     const firstName = input.firstName?.trim();
     const lastName = input.lastName?.trim();
@@ -72,26 +80,42 @@ export class AuthService {
     if (password.length < 8) {
       throw new BadRequestException('La password deve avere almeno 8 caratteri');
     }
+    if (input.privacyAccepted !== true || input.aiAssistantAccepted !== true) {
+      throw new BadRequestException(
+        'Privacy e utilizzo dell assistente AI devono essere accettati esplicitamente',
+      );
+    }
 
-    const existing = await this.prisma.user.findUnique({
-      where: { email },
-      select: {
-        id: true,
-        role: true,
-        isActive: true,
-        onboardingAssessment: { select: { status: true } },
-      },
-    });
-    if (existing) {
+    const [existingUser, existingIdentity] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { email },
+        select: {
+          id: true,
+          role: true,
+          isActive: true,
+          onboardingAssessment: { select: { status: true } },
+        },
+      }),
+      this.prisma.authIdentity.findFirst({
+        where: { email },
+        select: { id: true },
+      }),
+    ]);
+    if (existingIdentity) {
+      throw new BadRequestException(
+        'Non e possibile registrarsi: la mail e gia presente nel sistema',
+      );
+    }
+    if (existingUser) {
       if (
-        existing.role === UserRole.USER &&
-        existing.isActive === false &&
-        existing.onboardingAssessment?.status === 'REJECTED'
+        existingUser.role === UserRole.USER &&
+        existingUser.isActive === false &&
+        existingUser.onboardingAssessment?.status === 'REJECTED'
       ) {
         const passwordHash = await bcrypt.hash(password, 10);
         const user = await this.prisma.$transaction(async (tx) => {
           const updated = await tx.user.update({
-            where: { id: existing.id },
+            where: { id: existingUser.id },
             data: {
               firstName,
               lastName,
@@ -120,25 +144,10 @@ export class AuthService {
             },
           });
 
-          if (input.aiConsent === true) {
-            const existingConsent = await tx.consent.findFirst({
-              where: { userId: updated.id, type: 'AI' },
-              select: { id: true },
-            });
-            if (!existingConsent) {
-              await tx.consent.create({
-                data: {
-                  userId: updated.id,
-                  type: 'AI',
-                },
-              });
-            }
-          } else {
-            await tx.consent.deleteMany({
-              where: {
-                userId: updated.id,
-                type: 'AI',
-              },
+          if (this.consents) {
+            await this.consents.grantRequired(updated.id, {
+              ipAddress: input.ipAddress,
+              userAgent: input.userAgent,
             });
           }
 
@@ -147,11 +156,13 @@ export class AuthService {
 
         return {
           ...user,
-          aiConsent: input.aiConsent === true,
+          aiConsent: true,
           status: 'PENDING_ADMIN_ACTIVATION',
         };
       }
-      throw new BadRequestException('Utente gia esistente');
+      throw new BadRequestException(
+        'Non e possibile registrarsi: la mail e gia presente nel sistema',
+      );
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
@@ -179,12 +190,10 @@ export class AuthService {
         },
       });
 
-      if (input.aiConsent === true) {
-        await tx.consent.create({
-          data: {
-            userId: created.id,
-            type: 'AI',
-          },
+      if (this.consents) {
+        await this.consents.grantRequired(created.id, {
+          ipAddress: input.ipAddress,
+          userAgent: input.userAgent,
         });
       }
 
@@ -193,7 +202,7 @@ export class AuthService {
 
     return {
       ...user,
-      aiConsent: input.aiConsent === true,
+      aiConsent: true,
       status: 'PENDING_ADMIN_ACTIVATION',
     };
   }
@@ -211,10 +220,26 @@ export class AuthService {
       return false;
     }
     const consent = await this.prisma.consent.findFirst({
-      where: { userId, type: 'AI' },
+      where: {
+        userId,
+        type: { in: ['AI', 'AI_ASSISTANT'] },
+        withdrawnAt: null,
+      },
       select: { id: true },
     });
     return !!consent;
+  }
+
+  async requiredConsentStatus(userId: string) {
+    if (!this.consents) {
+      return {
+        required: false,
+        missingConsents: [],
+        documents: [],
+        acceptedConsents: [],
+      };
+    }
+    return this.consents.status(userId);
   }
 
   async isOnboardingRequired(userId: string, role?: string) {
@@ -244,6 +269,13 @@ export class AuthService {
       throw new UnauthorizedException('Utente mancante');
     }
 
+    return this.createApplicationSession(req, user);
+  }
+
+  async createApplicationSession(
+    req: SessionCarrier,
+    user: { id?: string; password?: string },
+  ) {
     const userId = user.id;
     if (userId) {
       if (req.session) {
@@ -261,6 +293,7 @@ export class AuthService {
       role: safe.role,
     });
     const aiConsent = await this.hasAiConsent(safe.id);
+    const requiredConsents = await this.requiredConsentStatus(safe.id);
     const onboardingRequired = await this.isOnboardingRequired(
       safe.id,
       safe.role,
@@ -269,6 +302,8 @@ export class AuthService {
     return {
       ...safe,
       aiConsent,
+      consentRequired: requiredConsents.required,
+      missingConsents: requiredConsents.missingConsents,
       onboardingRequired,
       tokenType: 'Bearer',
       ...token,

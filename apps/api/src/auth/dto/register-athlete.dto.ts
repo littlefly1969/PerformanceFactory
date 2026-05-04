@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class RegisterAthleteDto {
   @ApiProperty()
@@ -13,6 +13,9 @@ export class RegisterAthleteDto {
   @ApiProperty()
   password: string;
 
-  @ApiPropertyOptional()
-  aiConsent?: boolean;
+  @ApiProperty()
+  privacyAccepted: boolean;
+
+  @ApiProperty()
+  aiAssistantAccepted: boolean;
 }

@@ -116,6 +116,10 @@ export async function redirectIfOnboardingRequired() {
     return true;
   }
   const me = (await response.json()) as { role?: string; onboardingRequired?: boolean };
+  if ((me as { consentRequired?: boolean }).consentRequired) {
+    window.location.href = '/consents';
+    return true;
+  }
   if (me.role === 'USER' && me.onboardingRequired) {
     window.location.href = '/onboarding';
     return true;

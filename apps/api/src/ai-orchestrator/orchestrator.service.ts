@@ -264,7 +264,11 @@ export class OrchestratorService {
 
     if (AiProposalProviderService.requiresUserConsent()) {
       const consent = await this.prisma.consent.findFirst({
-        where: { userId, type: 'AI' },
+        where: {
+          userId,
+          type: { in: ['AI', 'AI_ASSISTANT'] },
+          withdrawnAt: null,
+        },
         select: { id: true },
       });
       if (!consent) {

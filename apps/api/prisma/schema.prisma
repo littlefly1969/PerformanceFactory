@@ -54,6 +54,7 @@ model User {
 
   feedbackEntries      FeedbackEntry[]
   consents             Consent[]
+  authIdentities       AuthIdentity[]
   assignments          UserAssignment[]
   currentStates        CurrentState[]
   kpiDaily             KpiDaily[]
@@ -84,6 +85,25 @@ model User {
   updatedOnboardingTemplates  OnboardingQuestionTemplate[] @relation("OnboardingTemplateUpdatedBy")
   createdGoalPromptConfigs    AiGoalPromptConfig[]         @relation("AiGoalPromptConfigCreatedBy")
   updatedGoalPromptConfigs    AiGoalPromptConfig[]         @relation("AiGoalPromptConfigUpdatedBy")
+}
+
+model AuthIdentity {
+  id            String   @id @default(uuid())
+  userId        String
+  provider      String
+  subject       String
+  email         String
+  emailVerified Boolean  @default(false)
+  profileJson   Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  lastLoginAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, subject])
+  @@index([userId])
+  @@index([email])
 }
 
 model UserOnboardingAssessment {
@@ -285,12 +305,20 @@ model FeedbackEntry {
 }
 
 model Consent {
-  id        String   @id @default(uuid())
-  userId    String
-  type      String
-  grantedAt DateTime @default(now())
+  id            String   @id @default(uuid())
+  userId        String
+  type          String
+  version       String   @default("v1")
+  documentTitle String?
+  documentHash  String?
+  ipAddress     String?
+  userAgent     String?
+  grantedAt     DateTime @default(now())
+  withdrawnAt   DateTime?
 
   user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, type, withdrawnAt])
 }
 
 /// @deprecated Legacy V1 guidance content. Do not use for new V2+ flows.
