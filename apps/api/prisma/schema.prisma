@@ -305,12 +305,20 @@ model FeedbackEntry {
 }
 
 model Consent {
-  id        String   @id @default(uuid())
-  userId    String
-  type      String
-  grantedAt DateTime @default(now())
+  id            String   @id @default(uuid())
+  userId        String
+  type          String
+  version       String   @default("v1")
+  documentTitle String?
+  documentHash  String?
+  ipAddress     String?
+  userAgent     String?
+  grantedAt     DateTime @default(now())
+  withdrawnAt   DateTime?
 
   user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, type, withdrawnAt])
 }
 
 /// @deprecated Legacy V1 guidance content. Do not use for new V2+ flows.

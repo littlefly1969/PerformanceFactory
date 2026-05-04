@@ -41,8 +41,16 @@ export class AuthController {
   @Post('register-athlete')
   @ApiOperation({ summary: 'Registra un nuovo atleta in attesa di attivazione admin' })
   @ApiBody({ type: RegisterAthleteDto })
-  registerAthlete(@Body() body: RegisterAthleteDto) {
-    return this.authService.registerAthlete(body);
+  registerAthlete(
+    @Body() body: RegisterAthleteDto,
+    @Req()
+    req: { ip?: string; headers?: { 'user-agent'?: string } },
+  ) {
+    return this.authService.registerAthlete({
+      ...body,
+      ipAddress: req.ip,
+      userAgent: req.headers?.['user-agent'],
+    });
   }
 
   @Get('google/login')
@@ -130,11 +138,18 @@ export class AuthController {
     const userId = (safe as { id?: string }).id ?? '';
     const role = (safe as { role?: string }).role;
     const aiConsent = await this.authService.hasAiConsent(userId);
+    const consentStatus = await this.authService.requiredConsentStatus(userId);
     const onboardingRequired = await this.authService.isOnboardingRequired(
       userId,
       role,
     );
-    return { ...safe, aiConsent, onboardingRequired };
+    return {
+      ...safe,
+      aiConsent,
+      consentRequired: consentStatus.required,
+      missingConsents: consentStatus.missingConsents,
+      onboardingRequired,
+    };
   }
 
   @Get('token')

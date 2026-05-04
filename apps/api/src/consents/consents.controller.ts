@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   Controller,
+  Get,
+  Body,
   Post,
   Req,
   UseGuards,
@@ -8,16 +10,56 @@ import {
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ConsentsService } from './consents.service';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 
-const AI_CONSENT_TYPE = 'AI';
+const AI_CONSENT_TYPE = 'AI_ASSISTANT';
 
 @ApiTags('consents')
 @Controller('consents')
 export class ConsentsController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly consents: ConsentsService,
+  ) {}
+
+  @Get('required')
+  @ApiOperation({ summary: 'Stato consensi obbligatori' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard)
+  required(@Req() req: { user?: { id: string } }) {
+    const userId = req.user?.id ?? '';
+    if (!userId) {
+      throw new BadRequestException('Utente mancante');
+    }
+    return this.consents.status(userId);
+  }
+
+  @Post('required')
+  @ApiOperation({ summary: 'Accetta privacy e assistente AI obbligatori' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard)
+  acceptRequired(
+    @Req()
+    req: {
+      user?: { id: string };
+      ip?: string;
+      headers?: { 'user-agent'?: string };
+    },
+    @Body()
+    body: { privacyAccepted?: boolean; aiAssistantAccepted?: boolean },
+  ) {
+    const userId = req.user?.id ?? '';
+    if (!userId) {
+      throw new BadRequestException('Utente mancante');
+    }
+    return this.consents.acceptRequired(userId, body, {
+      ipAddress: req.ip,
+      userAgent: req.headers?.['user-agent'],
+    });
+  }
 
   @Post('ai')
   @ApiOperation({ summary: 'Concedi consenso AI' })

@@ -10,7 +10,8 @@ export default function RegisterPage() {
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [aiConsent, setAiConsent] = useState(true);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [aiAssistantAccepted, setAiAssistantAccepted] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [registering, setRegistering] = useState(false);
 
@@ -27,7 +28,8 @@ export default function RegisterPage() {
         lastName,
         email,
         password,
-        aiConsent,
+        privacyAccepted,
+        aiAssistantAccepted,
       }),
     });
 
@@ -45,7 +47,8 @@ export default function RegisterPage() {
     setLastName("");
     setEmail("");
     setPassword("");
-    setAiConsent(true);
+    setPrivacyAccepted(false);
+    setAiAssistantAccepted(false);
     setRegistering(false);
     setMessage(
       "Nuovo atleta creato. Un amministratore deve abilitarlo e collegargli i coach prima dell accesso.",
@@ -148,13 +151,29 @@ export default function RegisterPage() {
               <label className="pf-checkbox">
                 <input
                   type="checkbox"
-                  checked={aiConsent}
-                  onChange={(event) => setAiConsent(event.target.checked)}
+                  checked={privacyAccepted}
+                  onChange={(event) => setPrivacyAccepted(event.target.checked)}
                 />
-                Consento l'uso dell'AI per generare proposte e questionari
-                revisionati dai coach.
+                Ho letto l'informativa privacy e accetto il trattamento dei dati
+                necessario per usare Performance Factory.
               </label>
-              <button className="pf-button" type="submit" disabled={registering}>
+              <label className="pf-checkbox">
+                <input
+                  type="checkbox"
+                  checked={aiAssistantAccepted}
+                  onChange={(event) =>
+                    setAiAssistantAccepted(event.target.checked)
+                  }
+                />
+                Acconsento esplicitamente all'uso dell'assistente AI, sapendo
+                che non sostituisce professionisti sanitari o sportivi e che le
+                proposte devono essere valutate con prudenza.
+              </label>
+              <button
+                className="pf-button"
+                type="submit"
+                disabled={registering || !privacyAccepted || !aiAssistantAccepted}
+              >
                 {registering ? "Creazione..." : "Crea nuovo utente"}
               </button>
             </form>

@@ -30,6 +30,8 @@ type CurrentUser = {
   email?: string;
   role?: "USER" | "PROFESSIONAL" | "ADMIN" | string;
   onboardingRequired?: boolean;
+  consentRequired?: boolean;
+  missingConsents?: string[];
 };
 
 const roleNav: Record<string, NavItem[]> = {
@@ -61,14 +63,25 @@ const pathMatchesRole = (path: string, role?: string) => {
   }
   if (role === "USER") {
     return (
-      path === "/onboarding" || path === "/user" || path.startsWith("/user/")
+      path === "/consents" ||
+      path === "/onboarding" ||
+      path === "/user" ||
+      path.startsWith("/user/")
     );
   }
   if (role === "PROFESSIONAL") {
-    return path === "/professional" || path.startsWith("/professional/");
+    return (
+      path === "/consents" ||
+      path === "/professional" ||
+      path.startsWith("/professional/")
+    );
   }
   if (role === "ADMIN") {
-    return path === "/admin/cycles" || path.startsWith("/admin/ai-config");
+    return (
+      path === "/consents" ||
+      path === "/admin/cycles" ||
+      path.startsWith("/admin/ai-config")
+    );
   }
   return true;
 };
@@ -110,6 +123,11 @@ export function ProductShell({
       const data = (await response.json()) as CurrentUser;
       setMe(data);
       setAuthChecked(true);
+
+      if (data.consentRequired && pathname !== "/consents") {
+        window.location.href = "/consents";
+        return;
+      }
 
       if (
         data.role === "USER" &&
