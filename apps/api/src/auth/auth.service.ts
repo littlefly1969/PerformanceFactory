@@ -4,7 +4,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { UserRole } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { signAccessToken } from '../common/auth-token';
 
@@ -28,11 +28,21 @@ export class AuthService {
   constructor(private readonly prisma: PrismaService) {}
 
   async validateUser(email: string, password: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: {
+        onboardingAssessment: { select: { status: true } },
+      },
+    });
     if (!user) {
       throw new UnauthorizedException('Credenziali non valide');
     }
     if (user.isActive === false) {
+      if (user.onboardingAssessment?.status === 'REJECTED') {
+        throw new UnauthorizedException(
+          'Candidatura rifiutata. Puoi riproporre una nuova richiesta di registrazione.',
+        );
+      }
       throw new UnauthorizedException('Account in attesa di attivazione admin');
     }
 
@@ -65,9 +75,82 @@ export class AuthService {
 
     const existing = await this.prisma.user.findUnique({
       where: { email },
-      select: { id: true },
+      select: {
+        id: true,
+        role: true,
+        isActive: true,
+        onboardingAssessment: { select: { status: true } },
+      },
     });
     if (existing) {
+      if (
+        existing.role === UserRole.USER &&
+        existing.isActive === false &&
+        existing.onboardingAssessment?.status === 'REJECTED'
+      ) {
+        const passwordHash = await bcrypt.hash(password, 10);
+        const user = await this.prisma.$transaction(async (tx) => {
+          const updated = await tx.user.update({
+            where: { id: existing.id },
+            data: {
+              firstName,
+              lastName,
+              password: passwordHash,
+              isActive: false,
+              onboardingAssessment: {
+                upsert: {
+                  update: {
+                    status: 'PENDING',
+                    answersJson: Prisma.JsonNull,
+                    profileJson: Prisma.JsonNull,
+                    completedAt: null,
+                  },
+                  create: { status: 'PENDING' },
+                },
+              },
+            },
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              role: true,
+              isActive: true,
+              createdAt: true,
+            },
+          });
+
+          if (input.aiConsent === true) {
+            const existingConsent = await tx.consent.findFirst({
+              where: { userId: updated.id, type: 'AI' },
+              select: { id: true },
+            });
+            if (!existingConsent) {
+              await tx.consent.create({
+                data: {
+                  userId: updated.id,
+                  type: 'AI',
+                },
+              });
+            }
+          } else {
+            await tx.consent.deleteMany({
+              where: {
+                userId: updated.id,
+                type: 'AI',
+              },
+            });
+          }
+
+          return updated;
+        });
+
+        return {
+          ...user,
+          aiConsent: input.aiConsent === true,
+          status: 'PENDING_ADMIN_ACTIVATION',
+        };
+      }
       throw new BadRequestException('Utente gia esistente');
     }
 

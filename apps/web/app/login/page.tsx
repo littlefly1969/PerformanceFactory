@@ -86,6 +86,8 @@ const coachDemoAccounts = demoAccounts
 
 const pendingAdminActivationMessage =
   "L'admin sta valutando la tua richiesta e ti accettera.";
+const rejectedApplicationMessage =
+  "Candidatura rifiutata. Puoi riproporre una nuova richiesta di registrazione.";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -116,6 +118,11 @@ export default function LoginPage() {
         const data = (await response.json()) as { message?: string };
         if (data.message === "Account in attesa di attivazione admin") {
           errorMessage = pendingAdminActivationMessage;
+        } else if (
+          data.message ===
+          "Candidatura rifiutata. Puoi riproporre una nuova richiesta di registrazione."
+        ) {
+          errorMessage = rejectedApplicationMessage;
         }
       } catch {
         // Mantiene l'errore standard quando l'API non restituisce JSON.

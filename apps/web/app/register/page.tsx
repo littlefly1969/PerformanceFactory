@@ -32,11 +32,16 @@ export default function RegisterPage() {
     });
 
     if (!response.ok) {
-      setMessage(
-        response.status === 400
-          ? "Registrazione non valida o email gia presente."
-          : "Registrazione non disponibile.",
-      );
+      try {
+        const data = (await response.json()) as { message?: string };
+        setMessage(data.message ?? "Registrazione non disponibile.");
+      } catch {
+        setMessage(
+          response.status === 400
+            ? "Registrazione non valida o email gia presente."
+            : "Registrazione non disponibile.",
+        );
+      }
       setRegistering(false);
       return;
     }

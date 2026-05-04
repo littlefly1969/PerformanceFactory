@@ -435,6 +435,52 @@ export class AdminService {
     });
   }
 
+  async rejectUserApplication(userId: string) {
+    if (!userId) {
+      throw new BadRequestException('ID utente mancante');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, isActive: true },
+    });
+    if (!user || user.role !== UserRole.USER) {
+      throw new NotFoundException('Atleta non trovato');
+    }
+    if (user.isActive) {
+      throw new BadRequestException(
+        'Puoi rifiutare solo una candidatura atleta in attesa',
+      );
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        isActive: false,
+        onboardingAssessment: {
+          upsert: {
+            update: {
+              status: 'REJECTED',
+              answersJson: Prisma.JsonNull,
+              profileJson: Prisma.JsonNull,
+              completedAt: null,
+            },
+            create: { status: 'REJECTED' },
+          },
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        isActive: true,
+        role: true,
+        onboardingAssessment: { select: { status: true } },
+      },
+    });
+  }
+
   async getAiSettings() {
     const areas = await this.prisma.area.findMany({
       select: { id: true, name: true },

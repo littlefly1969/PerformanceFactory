@@ -114,6 +114,11 @@ type PreviewTarget = {
   area: Area;
 };
 
+type AssignmentTarget = {
+  athlete: Athlete;
+  state: AreaState;
+};
+
 const readError = async (response: Response) => {
   try {
     const data = (await response.json()) as {
@@ -180,11 +185,6 @@ export default function AdminCyclesPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [selectedAreaByAthlete, setSelectedAreaByAthlete] = useState<
-    Record<string, string>
-  >({});
-  const [selectedProfessionalByAthlete, setSelectedProfessionalByAthlete] =
-    useState<Record<string, string>>({});
   const [competencesByProfessional, setCompetencesByProfessional] = useState<
     Record<string, Record<string, boolean>>
   >({});
@@ -192,8 +192,14 @@ export default function AdminCyclesPage() {
   const [previewTarget, setPreviewTarget] = useState<PreviewTarget | null>(
     null,
   );
+  const [assignmentTarget, setAssignmentTarget] =
+    useState<AssignmentTarget | null>(null);
+  const [professionalFilter, setProfessionalFilter] = useState("");
 
-  const athletes = dashboard?.athletes ?? [];
+  const athletes =
+    dashboard?.athletes.filter(
+      (athlete) => athlete.onboarding.status !== "REJECTED",
+    ) ?? [];
   const professionals = dashboard?.professionals ?? [];
   const areas = dashboard?.areas ?? [];
   const readyToGenerate = useMemo(
@@ -210,9 +216,9 @@ export default function AdminCyclesPage() {
       (cycle) => cycle.cycleStato !== "READY_TO_PUBLISH",
     ) ?? [];
   const readyCycles = dashboard?.readyCycles ?? [];
-  const pendingActivation = athletes.filter((athlete) => !athlete.isActive);
-  const selectionKey = (athleteId: string, areaId: string) =>
-    `${athleteId}:${areaId}`;
+  const pendingActivation = athletes.filter(
+    (athlete) => !athlete.isActive && athlete.onboarding.status !== "REJECTED",
+  );
   const professionalCanHandleArea = (professionalId: string, areaId: string) =>
     Boolean(
       professionals
@@ -229,6 +235,14 @@ export default function AdminCyclesPage() {
           ),
         )
       : [];
+  const filteredAssignmentProfessionals = assignmentTarget
+    ? enabledProfessionalsForArea(assignmentTarget.state.area.id).filter(
+        (professional) =>
+          displayUser(professional)
+            .toLowerCase()
+            .includes(professionalFilter.trim().toLowerCase()),
+      )
+    : [];
 
   const loadDashboard = async () => {
     setLoading(true);
@@ -248,30 +262,6 @@ export default function AdminCyclesPage() {
 
     const data = (await response.json()) as Dashboard;
     setDashboard(data);
-    setSelectedAreaByAthlete((current) => ({
-      ...Object.fromEntries(
-        data.athletes.map((athlete) => {
-          const firstReadyArea = athlete.areaStates.find(
-            (state) => state.generationReady && !state.generationBlocked,
-          )?.area.id;
-          const firstArea = athlete.areaStates[0]?.area.id ?? "";
-          return [
-            athlete.id,
-            current[athlete.id] || firstReadyArea || firstArea,
-          ];
-        }),
-      ),
-    }));
-    setSelectedProfessionalByAthlete(
-      Object.fromEntries(
-        data.athletes.flatMap((athlete) =>
-          athlete.areaStates.map((state) => [
-            selectionKey(athlete.id, state.area.id),
-            state.linkedProfessional?.id ?? "",
-          ]),
-        ),
-      ),
-    );
     setCompetencesByProfessional(
       Object.fromEntries(
         data.professionals.map((professional) => [
@@ -292,10 +282,21 @@ export default function AdminCyclesPage() {
     void loadDashboard();
   }, []);
 
-  const assignProfessional = async (athleteId: string) => {
-    const areaId = selectedAreaByAthlete[athleteId];
-    const professionalId =
-      selectedProfessionalByAthlete[selectionKey(athleteId, areaId)];
+  const openAssignmentModal = (athlete: Athlete, state: AreaState) => {
+    setAssignmentTarget({ athlete, state });
+    setProfessionalFilter("");
+  };
+
+  const closeAssignmentModal = () => {
+    setAssignmentTarget(null);
+    setProfessionalFilter("");
+  };
+
+  const assignProfessional = async (
+    athleteId: string,
+    areaId: string,
+    professionalId: string,
+  ) => {
     if (!areaId) {
       setMessage("Seleziona un'area prima di assegnare un professionista.");
       return;
@@ -308,7 +309,7 @@ export default function AdminCyclesPage() {
       setMessage("Il professionista selezionato non e abilitato per questa area.");
       return;
     }
-    setBusyKey(`link:${athleteId}`);
+    setBusyKey(`link:${athleteId}:${areaId}`);
     setMessage(null);
     const response = await secureFetch(`${API_BASE}/inspect/links`, {
       method: "POST",
@@ -324,6 +325,7 @@ export default function AdminCyclesPage() {
     setMessage(
       "Atleta assegnato a un professionista abilitato. I collegamenti precedenti sono stati sostituiti.",
     );
+    closeAssignmentModal();
     await loadDashboard();
     setBusyKey(null);
   };
@@ -479,6 +481,26 @@ export default function AdminCyclesPage() {
     setBusyKey(null);
   };
 
+  const rejectAthleteApplication = async (athleteId: string) => {
+    setBusyKey(`reject:${athleteId}`);
+    setMessage(null);
+    const response = await secureFetch(
+      `${API_BASE}/admin/users/${athleteId}/reject`,
+      {
+        method: "PATCH",
+        credentials: "include",
+      },
+    );
+    if (!response.ok) {
+      setMessage(`Rifiuto candidatura non riuscito: ${await readError(response)}`);
+      setBusyKey(null);
+      return;
+    }
+    setMessage("Candidatura atleta rifiutata. L'utente potra riproporne una nuova.");
+    await loadDashboard();
+    setBusyKey(null);
+  };
+
   return (
     <ProductShell
       eyebrow="Ambiente admin"
@@ -558,6 +580,14 @@ export default function AdminCyclesPage() {
                 onClick={() => setAthleteActive(athlete.id, true)}
               >
                 Abilita atleta
+              </button>
+              <button
+                className="pf-button-secondary"
+                type="button"
+                disabled={busyKey === `reject:${athlete.id}`}
+                onClick={() => rejectAthleteApplication(athlete.id)}
+              >
+                Rifiuta candidatura
               </button>
             </article>
           ))}
@@ -743,21 +773,6 @@ export default function AdminCyclesPage() {
         </div>
         <div className="pf-grid pf-ownership-grid">
           {athletes.map((athlete) => {
-            const selectedAreaId =
-              selectedAreaByAthlete[athlete.id] ??
-              athlete.areaStates[0]?.area.id ??
-              "";
-            const eligibleProfessionals =
-              enabledProfessionalsForArea(selectedAreaId);
-            const selectedKey = selectionKey(athlete.id, selectedAreaId);
-            const selectedAreaState = athlete.areaStates.find(
-              (state) => state.area.id === selectedAreaId,
-            );
-            const selectedProfessionalId =
-              selectedProfessionalByAthlete[selectedKey] ?? "";
-            const selectedProfessionalStillEligible =
-              !selectedProfessionalId ||
-              professionalCanHandleArea(selectedProfessionalId, selectedAreaId);
             const assignedCount = athlete.areaStates.filter(
               (state) => state.linkedProfessional,
             ).length;
@@ -787,101 +802,7 @@ export default function AdminCyclesPage() {
                       : `${assignedCount}/${athlete.areaStates.length} assegnati`}
                   </StatusBadge>
                 </div>
-                <div className="pf-ownership-fields">
-                  <label className="pf-field">
-                    Ambito
-                    <select
-                      className="pf-select"
-                      value={selectedAreaId}
-                      onChange={(event) => {
-                        const nextAreaId = event.target.value;
-                        setSelectedAreaByAthlete((prev) => ({
-                          ...prev,
-                          [athlete.id]: nextAreaId,
-                        }));
-                        setSelectedProfessionalByAthlete((prev) => {
-                          const currentProfessionalId =
-                            prev[selectionKey(athlete.id, nextAreaId)] ?? "";
-                          if (
-                            currentProfessionalId &&
-                            !professionalCanHandleArea(
-                              currentProfessionalId,
-                              nextAreaId,
-                            )
-                          ) {
-                            return {
-                              ...prev,
-                              [selectionKey(athlete.id, nextAreaId)]: "",
-                            };
-                          }
-                          return prev;
-                        });
-                      }}
-                    >
-                      {athlete.areaStates.map((state) => (
-                        <option key={state.area.id} value={state.area.id}>
-                          {state.area.name}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="pf-field">
-                    Professionista abilitato
-                    <select
-                      className="pf-select"
-                      value={
-                        selectedProfessionalStillEligible
-                          ? selectedProfessionalId
-                          : ""
-                      }
-                      onChange={(event) =>
-                        setSelectedProfessionalByAthlete((prev) => ({
-                          ...prev,
-                          [selectedKey]: event.target.value,
-                        }))
-                      }
-                    >
-                      <option value="">
-                        {eligibleProfessionals.length
-                          ? "Seleziona professionista"
-                          : "Nessun professionista abilitato per questa area"}
-                      </option>
-                      {eligibleProfessionals.map((professional) => (
-                        <option key={professional.id} value={professional.id}>
-                          {professional.email}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <p
-                  className={`pf-muted pf-owner-note ${
-                    selectedAreaState?.linkedProfessional ? "" : "empty"
-                  }`}
-                >
-                  {selectedAreaState?.linkedProfessional ? (
-                    <>
-                      Responsabile attuale {selectedAreaState.area.name}:{" "}
-                      {selectedAreaState.linkedProfessional.email}
-                    </>
-                  ) : (
-                    "Nessun responsabile assegnato per questa area"
-                  )}
-                </p>
                 <div className="pf-ownership-actions">
-                  <button
-                    className="pf-button"
-                    type="button"
-                    disabled={
-                      busyKey === `link:${athlete.id}` ||
-                      !selectedAreaId ||
-                      !selectedProfessionalByAthlete[selectedKey] ||
-                      !selectedProfessionalStillEligible
-                    }
-                    onClick={() => assignProfessional(athlete.id)}
-                  >
-                    Associa professionista
-                  </button>
                   <button
                     className="pf-button-secondary"
                     type="button"
@@ -895,12 +816,16 @@ export default function AdminCyclesPage() {
                 </div>
                 <div className="pf-area-strip">
                   {athlete.areaStates.map((state) => (
-                    <span
+                    <button
                       key={state.area.id}
-                      className={`pf-area-pill ${state.pendingCycle ? "pending" : state.generationReady ? "ready" : ""}`}
+                      className={`pf-area-pill ${state.pendingCycle ? "pending" : state.generationReady ? "ready" : ""} ${
+                        state.linkedProfessional ? "assigned" : ""
+                      }`}
+                      type="button"
+                      onClick={() => openAssignmentModal(athlete, state)}
                     >
-                      {state.area.name}
-                    </span>
+                      <span>{state.area.name}</span>
+                    </button>
                   ))}
                 </div>
               </article>
@@ -964,6 +889,95 @@ export default function AdminCyclesPage() {
           ))}
         </div>
       </section>
+
+      {assignmentTarget && (
+        <div className="pf-modal-backdrop" role="dialog" aria-modal="true">
+          <section className="pf-modal pf-assignment-modal">
+            <div className="pf-panel-header">
+              <div>
+                <p className="pf-eyebrow">Assegnazione area</p>
+                <h2>Seleziona professionista</h2>
+              </div>
+              <button
+                className="pf-button-secondary"
+                type="button"
+                onClick={closeAssignmentModal}
+              >
+                Chiudi
+              </button>
+            </div>
+
+            <div className="pf-assignment-summary">
+              <div>
+                <span>Utente</span>
+                <strong>{displayUser(assignmentTarget.athlete)}</strong>
+              </div>
+              <div>
+                <span>Zona driver</span>
+                <strong>{assignmentTarget.state.area.name}</strong>
+              </div>
+              <div>
+                <span>Attualmente assegnato</span>
+                <strong>
+                  {assignmentTarget.state.linkedProfessional?.email ??
+                    "Nessun professionista"}
+                </strong>
+              </div>
+            </div>
+
+            <label className="pf-field pf-combobox-field">
+              Professionista
+              <input
+                className="pf-input"
+                value={professionalFilter}
+                onChange={(event) => setProfessionalFilter(event.target.value)}
+                placeholder="Cerca per nome o email"
+                role="combobox"
+                aria-expanded="true"
+                aria-controls="professional-assignment-options"
+                autoFocus
+                autoComplete="off"
+              />
+            </label>
+
+            <div
+              className="pf-combobox-menu"
+              id="professional-assignment-options"
+            >
+              {filteredAssignmentProfessionals.map((professional) => (
+                <button
+                  key={professional.id}
+                  className={`pf-combobox-option ${
+                    assignmentTarget.state.linkedProfessional?.id ===
+                    professional.id
+                      ? "selected"
+                      : ""
+                  }`}
+                  type="button"
+                  disabled={
+                    busyKey ===
+                    `link:${assignmentTarget.athlete.id}:${assignmentTarget.state.area.id}`
+                  }
+                  onClick={() =>
+                    assignProfessional(
+                      assignmentTarget.athlete.id,
+                      assignmentTarget.state.area.id,
+                      professional.id,
+                    )
+                  }
+                >
+                  {displayUser(professional)}
+                </button>
+              ))}
+              {!filteredAssignmentProfessionals.length && (
+                <div className="pf-alert warning">
+                  Nessun professionista abilitato trovato per questa area.
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
 
       {aiPreview && previewTarget && (
         <div className="pf-modal-backdrop" role="dialog" aria-modal="true">

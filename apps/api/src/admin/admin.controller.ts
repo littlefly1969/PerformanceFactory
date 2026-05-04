@@ -100,6 +100,16 @@ export class AdminController {
     return this.admin.setUserActive(userId, false);
   }
 
+  @Patch('users/:userId/reject')
+  @ApiOperation({ summary: 'Rifiuta candidatura atleta in attesa' })
+  @ApiParam({ name: 'userId' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  rejectUser(@Param('userId') userId: string) {
+    return this.admin.rejectUserApplication(userId);
+  }
+
   @Get('ai-settings')
   @ApiOperation({ summary: 'Configurazione prompt AI e onboarding admin' })
   @ApiCookieAuth()
