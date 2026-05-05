@@ -149,16 +149,16 @@ export class AuthService {
             },
           });
 
-          if (this.consents) {
-            await this.consents.grantRequired(updated.id, {
-              ipAddress: input.ipAddress,
-              userAgent: input.userAgent,
-              source: 'password_register',
-            });
-          }
-
           return updated;
         });
+
+        if (this.consents) {
+          await this.consents.grantRequired(user.id, {
+            ipAddress: input.ipAddress,
+            userAgent: input.userAgent,
+            source: 'password_register',
+          });
+        }
 
         return {
           ...user,
@@ -196,16 +196,16 @@ export class AuthService {
         },
       });
 
-      if (this.consents) {
-        await this.consents.grantRequired(created.id, {
-          ipAddress: input.ipAddress,
-          userAgent: input.userAgent,
-          source: 'password_register',
-        });
-      }
-
       return created;
     });
+
+    if (this.consents) {
+      await this.consents.grantRequired(user.id, {
+        ipAddress: input.ipAddress,
+        userAgent: input.userAgent,
+        source: 'password_register',
+      });
+    }
 
     return {
       ...user,
