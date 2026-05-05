@@ -24,6 +24,7 @@ const consentExemptPaths = [
   '/api/auth/token',
   '/api/auth/logout',
   '/api/consents/required',
+  '/api/consents/documents',
   '/api/health',
 ];
 
@@ -108,7 +109,26 @@ export class AuthenticatedGuard implements CanActivate {
     if (consentExemptPaths.some((item) => path === item || path.startsWith(`${item}/`))) {
       return;
     }
-    const requiredTypes = REQUIRED_CONSENTS.map((consent) => consent.type);
+    const fallbackDocuments = REQUIRED_CONSENTS.map((consent) => ({
+      type: consent.type,
+      version: consent.version,
+      documentHash: consentDocumentHash(consent),
+    }));
+    const requiredTypes = fallbackDocuments.map((consent) => consent.type);
+    const activeDocuments = await this.prisma.consentDocument.findMany({
+      where: {
+        type: { in: requiredTypes },
+        isActive: true,
+      },
+      select: { type: true, version: true, documentHash: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    const activeByType = new Map(
+      activeDocuments.map((document) => [document.type, document]),
+    );
+    const requiredDocuments = fallbackDocuments.map(
+      (fallback) => activeByType.get(fallback.type) ?? fallback,
+    );
     const consents = await this.prisma.consent.findMany({
       where: {
         userId,
@@ -118,12 +138,12 @@ export class AuthenticatedGuard implements CanActivate {
       select: { type: true, version: true, documentHash: true },
     });
     const accepted = new Map(consents.map((consent) => [consent.type, consent]));
-    const missing = REQUIRED_CONSENTS.filter((document) => {
+    const missing = requiredDocuments.filter((document) => {
       const current = accepted.get(document.type);
       return (
         !current ||
         current.version !== document.version ||
-        current.documentHash !== consentDocumentHash(document)
+        current.documentHash !== document.documentHash
       );
     }).map((document) => document.type);
     if (missing.length) {

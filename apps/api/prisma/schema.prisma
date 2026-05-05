@@ -54,6 +54,7 @@ model User {
 
   feedbackEntries      FeedbackEntry[]
   consents             Consent[]
+  consentDocuments     ConsentDocument[]
   authIdentities       AuthIdentity[]
   assignments          UserAssignment[]
   currentStates        CurrentState[]
@@ -337,14 +338,35 @@ model Consent {
   version       String   @default("v1")
   documentTitle String?
   documentHash  String?
+  documentBody  Json?
   ipAddress     String?
   userAgent     String?
+  source        String?
   grantedAt     DateTime @default(now())
   withdrawnAt   DateTime?
 
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId, type, withdrawnAt])
+}
+
+model ConsentDocument {
+  id           String    @id @default(uuid())
+  type         String
+  version      String
+  title        String
+  summary      String
+  body         Json
+  documentHash String
+  isActive     Boolean   @default(false)
+  createdById  String?
+  createdAt    DateTime  @default(now())
+  publishedAt  DateTime?
+
+  createdBy User? @relation(fields: [createdById], references: [id])
+
+  @@unique([type, version])
+  @@index([type, isActive])
 }
 
 /// @deprecated Legacy V1 guidance content. Do not use for new V2+ flows.

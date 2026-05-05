@@ -8,6 +8,7 @@ import {
   Req,
   Res,
   UseGuards,
+  Logger,
 } from '@nestjs/common';
 import { ApiBody, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
@@ -20,6 +21,8 @@ import { RegisterAthleteDto } from './dto/register-athlete.dto';
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private readonly authService: AuthService,
     private readonly googleOidc?: GoogleOidcService,
@@ -56,32 +59,34 @@ export class AuthController {
   @Get('google/login')
   @ApiOperation({ summary: 'Avvia login con Google OIDC' })
   @Redirect()
-  googleLogin(
+  async googleLogin(
     @Req() req: unknown,
     @Query('returnTo') returnTo?: string,
   ) {
+    const google = this.google();
+    const typedReq =
+      req as Parameters<GoogleOidcService['buildAuthorizationUrl']>[0];
+    const url = google.buildAuthorizationUrl(typedReq, 'login', returnTo);
+    await google.persistSession(typedReq);
     return {
-      url: this.google().buildAuthorizationUrl(
-        req as Parameters<GoogleOidcService['buildAuthorizationUrl']>[0],
-        'login',
-        returnTo,
-      ),
+      url,
     };
   }
 
   @Get('google/register')
   @ApiOperation({ summary: 'Avvia registrazione atleta con Google OIDC' })
   @Redirect()
-  googleRegister(
+  async googleRegister(
     @Req() req: unknown,
     @Query('returnTo') returnTo?: string,
   ) {
+    const google = this.google();
+    const typedReq =
+      req as Parameters<GoogleOidcService['buildAuthorizationUrl']>[0];
+    const url = google.buildAuthorizationUrl(typedReq, 'register', returnTo);
+    await google.persistSession(typedReq);
     return {
-      url: this.google().buildAuthorizationUrl(
-        req as Parameters<GoogleOidcService['buildAuthorizationUrl']>[0],
-        'register',
-        returnTo,
-      ),
+      url,
     };
   }
 
@@ -89,7 +94,13 @@ export class AuthController {
   @ApiOperation({ summary: 'Callback Google OIDC server-side' })
   async googleCallback(
     @Req() req: unknown,
-    @Res() reply: { redirect: (url: string) => unknown },
+    @Res()
+    reply: {
+      code?: (statusCode: number) => {
+        header: (name: string, value: string) => { send: () => unknown };
+      };
+      redirect?: (url: string) => unknown;
+    },
     @Query('code') code?: string,
     @Query('state') state?: string,
     @Query('error') error?: string,
@@ -99,14 +110,70 @@ export class AuthController {
         req as Parameters<GoogleOidcService['handleCallback']>[0],
         { code, state, error },
       );
+      if ('pendingRegistration' in result) {
+        this.logger.log('Google OIDC pending registration created; saving session');
+        await this.google().persistSession(
+          req as Parameters<GoogleOidcService['persistSession']>[0],
+        );
+        this.logger.log('Google OIDC redirecting pending registration to consents');
+        return this.redirect(reply, this.google().successRedirect(result.returnTo));
+      }
       await this.authService.createApplicationSession(
         req as Parameters<AuthService['createApplicationSession']>[0],
         result.user,
       );
-      return reply.redirect(this.google().successRedirect(result.returnTo));
+      await this.google().persistSession(
+        req as Parameters<GoogleOidcService['persistSession']>[0],
+      );
+      this.logger.log('Google OIDC login session saved; redirecting user');
+      return this.redirect(reply, this.google().successRedirect(result.returnTo));
     } catch (callbackError) {
-      return reply.redirect(this.google().failureRedirect(callbackError));
+      this.logger.warn(
+        `Google OIDC callback failed: ${this.errorMessage(callbackError)}`,
+      );
+      return this.redirect(reply, this.google().failureRedirect(callbackError));
     }
+  }
+
+  @Get('google/register/pending')
+  @ApiOperation({ summary: 'Dati registrazione Google in attesa consensi' })
+  googleRegisterPending(@Req() req: unknown) {
+    return this.google().pendingRegistration(
+      req as Parameters<GoogleOidcService['pendingRegistration']>[0],
+    );
+  }
+
+  @Post('google/register/complete')
+  @ApiOperation({ summary: 'Completa registrazione Google dopo consensi' })
+  async completeGoogleRegister(
+    @Req()
+    req: {
+      ip?: string;
+      headers?: { 'user-agent'?: string };
+    },
+    @Body()
+    body: {
+      privacyAccepted?: boolean;
+      aiAssistantAccepted?: boolean;
+      acceptedDocuments?: Array<{
+        type?: string;
+        version?: string;
+        documentHash?: string;
+      }>;
+    },
+  ) {
+    const result = await this.google().completeRegistration(
+      req as Parameters<GoogleOidcService['completeRegistration']>[0],
+      body,
+      {
+        ipAddress: req.ip,
+        userAgent: req.headers?.['user-agent'],
+      },
+    );
+    await this.google().persistSession(
+      req as Parameters<GoogleOidcService['persistSession']>[0],
+    );
+    return result;
   }
 
   private google() {
@@ -114,6 +181,31 @@ export class AuthController {
       throw new Error('GoogleOidcService non configurato');
     }
     return this.googleOidc;
+  }
+
+  private errorMessage(error: unknown) {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    if (typeof error === 'string') {
+      return error;
+    }
+    return 'Errore sconosciuto';
+  }
+
+  private redirect(
+    reply: {
+      code?: (statusCode: number) => {
+        header: (name: string, value: string) => { send: () => unknown };
+      };
+      redirect?: (url: string) => unknown;
+    },
+    url: string,
+  ) {
+    if (reply.code) {
+      return reply.code(302).header('Location', url).send();
+    }
+    return reply.redirect?.(url);
   }
 
   @Post('logout')

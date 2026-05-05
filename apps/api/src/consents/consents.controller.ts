@@ -37,6 +37,12 @@ export class ConsentsController {
     return this.consents.status(userId);
   }
 
+  @Get('documents')
+  @ApiOperation({ summary: 'Documenti consenso correnti per registrazione' })
+  documents() {
+    return this.consents.requiredDocuments();
+  }
+
   @Post('required')
   @ApiOperation({ summary: 'Accetta privacy e assistente AI obbligatori' })
   @ApiCookieAuth()
@@ -49,7 +55,15 @@ export class ConsentsController {
       headers?: { 'user-agent'?: string };
     },
     @Body()
-    body: { privacyAccepted?: boolean; aiAssistantAccepted?: boolean },
+    body: {
+      privacyAccepted?: boolean;
+      aiAssistantAccepted?: boolean;
+      acceptedDocuments?: Array<{
+        type?: string;
+        version?: string;
+        documentHash?: string;
+      }>;
+    },
   ) {
     const userId = req.user?.id ?? '';
     if (!userId) {
@@ -58,6 +72,7 @@ export class ConsentsController {
     return this.consents.acceptRequired(userId, body, {
       ipAddress: req.ip,
       userAgent: req.headers?.['user-agent'],
+      source: 'reconsent',
     });
   }
 

@@ -85,7 +85,15 @@ export default function ConsentsPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ privacyAccepted, aiAssistantAccepted }),
+      body: JSON.stringify({
+        privacyAccepted,
+        aiAssistantAccepted,
+        acceptedDocuments: status?.documents.map((document) => ({
+          type: document.type,
+          version: document.version,
+          documentHash: document.documentHash,
+        })),
+      }),
     });
     if (!response.ok) {
       setMessage("Non e stato possibile salvare i consensi.");
