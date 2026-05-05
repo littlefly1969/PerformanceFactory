@@ -8,6 +8,7 @@ import {
   Req,
   Res,
   UseGuards,
+  Logger,
 } from '@nestjs/common';
 import { ApiBody, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
@@ -20,6 +21,8 @@ import { RegisterAthleteDto } from './dto/register-athlete.dto';
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private readonly authService: AuthService,
     private readonly googleOidc?: GoogleOidcService,
@@ -56,32 +59,34 @@ export class AuthController {
   @Get('google/login')
   @ApiOperation({ summary: 'Avvia login con Google OIDC' })
   @Redirect()
-  googleLogin(
+  async googleLogin(
     @Req() req: unknown,
     @Query('returnTo') returnTo?: string,
   ) {
+    const google = this.google();
+    const typedReq =
+      req as Parameters<GoogleOidcService['buildAuthorizationUrl']>[0];
+    const url = google.buildAuthorizationUrl(typedReq, 'login', returnTo);
+    await google.persistSession(typedReq);
     return {
-      url: this.google().buildAuthorizationUrl(
-        req as Parameters<GoogleOidcService['buildAuthorizationUrl']>[0],
-        'login',
-        returnTo,
-      ),
+      url,
     };
   }
 
   @Get('google/register')
   @ApiOperation({ summary: 'Avvia registrazione atleta con Google OIDC' })
   @Redirect()
-  googleRegister(
+  async googleRegister(
     @Req() req: unknown,
     @Query('returnTo') returnTo?: string,
   ) {
+    const google = this.google();
+    const typedReq =
+      req as Parameters<GoogleOidcService['buildAuthorizationUrl']>[0];
+    const url = google.buildAuthorizationUrl(typedReq, 'register', returnTo);
+    await google.persistSession(typedReq);
     return {
-      url: this.google().buildAuthorizationUrl(
-        req as Parameters<GoogleOidcService['buildAuthorizationUrl']>[0],
-        'register',
-        returnTo,
-      ),
+      url,
     };
   }
 
@@ -103,8 +108,14 @@ export class AuthController {
         req as Parameters<AuthService['createApplicationSession']>[0],
         result.user,
       );
+      await this.google().persistSession(
+        req as Parameters<GoogleOidcService['persistSession']>[0],
+      );
       return reply.redirect(this.google().successRedirect(result.returnTo));
     } catch (callbackError) {
+      this.logger.warn(
+        `Google OIDC callback failed: ${this.errorMessage(callbackError)}`,
+      );
       return reply.redirect(this.google().failureRedirect(callbackError));
     }
   }
@@ -114,6 +125,16 @@ export class AuthController {
       throw new Error('GoogleOidcService non configurato');
     }
     return this.googleOidc;
+  }
+
+  private errorMessage(error: unknown) {
+    if (error instanceof Error) {
+      return error.message;
+    }
+    if (typeof error === 'string') {
+      return error;
+    }
+    return 'Errore sconosciuto';
   }
 
   @Post('logout')

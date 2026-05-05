@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common';
 import { createHash, createPublicKey, createVerify, randomBytes } from 'crypto';
@@ -19,9 +20,15 @@ type GoogleOidcSession = {
   createdAt: number;
 };
 
+type SessionData = {
+  googleOidc?: GoogleOidcSession;
+  userId?: string;
+  save?: (callback: (error?: unknown) => void) => void;
+};
+
 type SessionCarrier = {
-  session?: { googleOidc?: GoogleOidcSession; userId?: string };
-  raw?: { session?: { googleOidc?: GoogleOidcSession; userId?: string } };
+  session?: SessionData;
+  raw?: { session?: SessionData };
 };
 
 type GoogleTokenResponse = {
@@ -69,6 +76,8 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 
 @Injectable()
 export class GoogleOidcService {
+  private readonly logger = new Logger(GoogleOidcService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   buildAuthorizationUrl(
@@ -109,6 +118,22 @@ export class GoogleOidcService {
     }
 
     return url.toString();
+  }
+
+  async persistSession(req: SessionCarrier) {
+    const session = this.session(req);
+    if (typeof session.save !== 'function') {
+      return;
+    }
+    await new Promise<void>((resolve, reject) => {
+      session.save?.((error?: unknown) => {
+        if (error) {
+          reject(error);
+          return;
+        }
+        resolve();
+      });
+    });
   }
 
   async handleCallback(
@@ -174,9 +199,11 @@ export class GoogleOidcService {
       }),
     });
     if (!response.ok) {
-      throw new UnauthorizedException(
-        `Scambio codice Google fallito: ${await response.text()}`,
+      const responseBody = await response.text();
+      this.logger.warn(
+        `Google token exchange failed with HTTP ${response.status}: ${responseBody.slice(0, 500)}`,
       );
+      throw new UnauthorizedException('Scambio codice Google fallito');
     }
     return (await response.json()) as GoogleTokenResponse;
   }
