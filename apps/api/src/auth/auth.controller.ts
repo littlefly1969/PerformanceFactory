@@ -94,7 +94,13 @@ export class AuthController {
   @ApiOperation({ summary: 'Callback Google OIDC server-side' })
   async googleCallback(
     @Req() req: unknown,
-    @Res() reply: { redirect: (url: string) => unknown },
+    @Res()
+    reply: {
+      code?: (statusCode: number) => {
+        header: (name: string, value: string) => { send: () => unknown };
+      };
+      redirect?: (url: string) => unknown;
+    },
     @Query('code') code?: string,
     @Query('state') state?: string,
     @Query('error') error?: string,
@@ -110,7 +116,7 @@ export class AuthController {
           req as Parameters<GoogleOidcService['persistSession']>[0],
         );
         this.logger.log('Google OIDC redirecting pending registration to consents');
-        return reply.redirect(this.google().successRedirect(result.returnTo));
+        return this.redirect(reply, this.google().successRedirect(result.returnTo));
       }
       await this.authService.createApplicationSession(
         req as Parameters<AuthService['createApplicationSession']>[0],
@@ -120,12 +126,12 @@ export class AuthController {
         req as Parameters<GoogleOidcService['persistSession']>[0],
       );
       this.logger.log('Google OIDC login session saved; redirecting user');
-      return reply.redirect(this.google().successRedirect(result.returnTo));
+      return this.redirect(reply, this.google().successRedirect(result.returnTo));
     } catch (callbackError) {
       this.logger.warn(
         `Google OIDC callback failed: ${this.errorMessage(callbackError)}`,
       );
-      return reply.redirect(this.google().failureRedirect(callbackError));
+      return this.redirect(reply, this.google().failureRedirect(callbackError));
     }
   }
 
@@ -185,6 +191,21 @@ export class AuthController {
       return error;
     }
     return 'Errore sconosciuto';
+  }
+
+  private redirect(
+    reply: {
+      code?: (statusCode: number) => {
+        header: (name: string, value: string) => { send: () => unknown };
+      };
+      redirect?: (url: string) => unknown;
+    },
+    url: string,
+  ) {
+    if (reply.code) {
+      return reply.code(302).header('Location', url).send();
+    }
+    return reply.redirect?.(url);
   }
 
   @Post('logout')
