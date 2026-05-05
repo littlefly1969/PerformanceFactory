@@ -85,6 +85,7 @@ const GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
 const GOOGLE_JWKS_ENDPOINT = 'https://www.googleapis.com/oauth2/v3/certs';
 const GOOGLE_ISSUERS = ['https://accounts.google.com', 'accounts.google.com'];
 const STATE_TTL_MS = 10 * 60 * 1000;
+const GOOGLE_FETCH_TIMEOUT_MS = 12_000;
 
 @Injectable()
 export class GoogleOidcService {
@@ -164,7 +165,6 @@ export class GoogleOidcService {
 
     const session = this.session(req);
     const oidc = session.googleOidc;
-    session.googleOidc = undefined;
     if (!oidc || oidc.state !== input.state) {
       throw new UnauthorizedException('Stato Google OIDC non valido');
     }
@@ -172,12 +172,16 @@ export class GoogleOidcService {
       throw new UnauthorizedException('Stato Google OIDC scaduto');
     }
 
+    this.logger.log(`Google OIDC callback state valid; mode=${oidc.mode}`);
+    this.logger.log('Google OIDC exchanging authorization code');
     const tokenResponse = await this.exchangeCode(input.code, oidc.codeVerifier);
     if (!tokenResponse.id_token) {
       throw new UnauthorizedException('Google non ha restituito id_token');
     }
 
+    this.logger.log('Google OIDC verifying id_token');
     const claims = await this.verifyIdToken(tokenResponse.id_token, oidc.nonce);
+    this.logger.log('Google OIDC resolving local account');
     const result = await this.resolveApplicationUser(
       oidc.mode,
       claims,
@@ -185,6 +189,7 @@ export class GoogleOidcService {
     );
     if ('pendingRegistration' in result) {
       session.pendingGoogleRegistration = result.pendingRegistration;
+      session.googleOidc = undefined;
       return {
         pendingRegistration: true as const,
         returnTo: `${this.webOrigin()}/register/google/consents`,
@@ -192,6 +197,7 @@ export class GoogleOidcService {
     }
     const user = result.user;
     session.userId = user.id;
+    session.googleOidc = undefined;
 
     return { user, returnTo: oidc.returnTo };
   }
@@ -308,7 +314,7 @@ export class GoogleOidcService {
     code: string,
     codeVerifier: string,
   ): Promise<GoogleTokenResponse> {
-    const response = await fetch(GOOGLE_TOKEN_ENDPOINT, {
+    const response = await this.fetchWithTimeout(GOOGLE_TOKEN_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -319,7 +325,7 @@ export class GoogleOidcService {
         grant_type: 'authorization_code',
         code_verifier: codeVerifier,
       }),
-    });
+    }, 'Google token endpoint');
     if (!response.ok) {
       const responseBody = await response.text();
       this.logger.warn(
@@ -343,7 +349,11 @@ export class GoogleOidcService {
       throw new UnauthorizedException('Firma Google non supportata');
     }
 
-    const jwksResponse = await fetch(GOOGLE_JWKS_ENDPOINT);
+    const jwksResponse = await this.fetchWithTimeout(
+      GOOGLE_JWKS_ENDPOINT,
+      undefined,
+      'Google JWKS endpoint',
+    );
     if (!jwksResponse.ok) {
       throw new UnauthorizedException('JWKS Google non disponibile');
     }
@@ -477,6 +487,27 @@ export class GoogleOidcService {
 
   private randomToken() {
     return randomBytes(32).toString('base64url');
+  }
+
+  private async fetchWithTimeout(
+    url: string,
+    init: RequestInit | undefined,
+    label: string,
+  ) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), GOOGLE_FETCH_TIMEOUT_MS);
+    try {
+      return await fetch(url, {
+        ...(init ?? {}),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`${label} request failed or timed out: ${message}`);
+      throw new UnauthorizedException(`${label} non raggiungibile`);
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private requiredEnv(name: string) {
