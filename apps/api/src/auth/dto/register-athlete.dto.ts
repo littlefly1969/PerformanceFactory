@@ -18,4 +18,11 @@ export class RegisterAthleteDto {
 
   @ApiProperty()
   aiAssistantAccepted: boolean;
+
+  @ApiProperty({ required: false })
+  acceptedDocuments?: Array<{
+    type?: string;
+    version?: string;
+    documentHash?: string;
+  }>;
 }

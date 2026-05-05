@@ -2,8 +2,17 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { API_BASE, secureFetch } from "@/app/lib/api";
+
+type ConsentDocument = {
+  type: "PRIVACY" | "AI_ASSISTANT" | string;
+  version: string;
+  title: string;
+  summary: string;
+  body: string[];
+  documentHash: string;
+};
 
 function GoogleIcon() {
   return (
@@ -41,6 +50,17 @@ export default function RegisterPage() {
   const [aiAssistantAccepted, setAiAssistantAccepted] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [registering, setRegistering] = useState(false);
+  const [documents, setDocuments] = useState<ConsentDocument[]>([]);
+
+  useEffect(() => {
+    const loadDocuments = async () => {
+      const response = await secureFetch(`${API_BASE}/consents/documents`);
+      if (response.ok) {
+        setDocuments((await response.json()) as ConsentDocument[]);
+      }
+    };
+    void loadDocuments();
+  }, []);
 
   const startGoogleRegister = () => {
     const returnTo = `${window.location.origin}/`;
@@ -62,6 +82,11 @@ export default function RegisterPage() {
         password,
         privacyAccepted,
         aiAssistantAccepted,
+        acceptedDocuments: documents.map((document) => ({
+          type: document.type,
+          version: document.version,
+          documentHash: document.documentHash,
+        })),
       }),
     });
 
@@ -185,14 +210,31 @@ export default function RegisterPage() {
                   required
                 />
               </label>
+              {documents.map((document) => (
+                <article className="pf-card" key={document.type}>
+                  <div className="pf-card-top">
+                    <div>
+                      <h3>{document.title}</h3>
+                      <p className="pf-muted">{document.summary}</p>
+                    </div>
+                    <span className="pf-badge accent">{document.version}</span>
+                  </div>
+                  <ul className="pf-muted">
+                    {document.body.map((paragraph) => (
+                      <li key={paragraph}>{paragraph}</li>
+                    ))}
+                  </ul>
+                </article>
+              ))}
               <label className="pf-checkbox">
                 <input
                   type="checkbox"
                   checked={privacyAccepted}
                   onChange={(event) => setPrivacyAccepted(event.target.checked)}
                 />
-                Ho letto l'informativa privacy e accetto il trattamento dei dati
-                necessario per usare Performance Factory.
+                Ho letto integralmente l'informativa privacy nella versione
+                corrente e accetto il trattamento dei dati necessario per usare
+                Performance Factory.
               </label>
               <label className="pf-checkbox">
                 <input
@@ -202,14 +244,20 @@ export default function RegisterPage() {
                     setAiAssistantAccepted(event.target.checked)
                   }
                 />
-                Acconsento esplicitamente all'uso dell'assistente AI, sapendo
-                che non sostituisce professionisti sanitari o sportivi e che le
-                proposte devono essere valutate con prudenza.
+                Acconsento esplicitamente all'uso dell'assistente AI nella
+                versione corrente, sapendo che non sostituisce professionisti
+                sanitari o sportivi e che le proposte devono essere valutate con
+                prudenza.
               </label>
               <button
                 className="pf-button"
                 type="submit"
-                disabled={registering || !privacyAccepted || !aiAssistantAccepted}
+                disabled={
+                  registering ||
+                  !privacyAccepted ||
+                  !aiAssistantAccepted ||
+                  documents.length === 0
+                }
               >
                 {registering ? "Creazione..." : "Crea nuovo utente"}
               </button>

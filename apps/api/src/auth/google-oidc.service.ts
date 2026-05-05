@@ -8,6 +8,7 @@ import { createHash, createPublicKey, createVerify, randomBytes } from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { ConsentsService } from '../consents/consents.service';
 
 type GoogleOidcMode = 'login' | 'register';
 
@@ -20,8 +21,19 @@ type GoogleOidcSession = {
   createdAt: number;
 };
 
+type PendingGoogleRegistration = {
+  subject: string;
+  email: string;
+  givenName?: string | null;
+  familyName?: string | null;
+  profileJson: Prisma.InputJsonValue;
+  returnTo: string;
+  createdAt: number;
+};
+
 type SessionData = {
   googleOidc?: GoogleOidcSession;
+  pendingGoogleRegistration?: PendingGoogleRegistration;
   userId?: string;
   save?: (callback: (error?: unknown) => void) => void;
 };
@@ -78,7 +90,10 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 export class GoogleOidcService {
   private readonly logger = new Logger(GoogleOidcService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly consents: ConsentsService,
+  ) {}
 
   buildAuthorizationUrl(
     req: SessionCarrier,
@@ -163,10 +178,117 @@ export class GoogleOidcService {
     }
 
     const claims = await this.verifyIdToken(tokenResponse.id_token, oidc.nonce);
-    const user = await this.resolveApplicationUser(oidc.mode, claims);
+    const result = await this.resolveApplicationUser(
+      oidc.mode,
+      claims,
+      oidc.returnTo,
+    );
+    if ('pendingRegistration' in result) {
+      session.pendingGoogleRegistration = result.pendingRegistration;
+      return {
+        pendingRegistration: true as const,
+        returnTo: `${this.webOrigin()}/register/google/consents`,
+      };
+    }
+    const user = result.user;
     session.userId = user.id;
 
     return { user, returnTo: oidc.returnTo };
+  }
+
+  async pendingRegistration(req: SessionCarrier) {
+    const pending = this.session(req).pendingGoogleRegistration;
+    if (!pending || Date.now() - pending.createdAt > STATE_TTL_MS) {
+      throw new UnauthorizedException('Registrazione Google non disponibile o scaduta');
+    }
+    return {
+      email: pending.email,
+      firstName: pending.givenName ?? null,
+      lastName: pending.familyName ?? null,
+    };
+  }
+
+  async completeRegistration(
+    req: SessionCarrier,
+    input: {
+      privacyAccepted?: boolean;
+      aiAssistantAccepted?: boolean;
+      acceptedDocuments?: Array<{
+        type?: string;
+        version?: string;
+        documentHash?: string;
+      }>;
+    },
+    audit: { ipAddress?: string | null; userAgent?: string | null },
+  ) {
+    const session = this.session(req);
+    const pending = session.pendingGoogleRegistration;
+    if (!pending || Date.now() - pending.createdAt > STATE_TTL_MS) {
+      throw new UnauthorizedException('Registrazione Google non disponibile o scaduta');
+    }
+    await this.consents.assertAcceptedCurrentDocuments(input);
+    const [existingIdentity, existingUser] = await Promise.all([
+      this.prisma.authIdentity.findUnique({
+        where: {
+          provider_subject: {
+            provider: GOOGLE_PROVIDER,
+            subject: pending.subject,
+          },
+        },
+        select: { id: true },
+      }),
+      this.prisma.user.findUnique({
+        where: { email: pending.email },
+        select: { id: true },
+      }),
+    ]);
+    if (existingIdentity || existingUser) {
+      throw new UnauthorizedException(
+        'Non e possibile usare Google: la mail e gia presente nel sistema',
+      );
+    }
+    const password = await bcrypt.hash(
+      `google:${pending.subject}:${this.randomToken()}`,
+      10,
+    );
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          email: pending.email,
+          password,
+          role: UserRole.USER,
+          firstName: pending.givenName ?? null,
+          lastName: pending.familyName ?? null,
+          isActive: false,
+          onboardingAssessment: {
+            create: { status: 'PENDING' },
+          },
+        },
+      });
+      await tx.authIdentity.create({
+        data: {
+          userId: created.id,
+          provider: GOOGLE_PROVIDER,
+          subject: pending.subject,
+          email: pending.email,
+          emailVerified: true,
+          profileJson: pending.profileJson,
+          lastLoginAt: new Date(),
+        },
+      });
+      return created;
+    });
+    await this.consents.grantRequired(user.id, {
+      ipAddress: audit.ipAddress,
+      userAgent: audit.userAgent,
+      source: 'google_register',
+    });
+    session.pendingGoogleRegistration = undefined;
+    return {
+      email: user.email,
+      status: 'PENDING_ADMIN_ACTIVATION',
+      returnTo: pending.returnTo,
+    };
   }
 
   failureRedirect(error: unknown) {
@@ -276,7 +398,11 @@ export class GoogleOidcService {
     return claims;
   }
 
-  private async resolveApplicationUser(mode: GoogleOidcMode, claims: GoogleClaims) {
+  private async resolveApplicationUser(
+    mode: GoogleOidcMode,
+    claims: GoogleClaims,
+    returnTo: string,
+  ) {
     const email = claims.email?.trim().toLowerCase();
     const subject = claims.sub?.trim();
     if (!email || !subject) {
@@ -302,7 +428,7 @@ export class GoogleOidcService {
           lastLoginAt: new Date(),
         },
       });
-      return existingIdentity.user;
+      return { user: existingIdentity.user };
     }
 
     const existingUser = await this.prisma.user.findUnique({
@@ -318,51 +444,17 @@ export class GoogleOidcService {
       throw new UnauthorizedException('Account Google non registrato');
     }
 
-    const password = await bcrypt.hash(
-      `google:${subject}:${this.randomToken()}`,
-      10,
-    );
-    return this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          email,
-          password,
-          role: UserRole.USER,
-          firstName: claims.given_name ?? null,
-          lastName: claims.family_name ?? null,
-          isActive: false,
-          onboardingAssessment: {
-            create: { status: 'PENDING' },
-          },
-        },
-      });
-      await tx.authIdentity.create({
-        data: {
-          userId: user.id,
-          provider: GOOGLE_PROVIDER,
-          subject,
-          email,
-          emailVerified: claims.email_verified === true,
-          profileJson: this.profileJson(claims),
-          lastLoginAt: new Date(),
-        },
-      });
-      return user;
-    });
-  }
-
-  private createIdentity(userId: string, claims: GoogleClaims) {
-    return this.prisma.authIdentity.create({
-      data: {
-        userId,
-        provider: GOOGLE_PROVIDER,
-        subject: claims.sub ?? '',
-        email: claims.email?.trim().toLowerCase() ?? '',
-        emailVerified: claims.email_verified === true,
+    return {
+      pendingRegistration: {
+        subject,
+        email,
+        givenName: claims.given_name ?? null,
+        familyName: claims.family_name ?? null,
         profileJson: this.profileJson(claims),
-        lastLoginAt: new Date(),
+        returnTo,
+        createdAt: Date.now(),
       },
-    });
+    };
   }
 
   private profileJson(claims: GoogleClaims): Prisma.InputJsonValue {

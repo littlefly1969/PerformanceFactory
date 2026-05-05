@@ -104,6 +104,12 @@ export class AuthController {
         req as Parameters<GoogleOidcService['handleCallback']>[0],
         { code, state, error },
       );
+      if ('pendingRegistration' in result) {
+        await this.google().persistSession(
+          req as Parameters<GoogleOidcService['persistSession']>[0],
+        );
+        return reply.redirect(this.google().successRedirect(result.returnTo));
+      }
       await this.authService.createApplicationSession(
         req as Parameters<AuthService['createApplicationSession']>[0],
         result.user,
@@ -118,6 +124,47 @@ export class AuthController {
       );
       return reply.redirect(this.google().failureRedirect(callbackError));
     }
+  }
+
+  @Get('google/register/pending')
+  @ApiOperation({ summary: 'Dati registrazione Google in attesa consensi' })
+  googleRegisterPending(@Req() req: unknown) {
+    return this.google().pendingRegistration(
+      req as Parameters<GoogleOidcService['pendingRegistration']>[0],
+    );
+  }
+
+  @Post('google/register/complete')
+  @ApiOperation({ summary: 'Completa registrazione Google dopo consensi' })
+  async completeGoogleRegister(
+    @Req()
+    req: {
+      ip?: string;
+      headers?: { 'user-agent'?: string };
+    },
+    @Body()
+    body: {
+      privacyAccepted?: boolean;
+      aiAssistantAccepted?: boolean;
+      acceptedDocuments?: Array<{
+        type?: string;
+        version?: string;
+        documentHash?: string;
+      }>;
+    },
+  ) {
+    const result = await this.google().completeRegistration(
+      req as Parameters<GoogleOidcService['completeRegistration']>[0],
+      body,
+      {
+        ipAddress: req.ip,
+        userAgent: req.headers?.['user-agent'],
+      },
+    );
+    await this.google().persistSession(
+      req as Parameters<GoogleOidcService['persistSession']>[0],
+    );
+    return result;
   }
 
   private google() {

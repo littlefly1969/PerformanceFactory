@@ -21,6 +21,7 @@ import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { OrchestratorService } from '../ai-orchestrator/orchestrator.service';
+import { ConsentsService } from '../consents/consents.service';
 import { RunCycleDto } from './dto/run-cycle.dto';
 import { AdminService } from './admin.service';
 import { UpsertAiPromptConfigDto } from './dto/upsert-ai-prompt-config.dto';
@@ -34,6 +35,7 @@ export class AdminController {
   constructor(
     private readonly orchestrator: OrchestratorService,
     private readonly admin: AdminService,
+    private readonly consents: ConsentsService,
   ) {}
 
   @Get('dashboard')
@@ -117,6 +119,35 @@ export class AdminController {
   @Roles(UserRole.ADMIN)
   aiSettings() {
     return this.admin.getAiSettings();
+  }
+
+  @Get('consent-documents')
+  @ApiOperation({ summary: 'Documenti consenso correnti' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  consentDocuments() {
+    return this.consents.requiredDocuments();
+  }
+
+  @Post('consent-documents')
+  @ApiOperation({ summary: 'Pubblica una nuova versione di documento consenso' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  upsertConsentDocument(
+    @Req() req: { user?: { id: string } },
+    @Body()
+    body: {
+      type?: string;
+      version?: string;
+      title?: string;
+      summary?: string;
+      body?: string[];
+      publish?: boolean;
+    },
+  ) {
+    return this.consents.upsertDocument(body, req.user?.id ?? '');
   }
 
   @Post('ai-prompts')

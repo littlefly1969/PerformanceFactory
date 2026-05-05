@@ -80,7 +80,12 @@ export class AuthService {
     if (password.length < 8) {
       throw new BadRequestException('La password deve avere almeno 8 caratteri');
     }
-    if (input.privacyAccepted !== true || input.aiAssistantAccepted !== true) {
+    if (this.consents) {
+      await this.consents.assertAcceptedCurrentDocuments(input);
+    } else if (
+      input.privacyAccepted !== true ||
+      input.aiAssistantAccepted !== true
+    ) {
       throw new BadRequestException(
         'Privacy e utilizzo dell assistente AI devono essere accettati esplicitamente',
       );
@@ -148,6 +153,7 @@ export class AuthService {
             await this.consents.grantRequired(updated.id, {
               ipAddress: input.ipAddress,
               userAgent: input.userAgent,
+              source: 'password_register',
             });
           }
 
@@ -194,6 +200,7 @@ export class AuthService {
         await this.consents.grantRequired(created.id, {
           ipAddress: input.ipAddress,
           userAgent: input.userAgent,
+          source: 'password_register',
         });
       }
 
