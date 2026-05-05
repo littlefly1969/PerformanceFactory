@@ -372,7 +372,7 @@ export default function AdminCyclesPage() {
         body: JSON.stringify({
           userIds: [athlete.id],
           areaId: area.id,
-          runAllAree: false,
+          runAllAreas: false,
         }),
       },
     );
@@ -401,7 +401,7 @@ export default function AdminCyclesPage() {
       body: JSON.stringify({
         userIds: [athleteId],
         areaId,
-        runAllAree: false,
+        runAllAreas: false,
       }),
     });
     if (!response.ok) {
