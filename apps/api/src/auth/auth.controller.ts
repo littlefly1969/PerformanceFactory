@@ -105,9 +105,11 @@ export class AuthController {
         { code, state, error },
       );
       if ('pendingRegistration' in result) {
+        this.logger.log('Google OIDC pending registration created; saving session');
         await this.google().persistSession(
           req as Parameters<GoogleOidcService['persistSession']>[0],
         );
+        this.logger.log('Google OIDC redirecting pending registration to consents');
         return reply.redirect(this.google().successRedirect(result.returnTo));
       }
       await this.authService.createApplicationSession(
@@ -117,6 +119,7 @@ export class AuthController {
       await this.google().persistSession(
         req as Parameters<GoogleOidcService['persistSession']>[0],
       );
+      this.logger.log('Google OIDC login session saved; redirecting user');
       return reply.redirect(this.google().successRedirect(result.returnTo));
     } catch (callbackError) {
       this.logger.warn(

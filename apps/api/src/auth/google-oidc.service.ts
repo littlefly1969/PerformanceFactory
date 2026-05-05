@@ -86,6 +86,7 @@ const GOOGLE_JWKS_ENDPOINT = 'https://www.googleapis.com/oauth2/v3/certs';
 const GOOGLE_ISSUERS = ['https://accounts.google.com', 'accounts.google.com'];
 const STATE_TTL_MS = 10 * 60 * 1000;
 const GOOGLE_FETCH_TIMEOUT_MS = 12_000;
+const SESSION_SAVE_TIMEOUT_MS = 5_000;
 
 @Injectable()
 export class GoogleOidcService {
@@ -142,7 +143,11 @@ export class GoogleOidcService {
       return;
     }
     await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Salvataggio sessione scaduto'));
+      }, SESSION_SAVE_TIMEOUT_MS);
       session.save?.((error?: unknown) => {
+        clearTimeout(timeout);
         if (error) {
           reject(error);
           return;
