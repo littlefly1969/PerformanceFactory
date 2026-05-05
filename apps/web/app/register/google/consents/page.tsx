@@ -117,22 +117,22 @@ export default function GoogleConsentsPage() {
             </div>
 
             <div className="pf-stack">
-              {documents.map((document) => (
-                <article className="pf-card" key={document.type}>
-                  <div className="pf-card-top">
+              <div className="pf-consent-documents">
+                {documents.map((document) => (
+                  <details className="pf-consent-document" key={document.type} open>
+                    <summary>
+                      <span>{document.title}</span>
+                      <span className="pf-badge accent">{document.version}</span>
+                    </summary>
                     <div>
-                      <h3>{document.title}</h3>
                       <p className="pf-muted">{document.summary}</p>
+                      {document.body.map((paragraph) => (
+                        <p key={paragraph}>{paragraph}</p>
+                      ))}
                     </div>
-                    <span className="pf-badge accent">{document.version}</span>
-                  </div>
-                  <ul className="pf-muted">
-                    {document.body.map((paragraph) => (
-                      <li key={paragraph}>{paragraph}</li>
-                    ))}
-                  </ul>
-                </article>
-              ))}
+                  </details>
+                ))}
+              </div>
 
               <label className="pf-checkbox">
                 <input

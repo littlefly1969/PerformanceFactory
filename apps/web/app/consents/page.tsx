@@ -96,7 +96,12 @@ export default function ConsentsPage() {
       }),
     });
     if (!response.ok) {
-      setMessage("Non e stato possibile salvare i consensi.");
+      try {
+        const data = (await response.json()) as { message?: string };
+        setMessage(data.message ?? "Non e stato possibile salvare i consensi.");
+      } catch {
+        setMessage("Non e stato possibile salvare i consensi.");
+      }
       setSaving(false);
       return;
     }
@@ -141,11 +146,11 @@ export default function ConsentsPage() {
                     {document.version}
                   </StatusBadge>
                 </div>
-                <ul className="pf-muted">
+                <div className="pf-consent-text">
                   {document.body.map((paragraph) => (
-                    <li key={paragraph}>{paragraph}</li>
+                    <p key={paragraph}>{paragraph}</p>
                   ))}
-                </ul>
+                </div>
                 {document.type === "PRIVACY" && (
                   <label className="pf-checkbox">
                     <input
@@ -180,7 +185,12 @@ export default function ConsentsPage() {
                 <button
                   className="pf-button"
                   type="button"
-                  disabled={saving || !privacyAccepted || !aiAssistantAccepted}
+                  disabled={
+                    saving ||
+                    !privacyAccepted ||
+                    !aiAssistantAccepted ||
+                    !status?.documents.length
+                  }
                   onClick={accept}
                 >
                   {saving ? "Salvataggio..." : "Accetta e continua"}

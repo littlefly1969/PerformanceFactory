@@ -305,6 +305,51 @@ a {
   padding: 18px;
 }
 
+.pf-consent-documents {
+  display: grid;
+  gap: 12px;
+}
+
+.pf-consent-document {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  overflow: hidden;
+}
+
+.pf-consent-document summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.pf-consent-document > div {
+  display: grid;
+  gap: 10px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 0 14px 14px;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.55;
+}
+
+.pf-consent-document p,
+.pf-consent-text p {
+  margin: 0;
+}
+
+.pf-consent-text {
+  display: grid;
+  gap: 10px;
+  color: var(--pf-muted);
+  line-height: 1.55;
+}
+
 .pf-config-row {
   display: flex;
   align-items: flex-start;
