@@ -1,6 +1,6 @@
 # PerformanceFactory - Stato Dell'Arte
 
-Aggiornato al 29 aprile 2026, verificando codice API, Web, Prisma, migrazioni, seed, env example, compose e build.
+Aggiornato al 6 maggio 2026, verificando codice API, Web, Prisma, migrazioni, env example, compose e build.
 
 ## Architettura
 
@@ -23,7 +23,8 @@ Il prodotto supporta oggi:
 
 - Registrazione pubblica di nuovi atleti da pagina login.
 - Creazione account atleta sospeso (`isActive=false`) in attesa di admin.
-- Consenso AI in registrazione; se attivo viene creata subito una riga `Consent` di tipo `AI`.
+- Consensi privacy e assistente AI obbligatori, con documenti versionati in DB e hash server-side.
+- Registrazione Google OIDC come identity provider: verifica Google, accettazione consensi, poi creazione account atleta sospeso.
 - Abilitazione/disabilitazione atleta da admin.
 - Collegamento coach-atleta per singola area.
 - Competenze coach per area.
@@ -63,11 +64,17 @@ Autenticazione:
 Nuovi atleti:
 
 - Endpoint: `POST /api/auth/register-athlete`.
-- Campi: `firstName`, `lastName`, `email`, `password`, `aiConsent`.
+- Campi: `firstName`, `lastName`, `email`, `password`, `privacyAccepted`, `aiAssistantAccepted`, `acceptedDocuments`.
 - Password minima: 8 caratteri.
 - Account creato come `USER` e `isActive=false`.
 - Login bloccato finche' l'admin non abilita.
-- Se `aiConsent=true`, il consenso AI e' gia' registrato.
+- I consensi vengono salvati solo se versione e hash dei documenti accettati corrispondono ai documenti attivi.
+
+Google OIDC:
+
+- Endpoint: `GET /api/auth/google/login`, `GET /api/auth/google/register`, `GET /api/auth/google/callback`.
+- La registrazione Google usa `/register/google/consents` prima di creare l'utente.
+- Email gia' presenti con altro metodo non vengono collegate automaticamente.
 
 Admin:
 
@@ -112,7 +119,7 @@ Provider supportati:
 - `openai`: usa Responses API e richiede `OPENAI_API_KEY`.
 - `gemini`: usa Gemini API e richiede `GEMINI_API_KEY`.
 
-Per provider esterni e' richiesto consenso AI atleta (`Consent.type = 'AI'`).
+Per provider esterni e' richiesto consenso assistente AI aggiornato (`Consent.type = 'AI_ASSISTANT'`).
 
 Prompt effettivo:
 
@@ -289,12 +296,13 @@ Route principali:
 - `/professional/approvals`: approvazioni coach.
 - `/admin/cycles`: operations dashboard, attivazione utenti, assegnazioni, generazione, publish.
 - `/admin/ai-config`: prompt AI e template anamnesi.
+- `/admin/consents`: documenti privacy e assistente AI versionati, con hash.
 
 La navigazione e' role-aware; un atleta con onboarding richiesto viene reindirizzato a `/onboarding`.
 
 ## Migrazioni
 
-Sono presenti 13 migrazioni ordinate in `apps/api/prisma/migrations`.
+Sono presenti 22 migrazioni ordinate in `apps/api/prisma/migrations`.
 
 Ultime migrazioni rilevanti:
 
@@ -302,6 +310,10 @@ Ultime migrazioni rilevanti:
 20260429110000_athlete_signup_ai_prompt_onboarding
 20260429123000_ai_prompt_uniqueness
 20260429142000_area_generation_config
+20260503110000_goal_driven_ai_flow
+20260504103000_auth_identity_google_oidc
+20260504112000_required_privacy_ai_consents
+20260505154000_consent_documents
 ```
 
 Aggiunge:
@@ -313,6 +325,9 @@ Aggiunge:
 - prompt AI configurabili per area/livello.
 - vincoli su nomi prompt e unico prompt attivo per area/livello;
 - configurazione AI per area di contesto iniziale, forma risposta e layout JSON questionari.
+- obiettivo atleta guidato da AI e prompt area personalizzati;
+- identity provider Google OIDC;
+- consensi privacy/AI obbligatori e versionati.
 
 Comandi corretti:
 
@@ -361,11 +376,11 @@ Punti solidi:
 - Privacy base rispettata: password non esposte nei select principali.
 - Admin ha controllo su utenti, coach, prompt e anamnesi.
 - Provider esterni subordinati a consenso AI.
+- Consensi bloccanti lato API quando versione/hash non sono aggiornati.
 
 Rischi e miglioramenti prossimi:
 
 - I DTO non usano ancora `class-validator`; le validazioni principali sono nei service.
-- Manca una UI per revocare consenso AI dopo registrazione.
-- Mancano test e2e specifici per registrazione atleta sospeso, consenso AI in registrazione, chiusura automatica questionario e pagina `/admin/ai-config`.
+- Manca una UI per revocare consensi non necessari dopo registrazione.
+- Mancano test e2e specifici per registrazione atleta sospeso, consensi versionati, registrazione Google, chiusura automatica questionario e pagine admin.
 - La gestione versioni prompt incrementa `version` sul record esistente; non mantiene uno storico immutabile per ogni modifica.
-- Il repository locale non risulta inizializzato come git in questa workspace, quindi non esiste tracciamento diff/commit locale.

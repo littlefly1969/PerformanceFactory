@@ -1,6 +1,6 @@
 # PerformanceFactory - Comandi Operativi
 
-Aggiornato al 29 aprile 2026.
+Aggiornato al 6 maggio 2026.
 
 ## Stato Server Attuale
 
@@ -10,7 +10,7 @@ In questa sessione i server locali sono stati fermati su richiesta. Ultimo stato
 - API NestJS: `http://127.0.0.1:4000/api`
 - Health API verificato: `GET http://127.0.0.1:4000/api/health` restituisce `{"status":"ok"}`
 - Database configurato da `apps/api/.env`; nell'ambiente corrente punta a Neon.
-- Ultima migrazione creata: `20260429142000_area_generation_config`
+- Ultima migrazione creata: `20260505154000_consent_documents`
 - Seed aggiornato: utenti demo, 6 aree, competenze coach, template anamnesi, prompt AI iniziali e configurazioni AI per area.
 
 Account seed principali:
@@ -120,8 +120,17 @@ Registrazione atleta:
 1. Apri `http://127.0.0.1:3000/login`.
 2. Usa "Nuovo utente".
 3. Compila nome, cognome, email, password.
-4. Lascia attivo il consenso AI se l'atleta consente generazioni con provider esterni.
-5. L'account nasce sospeso.
+4. Leggi i documenti privacy e AI completi caricati dalla piattaforma.
+5. Accetta separatamente privacy e utilizzo dell'assistente AI.
+6. L'account nasce sospeso.
+
+Registrazione atleta con Google:
+
+1. Apri `http://127.0.0.1:3000/register`.
+2. Usa `Registrati con Google`.
+3. Google verifica identita' ed email.
+4. La piattaforma mostra `/register/google/consents`.
+5. Accetta privacy e AI; solo dopo viene creato l'account atleta sospeso.
 
 Abilitazione admin:
 
@@ -147,6 +156,15 @@ Configurazione AI:
 5. Modifica domande di anamnesi generali o per area.
 6. Le successive preview/generazioni AI includono anamnesi generale, anamnesi della sola area target, livello area, performance sintetica e storico utile della stessa area.
 7. Gli ID tecnici non vengono passati al modello; restano solo nelle relazioni/audit del database.
+
+Configurazione documenti privacy e AI:
+
+1. Login admin.
+2. Vai in `/admin/consents`.
+3. Usa i documenti attivi come base.
+4. Inserisci una nuova `version`, per esempio `privacy-v2-2026-05-06`.
+5. Pubblica la nuova versione.
+6. Il server calcola l'hash del documento e rende bloccante la nuova accettazione per gli utenti che non hanno ancora accettato quella versione/hash.
 
 Generazione ciclo:
 
@@ -190,6 +208,13 @@ GEMINI_MODEL_PROPOSAL
 GEMINI_API_KEY
 AI_DEBUG_PROMPT_LOG=false
 SWAGGER_ENABLED=true
+GOOGLE_OIDC_CLIENT_ID
+GOOGLE_OIDC_CLIENT_SECRET
+GOOGLE_OIDC_REDIRECT_URI
+GOOGLE_OIDC_HOSTED_DOMAIN
+GOOGLE_OIDC_AUTO_LINK_VERIFIED_EMAIL=false
+WEB_LOGIN_SUCCESS_URL
+WEB_LOGIN_FAILURE_URL
 ```
 
 Web (`apps/web/.env.example`):
@@ -200,7 +225,36 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:4000/api
 
 ## Produzione Docker
 
-Sincronizzazione codice verso il server:
+### Deploy con Git sul server
+
+Il metodo consigliato e' usare una working copy Git in `/opt/performancefactory`.
+Prima di fare pull verifica sempre lo stato:
+
+```bash
+cd /opt/performancefactory
+
+git status --short --branch
+git remote -v
+git branch
+```
+
+Aggiornamento codice dal branch di lavoro:
+
+```bash
+cd /opt/performancefactory
+
+git fetch origin
+git switch feature-goal-driven-ai-flow
+git pull --ff-only origin feature-goal-driven-ai-flow
+git log -1 --oneline
+```
+
+`--ff-only` evita merge automatici sul server. Se fallisce, fermati e verifica
+le modifiche locali con `git status` e `git diff`.
+
+### Deploy con rsync
+
+In alternativa, sincronizzazione codice verso il server:
 
 ```bash
 rsync -az --delete \
@@ -213,7 +267,12 @@ rsync -az --delete \
   ./ stefano@192.168.1.105:/opt/performancefactory/
 ```
 
-Questo comando e' adatto al deploy del sorgente: esclude dipendenze installate, output di build e file ambiente locali. Dopo la sincronizzazione, build, migrazioni e variabili ambiente vanno gestite sul server.
+Questo comando e' adatto al deploy del sorgente quando non si usa Git sul
+server: esclude dipendenze installate, output di build e file ambiente locali.
+Dopo la sincronizzazione, build, migrazioni e variabili ambiente vanno gestite
+sul server. Non e' perfettamente equivalente a `git pull`: `rsync --delete`
+cancella file non presenti nella sorgente locale, mentre Git aggiorna solo file
+tracciati.
 
 Rigenerazione completa dei container Docker sul server:
 
@@ -237,11 +296,22 @@ SESSION_SECRET=metti-una-stringa-lunga-random
 ACCESS_TOKEN_SECRET=metti-una-seconda-stringa-lunga-random
 REDIS_URL=redis://redis:6379
 AI_PROVIDER=stub
+AI_MODEL_PROPOSAL=gpt-5.4-mini
+GEMINI_MODEL_PROPOSAL=gemini-2.5-flash
+GEMINI_API_KEY=
+OPENAI_API_KEY=
 SESSION_COOKIE_SECURE=true
 SESSION_COOKIE_SAME_SITE=lax
 SWAGGER_ENABLED=false
 API_HOST_PORT=4100
 WEB_HOST_PORT=3100
+GOOGLE_OIDC_CLIENT_ID=
+GOOGLE_OIDC_CLIENT_SECRET=
+GOOGLE_OIDC_REDIRECT_URI=https://performancefactory.littlefly.it/api/auth/google/callback
+GOOGLE_OIDC_HOSTED_DOMAIN=
+GOOGLE_OIDC_AUTO_LINK_VERIFIED_EMAIL=false
+WEB_LOGIN_SUCCESS_URL=https://performancefactory.littlefly.it/
+WEB_LOGIN_FAILURE_URL=https://performancefactory.littlefly.it/login
 ```
 
 Controlla che Compose legga davvero le variabili:
@@ -249,7 +319,7 @@ Controlla che Compose legga davvero le variabili:
 ```bash
 cd /opt/performancefactory
 docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml config >/tmp/pf-compose.yml
-grep -E "DATABASE_URL|WEB_ORIGIN|NEXT_PUBLIC_API_BASE_URL|REDIS_URL" /tmp/pf-compose.yml
+grep -E "DATABASE_URL|WEB_ORIGIN|NEXT_PUBLIC_API_BASE_URL|REDIS_URL|GOOGLE_OIDC|WEB_LOGIN" /tmp/pf-compose.yml
 ```
 
 Se vedi valori vuoti, fermati e correggi `.env.production`.
@@ -259,6 +329,8 @@ cd /opt/performancefactory
 
 docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml down
 docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml build --no-cache api web
+docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml run --rm api \
+  ./node_modules/.bin/prisma migrate deploy
 docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml up -d
 docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml ps
 ```
@@ -301,6 +373,10 @@ docker compose --env-file .env.production -f infra/docker-compose.prod.example.y
 ```
 
 Nota prompt AI: la migrazione `20260429123000_ai_prompt_uniqueness` normalizza eventuali duplicati preesistenti, poi applica i vincoli per impedire nomi prompt duplicati e piu' prompt attivi sulla stessa coppia area/livello. La migrazione `20260429142000_area_generation_config` aggiunge una configurazione unica per area con contesto iniziale, forma risposta e layout JSON questionari.
+Nota consensi: la migrazione `20260505154000_consent_documents` aggiunge i
+documenti consenso versionati e lo snapshot del testo accettato. Dopo questa
+migrazione la pagina admin `/admin/consents` puo' pubblicare nuove versioni
+privacy/AI; ogni nuova versione/hash richiede nuova accettazione bloccante.
 
 Seed solo quando serve:
 
@@ -337,4 +413,26 @@ Health check post deploy:
 ```bash
 curl -sS http://127.0.0.1:${API_HOST_PORT:-4000}/api/health
 curl -I http://127.0.0.1:${WEB_HOST_PORT:-3000}/login
+```
+
+Verifica Google OIDC post deploy:
+
+```bash
+docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml exec api printenv | grep -E "GOOGLE_OIDC|WEB_LOGIN"
+
+curl -sS -D - -o /dev/null "https://performancefactory.littlefly.it/api/auth/google/register"
+```
+
+Il redirect deve contenere `prompt=select_account` e `set-cookie: pf.sid=...`.
+Il flusso corretto di registrazione Google termina su
+`/register/google/consents`.
+
+Restart rapido senza rebuild, utile solo dopo cambio `.env.production` gia'
+supportato dall'immagine corrente:
+
+```bash
+cd /opt/performancefactory
+docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml up -d --force-recreate api web
+docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml logs --tail=120 api
+docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml logs --tail=120 web
 ```

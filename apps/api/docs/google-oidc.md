@@ -26,6 +26,8 @@ Backend endpoints:
 GET /api/auth/google/login
 GET /api/auth/google/register
 GET /api/auth/google/callback
+GET /api/auth/google/register/pending
+POST /api/auth/google/register/complete
 ```
 
 Security notes:
@@ -37,4 +39,26 @@ Security notes:
 - A separate `AuthIdentity` record stores provider, subject and verified email.
 - Existing emails are not auto-linked. If the email already exists in the
   system with another authentication method, registration is blocked.
-- New Google registrations create inactive athlete accounts, preserving admin activation.
+- Login and registration are intentionally separate. `login` works only for an
+  already registered Google identity.
+- New Google registrations first store a verified pending Google identity in
+  the server session, then redirect to `/register/google/consents`.
+- The inactive athlete account and `AuthIdentity` are created only after the
+  user accepts the current privacy and AI consent documents.
+- New Google registrations create inactive athlete accounts, preserving admin
+  activation.
+
+Production public redirect URI:
+
+```text
+https://performancefactory.littlefly.it/api/auth/google/callback
+```
+
+Production smoke test:
+
+```bash
+curl -sS -D - -o /dev/null "https://performancefactory.littlefly.it/api/auth/google/register"
+```
+
+The response must include a Google `location` with `prompt=select_account` and
+a `set-cookie: pf.sid=...` session cookie.
