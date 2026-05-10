@@ -158,10 +158,15 @@ a {
   display: block;
   cursor: pointer;
   list-style: none;
+  list-style-type: none;
 }
 
 .pf-nav-dropdown summary::-webkit-details-marker {
   display: none;
+}
+
+.pf-nav-dropdown summary::marker {
+  content: "";
 }
 
 .pf-nav-menu {

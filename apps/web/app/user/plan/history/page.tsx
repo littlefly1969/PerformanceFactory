@@ -33,6 +33,7 @@ export default function UserPlanHistoryPage() {
   const [areas, setAree] = useState<Area[]>([]);
   const [areaId, setAreaId] = useState("");
   const [history, setHistory] = useState<Piano[]>([]);
+  const [historyCounts, setHistoryCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [authHint, setAuthHint] = useState<string | null>(null);
 
@@ -69,6 +70,19 @@ export default function UserPlanHistoryPage() {
 
     const loadedAree = (await response.json()) as Area[];
     setAree(loadedAree);
+    const countEntries = await Promise.all(
+      loadedAree.map(async (area) => {
+        const historyResponse = await secureFetch(
+          `${API_BASE}/user/plan/history?areaId=${encodeURIComponent(area.id)}`,
+          { credentials: "include" },
+        );
+        const areaHistory = historyResponse.ok
+          ? ((await historyResponse.json()) as Piano[])
+          : [];
+        return [area.id, areaHistory.length] as const;
+      }),
+    );
+    setHistoryCounts(Object.fromEntries(countEntries));
     const requestedAreaId =
       typeof window === "undefined"
         ? ""
@@ -120,16 +134,20 @@ export default function UserPlanHistoryPage() {
           {areas.map((area) => (
             <button
               key={area.id}
-              className={`pf-area-card ${area.id === areaId ? "selected" : ""}`}
+              className={`pf-area-card ${area.id === areaId ? "selected" : ""} ${historyCounts[area.id] ? "attention" : ""}`}
               type="button"
               onClick={() => loadHistory(area.id)}
             >
               <span>
                 <strong>{area.name}</strong>
-                <small>Storico allenamenti</small>
+                <small>
+                  {historyCounts[area.id]
+                    ? `${historyCounts[area.id]} ${historyCounts[area.id] === 1 ? "storico disponibile" : "storici disponibili"}`
+                    : "Nessuno storico"}
+                </small>
               </span>
-              <StatusBadge tone={area.id === areaId ? "accent" : "neutral"}>
-                Apri
+              <StatusBadge tone={historyCounts[area.id] ? "accent" : "neutral"}>
+                {historyCounts[area.id] ? "Disponibile" : "Vuoto"}
               </StatusBadge>
             </button>
           ))}

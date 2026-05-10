@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE, clearAccessToken, secureFetch } from "@/app/lib/api";
 
 type NavItem = {
@@ -120,6 +120,8 @@ export function ProductShell({
   const [me, setMe] = useState<CurrentUser | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [openNavHref, setOpenNavHref] = useState<string | null>(null);
+  const navRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -178,6 +180,30 @@ export function ProductShell({
     return roleNav[me?.role ?? ""] ?? [];
   }, [me?.role, nav, pathname]);
 
+  useEffect(() => {
+    setOpenNavHref(null);
+  }, [pathname]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!navRef.current?.contains(event.target as Node)) {
+        setOpenNavHref(null);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpenNavHref(null);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
   const logout = async () => {
     setLoggingOut(true);
     await secureFetch(`${API_BASE}/auth/logout`, {
@@ -203,31 +229,43 @@ export function ProductShell({
         </Link>
         <div className="pf-topbar-right">
           {resolvedNav.length > 0 && (
-            <nav className="pf-nav" aria-label="Navigazione ambiente">
+            <nav ref={navRef} className="pf-nav" aria-label="Navigazione ambiente">
               {resolvedNav.map((item) =>
                 item.children?.length ? (
                   <details
                     key={item.href}
                     className={`pf-nav-dropdown ${isNavActive(pathname, item.href) ? "active" : ""}`}
+                    open={openNavHref === item.href}
+                    onToggle={(event) => {
+                      if (event.currentTarget.open) {
+                        setOpenNavHref(item.href);
+                      } else if (openNavHref === item.href) {
+                        setOpenNavHref(null);
+                      }
+                    }}
                   >
                     <summary>{item.label}</summary>
-                    <div className="pf-nav-menu">
+                    {openNavHref === item.href && (
+                      <div className="pf-nav-menu">
                       {item.children.map((child) => (
                         <Link
                           key={child.href}
                           className={pathname === child.href ? "active" : ""}
                           href={child.href}
+                          onClick={() => setOpenNavHref(null)}
                         >
                           {child.label}
                         </Link>
                       ))}
-                    </div>
+                      </div>
+                    )}
                   </details>
                 ) : (
                   <Link
                     key={item.href}
                     className={isNavActive(pathname, item.href) ? "active" : ""}
                     href={item.href}
+                    onClick={() => setOpenNavHref(null)}
                   >
                     {item.label}
                   </Link>
