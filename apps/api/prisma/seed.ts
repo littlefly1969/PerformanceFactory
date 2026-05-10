@@ -34,7 +34,7 @@ const defaultGoalPrompt = [
   'Sei l AI guida di Performance Factory, una piattaforma orientata al miglioramento della performance sportiva personale.',
   'Performance Factory non promuove il confronto tossico con gli altri, ma il miglioramento progressivo dell utente rispetto al proprio punto di partenza.',
   'Analizza l obiettivo iniziale dichiarato dall utente, valutane qualita, sicurezza, pertinenza, liceita e chiarezza, poi decidi se il sistema puo procedere alla costruzione di un percorso personalizzato.',
-  'Le sei aree ufficiali sono: Preparazione atletica, Equipaggiamento, Mental training, Nutrizione, Fisioterapia, Tecnico-tattica.',
+  'Le sei aree ufficiali sono: Preparazione atletica, Equipaggiamento, Allenamento mentale, Nutrizione, Fisioterapia, Tecnico-tattica.',
   'Classifica sempre con uno solo di questi status: OK, NEEDS_ANAMNESIS, GOAL_NEEDS_REFORMULATION, OUT_OF_SCOPE, UNSAFE.',
   'Usa OK solo se l obiettivo e sportivo o legato alla performance, chiaro, sicuro, orientato al miglioramento personale e i dati disponibili bastano per generare i prompt delle sei aree.',
   'Usa NEEDS_ANAMNESIS se l obiettivo e valido ma mancano dati personali indispensabili per costruire il percorso.',
@@ -83,12 +83,12 @@ async function main() {
   });
 
   const areas = [
-    'Technical-Tactical',
-    'Athletic Preparation',
-    'Equipment',
-    'Physiotherapy',
-    'Nutrition',
-    'Mental Training',
+    'Tecnico-tattica',
+    'Preparazione atletica',
+    'Equipaggiamento',
+    'Fisioterapia',
+    'Nutrizione',
+    'Allenamento mentale',
   ];
 
   for (const name of areas) {
@@ -100,12 +100,12 @@ async function main() {
   }
 
   const professionalEmailsByArea: Record<string, string> = {
-    'Athletic Preparation': 'prof_AP@example.it',
-    Equipment: 'prof_EQ@example.it',
-    'Mental Training': 'prof_MT@example.it',
-    Nutrition: 'prof_NU@example.it',
-    Physiotherapy: 'prof_PT@example.it',
-    'Technical-Tactical': 'prof_TT@example.it',
+    'Preparazione atletica': 'prof_AP@example.it',
+    Equipaggiamento: 'prof_EQ@example.it',
+    'Allenamento mentale': 'prof_MT@example.it',
+    Nutrizione: 'prof_NU@example.it',
+    Fisioterapia: 'prof_PT@example.it',
+    'Tecnico-tattica': 'prof_TT@example.it',
   };
 
   for (const email of Object.values(professionalEmailsByArea)) {
@@ -278,27 +278,27 @@ async function main() {
   }
 
   const areaQuestionText: Record<string, string[]> = {
-    'Technical-Tactical': [
+    'Tecnico-tattica': [
       'Quanto e costante la tua esecuzione tecnico-tattica sotto pressione di gara?',
       'Quanto riesci a scegliere la soluzione corretta quando ritmo e avversario cambiano?',
     ],
-    'Athletic Preparation': [
+    'Preparazione atletica': [
       'Quanto ti senti pronto fisicamente su resistenza, forza e recupero?',
       'Quanto mantieni qualita tecnica nelle fasi finali di allenamento o gara?',
     ],
-    Equipment: [
+    Equipaggiamento: [
       'Quanto il tuo setup di attrezzatura supporta gli obiettivi di performance attuali?',
       'Quanto sei sicuro che materiali, calzature e regolazioni siano adeguati al carico attuale?',
     ],
-    Physiotherapy: [
+    Fisioterapia: [
       'Quanto e stabile la tua condizione fisica rispetto a dolore, prevenzione e mobilita?',
       'Quanto rispetti routine di prevenzione, recupero e segnalazione dei fastidi?',
     ],
-    Nutrition: [
+    Nutrizione: [
       'Quanto alimentazione e idratazione sono allineate alle richieste di allenamento e gara?',
       'Quanto pianifichi pasti, snack e liquidi intorno agli impegni sportivi?',
     ],
-    'Mental Training': [
+    'Allenamento mentale': [
       'Quanto sono solidi focus, controllo emotivo e fiducia durante la performance?',
       'Quanto sai recuperare concentrazione dopo un errore o un momento difficile?',
     ],

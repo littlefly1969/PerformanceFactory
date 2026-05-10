@@ -253,8 +253,8 @@ export default function AdminCyclesPage() {
     if (!response.ok) {
       setMessage(
         response.status === 403
-          ? "Accesso admin richiesto."
-          : `Caricamento dashboard non riuscito: ${await readError(response)}`,
+          ? "Accesso amministratore richiesto."
+          : `Caricamento cruscotto non riuscito: ${await readError(response)}`,
       );
       setLoading(false);
       return;
@@ -503,7 +503,7 @@ export default function AdminCyclesPage() {
 
   return (
     <ProductShell
-      eyebrow="Ambiente admin"
+      eyebrow="Ambiente amministratore"
       title="Cruscotto operativo"
       description="Assegna un professionista per area atleta, genera cicli AI quando gli atleti sono pronti, traccia le approvazioni e pubblica senza copiare ID."
       actions={
@@ -556,7 +556,7 @@ export default function AdminCyclesPage() {
             <h2>Nuove richieste atleta</h2>
             <p className="pf-muted">
               Gli atleti creati dall'accesso pubblico devono essere abilitati
-              dall'admin prima di accedere e completare l'onboarding.
+              dall'amministratore prima di accedere e completare l'onboarding.
             </p>
           </div>
           <StatusBadge tone={pendingActivation.length ? "danger" : "success"}>
@@ -673,7 +673,7 @@ export default function AdminCyclesPage() {
               <h2>Pronti da pubblicare</h2>
               <p className="pf-muted">
                 I controlli dei professionisti sono completati. La pubblicazione
-                admin attiva il ciclo.
+                dell'amministratore attiva il ciclo.
               </p>
             </div>
           </div>
@@ -716,7 +716,7 @@ export default function AdminCyclesPage() {
             <div>
               <h2>Carico approvazioni</h2>
               <p className="pf-muted">
-                Chi deve agire prima che l'admin possa pubblicare.
+                Chi deve agire prima che l'amministratore possa pubblicare.
               </p>
             </div>
           </div>

@@ -38,13 +38,13 @@ const demoAccounts = [
   },
   {
     group: "Professionisti",
-    label: "Attrezzatura",
+    label: "Equipaggiamento",
     email: "prof_EQ@example.it",
     password: "password123",
   },
   {
     group: "Professionisti",
-    label: "Psicologia",
+    label: "Fisioterapia",
     email: "prof_PT@example.it",
     password: "password123",
   },
@@ -56,7 +56,7 @@ const demoAccounts = [
   },
   {
     group: "Professionisti",
-    label: "Mental training",
+    label: "Allenamento mentale",
     email: "prof_MT@example.it",
     password: "password123",
   },
@@ -64,7 +64,7 @@ const demoAccounts = [
 
 const demoAccessAccounts = [
   {
-    label: "Admin demo",
+    label: "Amministratore demo",
     account: demoAccounts.find(
       (account) => account.email === "admin@example.com",
     )!,
@@ -80,12 +80,12 @@ const demoAccessAccounts = [
 const coachDemoAccounts = demoAccounts
   .filter((account) => account.group === "Professionisti")
   .map((account) => ({
-    label: `${account.label} coach`,
+    label: `${account.label} professionista`,
     account,
   }));
 
 const pendingAdminActivationMessage =
-  "L'admin sta valutando la tua richiesta e ti accettera.";
+  "L'amministratore sta valutando la tua richiesta e ti accettera.";
 const rejectedApplicationMessage =
   "Candidatura rifiutata. Puoi riproporre una nuova richiesta di registrazione.";
 
@@ -156,7 +156,7 @@ export default function LoginPage() {
       let errorMessage = "Credenziali non valide oppure API non raggiungibile.";
       try {
         const data = (await response.json()) as { message?: string };
-        if (data.message === "Account in attesa di attivazione admin") {
+        if (data.message === "Account in attesa di attivazione amministratore") {
           errorMessage = pendingAdminActivationMessage;
         } else if (
           data.message ===
@@ -319,7 +319,7 @@ export default function LoginPage() {
                 </div>
               </div>
               <div className="pf-demo-group">
-                <span>Coach aree</span>
+                <span>Professionisti area</span>
                 <div className="pf-demo-actions coach">
                   {coachDemoAccounts.map(({ label, account }) => (
                     <button

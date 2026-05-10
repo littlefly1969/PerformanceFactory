@@ -47,7 +47,7 @@ export class AuthService {
           'Candidatura rifiutata. Puoi riproporre una nuova richiesta di registrazione.',
         );
       }
-      throw new UnauthorizedException('Account in attesa di attivazione admin');
+      throw new UnauthorizedException('Account in attesa di attivazione amministratore');
     }
 
     const ok = await bcrypt.compare(password, user.password);

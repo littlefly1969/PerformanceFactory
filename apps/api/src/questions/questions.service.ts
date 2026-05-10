@@ -307,7 +307,7 @@ export class QuestionsService {
       await this.orchestrator.rejectCycleProposal(
         questionSet.planReleaseId,
         actor.id,
-        notes ?? 'Questionnaire rejected',
+        notes ?? 'Questionario rifiutato',
       );
     }
 
@@ -374,7 +374,7 @@ export class QuestionsService {
       await this.orchestrator.rejectCycleProposal(
         questionSet.planReleaseId,
         actor.id,
-        notes ?? 'Questionnaire rejected',
+        notes ?? 'Questionario rifiutato',
       );
     }
 

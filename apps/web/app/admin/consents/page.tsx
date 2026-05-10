@@ -94,7 +94,7 @@ export default function AdminConsentsPage() {
 
   return (
     <ProductShell
-      eyebrow="Admin privacy"
+      eyebrow="Amministrazione privacy"
       title="Documenti consenso"
       description="Gestisci versioni, testo completo e hash dei documenti obbligatori per privacy e assistente AI."
       actions={

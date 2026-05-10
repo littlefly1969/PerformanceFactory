@@ -21,6 +21,9 @@ type StarterQuestion = {
 type StarterQuestionario = {
   required: boolean;
   status: string;
+  sportSelection?: SportSelection | null;
+  sportOptions?: SportOption[];
+  fitnessLocationOptions?: SportOption[];
   goalText?: string;
   interpretedGoal?: string | null;
   suggestedReformulatedGoal?: string | null;
@@ -28,6 +31,7 @@ type StarterQuestionario = {
   nextStep?: string | null;
   validationStatus?: string;
   validationMessage?: string | null;
+  goalFrozenAt?: string | null;
   title: string;
   description: string;
   options: StarterOption[];
@@ -37,10 +41,18 @@ type StarterQuestionario = {
 type SubmitResult = {
   status: string;
   goalValidation?: {
+    status?: GoalValidation["status"];
     interpretedGoal: string;
     userMessage: string;
   };
   areas: Array<{ areaId: string; areaName: string; realR: number; potentialP: number }>;
+};
+type GoalRiskResponse = {
+  code?: string;
+  message?: string;
+  goalValidation?: Partial<GoalValidation> & {
+    userMessage?: string;
+  };
 };
 type GoalValidation = {
   status: "OK" | "NEEDS_ANAMNESIS" | "GOAL_NEEDS_REFORMULATION" | "OUT_OF_SCOPE" | "UNSAFE";
@@ -53,6 +65,12 @@ type GoalValidation = {
   nextStep?: string | null;
   rejectionReason?: string | null;
 };
+type SportOption = { key: string; label: string };
+type SportSelection = {
+  sports: string[];
+  fitnessLocation: string | null;
+  label?: string;
+};
 type GoalChatMessage = {
   role: "assistant" | "user";
   content: string;
@@ -62,10 +80,14 @@ type GoalRefinement = GoalValidation & {
   refinedGoalText: string;
 };
 type MessageTone = "success" | "warning";
+type FlowStep = "ANAMNESIS" | "GOAL";
 
 export default function OnboardingPage() {
   const [questionnaire, setQuestionario] = useState<StarterQuestionario | null>(null);
   const [goalText, setGoalText] = useState("");
+  const [selectedSports, setSelectedSports] = useState<string[]>([]);
+  const [fitnessLocation, setFitnessLocation] = useState("");
+  const [sportSelectionSaved, setSportSelectionSaved] = useState(false);
   const [goalValidation, setGoalValidation] =
     useState<GoalValidation | null>(null);
   const [answers, setAnswers] = useState<Record<string, string | number>>({});
@@ -83,6 +105,12 @@ export default function OnboardingPage() {
   const [refinedGoalDraft, setRefinedGoalDraft] = useState("");
   const [refiningGoal, setRefiningGoal] = useState(false);
   const [goalAssistantClosed, setGoalAssistantClosed] = useState(false);
+  const [flowStep, setFlowStep] = useState<FlowStep>("ANAMNESIS");
+  const [goalRiskModalOpen, setGoalRiskModalOpen] = useState(false);
+  const [pendingGoalRisk, setPendingGoalRisk] = useState<GoalRiskResponse | null>(null);
+  const [goalRiskAcknowledged, setGoalRiskAcknowledged] = useState(false);
+  const [finalGoalValidated, setFinalGoalValidated] = useState(false);
+  const [validatingFinalGoal, setValidatingFinalGoal] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
   const redirectTimeout = useRef<number | null>(null);
 
@@ -112,16 +140,36 @@ export default function OnboardingPage() {
     [questionnaire?.questions],
   );
   const specialistQuestionsGenerated = specialistQuestions.length > 0;
-  const generalComplete =
-    goalIsValidated &&
+  const visibleQuestions =
+    flowStep === "ANAMNESIS" ? generalQuestions : specialistQuestions;
+  const goalReady = sportSelectionSaved && goalText.trim().length >= 10;
+  const goalConfirmed = goalReady && goalAssistantClosed;
+  const sportOptions = questionnaire?.sportOptions ?? [
+    { key: "CYCLING", label: "Ciclismo" },
+    { key: "RUNNING", label: "Corsa" },
+    { key: "TENNIS", label: "Tennis" },
+    { key: "PADEL", label: "Padel" },
+    { key: "FITNESS", label: "Fitness" },
+  ];
+  const fitnessLocationOptions = questionnaire?.fitnessLocationOptions ?? [
+    { key: "HOME", label: "In casa" },
+    { key: "GYM", label: "In palestra" },
+    { key: "MIXED", label: "Misto" },
+  ];
+  const sportSelectionValid =
+    selectedSports.length > 0 &&
+    selectedSports.length <= 2 &&
+    (!selectedSports.includes("FITNESS") || Boolean(fitnessLocation));
+  const generalAnswersComplete =
     generalQuestions.length > 0 &&
     generalQuestions.every(
       (question) =>
         !question.required ||
         (answers[question.id] !== undefined && answers[question.id] !== ""),
     );
+  const generalComplete = sportSelectionSaved && generalAnswersComplete;
   const completed = questionnaire
-    ? goalIsValidated &&
+    ? goalConfirmed &&
       specialistQuestionsGenerated &&
       questionnaire.questions.every(
         (question) =>
@@ -129,6 +177,14 @@ export default function OnboardingPage() {
           (answers[question.id] !== undefined && answers[question.id] !== ""),
       )
     : false;
+  const canCreatePerformance = completed && finalGoalValidated;
+  const specialistScoreOptions: StarterOption[] = [
+    { value: 1, label: "1" },
+    { value: 2, label: "2" },
+    { value: 3, label: "3" },
+    { value: 4, label: "4" },
+    { value: 5, label: "5" },
+  ];
 
   const loadQuestionario = async () => {
     setLoading(true);
@@ -143,6 +199,16 @@ export default function OnboardingPage() {
     const data = (await response.json()) as StarterQuestionario;
     setQuestionario(data);
     setGoalText(data.goalText ?? "");
+    setSelectedSports(data.sportSelection?.sports ?? []);
+    setFitnessLocation(data.sportSelection?.fitnessLocation ?? "");
+    setSportSelectionSaved(Boolean(data.sportSelection?.sports?.length));
+    setGoalAssistantClosed(Boolean(data.goalText));
+    setFinalGoalValidated(Boolean(data.goalFrozenAt));
+    setFlowStep(
+      data.goalText || data.questions.some((question) => question.scope === "AREA")
+        ? "GOAL"
+        : "ANAMNESIS",
+    );
     if (
       (data.validationStatus === "OK" || data.validationStatus === "NEEDS_ANAMNESIS") &&
       data.interpretedGoal
@@ -229,7 +295,154 @@ export default function OnboardingPage() {
     setGoalModalOpen(true);
   };
 
-  const validateGoal = async () => {
+  const openGoalRevisionFromRisk = () => {
+    const riskValidation = pendingGoalRisk?.goalValidation;
+    const userMessage =
+      riskValidation?.userMessage ??
+      pendingGoalRisk?.message ??
+      "L'obiettivo non risulta realistico rispetto alle risposte attuali.";
+    setGoalValidation({
+      status: "GOAL_NEEDS_REFORMULATION",
+      accepted: false,
+      canProceedToAnamnesis: false,
+      interpretedGoal: riskValidation?.interpretedGoal ?? goalText,
+      userMessage,
+      suggestedReformulatedGoal:
+        riskValidation?.suggestedReformulatedGoal ?? null,
+      questionsToUser: riskValidation?.questionsToUser ?? [
+        "Vuoi ridurre il risultato atteso, modificare i tempi o trasformarlo in un obiettivo intermedio?",
+      ],
+      nextStep: riskValidation?.nextStep ?? null,
+      rejectionReason: riskValidation?.rejectionReason ?? null,
+    });
+    setRefinedGoalDraft(
+      riskValidation?.suggestedReformulatedGoal?.trim() || goalText,
+    );
+    setGoalChatMessages([
+      {
+        role: "assistant",
+        content: [
+          userMessage,
+          "Possiamo riformulare l'obiettivo mantenendo l'idea di allenarti al massimo, ma rendendolo piu coerente con i dati attuali.",
+          riskValidation?.questionsToUser?.length
+            ? riskValidation.questionsToUser.join("\n")
+            : "Dimmi cosa vuoi modificare: risultato atteso, tempi, frequenza o livello di partenza.",
+        ]
+          .filter(Boolean)
+          .join("\n\n"),
+      },
+    ]);
+    setGoalChatInput("");
+    setGoalRiskAcknowledged(false);
+    setFinalGoalValidated(false);
+    setPendingGoalRisk(null);
+    setGoalRiskModalOpen(false);
+    setGoalAssistantClosed(false);
+    setGoalModalOpen(true);
+  };
+
+  const confirmSuggestedGoalFromRisk = async () => {
+    const suggestedGoal =
+      pendingGoalRisk?.goalValidation?.suggestedReformulatedGoal?.trim();
+    if (!suggestedGoal) {
+      return;
+    }
+    setGoalText(suggestedGoal);
+    setGoalRiskModalOpen(false);
+    setPendingGoalRisk(null);
+    setGoalRiskAcknowledged(false);
+    setGoalAssistantClosed(true);
+    await validateFinalGoal(suggestedGoal);
+  };
+
+  const toggleSport = (sportKey: string) => {
+    setSelectedSports((current) => {
+      const next = current.includes(sportKey)
+        ? current.filter((item) => item !== sportKey)
+        : current.length < 2
+          ? [...current, sportKey]
+          : current;
+      if (!next.includes("FITNESS")) {
+        setFitnessLocation("");
+      } else if (!fitnessLocation) {
+        setFitnessLocation("HOME");
+      }
+      setSportSelectionSaved(false);
+      setGoalValidation(null);
+      return next;
+    });
+  };
+
+  const saveSportSelection = async () => {
+    if (!sportSelectionValid) {
+      setMessageTone("warning");
+      setMessage("Seleziona uno o due sport. Per fitness indica casa, palestra o misto.");
+      return false;
+    }
+    setMessage(null);
+    const response = await secureFetch(`${API_BASE}/onboarding/sport-selection`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sports: selectedSports,
+        fitnessLocation: selectedSports.includes("FITNESS")
+          ? fitnessLocation
+          : null,
+      }),
+    });
+    if (!response.ok) {
+      setMessageTone("warning");
+      setMessage(await readError(response));
+      return false;
+    }
+    const saved = (await response.json()) as SportSelection;
+    setSelectedSports(saved.sports);
+    setFitnessLocation(saved.fitnessLocation ?? "");
+    setSportSelectionSaved(true);
+    setMessageTone("success");
+    setMessage("Sport salvato. Ora completa l'anamnesi.");
+    return true;
+  };
+
+  const setQuestionAnswer = (questionId: string, value: string | number) => {
+    setGoalRiskAcknowledged(false);
+    setFinalGoalValidated(false);
+    setPendingGoalRisk(null);
+    setAnswers((prev) => ({
+      ...prev,
+      [questionId]: value,
+    }));
+  };
+
+  const confirmAnamnesis = async () => {
+    if (!sportSelectionValid) {
+      setMessageTone("warning");
+      setMessage("Seleziona uno o due sport prima di confermare.");
+      return;
+    }
+    if (!sportSelectionSaved) {
+      const saved = await saveSportSelection();
+      if (!saved) {
+        return;
+      }
+    }
+    if (!generalAnswersComplete) {
+      setMessageTone("warning");
+      setMessage("Completa tutte le domande anamnestiche generali prima di continuare.");
+      return;
+    }
+    setFlowStep("GOAL");
+    setMessageTone("success");
+    setMessage("Anamnesi confermata. Ora definisci l'obiettivo.");
+  };
+
+  const confirmGoalContext = async () => {
+    if (!sportSelectionSaved) {
+      const saved = await saveSportSelection();
+      if (!saved) {
+        return;
+      }
+    }
     const trimmed = goalText.trim();
     if (trimmed.length < 10) {
       setGoalValidation({
@@ -256,31 +469,15 @@ export default function OnboardingPage() {
       });
       return;
     }
-
-    setValidatingGoal(true);
-    setMessage(null);
-    const response = await secureFetch(`${API_BASE}/onboarding/goal/validate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ goalText: trimmed }),
-    });
-    if (!response.ok) {
-      setMessageTone("warning");
-      setMessage("Validazione obiettivo non disponibile.");
-      setValidatingGoal(false);
-      return;
-    }
-    const validation = (await response.json()) as GoalValidation;
-    setGoalValidation(validation);
-    setMessageTone(validation.canProceedToAnamnesis ? "success" : "warning");
-    if (validation.canProceedToAnamnesis) {
-      setMessage(validation.userMessage);
-      openGoalConfirmation(validation, trimmed);
-    } else {
-      setMessage(null);
-      openGoalAssistant(validation);
-    }
-    setValidatingGoal(false);
+    setGoalValidation(null);
+    setGoalAssistantClosed(true);
+    setGoalRiskAcknowledged(false);
+    setFinalGoalValidated(false);
+    setPendingGoalRisk(null);
+    setMessageTone("success");
+    setMessage(
+      "Obiettivo acquisito. Ora puoi generare le domande specialistiche: la validazione AI verra fatta alla fine con tutti i dati.",
+    );
   };
 
   const refineGoal = async () => {
@@ -333,7 +530,7 @@ export default function OnboardingPage() {
     setRefiningGoal(false);
   };
 
-  const useRefinedGoal = () => {
+  const useRefinedGoal = async () => {
     const nextGoal = refinedGoalDraft.trim();
     if (!nextGoal || !goalValidation?.canProceedToAnamnesis) {
       return;
@@ -343,13 +540,16 @@ export default function OnboardingPage() {
     setGoalAssistantClosed(true);
     setMessageTone("success");
     setMessage(goalValidation.userMessage);
+    if (completed) {
+      await validateFinalGoal(nextGoal);
+    }
   };
 
   const generateSpecialistQuestions = async () => {
     if (!questionnaire || !generalComplete) {
       setMessageTone("warning");
       setMessage(
-        "Completa prima obiettivo valido e anamnesi generale per generare le domande specialistiche.",
+        "Completa prima anamnesi generale e obiettivo per generare le domande specialistiche.",
       );
       return;
     }
@@ -361,6 +561,7 @@ export default function OnboardingPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          goalText: goalText.trim(),
           answers: generalQuestions.map((question) => ({
             questionId: question.id,
             value: answers[question.id],
@@ -380,11 +581,67 @@ export default function OnboardingPage() {
     setQuestionario((current) =>
       current ? { ...current, questions: data.questions } : current,
     );
+    setFinalGoalValidated(false);
+    setGoalRiskAcknowledged(false);
+    setPendingGoalRisk(null);
     setMessageTone("success");
     setMessage(
       "Domande specialistiche generate in base all'obiettivo e salvate sulla base dati.",
     );
     setGeneratingSpecialistQuestions(false);
+  };
+
+  const validateFinalGoal = async (goalOverride?: string) => {
+    if (!questionnaire || !completed) {
+      setMessageTone("warning");
+      setMessage("Completa tutte le risposte prima di validare l'obiettivo.");
+      return;
+    }
+
+    const goalForValidation =
+      typeof goalOverride === "string" ? goalOverride : goalText;
+    setValidatingFinalGoal(true);
+    setMessage(null);
+    const response = await secureFetch(`${API_BASE}/onboarding/goal/final-validate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        goalText: goalForValidation,
+        answers: questionnaire.questions.map((question) => ({
+          questionId: question.id,
+          value: answers[question.id],
+        })),
+      }),
+    });
+
+    if (!response.ok) {
+      if (response.status === 409) {
+        const risk = (await response.json()) as GoalRiskResponse;
+        if (risk.code === "GOAL_RISK_ACK_REQUIRED") {
+          setPendingGoalRisk(risk);
+          setGoalRiskModalOpen(true);
+          setValidatingFinalGoal(false);
+          return;
+        }
+        setMessageTone("warning");
+        setMessage(risk.message ?? "Validazione obiettivo non disponibile.");
+        setValidatingFinalGoal(false);
+        return;
+      }
+      setMessageTone("warning");
+      setMessage(await readError(response));
+      setValidatingFinalGoal(false);
+      return;
+    }
+
+    const validation = (await response.json()) as GoalValidation;
+    setGoalText(goalForValidation);
+    setGoalValidation(validation);
+    setFinalGoalValidated(true);
+    setGoalRiskAcknowledged(false);
+    setMessageTone("success");
+    setMessage(validation.userMessage || "Obiettivo validato. Ora puoi creare la performance.");
+    setValidatingFinalGoal(false);
   };
 
   useEffect(() => {
@@ -438,8 +695,12 @@ export default function OnboardingPage() {
   return (
     <ProductShell
       eyebrow="Onboarding atleta"
-      title="Questionario iniziale di performance"
-      description="Completa questa baseline prima di accedere all'ambiente atleta. Crea il primo grafico spider e il profilo iniziale per area."
+      title={flowStep === "ANAMNESIS" ? "Anamnesi iniziale" : "Definizione obiettivo"}
+      description={
+        flowStep === "ANAMNESIS"
+          ? "Completa sport e dati anamnestici. L'obiettivo viene definito nello step successivo."
+          : "Definisci l'obiettivo usando i dati appena inseriti; l'AI validera il realismo alla fine."
+      }
       actions={
         result ? (
           <button className="pf-button" type="button" onClick={() => { window.location.href = "/user"; }}>
@@ -449,13 +710,25 @@ export default function OnboardingPage() {
       }
       stats={[
         { label: "Stato", value: loading ? "..." : questionnaire?.status ?? "-", tone: questionnaire?.required ? "warning" : "success" },
+        {
+          label: "Sport",
+          value: selectedSports.length ? selectedSports.length : "-",
+          tone: sportSelectionSaved ? "success" : "warning",
+        },
         { label: "Risposte", value: questionnaire ? `${Object.keys(answers).length}/${questionnaire.questions.length}` : "-", tone: "accent" },
         {
           label: "Obiettivo",
-          value: goalIsValidated ? "Obiettivo valido" : goalText.trim() ? "Da validare" : "-",
-          tone: goalIsValidated ? "success" : "warning",
+          value:
+            flowStep === "ANAMNESIS"
+              ? "Dopo anamnesi"
+              : goalConfirmed
+                ? "Pronto"
+                : goalText.trim()
+                  ? "Da confermare"
+                  : "-",
+          tone: goalConfirmed ? "success" : "warning",
         },
-      ]}
+      ]} 
     >
       {message && <div className={`pf-alert ${messageTone}`}>{message}</div>}
 
@@ -463,24 +736,101 @@ export default function OnboardingPage() {
         <article className="pf-panel">
           <div className="pf-panel-header">
             <div>
-              <h2>{questionnaire?.title ?? "Questionario"}</h2>
-              <p className="pf-muted">{questionnaire?.description ?? "Caricamento..."}</p>
+              <h2>
+                {flowStep === "ANAMNESIS"
+                  ? questionnaire?.title ?? "Questionario"
+                  : "Definizione dell'obiettivo"}
+              </h2>
+              <p className="pf-muted">
+                {flowStep === "ANAMNESIS"
+                  ? questionnaire?.description ?? "Caricamento..."
+                  : "Ora usa l'anamnesi come contesto: l'obiettivo guidera le domande specialistiche e sara validato alla fine."}
+              </p>
             </div>
             {questionnaire && <StatusBadge tone={questionnaire.required ? "warning" : "success"}>{questionnaire.status}</StatusBadge>}
           </div>
 
           <div className="pf-stack">
+            {flowStep === "ANAMNESIS" && (
+            <article className="pf-card">
+              <div className="pf-card-top">
+                <div>
+                  <h3>Sport</h3>
+                  <p className="pf-muted">
+                    Seleziona fino a due sport. Se scegli fitness indica il
+                    contesto di allenamento.
+                  </p>
+                </div>
+                {sportSelectionSaved && (
+                  <StatusBadge tone="success">Salvato</StatusBadge>
+                )}
+              </div>
+              <div className="pf-option-grid">
+                {sportOptions.map((sport) => (
+                  <button
+                    key={sport.key}
+                    type="button"
+                    className={
+                      selectedSports.includes(sport.key)
+                        ? "pf-button"
+                        : "pf-button-secondary"
+                    }
+                    disabled={
+                      !selectedSports.includes(sport.key) &&
+                      selectedSports.length >= 2
+                    }
+                    onClick={() => toggleSport(sport.key)}
+                  >
+                    {sport.label}
+                  </button>
+                ))}
+              </div>
+              {selectedSports.includes("FITNESS") && (
+                <label className="pf-field">
+                  Dove fai fitness
+                  <select
+                    className="pf-select"
+                    value={fitnessLocation}
+                    onChange={(event) => {
+                      setFitnessLocation(event.target.value);
+                      setSportSelectionSaved(false);
+                      setGoalValidation(null);
+                    }}
+                  >
+                    <option value="">Seleziona</option>
+                    {fitnessLocationOptions.map((location) => (
+                      <option key={location.key} value={location.key}>
+                        {location.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <div className="pf-actions">
+                <button
+                  className="pf-button-secondary"
+                  type="button"
+                  disabled={!sportSelectionValid}
+                  onClick={saveSportSelection}
+                >
+                  Salva sport
+                </button>
+              </div>
+            </article>
+            )}
+
+            {flowStep === "GOAL" && (
             <article className="pf-card">
               <div className="pf-card-top">
                 <div>
                   <h3>Obiettivo</h3>
                   <p className="pf-muted">
-                    Definisci l'obiettivo da cui parte l'anamnesi iniziale di
-                    performance.
+                    Definisci l'obiettivo dopo aver completato l'anamnesi
+                    generale.
                   </p>
                 </div>
-                {goalIsValidated && (
-                  <StatusBadge tone="success">Obiettivo valido</StatusBadge>
+                {goalConfirmed && (
+                  <StatusBadge tone="success">Pronto</StatusBadge>
                 )}
               </div>
               {!goalIsValidated && (
@@ -492,6 +842,9 @@ export default function OnboardingPage() {
                     setGoalText(event.target.value);
                     setGoalValidation(null);
                     setGoalAssistantClosed(false);
+                    setGoalRiskAcknowledged(false);
+                    setFinalGoalValidated(false);
+                    setPendingGoalRisk(null);
                   }}
                   placeholder="Esempio: voglio migliorare continuita, prevenire cali fisici e arrivare piu preparato alle gare."
                 />
@@ -501,14 +854,29 @@ export default function OnboardingPage() {
                   <button
                     className="pf-button-secondary"
                     type="button"
-                    disabled={validatingGoal || goalText.trim().length < 10}
-                    onClick={validateGoal}
+                    disabled={
+                      validatingGoal ||
+                      goalText.trim().length < 10 ||
+                      !sportSelectionValid
+                    }
+                    onClick={confirmGoalContext}
                   >
-                    {validatingGoal ? "Validazione..." : "Valida obiettivo"}
+                    Conferma obiettivo
                   </button>
                   {goalValidation && !goalValidation.canProceedToAnamnesis && (
                     <StatusBadge tone="warning">Non consono</StatusBadge>
                   )}
+                </div>
+              )}
+              {goalConfirmed && !goalValidation && (
+                <div className="pf-goal-validated-summary">
+                  <div>
+                    <span>Validazione finale</span>
+                    <strong>
+                      L'AI valutera realismo e coerenza dopo le risposte
+                      anamnestiche.
+                    </strong>
+                  </div>
                 </div>
               )}
               {goalValidation?.canProceedToAnamnesis && goalAssistantClosed && (
@@ -560,14 +928,15 @@ export default function OnboardingPage() {
                 </div>
               ) : null}
             </article>
-            {questionnaire?.questions.map((question) => {
+            )}
+            {visibleQuestions.map((question) => {
               const questionLocked =
                 specialistQuestionsGenerated && question.scope === "GENERAL";
               return (
               <article key={question.id} className="pf-card">
                 <div className="pf-card-top">
                   <div>
-                    <h3>{question.scope === "GENERAL" ? "Generale" : question.areaName}</h3>
+                    {question.scope === "AREA" && <h3>{question.areaName}</h3>}
                     <p className="pf-muted">{question.text}</p>
                     {question.helpText && (
                       <p className="pf-muted">{question.helpText}</p>
@@ -586,10 +955,7 @@ export default function OnboardingPage() {
                       questionLocked
                         ? undefined
                         :
-                      setAnswers((prev) => ({
-                        ...prev,
-                        [question.id]: event.target.value,
-                      }))
+                      setQuestionAnswer(question.id, event.target.value)
                     }
                     rows={3}
                   />
@@ -604,10 +970,7 @@ export default function OnboardingPage() {
                       questionLocked
                         ? undefined
                         :
-                      setAnswers((prev) => ({
-                        ...prev,
-                        [question.id]: Number(event.target.value),
-                      }))
+                      setQuestionAnswer(question.id, Number(event.target.value))
                     }
                   />
                 )}
@@ -617,10 +980,7 @@ export default function OnboardingPage() {
                     value={String(answers[question.id] ?? "")}
                     disabled={questionLocked}
                     onChange={(event) =>
-                      setAnswers((prev) => ({
-                        ...prev,
-                        [question.id]: event.target.value,
-                      }))
+                      setQuestionAnswer(question.id, event.target.value)
                     }
                   >
                     <option value="">Seleziona</option>
@@ -633,13 +993,18 @@ export default function OnboardingPage() {
                 )}
                 {question.inputType === "SCORE" && (
                   <div className="pf-option-grid">
-                    {(question.options.length ? question.options : questionnaire.options).map((option) => (
+                    {(question.scope === "AREA"
+                      ? specialistScoreOptions
+                      : question.options.length
+                        ? question.options
+                        : questionnaire?.options ?? []
+                    ).map((option) => (
                       <button
                         key={String(option.value)}
                         type="button"
                         className={answers[question.id] === option.value ? "pf-button" : "pf-button-secondary"}
                         disabled={questionLocked}
-                        onClick={() => setAnswers((prev) => ({ ...prev, [question.id]: option.value }))}
+                        onClick={() => setQuestionAnswer(question.id, option.value)}
                       >
                         {option.label}
                       </button>
@@ -652,7 +1017,8 @@ export default function OnboardingPage() {
           </div>
 
           {questionnaire &&
-            goalIsValidated &&
+            flowStep === "GOAL" &&
+            goalConfirmed &&
             !specialistQuestionsGenerated && (
               <div className="pf-submit-row">
                 <article className="pf-card pf-next-step-card">
@@ -661,8 +1027,8 @@ export default function OnboardingPage() {
                       <h3>Domande specialistiche AI</h3>
                       <p className="pf-muted">
                         Dopo l'anamnesi generale, l'AI genera tre domande per
-                        ogni area in base all'obiettivo validato e alle risposte
-                        appena date.
+                        ogni area per raccogliere dati utili a verificare anche
+                        il realismo dell'obiettivo finale.
                       </p>
                     </div>
                     <StatusBadge tone={generalComplete ? "accent" : "warning"}>
@@ -677,7 +1043,43 @@ export default function OnboardingPage() {
                   >
                     {generatingSpecialistQuestions
                       ? "Generazione..."
-                      : "Genera domande specialistiche"}
+                      : "Genera domande di realismo e area"}
+                  </button>
+                </article>
+              </div>
+            )}
+
+          {questionnaire &&
+            flowStep === "GOAL" &&
+            specialistQuestionsGenerated && (
+              <div className="pf-submit-row">
+                <article className="pf-card pf-next-step-card">
+                  <div className="pf-card-top">
+                    <div>
+                      <h3>Validazione finale obiettivo</h3>
+                      <p className="pf-muted">
+                        L'AI valuta l'obiettivo usando anamnesi e risposte
+                        specialistiche. Se non risulta realistico devi prendere
+                        visione prima della creazione finale.
+                      </p>
+                    </div>
+                    <StatusBadge tone={finalGoalValidated ? "success" : completed ? "accent" : "warning"}>
+                      {finalGoalValidated
+                        ? goalRiskAcknowledged
+                          ? "Presa visione"
+                          : "Validato"
+                        : completed
+                          ? "Pronta"
+                          : "Completa risposte"}
+                    </StatusBadge>
+                  </div>
+                  <button
+                    className="pf-button-secondary"
+                    type="button"
+                    disabled={!completed || validatingFinalGoal || finalGoalValidated}
+                    onClick={() => void validateFinalGoal()}
+                  >
+                    {validatingFinalGoal ? "Validazione..." : "Valida obiettivo"}
                   </button>
                 </article>
               </div>
@@ -687,10 +1089,25 @@ export default function OnboardingPage() {
             <button className="pf-button" type="button" onClick={() => { window.location.href = "/user"; }}>
               Continua all'ambiente
             </button>
+          ) : flowStep === "ANAMNESIS" ? (
+            <div className="pf-submit-row">
+              <button
+                className="pf-button"
+                type="button"
+                disabled={!sportSelectionValid || !generalAnswersComplete}
+                onClick={confirmAnamnesis}
+              >
+                Conferma
+              </button>
+            </div>
           ) : (
             <div className="pf-submit-row">
-              <button className="pf-button" type="button" disabled={!completed || submitting} onClick={submit}>
-                {redirecting ? "Apertura ambiente..." : submitting ? "Salvataggio..." : "Crea la performance"}
+              <button className="pf-button" type="button" disabled={!canCreatePerformance || submitting} onClick={submit}>
+                {redirecting
+                  ? "Apertura ambiente..."
+                  : submitting
+                    ? "Salvataggio..."
+                    : "Crea la performance"}
               </button>
             </div>
           )}
@@ -782,6 +1199,78 @@ export default function OnboardingPage() {
                 onClick={useRefinedGoal}
               >
                 Conferma e chiudi
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {goalRiskModalOpen && pendingGoalRisk && (
+        <div className="pf-modal-backdrop" role="dialog" aria-modal="true">
+          <section className="pf-modal pf-goal-modal">
+            <div className="pf-panel-header">
+              <div>
+                <p className="pf-eyebrow">Validazione obiettivo</p>
+                <h2>Obiettivo non realistico</h2>
+                <p className="pf-muted">
+                  L'AI ha valutato l'obiettivo rispetto alle risposte inserite.
+                </p>
+              </div>
+            </div>
+
+            <div className="pf-alert warning">
+              <strong>Valutazione AI</strong>
+              <p>
+                {pendingGoalRisk.goalValidation?.userMessage ??
+                  pendingGoalRisk.message ??
+                  "Date le risposte attuali, l'obiettivo non risulta realistico."}
+              </p>
+              <p>
+                Puoi procedere con la performance, ma l'obiettivo viene salvato
+                come irrealistico rispetto ai dati attuali.
+              </p>
+            </div>
+
+            {pendingGoalRisk.goalValidation?.suggestedReformulatedGoal && (
+              <div className="pf-goal-draft">
+                <span>Possibile riformulazione</span>
+                <strong>
+                  {pendingGoalRisk.goalValidation.suggestedReformulatedGoal}
+                </strong>
+              </div>
+            )}
+
+            <div className="pf-actions">
+              {pendingGoalRisk.goalValidation?.suggestedReformulatedGoal && (
+                <button
+                  className="pf-button"
+                  type="button"
+                  disabled={validatingFinalGoal}
+                  onClick={() => void confirmSuggestedGoalFromRisk()}
+                >
+                  Conferma obiettivo AI
+                </button>
+              )}
+              <button
+                className="pf-button-secondary"
+                type="button"
+                onClick={openGoalRevisionFromRisk}
+              >
+                Chatta con AI per modifica
+              </button>
+              <button
+                className="pf-button-secondary"
+                type="button"
+                onClick={() => {
+                  setGoalRiskAcknowledged(true);
+                  setFinalGoalValidated(true);
+                  setGoalRiskModalOpen(false);
+                  setMessageTone("warning");
+                  setMessage(
+                    "Presa visione confermata. Ora puoi creare la performance.",
+                  );
+                }}
+              >
+                Procedi comunque
               </button>
             </div>
           </section>

@@ -42,6 +42,22 @@ export class OnboardingController {
     );
   }
 
+  @Post('sport-selection')
+  @ApiOperation({ summary: 'Salva sport e contesto scelti prima dell obiettivo' })
+  saveSportSelection(
+    @Req() req: { user?: { id: string; role: UserRole } },
+    @Body()
+    body: {
+      sports?: string[];
+      fitnessLocation?: string | null;
+    },
+  ) {
+    return this.onboarding.saveSportSelection(
+      { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },
+      body,
+    );
+  }
+
   @Post('goal/refine')
   @ApiOperation({ summary: 'Raffina obiettivo performance con chat AI' })
   refineGoal(
@@ -69,6 +85,7 @@ export class OnboardingController {
     @Req() req: { user?: { id: string; role: UserRole } },
     @Body()
     body: {
+      goalText?: string;
       answers?: Array<{
         questionId: string;
         value: string | number | boolean | null;
@@ -77,6 +94,26 @@ export class OnboardingController {
   ) {
     return this.onboarding.generateSpecialistQuestions(
       { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },
+      body.goalText ?? '',
+      body.answers ?? [],
+    );
+  }
+
+  @Post('goal/final-validate')
+  @ApiOperation({
+    summary: 'Valida obiettivo finale con anamnesi e risposte specialistiche',
+  })
+  validateFinalGoal(
+    @Req() req: { user?: { id: string; role: UserRole } },
+    @Body()
+    body: {
+      goalText?: string;
+      answers?: Array<{ questionId: string; value: string | number | boolean | null }>;
+    },
+  ) {
+    return this.onboarding.validateFinalGoal(
+      { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },
+      body.goalText ?? '',
       body.answers ?? [],
     );
   }

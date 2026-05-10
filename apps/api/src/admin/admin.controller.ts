@@ -28,6 +28,7 @@ import { UpsertAiPromptConfigDto } from './dto/upsert-ai-prompt-config.dto';
 import { UpsertAiAreaGenerationConfigDto } from './dto/upsert-ai-area-generation-config.dto';
 import { UpsertOnboardingTemplateDto } from './dto/upsert-onboarding-template.dto';
 import { UpsertGoalPromptConfigDto } from './dto/upsert-goal-prompt-config.dto';
+import { UpsertSportAreaPromptConfigDto } from './dto/upsert-sport-area-prompt-config.dto';
 
 @ApiTags('admin-cycles')
 @Controller('admin')
@@ -39,7 +40,7 @@ export class AdminController {
   ) {}
 
   @Get('dashboard')
-  @ApiOperation({ summary: 'Cruscotto operativo admin' })
+  @ApiOperation({ summary: 'Cruscotto operativo amministratore' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -48,7 +49,7 @@ export class AdminController {
   }
 
   @Post('orchestrator/run')
-  @ApiOperation({ summary: 'Esegui ciclo proposta (solo admin)' })
+  @ApiOperation({ summary: 'Esegui ciclo proposta (solo amministratore)' })
   @ApiBody({ type: RunCycleDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -113,7 +114,7 @@ export class AdminController {
   }
 
   @Get('ai-settings')
-  @ApiOperation({ summary: 'Configurazione prompt AI e onboarding admin' })
+  @ApiOperation({ summary: 'Configurazione prompt AI e onboarding amministratore' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -176,6 +177,19 @@ export class AdminController {
     return this.admin.upsertGoalPromptConfig(body, req.user?.id ?? '');
   }
 
+  @Post('sport-area-prompts')
+  @ApiOperation({ summary: 'Crea o aggiorna un prompt sportivo per area' })
+  @ApiBody({ type: UpsertSportAreaPromptConfigDto })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  upsertSportAreaPrompt(
+    @Req() req: { user?: { id: string } },
+    @Body() body: UpsertSportAreaPromptConfigDto,
+  ) {
+    return this.admin.upsertSportAreaPromptConfig(body, req.user?.id ?? '');
+  }
+
   @Post('ai-area-configs')
   @ApiOperation({
     summary: 'Crea o aggiorna una configurazione generazione AI per area',
@@ -216,7 +230,7 @@ export class AdminController {
   }
 
   @Post('cycles/:cycleId/publish')
-  @ApiOperation({ summary: 'Pubblica un ciclo (solo admin)' })
+  @ApiOperation({ summary: 'Pubblica un ciclo (solo amministratore)' })
   @ApiParam({ name: 'cycleId' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)

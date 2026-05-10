@@ -32,7 +32,7 @@ export const REQUIRED_CONSENTS = [
       'Autorizzi l uso di sistemi AI per analizzare obiettivi, risposte e storico e proporre contenuti che restano soggetti a verifica umana e limiti di sicurezza.',
     body: [
       'L assistente AI puo elaborare obiettivi, questionari, risposte, storico, profilo sportivo e vincoli dichiarati per generare valutazioni, prompt, proposte operative, domande e materiali di supporto.',
-      'L AI non e un professionista sanitario, non formula diagnosi, non prescrive farmaci, non prescrive diete cliniche e non sostituisce medici, fisioterapisti, nutrizionisti, psicologi, coach o altri professionisti qualificati.',
+      'L AI non e un professionista sanitario, non formula diagnosi, non prescrive farmaci, non prescrive diete cliniche e non sostituisce medici, fisioterapisti, nutrizionisti, psicologi, allenatori o altri professionisti qualificati.',
       'Le risposte AI possono contenere errori, incompletezze o indicazioni non adatte al caso specifico. I contenuti devono essere valutati con prudenza e, quando previsto, revisionati da un professionista umano.',
       'In presenza di dolore acuto, trauma, sintomi neurologici, dolore toracico, svenimenti, disturbi alimentari, patologie note, farmaci o condizioni mediche non controllate, devi rivolgerti a un professionista qualificato prima di seguire indicazioni operative.',
       'Non devi inserire dati non necessari, dati di terzi, informazioni illecite o richieste orientate a doping, frode, danno a te o ad altri, o pratiche contrarie alla salute e allo spirito sportivo.',

@@ -224,7 +224,7 @@ export default function ProfessionalDashboardPage() {
         <aside className="pf-panel">
           <div className="pf-panel-header">
             <div>
-              <h2>Focus coaching</h2>
+              <h2>Focus professionista</h2>
               <p className="pf-muted">
                 Area con maggiore opportunita e carico revisioni pendenti.
               </p>
@@ -318,7 +318,7 @@ export default function ProfessionalDashboardPage() {
           {!loading && users.length === 0 && (
             <EmptyState
               title="Nessun atleta collegato"
-              description="Collega atleti dall'ambiente admin o dai dati demo."
+              description="Collega atleti dall'ambiente amministratore o dai dati demo."
             />
           )}
         </div>

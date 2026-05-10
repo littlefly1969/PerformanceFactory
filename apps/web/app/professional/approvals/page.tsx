@@ -292,7 +292,7 @@ export default function ProfessionalApprovazioniPage() {
           <div>
             <h2>Approvazioni per atleta</h2>
             <p className="pf-muted">
-              Ogni blocco mostra esattamente cosa blocca la pubblicazione admin.
+              Ogni blocco mostra esattamente cosa blocca la pubblicazione dell'amministratore.
             </p>
           </div>
           <StatusBadge tone={totalPending ? "warning" : "success"}>

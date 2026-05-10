@@ -21,7 +21,7 @@ export class InspectController {
   constructor(private readonly inspect: InspectService) {}
 
   @Get('cycles')
-  @ApiOperation({ summary: 'Elenca cicli (solo admin)' })
+  @ApiOperation({ summary: 'Elenca cicli (solo amministratore)' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -30,7 +30,7 @@ export class InspectController {
   }
 
   @Get('cycles/:cycleId')
-  @ApiOperation({ summary: 'Ottieni dettagli ciclo (solo admin)' })
+  @ApiOperation({ summary: 'Ottieni dettagli ciclo (solo amministratore)' })
   @ApiParam({ name: 'cycleId' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -40,7 +40,7 @@ export class InspectController {
   }
 
   @Get('users')
-  @ApiOperation({ summary: 'Elenca utenti (solo admin)' })
+  @ApiOperation({ summary: 'Elenca utenti (solo amministratore)' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -49,7 +49,7 @@ export class InspectController {
   }
 
   @Post('users')
-  @ApiOperation({ summary: 'Crea utente (solo admin)' })
+  @ApiOperation({ summary: 'Crea utente (solo amministratore)' })
   @ApiBody({ type: CreateUserDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -59,7 +59,7 @@ export class InspectController {
   }
 
   @Get('users/:userId')
-  @ApiOperation({ summary: 'Ottieni dettagli utente (solo admin)' })
+  @ApiOperation({ summary: 'Ottieni dettagli utente (solo amministratore)' })
   @ApiParam({ name: 'userId' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -69,7 +69,7 @@ export class InspectController {
   }
 
   @Get('professionals')
-  @ApiOperation({ summary: 'Elenca professionisti (solo admin)' })
+  @ApiOperation({ summary: 'Elenca professionisti (solo amministratore)' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -78,7 +78,7 @@ export class InspectController {
   }
 
   @Get('professionals/:id')
-  @ApiOperation({ summary: 'Ottieni dettagli professionista (solo admin)' })
+  @ApiOperation({ summary: 'Ottieni dettagli professionista (solo amministratore)' })
   @ApiParam({ name: 'id' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -88,7 +88,7 @@ export class InspectController {
   }
 
   @Post('links')
-  @ApiOperation({ summary: 'Collega utente a professionista (solo admin)' })
+  @ApiOperation({ summary: 'Collega utente a professionista (solo amministratore)' })
   @ApiBody({ type: AdminLinkUserDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -102,7 +102,7 @@ export class InspectController {
   }
 
   @Post('competences')
-  @ApiOperation({ summary: 'Assegna competenze professionista (solo admin)' })
+  @ApiOperation({ summary: 'Assegna competenze professionista (solo amministratore)' })
   @ApiBody({ type: AssignCompetenceDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)

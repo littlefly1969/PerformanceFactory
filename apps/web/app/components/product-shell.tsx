@@ -47,7 +47,7 @@ const roleNav: Record<string, NavItem[]> = {
   ],
   ADMIN: [
     { href: "/admin/cycles", label: "Operazioni" },
-    { href: "/admin/ai-config", label: "Config AI" },
+    { href: "/admin/ai-config", label: "Configurazione AI" },
     { href: "/admin/consents", label: "Privacy" },
   ],
 };

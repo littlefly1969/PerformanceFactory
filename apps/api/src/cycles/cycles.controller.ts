@@ -10,7 +10,7 @@ export class CyclesController {
   constructor(private readonly cycles: CyclesService) {}
 
   @Get(':cycleId/status')
-  @ApiOperation({ summary: 'Ottieni stato ciclo (admin/professionista)' })
+  @ApiOperation({ summary: 'Ottieni stato ciclo (amministratore/professionista)' })
   @ApiParam({ name: 'cycleId' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)

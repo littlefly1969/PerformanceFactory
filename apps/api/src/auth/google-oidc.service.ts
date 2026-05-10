@@ -432,7 +432,7 @@ export class GoogleOidcService {
     });
     if (existingIdentity) {
       if (!existingIdentity.user.isActive) {
-        throw new UnauthorizedException('Account in attesa di attivazione admin');
+        throw new UnauthorizedException('Account in attesa di attivazione amministratore');
       }
       await this.prisma.authIdentity.update({
         where: { id: existingIdentity.id },

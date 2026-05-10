@@ -170,6 +170,20 @@ export type GoalValidationInput = {
   goalText: string;
   basePrompt: string;
   areas: AiAreaInput[];
+  sportSelection?: {
+    sports: string[];
+    fitnessLocation: string | null;
+    label: string;
+  };
+  sportAreaPromptInstructions?: Array<{
+    sportKey: string;
+    fitnessLocation: string | null;
+    sportLabel: string;
+    areaId: string;
+    areaName: string;
+    basePrompt: string;
+    version: number;
+  }>;
   onboardingProfile?: unknown;
   onboardingAnswers?: unknown;
   refinementContext?: {
@@ -215,6 +229,20 @@ export type SpecialistOnboardingQuestionInput = {
   goalText: string;
   interpretedGoal: string;
   normalizedGoal?: unknown;
+  sportSelection?: {
+    sports: string[];
+    fitnessLocation: string | null;
+    label: string;
+  };
+  sportAreaPromptInstructions?: Array<{
+    sportKey: string;
+    fitnessLocation: string | null;
+    sportLabel: string;
+    areaId: string;
+    areaName: string;
+    basePrompt: string;
+    version: number;
+  }>;
   generalProfile: unknown;
   generalAnswers: unknown;
   areas: AiAreaInput[];
@@ -1143,15 +1171,29 @@ export class AiProposalProviderService {
       athleteGoal: input.goalText,
       interpretedGoal: input.interpretedGoal,
       normalizedGoal: input.normalizedGoal ?? null,
+      sportSelection: input.sportSelection ?? null,
+      sportAreaPromptInstructions:
+        input.sportAreaPromptInstructions?.map((instruction) => ({
+          sport: instruction.sportLabel,
+          areaName: instruction.areaName,
+          version: instruction.version,
+          basePrompt: instruction.basePrompt,
+        })) ?? [],
       generalProfile: input.generalProfile,
       generalAnswers: input.generalAnswers,
       areas: input.areas,
       constraints: {
         questionsPerArea: QUESTIONS_PER_AREA,
         questionType:
-          'Domande SCORE a risposta su scala, formulate per misurare livello iniziale, vincoli, priorita o rischio operativo della specifica area.',
+          'Domande SCORE a risposta su scala numerica 1-5. Il testo puo indicare chiaramente che la risposta va data da 1 a 5.',
+        answerScale:
+          'Scala 1-5: 1 = molto basso o molto critico, 2 = fragile, 3 = sufficiente/stabile, 4 = buono/forte, 5 = eccellente.',
+        numericQuestionWording:
+          'Ogni domanda deve essere valutabile con un numero da 1 a 5. Usa formule come "Quanto...", "In che misura...", "Quanto ritieni..." o "Quanto e presente...". Non usare domande aperte come "Quali sono...", "Descrivi...", "Elenca..." o "Spiega...", perche l atleta non avra un campo testuale.',
         personalization:
           'Ogni domanda deve essere coerente con obiettivo, dati generali e atleta specifico; non usare domande generiche uguali per tutti.',
+        realismCheck:
+          'Le risposte devono dare all AI dati sufficienti per capire alla validazione finale se l obiettivo e realistico rispetto a sport scelto, anamnesi generale, baseline per area e vincoli dichiarati.',
         areaSpecificity:
           'Ogni domanda deve citare o riflettere chiaramente il lavoro della propria area, evitando duplicazioni tra aree.',
         avoid: [
@@ -1168,19 +1210,31 @@ export class AiProposalProviderService {
   }
 
   private buildGoalValidationTask(input: GoalValidationInput) {
+    const finalValidation = Boolean(input.onboardingProfile || input.onboardingAnswers);
     return {
       task: 'Valida l obiettivo iniziale Performance Factory e, solo se status=OK, genera prompt specialistici per le aree ufficiali.',
+      evaluationPhase: finalValidation
+        ? 'VALIDAZIONE_FINALE_DOPO_ANAMNESI'
+        : 'BOZZA_OBIETTIVO_PRIMA_DELL_ANAMNESI',
       platformPrinciple:
         'Performance Factory promuove il miglioramento personale rispetto al punto di partenza, non il confronto tossico con gli altri.',
       officialAreas: [
         'Preparazione atletica',
         'Equipaggiamento',
-        'Mental training',
+        'Allenamento mentale',
         'Nutrizione',
         'Fisioterapia',
         'Tecnico-tattica',
       ],
       athleteGoal: input.goalText,
+      sportSelection: input.sportSelection ?? null,
+      sportAreaPromptInstructions:
+        input.sportAreaPromptInstructions?.map((instruction) => ({
+          sport: instruction.sportLabel,
+          areaName: instruction.areaName,
+          version: instruction.version,
+          basePrompt: instruction.basePrompt,
+        })) ?? [],
       refinementContext: input.refinementContext ?? null,
       datiAnamnestici: input.onboardingProfile ?? null,
       storicoRisposte: input.onboardingAnswers ?? null,
@@ -1193,7 +1247,9 @@ export class AiProposalProviderService {
         'UNSAFE',
       ],
       decisionRules: {
-        OK: 'Obiettivo sportivo/performance, chiaro, sicuro, personale e misurabile nei suoi elementi essenziali. Non servono ancora frequenza di allenamento, dieta, abitudini o anamnesi: quei dati arrivano dopo nei questionari.',
+        OK: finalValidation
+          ? 'Obiettivo sportivo/performance, chiaro, sicuro, personale, misurabile e realistico rispetto a sport scelto, anamnesi generale, risposte specialistiche e baseline dichiarata.'
+          : 'Obiettivo sportivo/performance, chiaro, sicuro, personale e misurabile nei suoi elementi essenziali. Non servono ancora frequenza di allenamento, dieta, abitudini o anamnesi: quei dati arrivano dopo nei questionari.',
         NEEDS_ANAMNESIS:
           'Usalo solo se l obiettivo cita dolore, trauma, patologie, sintomi o rischio concreto che richiede dati personali prima di procedere.',
         GOAL_NEEDS_REFORMULATION:
@@ -1212,8 +1268,15 @@ export class AiProposalProviderService {
         'Rispondi solo in JSON valido.',
         'Il campo status governa il flusso.',
         'Se refinementContext e presente, conserva le parti gia utili dell obiettivo originale e della bozza corrente, integra solo le nuove risposte dell utente e non chiedere di riscrivere tutto.',
-        'La fase corrente serve SOLO a definire l obiettivo, non a fare anamnesi, onboarding, piano di allenamento o questionario sulle abitudini.',
+        finalValidation
+          ? 'La fase corrente serve a validare definitivamente obiettivo e realismo, non a generare ancora il piano di allenamento.'
+          : 'La fase corrente serve SOLO a definire l obiettivo, non a fare anamnesi, onboarding, piano di allenamento o questionario sulle abitudini.',
+        finalValidation
+          ? 'Questa e la validazione finale: usa datiAnamnestici e storicoRisposte per decidere se l obiettivo e realistico. Se non lo e, usa GOAL_NEEDS_REFORMULATION e spiega cosa va ridimensionato o chiarito.'
+          : 'Questa non e la validazione finale: se mancano dati personali ma l obiettivo e sensato, usa NEEDS_ANAMNESIS.',
         'Se mancano informazioni, fai al massimo 3 domande specifiche e brevi in questions_to_user, riferite solo a: sport/attivita, risultato concreto desiderato, criterio di misura, orizzonte temporale, punto di partenza espresso come prestazione attuale.',
+        'La scelta sportiva dell atleta e vincolante: non chiedere quale sport pratica se sportSelection e presente; usa quella selezione per valutare pertinenza e generare prompt area.',
+        'Integra i prompt sportAreaPromptInstructions nei prompt area finali: ogni area deve riflettere sport, eventuale contesto fitness e istruzioni amministrative specifiche.',
         'Non chiedere quante volte si allena, quanto spesso si allena, quanto mangia, cosa mangia, dieta, sonno, stress, disponibilita settimanale, attrezzatura, infortuni o dettagli sul metodo per raggiungere l obiettivo. Questi dati appartengono ai questionari successivi.',
         'Se l obiettivo e gia comprensibile ma mancano dettagli sul metodo o sulle abitudini, considera status=OK e lascia che i questionari raccolgano quei dati.',
         'Se status diverso da OK, area_prompts deve avere tutti i valori null.',
@@ -1697,15 +1760,47 @@ export class AiProposalProviderService {
     return input.areas.map((area) => {
       const key = this.areaPromptKey(area.name);
       const prompt = areaPrompts[key] ?? areaPrompts[this.fallbackAreaPromptKey(area.name)];
+      const sportInstructions = this.sportInstructionsForArea(input, area.id);
       return {
         areaId: area.id,
         areaName: area.name,
         promptText:
           prompt && typeof prompt === 'object'
-            ? JSON.stringify(prompt)
-            : this.buildFallbackGoalAreaPrompt(input.goalText, area.name),
+            ? [JSON.stringify(prompt), sportInstructions].filter(Boolean).join('\n\n')
+            : [
+                this.buildFallbackGoalAreaPrompt(input.goalText, area.name),
+                sportInstructions,
+              ]
+                .filter(Boolean)
+                .join('\n\n'),
       };
     });
+  }
+
+  private sportInstructionsForArea(
+    input: GoalValidationInput,
+    areaId: string,
+  ) {
+    const instructions =
+      input.sportAreaPromptInstructions?.filter(
+        (instruction) => instruction.areaId === areaId,
+      ) ?? [];
+    if (!instructions.length) {
+      return input.sportSelection
+        ? `Contesto sportivo selezionato dall atleta: ${input.sportSelection.label}.`
+        : '';
+    }
+    return [
+      input.sportSelection
+        ? `Contesto sportivo selezionato dall atleta: ${input.sportSelection.label}.`
+        : '',
+      ...instructions.map(
+        (instruction) =>
+          `[Prompt sport ${instruction.sportLabel} v${instruction.version}]\n${instruction.basePrompt}`,
+      ),
+    ]
+      .filter(Boolean)
+      .join('\n\n');
   }
 
   private areaPromptKey(areaName: string) {
@@ -1765,7 +1860,7 @@ export class AiProposalProviderService {
         suggested_reformulated_goal: null,
         questions_to_user: [],
         normalized_goal: {
-          sport_or_activity: null,
+          sport_or_activity: input.sportSelection?.label ?? null,
           performance_dimension: null,
           current_level_assumption: null,
           desired_improvement: null,
@@ -1804,7 +1899,7 @@ export class AiProposalProviderService {
             'Quanto tempo puoi dedicare al percorso?',
           ],
       normalized_goal: {
-        sport_or_activity: null,
+        sport_or_activity: input.sportSelection?.label ?? null,
         performance_dimension: null,
         current_level_assumption: null,
         desired_improvement: input.goalText.trim(),
@@ -1818,7 +1913,7 @@ export class AiProposalProviderService {
               this.areaPromptKey(area.name),
               {
                 role: `Modulo ${area.name}`,
-                objective: `Personalizzare il lavoro ${area.name} rispetto all obiettivo: ${input.goalText.trim()}`,
+                objective: `Personalizzare il lavoro ${area.name} rispetto all obiettivo: ${input.goalText.trim()}${input.sportSelection ? ` nel contesto ${input.sportSelection.label}` : ''}`,
                 required_inputs: ['obiettivo normalizzato', 'anamnesi', 'storico risposte'],
                 initial_questionnaire: [],
                 exercise_generation_rules: [
@@ -1829,6 +1924,7 @@ export class AiProposalProviderService {
                 measurement_indicators: ['aderenza', 'qualita esecuzione', 'progresso percepito'],
                 safety_limits: ['Non fare diagnosi o prescrizioni cliniche.'],
                 output_format: {},
+                sport_context: this.sportInstructionsForArea(input, area.id),
               },
             ]),
           )
@@ -2042,6 +2138,8 @@ export class AiProposalProviderService {
         user: this.buildGoalValidationTask(input),
         responseJsonSchema: this.buildGoalValidationJsonSchema(),
       },
+      sportSelection: input.sportSelection ?? null,
+      sportAreaPromptInstructions: input.sportAreaPromptInstructions ?? [],
     };
   }
 

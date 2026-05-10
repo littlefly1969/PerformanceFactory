@@ -34,6 +34,17 @@ type AreaGenerationConfig = {
   questionnaireLayoutJson: unknown;
   area?: Area | null;
 };
+type SportOption = { key: string; label: string };
+type SportAreaPromptConfig = {
+  id?: string;
+  sportKey: string;
+  fitnessLocation: string;
+  areaId: string;
+  basePrompt: string;
+  version?: number;
+  isActive: boolean;
+  area?: Area | null;
+};
 type OnboardingTemplate = {
   id?: string;
   key: string;
@@ -50,10 +61,13 @@ type OnboardingTemplate = {
 };
 type Settings = {
   areas: Area[];
+  sportOptions: SportOption[];
+  fitnessLocationOptions: SportOption[];
   levels: string[];
   promptConfigs: PromptConfig[];
   goalPromptConfig?: GoalPromptConfig | null;
   areaGenerationConfigs: AreaGenerationConfig[];
+  sportAreaPromptConfigs: SportAreaPromptConfig[];
   onboardingTemplates: OnboardingTemplate[];
   inputTypes: OnboardingTemplate["inputType"][];
   scopes: OnboardingTemplate["scope"][];
@@ -93,6 +107,29 @@ const emptyAreaConfig: AreaGenerationConfig = {
   questionnaireLayoutJson: {},
 };
 
+const emptySportAreaPrompt: SportAreaPromptConfig = {
+  sportKey: "CYCLING",
+  fitnessLocation: "NONE",
+  areaId: "",
+  basePrompt: "",
+  isActive: true,
+};
+
+const athleteLevelLabel = (level: string) =>
+  ({
+    BASELINE: "Base",
+    STABLE: "Stabile",
+    ADVANCED: "Avanzato",
+  })[level] ?? level;
+
+const inputTypeLabel = (type: OnboardingTemplate["inputType"]) =>
+  ({
+    TEXT: "Testo",
+    NUMBER: "Numero",
+    SELECT: "Selezione",
+    SCORE: "Punteggio",
+  })[type] ?? type;
+
 const readError = async (response: Response) => {
   try {
     const data = (await response.json()) as { message?: string; error?: string };
@@ -112,6 +149,8 @@ export default function AdminAiConfigPage() {
     useState<GoalPromptConfig>(emptyGoalPrompt);
   const [areaConfigDraft, setAreaConfigDraft] =
     useState<AreaGenerationConfig>(emptyAreaConfig);
+  const [sportAreaPromptDraft, setSportAreaPromptDraft] =
+    useState<SportAreaPromptConfig>(emptySportAreaPrompt);
   const [areaConfigLayoutText, setAreaConfigLayoutText] = useState("");
   const [templateDraft, setTemplateDraft] =
     useState<OnboardingTemplate>(emptyTemplate);
@@ -120,10 +159,13 @@ export default function AdminAiConfigPage() {
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
   const areas = settings?.areas ?? [];
+  const sportOptions = settings?.sportOptions ?? [];
+  const fitnessLocationOptions = settings?.fitnessLocationOptions ?? [];
   const levels = settings?.levels ?? ["BASELINE", "STABLE", "ADVANCED"];
   const promptConfigs = settings?.promptConfigs ?? [];
   const goalPromptConfig = settings?.goalPromptConfig ?? null;
   const areaGenerationConfigs = settings?.areaGenerationConfigs ?? [];
+  const sportAreaPromptConfigs = settings?.sportAreaPromptConfigs ?? [];
   const templates = settings?.onboardingTemplates ?? [];
   const activePromptCount = useMemo(
     () => promptConfigs.filter((prompt) => prompt.isActive).length,
@@ -275,6 +317,31 @@ export default function AdminAiConfigPage() {
     setBusyKey(null);
   };
 
+  const saveSportAreaPrompt = async () => {
+    setBusyKey("sport-area-prompt");
+    setMessage(null);
+    const response = await secureFetch(`${API_BASE}/admin/sport-area-prompts`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...sportAreaPromptDraft,
+        fitnessLocation:
+          sportAreaPromptDraft.sportKey === "FITNESS"
+            ? sportAreaPromptDraft.fitnessLocation
+            : null,
+      }),
+    });
+    if (!response.ok) {
+      setMessage(`Salvataggio prompt sport area non riuscito: ${await readError(response)}`);
+      setBusyKey(null);
+      return;
+    }
+    await loadSettings();
+    setMessage("Prompt sport area salvato.");
+    setBusyKey(null);
+  };
+
   const editTemplate = (template: OnboardingTemplate) => {
     setTemplateDraft({ ...template });
     setTemplateOptionsText(stringifyOptions(template.optionsJson));
@@ -285,9 +352,24 @@ export default function AdminAiConfigPage() {
     setAreaConfigLayoutText(stringifyOptions(config.questionnaireLayoutJson));
   };
 
+  const editSportAreaPrompt = (config: SportAreaPromptConfig) => {
+    setSportAreaPromptDraft({ ...config });
+  };
+
+  const sportLabel = (config: SportAreaPromptConfig) => {
+    const sport = sportOptions.find((item) => item.key === config.sportKey);
+    if (config.sportKey !== "FITNESS") {
+      return sport?.label ?? config.sportKey;
+    }
+    const fitness = fitnessLocationOptions.find(
+      (item) => item.key === config.fitnessLocation,
+    );
+    return `${sport?.label ?? config.sportKey} - ${fitness?.label ?? config.fitnessLocation}`;
+  };
+
   return (
     <ProductShell
-      eyebrow="Admin AI"
+      eyebrow="Amministrazione AI"
       title="Prompt e anamnesi"
       description="Configura prompt base per livello e area, e mantieni modificabili le domande generali e specifiche di onboarding."
       actions={
@@ -303,6 +385,7 @@ export default function AdminAiConfigPage() {
           tone: "success",
         },
         { label: "Aree", value: areas.length, tone: "neutral" },
+        { label: "Prompt sport", value: sportAreaPromptConfigs.length, tone: "accent" },
       ]}
     >
       {message && <div className="pf-alert warning">{message}</div>}
@@ -378,6 +461,164 @@ export default function AdminAiConfigPage() {
         <article className="pf-panel">
           <div className="pf-panel-header">
             <div>
+              <h2>Prompt sport per area</h2>
+              <p className="pf-muted">
+                Istruzioni applicate prima della validazione obiettivo, in base
+                agli sport scelti dall'atleta e all'area specialistica.
+              </p>
+            </div>
+          </div>
+          <div className="pf-stack">
+            <div className="pf-two-col">
+              <label className="pf-field">
+                Sport
+                <select
+                  className="pf-select"
+                  value={sportAreaPromptDraft.sportKey}
+                  onChange={(event) =>
+                    setSportAreaPromptDraft((prev) => ({
+                      ...prev,
+                      sportKey: event.target.value,
+                      fitnessLocation:
+                        event.target.value === "FITNESS" ? "HOME" : "NONE",
+                    }))
+                  }
+                >
+                  {sportOptions.map((sport) => (
+                    <option key={sport.key} value={sport.key}>
+                      {sport.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="pf-field">
+                Contesto fitness
+                <select
+                  className="pf-select"
+                  value={sportAreaPromptDraft.fitnessLocation}
+                  disabled={sportAreaPromptDraft.sportKey !== "FITNESS"}
+                  onChange={(event) =>
+                    setSportAreaPromptDraft((prev) => ({
+                      ...prev,
+                      fitnessLocation: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="NONE">Non applicabile</option>
+                  {fitnessLocationOptions.map((location) => (
+                    <option key={location.key} value={location.key}>
+                      {location.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <label className="pf-field">
+              Area
+              <select
+                className="pf-select"
+                value={sportAreaPromptDraft.areaId}
+                onChange={(event) => {
+                  const areaId = event.target.value;
+                  const existing = sportAreaPromptConfigs.find(
+                    (config) =>
+                      config.areaId === areaId &&
+                      config.sportKey === sportAreaPromptDraft.sportKey &&
+                      config.fitnessLocation === sportAreaPromptDraft.fitnessLocation,
+                  );
+                  if (existing) {
+                    editSportAreaPrompt(existing);
+                    return;
+                  }
+                  setSportAreaPromptDraft((prev) => ({ ...prev, areaId }));
+                }}
+              >
+                <option value="">Seleziona area</option>
+                {areas.map((area) => (
+                  <option key={area.id} value={area.id}>
+                    {area.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="pf-field">
+              Prompt
+              <textarea
+                className="pf-textarea"
+                rows={8}
+                value={sportAreaPromptDraft.basePrompt}
+                onChange={(event) =>
+                  setSportAreaPromptDraft((prev) => ({
+                    ...prev,
+                    basePrompt: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label className="pf-checkbox">
+              <input
+                type="checkbox"
+                checked={sportAreaPromptDraft.isActive}
+                onChange={(event) =>
+                  setSportAreaPromptDraft((prev) => ({
+                    ...prev,
+                    isActive: event.target.checked,
+                  }))
+                }
+              />
+              Attivo
+            </label>
+            <button
+              className="pf-button"
+              type="button"
+              disabled={
+                busyKey === "sport-area-prompt" ||
+                !sportAreaPromptDraft.areaId ||
+                !sportAreaPromptDraft.basePrompt.trim()
+              }
+              onClick={saveSportAreaPrompt}
+            >
+              Salva prompt sport area
+            </button>
+          </div>
+        </article>
+
+        <aside className="pf-panel">
+          <div className="pf-panel-header">
+            <div>
+              <h2>Prompt sport attuali</h2>
+              <p className="pf-muted">
+                Seleziona una configurazione per editarla.
+              </p>
+            </div>
+          </div>
+          <div className="pf-stack">
+            {sportAreaPromptConfigs.map((config) => (
+              <button
+                key={config.id}
+                className="pf-config-row"
+                type="button"
+                onClick={() => editSportAreaPrompt(config)}
+              >
+                <span>
+                  <strong>{sportLabel(config)}</strong>
+                  <small>
+                    {config.area?.name ?? "Area"} - v{config.version ?? 1}
+                  </small>
+                </span>
+                <StatusBadge tone={config.isActive ? "success" : "neutral"}>
+                  {config.isActive ? "attivo" : "spento"}
+                </StatusBadge>
+              </button>
+            ))}
+          </div>
+        </aside>
+      </section>
+
+      <section className="pf-dashboard-grid">
+        <article className="pf-panel">
+          <div className="pf-panel-header">
+            <div>
               <h2>Prompt base</h2>
               <p className="pf-muted">
                 Compatibilita legacy: usato solo quando l atleta non ha ancora
@@ -431,7 +672,7 @@ export default function AdminAiConfigPage() {
                 >
                   {levels.map((level) => (
                     <option key={level} value={level}>
-                      {level}
+                      {athleteLevelLabel(level)}
                     </option>
                   ))}
                 </select>
@@ -505,7 +746,7 @@ export default function AdminAiConfigPage() {
                 <span>
                   <strong>{prompt.name}</strong>
                   <small>
-                    {prompt.area?.name ?? "Globale"} - {prompt.athleteLevel} -
+                    {prompt.area?.name ?? "Globale"} - {athleteLevelLabel(prompt.athleteLevel)} -
                     v{prompt.version ?? 1}
                   </small>
                 </span>
@@ -641,7 +882,7 @@ export default function AdminAiConfigPage() {
             <h2>Questionari anamnesi</h2>
             <p className="pf-muted">
               Le domande generali alimentano il profilo atleta. Le domande area
-              con input SCORE alimentano la baseline e le future promozioni.
+              con input di tipo punteggio alimentano la baseline e le future promozioni.
             </p>
           </div>
         </div>
@@ -673,7 +914,7 @@ export default function AdminAiConfigPage() {
             </label>
             <div className="pf-two-col">
               <label className="pf-field">
-                Scope
+                Ambito
                 <select
                   className="pf-select"
                   value={templateDraft.scope}
@@ -725,7 +966,7 @@ export default function AdminAiConfigPage() {
                 >
                   {["TEXT", "NUMBER", "SELECT", "SCORE"].map((type) => (
                     <option key={type} value={type}>
-                      {type}
+                      {inputTypeLabel(type as OnboardingTemplate["inputType"])}
                     </option>
                   ))}
                 </select>
@@ -746,7 +987,7 @@ export default function AdminAiConfigPage() {
               </label>
             </div>
             <label className="pf-field">
-              Help text
+              Testo di aiuto
               <input
                 className="pf-input"
                 value={templateDraft.helpText ?? ""}

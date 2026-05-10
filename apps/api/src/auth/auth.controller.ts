@@ -42,7 +42,7 @@ export class AuthController {
   }
 
   @Post('register-athlete')
-  @ApiOperation({ summary: 'Registra un nuovo atleta in attesa di attivazione admin' })
+  @ApiOperation({ summary: 'Registra un nuovo atleta in attesa di attivazione amministratore' })
   @ApiBody({ type: RegisterAthleteDto })
   registerAthlete(
     @Body() body: RegisterAthleteDto,

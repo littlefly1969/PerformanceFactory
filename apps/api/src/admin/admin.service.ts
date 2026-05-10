@@ -10,7 +10,13 @@ import { UpsertAiPromptConfigDto } from './dto/upsert-ai-prompt-config.dto';
 import { UpsertAiAreaGenerationConfigDto } from './dto/upsert-ai-area-generation-config.dto';
 import { UpsertOnboardingTemplateDto } from './dto/upsert-onboarding-template.dto';
 import { UpsertGoalPromptConfigDto } from './dto/upsert-goal-prompt-config.dto';
+import { UpsertSportAreaPromptConfigDto } from './dto/upsert-sport-area-prompt-config.dto';
 import { OrchestratorService } from '../ai-orchestrator/orchestrator.service';
+import {
+  FITNESS_LOCATION_OPTIONS,
+  SPORT_OPTIONS,
+  normalizeSportSelection,
+} from '../onboarding/sport-selection';
 
 const DEFAULT_INITIAL_CONTEXT =
   'Sei un assistente senior di sport performance a supporto di professionisti umani. Genera una proposta di miglioramento specifica per area e tre domande di monitoraggio usando solo il contesto atleta fornito. Rispondi esclusivamente in italiano e solo con JSON valido conforme allo schema. Il lavoro deve essere pratico, misurabile, progressivo e revisionabile da un professionista. Non inventare diagnosi, indicazioni mediche, dati atleta non presenti o contesto nascosto. Se esistono lavori precedenti, usa note di completamento, punteggi e motivi di rifiuto per migliorare la proposta.';
@@ -36,7 +42,7 @@ const DEFAULT_GOAL_PROMPT = [
   'Sei l AI guida di Performance Factory, una piattaforma orientata al miglioramento della performance sportiva personale.',
   'Performance Factory non promuove il confronto tossico con gli altri, ma il miglioramento progressivo dell utente rispetto al proprio punto di partenza.',
   'Analizza l obiettivo iniziale dichiarato dall utente, valutane qualita, sicurezza, pertinenza, liceita e chiarezza, poi decidi se il sistema puo procedere alla costruzione di un percorso personalizzato.',
-  'Le sei aree ufficiali sono: Preparazione atletica, Equipaggiamento, Mental training, Nutrizione, Fisioterapia, Tecnico-tattica.',
+  'Le sei aree ufficiali sono: Preparazione atletica, Equipaggiamento, Allenamento mentale, Nutrizione, Fisioterapia, Tecnico-tattica.',
   'Classifica sempre con uno solo di questi status: OK, NEEDS_ANAMNESIS, GOAL_NEEDS_REFORMULATION, OUT_OF_SCOPE, UNSAFE.',
   'Usa OK solo se l obiettivo e sportivo o legato alla performance, chiaro, sicuro, orientato al miglioramento personale e i dati disponibili bastano per generare i prompt delle sei aree.',
   'Usa NEEDS_ANAMNESIS se l obiettivo e valido ma mancano dati personali indispensabili per costruire il percorso.',
@@ -49,6 +55,21 @@ const DEFAULT_GOAL_PROMPT = [
   'Se status e diverso da OK, area_prompts deve contenere valori null per tutte le sei aree.',
   'Se status e OK, compila tutti i prompt delle sei aree. Ogni prompt area deve contenere role, objective, required_inputs, initial_questionnaire, exercise_generation_rules, feedback_questions, progression_rules, measurement_indicators, safety_limits, output_format.',
 ].join('\n');
+
+const FITNESS_LOCATION_NONE = 'NONE';
+
+const sportPromptContexts = [
+  ...SPORT_OPTIONS.filter((sport) => sport.key !== 'FITNESS').map((sport) => ({
+    sportKey: sport.key,
+    fitnessLocation: FITNESS_LOCATION_NONE,
+    label: sport.label,
+  })),
+  ...FITNESS_LOCATION_OPTIONS.map((location) => ({
+    sportKey: 'FITNESS',
+    fitnessLocation: location.key,
+    label: `Fitness - ${location.label}`,
+  })),
+];
 
 @Injectable()
 export class AdminService {
@@ -354,9 +375,9 @@ export class AdminService {
           generationBlocked,
           reason: generationBlocked
             ? pending
-              ? 'Pending approval already exists'
+              ? 'Approvazione gia in attesa'
               : !user.isActive
-                ? 'Atleta in attesa di attivazione admin'
+                ? 'Atleta in attesa di attivazione amministratore'
               : !activeActivitiesCompleted
                 ? 'Attivita precedente non completata'
                 : 'Questionario precedente non completato'
@@ -488,8 +509,15 @@ export class AdminService {
     });
     await this.ensureAreaGenerationConfigs(areas.map((area) => area.id));
     await this.ensureGoalPromptConfig();
+    await this.ensureSportAreaPromptConfigs(areas);
 
-    const [promptConfigs, goalPromptConfig, areaGenerationConfigs, onboardingTemplates] = await Promise.all([
+    const [
+      promptConfigs,
+      goalPromptConfig,
+      areaGenerationConfigs,
+      sportAreaPromptConfigs,
+      onboardingTemplates,
+    ] = await Promise.all([
       this.prisma.aiPromptConfig.findMany({
         select: {
           id: true,
@@ -530,6 +558,24 @@ export class AdminService {
         },
         orderBy: [{ area: { name: 'asc' } }],
       }),
+      this.prisma.aiSportAreaPromptConfig.findMany({
+        select: {
+          id: true,
+          sportKey: true,
+          fitnessLocation: true,
+          areaId: true,
+          basePrompt: true,
+          version: true,
+          isActive: true,
+          updatedAt: true,
+          area: { select: { id: true, name: true } },
+        },
+        orderBy: [
+          { sportKey: 'asc' },
+          { fitnessLocation: 'asc' },
+          { area: { name: 'asc' } },
+        ],
+      }),
       this.prisma.onboardingQuestionTemplate.findMany({
         select: {
           id: true,
@@ -552,10 +598,13 @@ export class AdminService {
 
     return {
       areas,
+      sportOptions: SPORT_OPTIONS,
+      fitnessLocationOptions: FITNESS_LOCATION_OPTIONS,
       levels: ['BASELINE', 'STABLE', 'ADVANCED'],
       promptConfigs,
       goalPromptConfig,
       areaGenerationConfigs,
+      sportAreaPromptConfigs,
       onboardingTemplates,
       inputTypes: Object.values(OnboardingInputType),
       scopes: Object.values(OnboardingQuestionScope),
@@ -590,6 +639,34 @@ export class AdminService {
         isActive: true,
       },
     });
+  }
+
+  private async ensureSportAreaPromptConfigs(areas: Array<{ id: string; name: string }>) {
+    if (!areas.length) {
+      return;
+    }
+    await this.prisma.aiSportAreaPromptConfig.createMany({
+      data: sportPromptContexts.flatMap((context) =>
+        areas.map((area) => ({
+          sportKey: context.sportKey,
+          fitnessLocation: context.fitnessLocation,
+          areaId: area.id,
+          basePrompt: this.defaultSportAreaPrompt(
+            context.label,
+            area.name,
+          ),
+        })),
+      ),
+      skipDuplicates: true,
+    });
+  }
+
+  private defaultSportAreaPrompt(sportLabel: string, areaName: string) {
+    return [
+      `Adatta l area ${areaName} allo scenario sportivo ${sportLabel}.`,
+      'Usa questa scelta come vincolo prioritario quando interpreti obiettivo, anamnesi e domande specialistiche.',
+      'Mantieni il lavoro specifico per il contesto scelto, pratico, misurabile, progressivo e revisionabile da un professionista.',
+    ].join(' ');
   }
 
   async upsertGoalPromptConfig(
@@ -648,6 +725,63 @@ export class AdminService {
           updatedById: actorId,
         },
       });
+    });
+  }
+
+  async upsertSportAreaPromptConfig(
+    body: UpsertSportAreaPromptConfigDto,
+    actorId: string,
+  ) {
+    const sportKey = body.sportKey?.trim().toUpperCase();
+    const areaId = body.areaId?.trim();
+    const basePrompt = body.basePrompt?.trim();
+    const isActive = body.isActive ?? true;
+    const normalized = normalizeSportSelection({
+      sports: sportKey ? [sportKey] : [],
+      fitnessLocation:
+        sportKey === 'FITNESS'
+          ? body.fitnessLocation ?? null
+          : null,
+    });
+    const fitnessLocation =
+      normalized.sports.includes('FITNESS') && normalized.fitnessLocation
+        ? normalized.fitnessLocation
+        : FITNESS_LOCATION_NONE;
+
+    if (!actorId || !areaId || !basePrompt) {
+      throw new BadRequestException('Dati prompt sport area mancanti');
+    }
+    const area = await this.prisma.area.findUnique({
+      where: { id: areaId },
+      select: { id: true },
+    });
+    if (!area) {
+      throw new BadRequestException('Area non valida');
+    }
+
+    return this.prisma.aiSportAreaPromptConfig.upsert({
+      where: {
+        sportKey_fitnessLocation_areaId: {
+          sportKey,
+          fitnessLocation,
+          areaId,
+        },
+      },
+      update: {
+        basePrompt,
+        isActive,
+        version: { increment: 1 },
+        updatedById: actorId,
+      },
+      create: {
+        sportKey,
+        fitnessLocation,
+        areaId,
+        basePrompt,
+        isActive,
+        createdById: actorId,
+        updatedById: actorId,
+      },
     });
   }
 

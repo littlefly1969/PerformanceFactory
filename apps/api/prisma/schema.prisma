@@ -63,6 +63,7 @@ model User {
   onboardingAssessment UserOnboardingAssessment?
   onboardingQuestions  UserOnboardingQuestion[]
   performanceGoal      UserPerformanceGoal?
+  sportSelection       UserSportSelection?
   userAreaPromptInstructions UserAreaPromptInstruction[]
 
   performanceProfileSnapshots PerformanceProfileSnapshot[]
@@ -87,6 +88,8 @@ model User {
   updatedOnboardingTemplates  OnboardingQuestionTemplate[] @relation("OnboardingTemplateUpdatedBy")
   createdGoalPromptConfigs    AiGoalPromptConfig[]         @relation("AiGoalPromptConfigCreatedBy")
   updatedGoalPromptConfigs    AiGoalPromptConfig[]         @relation("AiGoalPromptConfigUpdatedBy")
+  createdSportAreaPromptConfigs AiSportAreaPromptConfig[]   @relation("AiSportAreaPromptConfigCreatedBy")
+  updatedSportAreaPromptConfigs AiSportAreaPromptConfig[]   @relation("AiSportAreaPromptConfigUpdatedBy")
 }
 
 model AuthIdentity {
@@ -119,6 +122,17 @@ model UserOnboardingAssessment {
   updatedAt   DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id])
+}
+
+model UserSportSelection {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  sports          Json
+  fitnessLocation String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model UserPerformanceGoal {
@@ -243,6 +257,28 @@ model AiAreaGenerationConfig {
   updatedBy User? @relation("AiAreaGenerationConfigUpdatedBy", fields: [updatedById], references: [id])
 }
 
+model AiSportAreaPromptConfig {
+  id              String   @id @default(uuid())
+  sportKey        String
+  fitnessLocation String   @default("NONE")
+  areaId          String
+  basePrompt      String
+  version         Int      @default(1)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdById     String?
+  updatedById     String?
+
+  area      Area  @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  createdBy User? @relation("AiSportAreaPromptConfigCreatedBy", fields: [createdById], references: [id])
+  updatedBy User? @relation("AiSportAreaPromptConfigUpdatedBy", fields: [updatedById], references: [id])
+
+  @@unique([sportKey, fitnessLocation, areaId])
+  @@index([sportKey, fitnessLocation, isActive])
+  @@index([areaId])
+}
+
 model UserAreaPromptInstruction {
   id            String   @id @default(uuid())
   userId        String
@@ -317,6 +353,7 @@ model Area {
   userOnboardingQuestions     UserOnboardingQuestion[]
   aiPromptConfigs             AiPromptConfig[]
   aiAreaGenerationConfig      AiAreaGenerationConfig?
+  sportAreaPromptConfigs      AiSportAreaPromptConfig[]
   userAreaPromptInstructions  UserAreaPromptInstruction[]
 }
 

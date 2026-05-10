@@ -115,7 +115,7 @@ export default function RegisterPage() {
     setAiAssistantAccepted(false);
     setRegistering(false);
     setMessage(
-      "Nuovo atleta creato. Un amministratore deve abilitarlo e collegargli i coach prima dell accesso.",
+      "Nuovo atleta creato. Un amministratore deve abilitarlo e collegargli i professionisti prima dell accesso.",
     );
   };
 
@@ -144,7 +144,7 @@ export default function RegisterPage() {
           </h1>
           <p className="pf-auth-copy">
             Richiedi il tuo accesso atleta. L'account verra abilitato
-            dall'admin prima di entrare nell'ambiente Performance Factory.
+            dall'amministratore prima di entrare nell'ambiente Performance Factory.
           </p>
 
           <ul
