@@ -55,7 +55,6 @@ export default function UserPianoPage() {
   const [plansByArea, setPianosByArea] = useState<Record<string, Piano | null>>(
     {},
   );
-  const [planHistory, setPianoHistory] = useState<Piano[]>([]);
 
   const activeItems = useMemo(
     () => plan?.items.filter((item) => item.status === "ACTIVE") ?? [],
@@ -116,7 +115,7 @@ export default function UserPianoPage() {
 
     if (!selectedAreaId) {
       setPiano(null);
-      setMessage("Seleziona un'area per caricare il piano corrente.");
+      setMessage("Seleziona un'area per caricare l'allenamento corrente.");
       setLoading(false);
       return;
     }
@@ -129,20 +128,15 @@ export default function UserPianoPage() {
     if (!response.ok) {
       setPiano(null);
       if (response.status === 401) {
-        setAuthHint("Accedi per vedere il tuo piano.");
+        setAuthHint("Accedi per vedere il tuo allenamento.");
       } else if (response.status !== 404) {
-        setMessage("Impossibile caricare il piano corrente.");
+        setMessage("Impossibile caricare l'allenamento corrente.");
       }
       setLoading(false);
       return;
     }
 
     setPiano((await response.json()) as Piano);
-    const historyResponse = await secureFetch(
-      `${API_BASE}/user/plan/history?areaId=${encodeURIComponent(selectedAreaId)}`,
-      { credentials: "include" },
-    );
-    setPianoHistory(historyResponse.ok ? ((await historyResponse.json()) as Piano[]) : []);
     setLoading(false);
   };
 
@@ -202,8 +196,8 @@ export default function UserPianoPage() {
   return (
     <ProductShell
       eyebrow="Ambiente atleta"
-      title="Piano performance attivo"
-      description="Il lavoro e organizzato per area. Le aree con attivita attive sono evidenziate per prime: aprine una e completa l'attivita assegnata."
+      title="Allenamenti da fare"
+      description="Il lavoro e organizzato per area. Le aree con allenamenti da fare sono evidenziate per prime: aprine una e completa l'allenamento assegnato."
       actions={
         <button
           className="pf-button-secondary"
@@ -215,7 +209,7 @@ export default function UserPianoPage() {
       }
       stats={[
         {
-          label: "Attivita attive",
+          label: "Allenamenti da fare",
           value: loading ? "..." : activeItems.length,
           tone: "accent",
         },
@@ -225,7 +219,7 @@ export default function UserPianoPage() {
           tone: "success",
         },
         {
-          label: "Versione piano",
+          label: "Versione allenamento",
           value: plan ? `v${plan.version}` : "-",
           tone: "warning",
         },
@@ -259,10 +253,10 @@ export default function UserPianoPage() {
                   <strong>{area.name}</strong>
                   <small>
                     {active
-                      ? `${active} attivita attiva`
+                      ? `${active} ${active === 1 ? "allenamento" : "allenamenti"} da fare`
                       : completed
                         ? `${completed} completate`
-                        : "Nessun piano attivo"}
+                        : "Nessun allenamento attivo"}
                   </small>
                 </span>
                 <StatusBadge
@@ -298,21 +292,20 @@ export default function UserPianoPage() {
 
         <div className="pf-stack">
           {activeItems.map((item) => (
-            <article key={item.id} className="pf-card">
-              <div className="pf-card-top">
+            <article key={item.id} className="pf-card pf-active-plan-card">
+              <div className="pf-card-top pf-active-plan-header">
                 <div>
-                  <h3>{item.title}</h3>
-                  <p className="pf-muted">
-                    {item.area?.name ?? "Area"} -{" "}
-                    <span className="pf-mono">{item.id.slice(0, 8)}</span>
+                  <p className="pf-active-plan-area">
+                    {item.area?.name ?? "Area"}
                   </p>
+                  <h3>{item.title}</h3>
                 </div>
                 <StatusBadge tone="accent">
                   {cleanStato(item.status)}
                 </StatusBadge>
               </div>
-              <p>{item.body}</p>
-              <div className="pf-grid">
+              <p className="pf-active-plan-body">{item.body}</p>
+              <div className="pf-grid pf-active-plan-form">
                 <label className="pf-field">
                   Note di completamento
                   <textarea
@@ -346,13 +339,15 @@ export default function UserPianoPage() {
                   />
                 </label>
               </div>
-              <button
-                className="pf-button"
-                type="button"
-                onClick={() => completePlanItem(item.id)}
-              >
-                Segna come completata
-              </button>
+              <div className="pf-active-plan-actions">
+                <button
+                  className="pf-button"
+                  type="button"
+                  onClick={() => completePlanItem(item.id)}
+                >
+                  Segna come completata
+                </button>
+              </div>
             </article>
           ))}
 
@@ -362,56 +357,13 @@ export default function UserPianoPage() {
               description={
                 areaId
                   ? "Non ci sono attivita attive pubblicate per l'area selezionata."
-                  : "Scegli un'area per caricare il piano corrente."
+                  : "Scegli un'area per caricare l'allenamento corrente."
               }
             />
           )}
         </div>
       </section>
 
-      <section className="pf-panel">
-        <div className="pf-panel-header">
-          <div>
-            <h2>Storico lavori</h2>
-            <p className="pf-muted">
-              Rivedi anche esercizi completati o chiusi delle versioni precedenti.
-            </p>
-          </div>
-        </div>
-        <div className="pf-stack">
-          {planHistory.map((historyPlan) => (
-            <article key={historyPlan.id} className="pf-card">
-              <div className="pf-card-top">
-                <div>
-                  <h3>Versione {historyPlan.version}</h3>
-                  <p className="pf-muted">{new Date(historyPlan.createdAt).toLocaleDateString("it-IT")}</p>
-                </div>
-                <StatusBadge tone={historyPlan.status === "ACTIVE" ? "accent" : "neutral"}>
-                  {cleanStato(historyPlan.status)}
-                </StatusBadge>
-              </div>
-              <div className="pf-stack">
-                {historyPlan.items.map((item) => (
-                  <div key={item.id} className="pf-work-row">
-                    <span>
-                      <strong>{item.title}</strong>
-                      <small>
-                        {cleanStato(item.status)}
-                        {item.completedAt ? ` - completato ${new Date(item.completedAt).toLocaleDateString("it-IT")}` : ""}
-                        {item.completionRating ? ` - voto ${item.completionRating}` : ""}
-                      </small>
-                    </span>
-                    <p className="pf-muted">{item.body}</p>
-                  </div>
-                ))}
-              </div>
-            </article>
-          ))}
-          {!loading && planHistory.length === 0 && (
-            <EmptyState title="Nessuno storico" description="Lo storico apparira dopo la pubblicazione dei piani." />
-          )}
-        </div>
-      </section>
     </ProductShell>
   );
 }

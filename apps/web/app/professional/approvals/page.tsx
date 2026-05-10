@@ -214,7 +214,7 @@ export default function ProfessionalApprovazioniPage() {
       },
     );
     if (!response.ok) {
-      setMessage(`Approvazione attivita piano non riuscita: ${await readError(response)}`);
+      setMessage(`Approvazione attivita allenamento non riuscita: ${await readError(response)}`);
       setBusy(planItemId, false);
       return;
     }
@@ -239,7 +239,7 @@ export default function ProfessionalApprovazioniPage() {
       },
     );
     if (!response.ok) {
-      setMessage(`Rifiuto attivita piano non riuscito: ${await readError(response)}`);
+      setMessage(`Rifiuto attivita allenamento non riuscito: ${await readError(response)}`);
       setBusy(planItemId, false);
       return;
     }
@@ -278,7 +278,7 @@ export default function ProfessionalApprovazioniPage() {
           tone: "warning",
         },
         {
-          label: "Attivita piano",
+          label: "Attivita allenamento",
           value: loading ? "..." : inbox.planItems.length,
           tone: "success",
         },
@@ -308,7 +308,7 @@ export default function ProfessionalApprovazioniPage() {
                   <h3>{group.user.email}</h3>
                   <p className="pf-muted">
                     {group.questions.length} questionari -{" "}
-                    {group.plans.length} attivita piano
+                    {group.plans.length} attivita allenamento
                   </p>
                 </div>
                 <div className="pf-actions">

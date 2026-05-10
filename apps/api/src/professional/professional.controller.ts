@@ -60,7 +60,7 @@ export class ProfessionalController {
   }
 
   @Post('plan-items/:id/approve')
-  @ApiOperation({ summary: 'Approva una attivita piano (per area)' })
+  @ApiOperation({ summary: 'Approva una attivita allenamento (per area)' })
   @ApiParam({ name: 'id' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
@@ -75,7 +75,7 @@ export class ProfessionalController {
   }
 
   @Post('plan-items/:id/reject')
-  @ApiOperation({ summary: 'Rifiuta una attivita piano (per area)' })
+  @ApiOperation({ summary: 'Rifiuta una attivita allenamento (per area)' })
   @ApiParam({ name: 'id' })
   @ApiBody({ type: RejectionDto })
   @ApiCookieAuth()

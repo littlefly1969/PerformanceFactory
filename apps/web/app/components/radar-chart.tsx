@@ -10,6 +10,7 @@ type RadarArea = {
 type RadarChartProps = {
   areas: RadarArea[];
   max?: number;
+  getAreaHref?: (area: RadarArea) => string;
 };
 
 const clamp = (value: number, max: number) => Math.max(0, Math.min(max, value));
@@ -31,7 +32,7 @@ const polygonPoints = (areas: RadarArea[], key: "real" | "potential", max: numbe
     })
     .join(" ");
 
-export function RadarChart({ areas, max = 100 }: RadarChartProps) {
+export function RadarChart({ areas, max = 100, getAreaHref }: RadarChartProps) {
   const center = 150;
   const radius = 104;
   const rings = [0.2, 0.4, 0.6, 0.8, 1];
@@ -64,11 +65,19 @@ export function RadarChart({ areas, max = 100 }: RadarChartProps) {
 
           {areas.map((area, index) => {
             const outer = pointFor(index, areas.length, max, max, radius, center);
-            return (
-              <g key={area.id}>
+            const href = getAreaHref?.(area);
+            const axis = (
+              <g className={href ? "pf-radar-clickable" : undefined}>
                 <line className="pf-radar-axis" x1={center} y1={center} x2={outer.x} y2={outer.y} />
                 <circle className="pf-radar-node" cx={outer.x} cy={outer.y} r="6" />
               </g>
+            );
+            return href ? (
+              <a key={area.id} href={href} aria-label={`Apri dettaglio ${area.label}`}>
+                {axis}
+              </a>
+            ) : (
+              <g key={area.id}>{axis}</g>
             );
           })}
 
@@ -77,23 +86,44 @@ export function RadarChart({ areas, max = 100 }: RadarChartProps) {
           {areas.map((area, index) => {
             const real = pointFor(index, areas.length, area.real, max, radius, center);
             const potential = pointFor(index, areas.length, area.potential, max, radius, center);
-            return (
-              <g key={`${area.id}-points`}>
+            const href = getAreaHref?.(area);
+            const points = (
+              <g className={href ? "pf-radar-clickable" : undefined}>
                 <circle className="pf-radar-dot potential" cx={potential.x} cy={potential.y} r="3.5" />
                 <circle className="pf-radar-dot real" cx={real.x} cy={real.y} r="4" />
               </g>
             );
+            return href ? (
+              <a key={`${area.id}-points`} href={href} aria-label={`Apri dettaglio ${area.label}`}>
+                {points}
+              </a>
+            ) : (
+              <g key={`${area.id}-points`}>{points}</g>
+            );
           })}
         </svg>
-        {areas.map((area, index) => (
-          <span
-            key={`${area.id}-label`}
-            className="pf-radar-pill"
-            style={{ "--pf-radar-index": index, "--pf-radar-total": areas.length } as CSSProperties}
-          >
-            {area.label}
-          </span>
-        ))}
+        {areas.map((area, index) => {
+          const href = getAreaHref?.(area);
+          const style = { "--pf-radar-index": index, "--pf-radar-total": areas.length } as CSSProperties;
+          return href ? (
+            <a
+              key={`${area.id}-label`}
+              className="pf-radar-pill pf-radar-link"
+              href={href}
+              style={style}
+            >
+              {area.label}
+            </a>
+          ) : (
+            <span
+              key={`${area.id}-label`}
+              className="pf-radar-pill"
+              style={style}
+            >
+              {area.label}
+            </span>
+          );
+        })}
       </div>
       <div className="pf-radar-legend">
         <span><i className="real" /> Reale</span>

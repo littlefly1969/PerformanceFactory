@@ -1269,8 +1269,8 @@ export class AiProposalProviderService {
         'Il campo status governa il flusso.',
         'Se refinementContext e presente, conserva le parti gia utili dell obiettivo originale e della bozza corrente, integra solo le nuove risposte dell utente e non chiedere di riscrivere tutto.',
         finalValidation
-          ? 'La fase corrente serve a validare definitivamente obiettivo e realismo, non a generare ancora il piano di allenamento.'
-          : 'La fase corrente serve SOLO a definire l obiettivo, non a fare anamnesi, onboarding, piano di allenamento o questionario sulle abitudini.',
+          ? 'La fase corrente serve a validare definitivamente obiettivo e realismo, non a generare ancora l allenamento.'
+          : 'La fase corrente serve SOLO a definire l obiettivo, non a fare anamnesi, onboarding, allenamento o questionario sulle abitudini.',
         finalValidation
           ? 'Questa e la validazione finale: usa datiAnamnestici e storicoRisposte per decidere se l obiettivo e realistico. Se non lo e, usa GOAL_NEEDS_REFORMULATION e spiega cosa va ridimensionato o chiarito.'
           : 'Questa non e la validazione finale: se mancano dati personali ma l obiettivo e sensato, usa NEEDS_ANAMNESIS.',

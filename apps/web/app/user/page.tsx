@@ -149,7 +149,7 @@ export default function AthleteDashboardPage() {
   return (
     <ProductShell
       eyebrow="Ambiente atleta"
-      title="Cruscotto performance"
+      title="La tua performance"
       description="Vista personale di profilo corrente, lavoro attivo, check-in aperti e team professionale."
       actions={
         <button className="pf-button-secondary" type="button" onClick={() => loadDashboard()}>
@@ -159,7 +159,7 @@ export default function AthleteDashboardPage() {
       stats={[
         { label: "Media reale", value: loading ? "..." : realAverage || "-", tone: "accent" },
         { label: "Media potenziale", value: loading ? "..." : potentialAverage || "-", tone: "success" },
-        { label: "Lavoro attivo", value: loading ? "..." : activeItems.length, tone: "warning" },
+        { label: "Allenamenti da fare", value: loading ? "..." : activeItems.length, tone: "warning" },
       ]}
     >
       {message && <div className="pf-alert warning">{message}</div>}
@@ -175,7 +175,10 @@ export default function AthleteDashboardPage() {
             </div>
             {snapshot && <StatusBadge tone="success">{formatDate(snapshot.createdAt)}</StatusBadge>}
           </div>
-          <RadarChart areas={radarAree} />
+          <RadarChart
+            areas={radarAree}
+            getAreaHref={(area) => `/user/areas/${encodeURIComponent(area.id)}`}
+          />
         </article>
 
         <aside className="pf-panel">
@@ -187,7 +190,7 @@ export default function AthleteDashboardPage() {
           </div>
           <div className="pf-stack">
             <div className="pf-metric-row">
-              <Link href="/user/plan">Attivita piano attive</Link>
+              <Link href="/user/plan">Allenamenti da fare</Link>
               <strong>{activeItems.length}</strong>
             </div>
             <div className="pf-metric-row">
@@ -199,7 +202,7 @@ export default function AthleteDashboardPage() {
               <strong>{professionals.length}</strong>
             </div>
             <div className="pf-actions">
-              <Link className="pf-button" href="/user/plan">Apri piano</Link>
+              <Link className="pf-button" href="/user/plan">Apri allenamento</Link>
               <Link className="pf-button-secondary" href="/user/questions">Rispondi al check-in</Link>
             </div>
           </div>
@@ -218,25 +221,31 @@ export default function AthleteDashboardPage() {
             const profile = snapshot?.areas.find((area) => area.areaId === row.area.id);
             const active = row.plan?.items.filter((item) => item.status === "ACTIVE") ?? [];
             return (
-              <article key={row.area.id} className="pf-card">
-                <div className="pf-card-top">
-                  <div>
-                    <h3>{row.area.name}</h3>
-                    <p className="pf-muted">
-                      Reale {profile?.realR.toFixed(0) ?? "-"} - Potenziale {profile?.potentialP.toFixed(0) ?? "-"}
-                    </p>
-                  </div>
+              <article
+                key={row.area.id}
+                className={`pf-card pf-area-focus-card ${active.length ? "attention" : ""}`}
+              >
+                <div className="pf-area-focus-header">
+                  <h3>{row.area.name}</h3>
+                  <div className="pf-area-focus-status">
                   <StatusBadge tone={active.length ? "accent" : "neutral"}>
-                    {active.length ? `${active.length} attive` : "Nessun lavoro attivo"}
+                    {active.length
+                      ? `${active.length} ${active.length === 1 ? "allenamento" : "allenamenti"} da fare`
+                      : "Nessun allenamento da fare"}
                   </StatusBadge>
+                  </div>
                 </div>
-                {active[0] && (
-                  <p>
-                    <strong>{active[0].title}</strong><br />
-                    <span className="pf-muted">{active[0].body}</span>
-                  </p>
-                )}
-                <div className="pf-row">
+                <div className="pf-area-score-row">
+                  <span className="pf-area-score-item">
+                    <small>Reale</small>
+                    <strong>{profile?.realR.toFixed(0) ?? "-"}</strong>
+                  </span>
+                  <span className="pf-area-score-item">
+                    <small>Potenziale</small>
+                    <strong>{profile?.potentialP.toFixed(0) ?? "-"}</strong>
+                  </span>
+                </div>
+                <div className="pf-area-question-status">
                   <Link href={`/user/questions?areaId=${encodeURIComponent(row.area.id)}`}>
                     Questionario
                   </Link>
@@ -244,12 +253,15 @@ export default function AthleteDashboardPage() {
                     {row.questionSet ? `${row.questionSet.questions.length} domande` : "Non disponibile"}
                   </StatusBadge>
                 </div>
-                <div className="pf-actions">
+                <div className="pf-actions pf-area-card-actions">
                   <Link className="pf-button-secondary" href={`/user/plan?areaId=${encodeURIComponent(row.area.id)}`}>
-                    Lavori
+                    Allenamenti
                   </Link>
                   <Link className="pf-button-secondary" href={`/user/questions?areaId=${encodeURIComponent(row.area.id)}`}>
                     Questionari
+                  </Link>
+                  <Link className="pf-button-secondary" href={`/user/areas/${encodeURIComponent(row.area.id)}`}>
+                    Dettaglio area
                   </Link>
                 </div>
               </article>

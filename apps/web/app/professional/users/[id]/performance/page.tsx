@@ -325,7 +325,7 @@ export default function ProfessionalUserPerformancePage() {
             </article>
           ))}
           {!loading && planHistory.length === 0 && (
-            <EmptyState title="Nessuno storico piani" description="Lo storico dei piani pubblicati apparira qui." />
+            <EmptyState title="Nessuno storico allenamenti" description="Lo storico degli allenamenti pubblicati apparira qui." />
           )}
         </div>
       </section>

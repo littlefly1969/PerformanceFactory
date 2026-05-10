@@ -223,7 +223,7 @@ export default function LoginPage() {
           </h1>
           <p className="pf-auth-copy">
             Un unico spazio per iniziare il tuo percorso, seguire i progressi e
-            costruire un piano personalizzato.
+            costruire un allenamento personalizzato.
           </p>
 
           <ul

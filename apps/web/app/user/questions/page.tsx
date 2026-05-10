@@ -41,15 +41,6 @@ type Snapshot = {
 };
 type Area = { id: string; name: string };
 
-const formatStatus = (status: string) =>
-  ({
-    ACTIVE: "attivo",
-    COMPLETED: "completato",
-    CLOSED: "chiuso",
-    PENDING: "in attesa",
-    PUBLISHED: "pubblicato",
-  })[status] ?? status.replace(/_/g, " ").toLowerCase();
-
 export default function UserQuestionsPage() {
   const [questionSet, setQuestionSet] = useState<QuestionSet | null>(null);
   const [selected, setSelected] = useState<Record<string, string>>({});
@@ -63,7 +54,6 @@ export default function UserQuestionsPage() {
   const [questionSetsByArea, setQuestionSetsByArea] = useState<
     Record<string, QuestionSet | null>
   >({});
-  const [questionHistory, setQuestionHistory] = useState<QuestionSet[]>([]);
 
   const totalQuestions = questionSet?.questions.length ?? 0;
   const answeredCount = Object.keys(selected).length;
@@ -149,13 +139,6 @@ export default function UserQuestionsPage() {
     }
 
     setQuestionSet((await response.json()) as QuestionSet);
-    const historyResponse = await secureFetch(
-      `${API_BASE}/user/questions/history?areaId=${encodeURIComponent(selectedAreaId)}`,
-      { credentials: "include" },
-    );
-    setQuestionHistory(
-      historyResponse.ok ? ((await historyResponse.json()) as QuestionSet[]) : [],
-    );
     setLoading(false);
   };
 
@@ -370,50 +353,6 @@ export default function UserQuestionsPage() {
         )}
       </section>
 
-      <section className="pf-panel">
-        <div className="pf-panel-header">
-          <div>
-            <h2>Storico questionari</h2>
-            <p className="pf-muted">
-              Rivedi questionari aperti, completati e chiusi dell area selezionata.
-            </p>
-          </div>
-        </div>
-        <div className="pf-stack">
-          {questionHistory.map((set) => (
-            <article key={set.id} className="pf-card">
-              <div className="pf-card-top">
-                <div>
-                  <h3>{new Date(set.createdAt).toLocaleDateString("it-IT")}</h3>
-                  <p className="pf-muted">{set.questions.length} domande</p>
-                </div>
-                <StatusBadge tone={set.status === "CLOSED" ? "success" : "warning"}>
-                  {formatStatus(set.status)}
-                </StatusBadge>
-              </div>
-              <div className="pf-stack">
-                {set.questions.map((question) => {
-                  const answer = question.answers?.[0];
-                  const answerLabel = question.options.find(
-                    (option) => option.id === answer?.answerOptionId,
-                  )?.label;
-                  return (
-                    <div key={question.id} className="pf-work-row">
-                      <span>
-                        <strong>{question.orderIndex}. {question.text}</strong>
-                        <small>{answerLabel ?? "Nessuna risposta registrata"}</small>
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </article>
-          ))}
-          {!loading && questionHistory.length === 0 && (
-            <EmptyState title="Nessuno storico" description="Lo storico apparira dopo la pubblicazione dei questionari." />
-          )}
-        </div>
-      </section>
     </ProductShell>
   );
 }

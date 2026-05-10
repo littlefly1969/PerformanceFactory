@@ -134,7 +134,8 @@ a {
   gap: 6px;
 }
 
-.pf-nav a {
+.pf-nav a,
+.pf-nav-dropdown summary {
   padding: 9px 11px;
   border-radius: 999px;
   color: #344054;
@@ -142,9 +143,45 @@ a {
 }
 
 .pf-nav a:hover,
-.pf-nav a.active {
+.pf-nav a.active,
+.pf-nav-dropdown.active > summary,
+.pf-nav-dropdown summary:hover {
   background: #ecfdf5;
   color: var(--pf-accent-strong);
+}
+
+.pf-nav-dropdown {
+  position: relative;
+}
+
+.pf-nav-dropdown summary {
+  display: block;
+  cursor: pointer;
+  list-style: none;
+}
+
+.pf-nav-dropdown summary::-webkit-details-marker {
+  display: none;
+}
+
+.pf-nav-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 20;
+  display: grid;
+  min-width: 210px;
+  gap: 6px;
+  border: 1px solid var(--pf-border);
+  border-radius: 8px;
+  background: var(--pf-surface);
+  padding: 8px;
+  box-shadow: var(--pf-shadow);
+}
+
+.pf-nav-menu a {
+  border-radius: 6px;
+  white-space: nowrap;
 }
 
 .pf-main {
@@ -303,6 +340,176 @@ a {
 
 .pf-card {
   padding: 18px;
+}
+
+.pf-active-plan-card {
+  display: grid;
+  gap: 18px;
+}
+
+.pf-active-plan-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.pf-active-plan-area {
+  margin: 0 0 10px;
+  color: var(--pf-accent);
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.25;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.pf-active-plan-card h3 {
+  color: var(--pf-text);
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.pf-active-plan-body {
+  margin: 2px 0 0;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.pf-active-plan-form {
+  align-items: start;
+  gap: 20px;
+}
+
+.pf-active-plan-form .pf-textarea {
+  min-height: 100px;
+}
+
+.pf-active-plan-actions {
+  display: flex;
+  justify-content: flex-start;
+  padding-top: 2px;
+}
+
+.pf-area-focus-card {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  min-height: 360px;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.pf-area-focus-card.attention {
+  border-color: rgba(220, 255, 50, 0.86);
+  background:
+    linear-gradient(90deg, rgba(220, 255, 50, 0.14), transparent 42%),
+    linear-gradient(180deg, rgba(68, 72, 84, 0.96), rgba(18, 19, 37, 0.98));
+  box-shadow:
+    0 0 0 2px rgba(220, 255, 50, 0.32),
+    0 18px 42px rgba(220, 255, 50, 0.1);
+}
+
+.pf-area-focus-card.attention::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 6px;
+  background: var(--pf-accent);
+  content: "";
+}
+
+.pf-area-focus-header {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.pf-area-focus-status {
+  min-width: 0;
+}
+
+.pf-area-focus-status .pf-badge {
+  justify-self: start;
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+  line-height: 1.2;
+}
+
+.pf-area-focus-card h3 {
+  margin: 0;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.pf-area-score-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.pf-area-score-item {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+  padding: 10px 12px;
+}
+
+.pf-area-score-item small {
+  color: var(--pf-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.pf-area-score-item strong {
+  color: var(--pf-text);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.pf-area-card-body {
+  min-height: 24px;
+  overflow: hidden;
+}
+
+.pf-area-card-body:empty {
+  min-height: 0;
+  margin-top: 0;
+}
+
+.pf-area-question-status {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.pf-area-question-status .pf-badge {
+  justify-self: start;
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
+
+.pf-area-card-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 14px;
+  width: 100%;
+  margin-top: 14px;
+}
+
+.pf-area-card-actions .pf-button-secondary {
+  width: 100%;
+}
+
+.pf-history-content {
+  margin-top: 18px;
 }
 
 .pf-consent-documents {
@@ -879,6 +1086,35 @@ a {
   margin: 4px 0 0;
 }
 
+.pf-plan-history-item {
+  grid-template-columns: 1fr;
+  align-items: start;
+  gap: 10px;
+}
+
+.pf-plan-history-heading {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pf-plan-history-heading strong,
+.pf-plan-history-heading small {
+  display: block;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pf-plan-history-heading small {
+  color: var(--pf-muted);
+  font-size: 13px;
+}
+
+.pf-plan-history-item p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .pf-inline-metrics {
   display: inline-flex;
   gap: 8px;
@@ -934,6 +1170,8 @@ a {
 }
 
 .pf-area-card {
+  position: relative;
+  overflow: hidden;
   min-height: 86px;
   border: 1px solid var(--pf-border);
   border-radius: 8px;
@@ -955,7 +1193,27 @@ a {
 }
 
 .pf-area-card.attention {
-  background: linear-gradient(180deg, #ffffff, #f0fdfa);
+  border-color: rgba(220, 255, 50, 0.86);
+  background:
+    linear-gradient(90deg, rgba(220, 255, 50, 0.16), transparent 42%),
+    linear-gradient(180deg, rgba(68, 72, 84, 0.96), rgba(18, 19, 37, 0.98));
+  color: var(--pf-text);
+  box-shadow:
+    0 0 0 2px rgba(220, 255, 50, 0.34),
+    0 18px 42px rgba(220, 255, 50, 0.12);
+}
+
+.pf-area-card.attention::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 6px;
+  background: var(--pf-accent);
+  content: "";
+}
+
+.pf-area-card.attention strong {
+  color: #ffffff;
+  font-weight: 900;
 }
 
 .pf-area-card span,
@@ -968,6 +1226,11 @@ a {
   color: var(--pf-muted);
   font-size: 12px;
   font-weight: 700;
+}
+
+.pf-area-card.attention small {
+  color: var(--pf-accent-strong);
+  font-weight: 900;
 }
 
 .pf-review-card {
@@ -1234,6 +1497,7 @@ a {
   .pf-two-col,
   .pf-role-grid,
   .pf-option-grid,
+  .pf-area-card-actions,
   .pf-work-row {
     grid-template-columns: 1fr;
   }
@@ -1343,16 +1607,28 @@ body {
   padding: 4px;
 }
 
-.pf-nav a {
+.pf-nav a,
+.pf-nav-dropdown summary {
   color: rgba(255, 255, 255, 0.72);
   border-radius: 999px;
   padding: 9px 14px;
 }
 
 .pf-nav a:hover,
-.pf-nav a.active {
+.pf-nav a.active,
+.pf-nav-dropdown.active > summary,
+.pf-nav-dropdown summary:hover {
   background: var(--pf-accent);
   color: #050515;
+}
+
+.pf-nav-menu {
+  border-color: var(--pf-border);
+  background: linear-gradient(180deg, rgba(58, 58, 83, 0.98), rgba(22, 22, 43, 0.98));
+}
+
+.pf-nav-menu a {
+  border-radius: 6px;
 }
 
 .pf-userbar {
@@ -1396,6 +1672,24 @@ body {
   border-color: var(--pf-border);
   background: linear-gradient(180deg, rgba(58, 58, 83, 0.72), rgba(27, 27, 48, 0.94));
   box-shadow: var(--pf-shadow);
+}
+
+.pf-area-focus-card.attention {
+  border-color: rgba(220, 255, 50, 0.9);
+  background:
+    linear-gradient(90deg, rgba(220, 255, 50, 0.18), transparent 44%),
+    linear-gradient(180deg, rgba(72, 76, 88, 0.98), rgba(18, 19, 37, 0.98));
+  box-shadow:
+    0 0 0 2px rgba(220, 255, 50, 0.46),
+    0 22px 48px rgba(220, 255, 50, 0.14);
+}
+
+.pf-area-focus-card.attention::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 7px;
+  background: var(--pf-accent);
+  content: "";
 }
 
 .pf-panel {
@@ -1679,6 +1973,22 @@ body {
   stroke-width: 1;
 }
 
+.pf-radar-clickable {
+  cursor: pointer;
+}
+
+.pf-radar-link {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.pf-radar-link:hover,
+.pf-radar-link:focus-visible {
+  background: var(--pf-accent);
+  color: #050515;
+  outline: none;
+}
+
 .pf-radar-pill {
   position: absolute;
   min-width: 148px;
@@ -1747,6 +2057,14 @@ body {
   color: rgba(255, 255, 255, 0.75);
   cursor: pointer;
   font: inherit;
+}
+
+.pf-score-value {
+  display: block;
+  margin-top: 18px;
+  color: var(--pf-accent);
+  font-size: 44px;
+  line-height: 1;
 }
 
 .pf-area-pill.ready {

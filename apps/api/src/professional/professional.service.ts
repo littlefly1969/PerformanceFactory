@@ -412,15 +412,15 @@ export class ProfessionalService {
     });
 
     if (!planItem) {
-      throw new NotFoundException('Attivita piano non trovata');
+      throw new NotFoundException('Attivita allenamento non trovata');
     }
 
     if (planItem.status !== 'PROPOSED') {
-      throw new BadRequestException('Attivita piano gia decisa');
+      throw new BadRequestException('Attivita allenamento gia decisa');
     }
 
     if (planItem.planRelease.status !== 'PENDING_APPROVAL') {
-      throw new BadRequestException('Il rilascio piano non e in approvazione');
+      throw new BadRequestException('Il rilascio allenamento non e in approvazione');
     }
 
     const allowed = await this.abac.canAccessUserArea(
@@ -429,7 +429,7 @@ export class ProfessionalService {
       planItem.areaId,
     );
     if (!allowed) {
-      throw new ForbiddenException('Operazione non consentita per questa attivita piano');
+      throw new ForbiddenException('Operazione non consentita per questa attivita allenamento');
     }
 
     const updated = await this.prisma.planItem.update({
@@ -475,15 +475,15 @@ export class ProfessionalService {
     });
 
     if (!planItem) {
-      throw new NotFoundException('Attivita piano non trovata');
+      throw new NotFoundException('Attivita allenamento non trovata');
     }
 
     if (planItem.status !== 'PROPOSED') {
-      throw new BadRequestException('Attivita piano gia decisa');
+      throw new BadRequestException('Attivita allenamento gia decisa');
     }
 
     if (planItem.planRelease.status !== 'PENDING_APPROVAL') {
-      throw new BadRequestException('Il rilascio piano non e in approvazione');
+      throw new BadRequestException('Il rilascio allenamento non e in approvazione');
     }
 
     const allowed = await this.abac.canAccessUserArea(
@@ -492,7 +492,7 @@ export class ProfessionalService {
       planItem.areaId,
     );
     if (!allowed) {
-      throw new ForbiddenException('Operazione non consentita per questa attivita piano');
+      throw new ForbiddenException('Operazione non consentita per questa attivita allenamento');
     }
 
     const updated = await this.prisma.planItem.update({

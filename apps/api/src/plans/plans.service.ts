@@ -94,7 +94,7 @@ export class PlansService {
     });
 
     if (!plan) {
-      throw new NotFoundException('Rilascio piano non trovato');
+      throw new NotFoundException('Rilascio allenamento non trovato');
     }
 
     const filteredForUser =
@@ -226,7 +226,7 @@ export class PlansService {
     });
 
     if (!planItem) {
-      throw new NotFoundException('Attivita piano non trovata');
+      throw new NotFoundException('Attivita allenamento non trovata');
     }
 
     const allowed = await this.abac.canAccessUserArea(
@@ -235,7 +235,7 @@ export class PlansService {
       planItem.areaId,
     );
     if (!allowed) {
-      throw new ForbiddenException('Operazione non consentita per questa attivita piano');
+      throw new ForbiddenException('Operazione non consentita per questa attivita allenamento');
     }
 
     const updated = await this.prisma.planItem.update({
@@ -274,7 +274,7 @@ export class PlansService {
     });
 
     if (!planItem) {
-      throw new NotFoundException('Attivita piano non trovata');
+      throw new NotFoundException('Attivita allenamento non trovata');
     }
 
     const allowed = await this.abac.canAccessUserArea(
@@ -283,7 +283,7 @@ export class PlansService {
       planItem.areaId,
     );
     if (!allowed) {
-      throw new ForbiddenException('Operazione non consentita per questa attivita piano');
+      throw new ForbiddenException('Operazione non consentita per questa attivita allenamento');
     }
 
     const updated = await this.prisma.planItem.update({
@@ -301,7 +301,7 @@ export class PlansService {
       await this.orchestrator.rejectCycleProposal(
         planItem.planReleaseId,
         actor.id,
-        reason ?? 'Attivita piano rifiutata',
+        reason ?? 'Attivita allenamento rifiutata',
       );
     }
 

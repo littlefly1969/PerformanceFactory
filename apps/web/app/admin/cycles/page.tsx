@@ -430,7 +430,7 @@ export default function AdminCyclesPage() {
       setBusyKey(null);
       return;
     }
-    setMessage("Ciclo pubblicato. L'atleta ora vede piano e questionario.");
+    setMessage("Ciclo pubblicato. L'atleta ora vede allenamento e questionario.");
     await loadDashboard();
     setBusyKey(null);
   };
@@ -744,7 +744,7 @@ export default function AdminCyclesPage() {
                     {displayUser(item.user)} - {item.area.name}
                   </small>
                 </span>
-                <StatusBadge tone="warning">Attivita piano</StatusBadge>
+                <StatusBadge tone="warning">Attivita allenamento</StatusBadge>
               </div>
             ))}
             {!loading &&

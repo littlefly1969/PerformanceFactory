@@ -972,7 +972,7 @@ export class OrchestratorService {
       active.items.every((item) => item.status === 'COMPLETED');
     if (!allActivitiesCompleted) {
       throw new BadRequestException(
-        'L attivita del piano precedente deve essere completata prima di generare un nuovo ciclo',
+        'L attivita dell allenamento precedente deve essere completata prima di generare un nuovo ciclo',
       );
     }
 
@@ -986,7 +986,7 @@ export class OrchestratorService {
 
   async publishCycle(planReleaseId: string, actorId: string) {
     if (!planReleaseId) {
-      throw new BadRequestException('ID rilascio piano mancante');
+      throw new BadRequestException('ID rilascio allenamento mancante');
     }
     if (!actorId) {
       throw new BadRequestException('ID attore mancante');
@@ -1013,18 +1013,18 @@ export class OrchestratorService {
       });
 
       if (!plan) {
-        throw new BadRequestException('Rilascio piano non trovato');
+        throw new BadRequestException('Rilascio allenamento non trovato');
       }
 
       if (plan.status !== 'PENDING_APPROVAL') {
-        throw new BadRequestException('Il rilascio piano non e in approvazione');
+        throw new BadRequestException('Il rilascio allenamento non e in approvazione');
       }
 
       const allItemsApproved = plan.items.every(
         (item) => item.status === 'APPROVED',
       );
       if (!allItemsApproved) {
-        throw new BadRequestException('Non tutte le attivita piano sono approvate');
+        throw new BadRequestException('Non tutte le attivita allenamento sono approvate');
       }
 
       const questionSet = plan.questionSets[0];
@@ -1220,7 +1220,7 @@ export class OrchestratorService {
 
   async refreshCycleReadiness(planReleaseId: string) {
     if (!planReleaseId) {
-      throw new BadRequestException('ID rilascio piano mancante');
+      throw new BadRequestException('ID rilascio allenamento mancante');
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -1278,7 +1278,7 @@ export class OrchestratorService {
     rejectionReason = 'Proposta ciclo rifiutata',
   ) {
     if (!planReleaseId) {
-      throw new BadRequestException('ID rilascio piano mancante');
+      throw new BadRequestException('ID rilascio allenamento mancante');
     }
     if (!actorId) {
       throw new BadRequestException('ID attore mancante');
@@ -1295,7 +1295,7 @@ export class OrchestratorService {
       });
 
       if (!plan) {
-        throw new BadRequestException('Rilascio piano non trovato');
+        throw new BadRequestException('Rilascio allenamento non trovato');
       }
 
       if (plan.status === 'REJECTED') {
@@ -1303,7 +1303,7 @@ export class OrchestratorService {
       }
 
       if (plan.status !== 'PENDING_APPROVAL') {
-        throw new BadRequestException('Il rilascio piano non e in approvazione');
+        throw new BadRequestException('Il rilascio allenamento non e in approvazione');
       }
 
       const rejectedAt = new Date();

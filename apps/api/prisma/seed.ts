@@ -404,7 +404,7 @@ async function main() {
         areaId: area.id,
         athleteLevel: 'BASELINE',
         isActive: true,
-        basePrompt: `Per l area ${area.name}, genera indicazioni iniziali semplici, misurabili e compatibili con il livello baseline dell atleta. Collega sempre piano e domande alle risposte anamnestiche dell area e alla sicurezza operativa.`,
+        basePrompt: `Per l area ${area.name}, genera indicazioni iniziali semplici, misurabili e compatibili con il livello baseline dell atleta. Collega sempre allenamento e domande alle risposte anamnestiche dell area e alla sicurezza operativa.`,
         updatedById: admin.id,
       },
       create: {
@@ -413,7 +413,7 @@ async function main() {
         areaId: area.id,
         athleteLevel: 'BASELINE',
         isActive: true,
-        basePrompt: `Per l area ${area.name}, genera indicazioni iniziali semplici, misurabili e compatibili con il livello baseline dell atleta. Collega sempre piano e domande alle risposte anamnestiche dell area e alla sicurezza operativa.`,
+        basePrompt: `Per l area ${area.name}, genera indicazioni iniziali semplici, misurabili e compatibili con il livello baseline dell atleta. Collega sempre allenamento e domande alle risposte anamnestiche dell area e alla sicurezza operativa.`,
         createdById: admin.id,
       },
     });

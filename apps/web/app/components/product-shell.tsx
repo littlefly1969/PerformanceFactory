@@ -10,6 +10,7 @@ import { API_BASE, clearAccessToken, secureFetch } from "@/app/lib/api";
 type NavItem = {
   href: string;
   label: string;
+  children?: NavItem[];
 };
 
 type ProductShellProps = {
@@ -36,10 +37,23 @@ type CurrentUser = {
 
 const roleNav: Record<string, NavItem[]> = {
   USER: [
-    { href: "/user", label: "Cruscotto" },
-    { href: "/user/plan", label: "Piano" },
-    { href: "/user/questions", label: "Questionari" },
-    { href: "/user/performance", label: "Performance" },
+    { href: "/user", label: "La tua performance" },
+    {
+      href: "/user/plan",
+      label: "Allenamenti",
+      children: [
+        { href: "/user/plan", label: "Allenamenti attivi" },
+        { href: "/user/plan/history", label: "Storico allenamenti" },
+      ],
+    },
+    {
+      href: "/user/questions",
+      label: "Questionari",
+      children: [
+        { href: "/user/questions", label: "Questionari aperti" },
+        { href: "/user/questions/history", label: "Storico questionari" },
+      ],
+    },
   ],
   PROFESSIONAL: [
     { href: "/professional", label: "Atleti" },
@@ -90,6 +104,7 @@ const pathMatchesRole = (path: string, role?: string) => {
 
 const isNavActive = (path: string, href: string) =>
   path === href ||
+  (href === "/user" && path.startsWith("/user/areas/")) ||
   (href !== "/user" && href !== "/professional" && path.startsWith(`${href}/`));
 
 export function ProductShell({
@@ -189,15 +204,35 @@ export function ProductShell({
         <div className="pf-topbar-right">
           {resolvedNav.length > 0 && (
             <nav className="pf-nav" aria-label="Navigazione ambiente">
-              {resolvedNav.map((item) => (
-                <Link
-                  key={item.href}
-                  className={isNavActive(pathname, item.href) ? "active" : ""}
-                  href={item.href}
-                >
-                  {item.label}
-                </Link>
-              ))}
+              {resolvedNav.map((item) =>
+                item.children?.length ? (
+                  <details
+                    key={item.href}
+                    className={`pf-nav-dropdown ${isNavActive(pathname, item.href) ? "active" : ""}`}
+                  >
+                    <summary>{item.label}</summary>
+                    <div className="pf-nav-menu">
+                      {item.children.map((child) => (
+                        <Link
+                          key={child.href}
+                          className={pathname === child.href ? "active" : ""}
+                          href={child.href}
+                        >
+                          {child.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </details>
+                ) : (
+                  <Link
+                    key={item.href}
+                    className={isNavActive(pathname, item.href) ? "active" : ""}
+                    href={item.href}
+                  >
+                    {item.label}
+                  </Link>
+                ),
+              )}
             </nav>
           )}
           <div className="pf-userbar">

@@ -52,7 +52,7 @@ export class UserPlanService {
     });
 
     if (!plan) {
-      throw new NotFoundException('Piano attivo non trovato');
+      throw new NotFoundException('Allenamento attivo non trovato');
     }
 
     return plan;
@@ -103,7 +103,7 @@ export class UserPlanService {
     input: CompletePlanItemDto = {},
   ) {
     if (!userId || !planItemId) {
-      throw new BadRequestException('Attivita piano mancante');
+      throw new BadRequestException('Attivita allenamento mancante');
     }
 
     if (
@@ -124,7 +124,7 @@ export class UserPlanService {
     });
 
     if (!planItem) {
-      throw new NotFoundException('Attivita piano non trovata');
+      throw new NotFoundException('Attivita allenamento non trovata');
     }
 
     if (planItem.planRelease.userId !== userId) {
@@ -132,15 +132,15 @@ export class UserPlanService {
     }
 
     if (planItem.planRelease.status !== 'ACTIVE') {
-      throw new BadRequestException('Il piano non e attivo');
+      throw new BadRequestException('Allenamento non attivo');
     }
 
     if (planItem.status === 'COMPLETED') {
-      throw new ConflictException('Attivita piano gia completata');
+      throw new ConflictException('Attivita allenamento gia completata');
     }
 
     if (planItem.status !== 'ACTIVE') {
-      throw new BadRequestException('Attivita piano non attiva');
+      throw new BadRequestException('Attivita allenamento non attiva');
     }
 
     const data: {
