@@ -203,7 +203,7 @@ export default function AthleteDashboardPage() {
             </div>
             <div className="pf-actions">
               <Link className="pf-button" href="/user/plan">Apri allenamento</Link>
-              <Link className="pf-button-secondary" href="/user/questions">Rispondi al check-in</Link>
+              <Link className="pf-button-secondary" href="/user/questions">Rispondi ai questionari</Link>
             </div>
           </div>
         </aside>
