@@ -127,27 +127,21 @@ export default function UserPlanHistoryPage() {
         <div className="pf-panel-header">
           <div>
             <h2>Aree</h2>
-            <p className="pf-muted">Apri lo storico dell'area che vuoi consultare.</p>
           </div>
         </div>
         <div className="pf-area-grid">
           {areas.map((area) => (
             <button
               key={area.id}
-              className={`pf-area-card ${area.id === areaId ? "selected" : ""} ${historyCounts[area.id] ? "attention" : ""}`}
+              className={`pf-area-card ${area.id === areaId ? "selected" : ""}`}
               type="button"
               onClick={() => loadHistory(area.id)}
             >
               <span>
                 <strong>{area.name}</strong>
-                <small>
-                  {historyCounts[area.id]
-                    ? `${historyCounts[area.id]} ${historyCounts[area.id] === 1 ? "storico disponibile" : "storici disponibili"}`
-                    : "Nessuno storico"}
-                </small>
               </span>
               <StatusBadge tone={historyCounts[area.id] ? "accent" : "neutral"}>
-                {historyCounts[area.id] ? "Disponibile" : "Vuoto"}
+                {historyCounts[area.id] ? `${historyCounts[area.id]} disponibili` : "Vuoto"}
               </StatusBadge>
             </button>
           ))}

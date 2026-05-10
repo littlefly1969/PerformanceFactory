@@ -66,10 +66,11 @@ export function RadarChart({ areas, max = 100, getAreaHref }: RadarChartProps) {
           {areas.map((area, index) => {
             const outer = pointFor(index, areas.length, max, max, radius, center);
             const href = getAreaHref?.(area);
+            const isMaxed = area.real >= max || area.potential >= max;
             const axis = (
               <g className={href ? "pf-radar-clickable" : undefined}>
                 <line className="pf-radar-axis" x1={center} y1={center} x2={outer.x} y2={outer.y} />
-                <circle className="pf-radar-node" cx={outer.x} cy={outer.y} r="6" />
+                <circle className={`pf-radar-node ${isMaxed ? "maxed" : ""}`} cx={outer.x} cy={outer.y} r="6" />
               </g>
             );
             return href ? (
@@ -89,8 +90,22 @@ export function RadarChart({ areas, max = 100, getAreaHref }: RadarChartProps) {
             const href = getAreaHref?.(area);
             const points = (
               <g className={href ? "pf-radar-clickable" : undefined}>
-                <circle className="pf-radar-dot potential" cx={potential.x} cy={potential.y} r="3.5" />
-                <circle className="pf-radar-dot real" cx={real.x} cy={real.y} r="4" />
+                <g className="pf-radar-point-group">
+                  <circle className="pf-radar-point-hit" cx={potential.x} cy={potential.y} r="10" />
+                  <circle className="pf-radar-dot potential" cx={potential.x} cy={potential.y} r="3.5" />
+                  <g className="pf-radar-tooltip potential" transform={`translate(${potential.x}, ${potential.y - 18})`}>
+                    <rect x="-18" y="-18" width="36" height="20" rx="8" />
+                    <text y="-4">{Math.round(area.potential)}</text>
+                  </g>
+                </g>
+                <g className="pf-radar-point-group">
+                  <circle className="pf-radar-point-hit" cx={real.x} cy={real.y} r="10" />
+                  <circle className="pf-radar-dot real" cx={real.x} cy={real.y} r="4" />
+                  <g className="pf-radar-tooltip real" transform={`translate(${real.x}, ${real.y - 18})`}>
+                    <rect x="-18" y="-18" width="36" height="20" rx="8" />
+                    <text y="-4">{Math.round(area.real)}</text>
+                  </g>
+                </g>
               </g>
             );
             return href ? (

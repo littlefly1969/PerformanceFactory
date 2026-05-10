@@ -16,6 +16,7 @@ type NavItem = {
 type ProductShellProps = {
   eyebrow?: string;
   title: string;
+  titleMeta?: ReactNode;
   description?: string;
   nav?: NavItem[];
   actions?: ReactNode;
@@ -110,6 +111,7 @@ const isNavActive = (path: string, href: string) =>
 export function ProductShell({
   eyebrow = "PerformanceFactory",
   title,
+  titleMeta,
   description,
   nav,
   actions,
@@ -291,7 +293,10 @@ export function ProductShell({
         <header className="pf-header">
           <div>
             <p className="pf-eyebrow">{eyebrow}</p>
-            <h1>{title}</h1>
+            <div className="pf-title-row">
+              <h1>{title}</h1>
+              {titleMeta && <div className="pf-title-meta">{titleMeta}</div>}
+            </div>
             {description && <p className="pf-subtitle">{description}</p>}
           </div>
           {actions && <div className="pf-header-actions">{actions}</div>}

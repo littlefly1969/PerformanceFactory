@@ -68,6 +68,26 @@ const avg = (items: number[]) => {
   return Math.round(items.reduce((sum, item) => sum + item, 0) / items.length);
 };
 
+const getAverageTone = (real: number, potential: number) => {
+  if (!real || !potential) {
+    return "neutral";
+  }
+  const ratio = real / potential;
+  if (ratio <= 0.25) {
+    return "danger";
+  }
+  if (ratio <= 0.5) {
+    return "warning";
+  }
+  if (ratio <= 0.75) {
+    return "soft";
+  }
+  if (ratio < 1) {
+    return "accent";
+  }
+  return "max";
+};
+
 export default function AthleteDashboardPage() {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [areas, setAree] = useState<Area[]>([]);
@@ -89,6 +109,10 @@ export default function AthleteDashboardPage() {
 
   const realAverage = useMemo(() => avg(radarAree.map((area) => area.real)), [radarAree]);
   const potentialAverage = useMemo(() => avg(radarAree.map((area) => area.potential)), [radarAree]);
+  const realAverageTone = useMemo(
+    () => getAverageTone(realAverage, potentialAverage),
+    [potentialAverage, realAverage],
+  );
   const activeItems = useMemo(
     () => workspace.flatMap((item) => item.plan?.items.filter((planItem) => planItem.status === "ACTIVE") ?? []),
     [workspace],
@@ -150,23 +174,30 @@ export default function AthleteDashboardPage() {
     <ProductShell
       eyebrow="Ambiente atleta"
       title="La tua performance"
+      titleMeta={
+        <>
+          <span className={`pf-title-metric real-${realAverageTone}`}>
+            <small>Media reale</small>
+            <strong>{loading ? "..." : realAverage || "-"}</strong>
+          </span>
+          <span className="pf-title-metric">
+            <small>Media potenziale</small>
+            <strong>{loading ? "..." : potentialAverage || "-"}</strong>
+          </span>
+        </>
+      }
       description="Vista personale di profilo corrente, lavoro attivo, check-in aperti e team professionale."
       actions={
         <button className="pf-button-secondary" type="button" onClick={() => loadDashboard()}>
           Aggiorna
         </button>
       }
-      stats={[
-        { label: "Media reale", value: loading ? "..." : realAverage || "-", tone: "accent" },
-        { label: "Media potenziale", value: loading ? "..." : potentialAverage || "-", tone: "success" },
-        { label: "Allenamenti da fare", value: loading ? "..." : activeItems.length, tone: "warning" },
-      ]}
     >
       {message && <div className="pf-alert warning">{message}</div>}
 
-      <section className="pf-dashboard-grid">
-        <article className="pf-panel pf-focus-panel">
-          <div className="pf-panel-header">
+      <section className="pf-panel pf-performance-overview">
+        <div className="pf-performance-spider">
+          <div className="pf-panel-header pf-performance-spider-header">
             <div>
               <h2>Grafico spider performance</h2>
               <p className="pf-muted">
@@ -179,9 +210,9 @@ export default function AthleteDashboardPage() {
             areas={radarAree}
             getAreaHref={(area) => `/user/areas/${encodeURIComponent(area.id)}`}
           />
-        </article>
+        </div>
 
-        <aside className="pf-panel">
+        <aside className="pf-performance-actions">
           <div className="pf-panel-header">
             <div>
               <h2>Prossime azioni</h2>
@@ -189,22 +220,18 @@ export default function AthleteDashboardPage() {
             </div>
           </div>
           <div className="pf-stack">
-            <div className="pf-metric-row">
-              <Link href="/user/plan">Allenamenti da fare</Link>
+            <Link className="pf-metric-row pf-action-metric" href="/user/plan">
+              <span>Allenamenti da fare</span>
               <strong>{activeItems.length}</strong>
-            </div>
-            <div className="pf-metric-row">
-              <Link href="/user/questions">Questionari aperti</Link>
+            </Link>
+            <Link className="pf-metric-row pf-action-metric" href="/user/questions">
+              <span>Questionari aperti</span>
               <strong>{openQuestionSets.length}</strong>
-            </div>
-            <div className="pf-metric-row">
-              <Link href="/user/performance">Storico performance</Link>
+            </Link>
+            <Link className="pf-metric-row pf-action-metric" href="/user/performance">
+              <span>Storico performance</span>
               <strong>{professionals.length}</strong>
-            </div>
-            <div className="pf-actions">
-              <Link className="pf-button" href="/user/plan">Apri allenamento</Link>
-              <Link className="pf-button-secondary" href="/user/questions">Rispondi ai questionari</Link>
-            </div>
+            </Link>
           </div>
         </aside>
       </section>

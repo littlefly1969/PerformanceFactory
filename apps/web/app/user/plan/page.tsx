@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  EmptyState,
   ProductShell,
   StatusBadge,
 } from "@/app/components/product-shell";
@@ -55,13 +54,10 @@ export default function UserPianoPage() {
   const [plansByArea, setPianosByArea] = useState<Record<string, Piano | null>>(
     {},
   );
+  const planRequestIdRef = useRef(0);
 
   const activeItems = useMemo(
     () => plan?.items.filter((item) => item.status === "ACTIVE") ?? [],
-    [plan],
-  );
-  const completedItems = useMemo(
-    () => plan?.items.filter((item) => item.status === "COMPLETED") ?? [],
     [plan],
   );
 
@@ -93,20 +89,22 @@ export default function UserPianoPage() {
         typeof window === "undefined"
           ? ""
           : new URLSearchParams(window.location.search).get("areaId");
-      setAreaId(
-        (current) =>
-          current ||
-          (requestedAreaId && loadedAree.some((area) => area.id === requestedAreaId)
-            ? requestedAreaId
-            : "") ||
-          firstActive?.[0] ||
-          loadedAree[0]?.id ||
-          "",
-      );
+      const nextAreaId =
+        areaId ||
+        (requestedAreaId && loadedAree.some((area) => area.id === requestedAreaId)
+          ? requestedAreaId
+          : "") ||
+        firstActive?.[0] ||
+        loadedAree[0]?.id ||
+        "";
+      setAreaId(nextAreaId);
+      setPiano(nextPianos[nextAreaId] ?? null);
     }
   };
 
   const loadPiano = async (selectedAreaId = areaId) => {
+    const requestId = planRequestIdRef.current + 1;
+    planRequestIdRef.current = requestId;
     setLoading(true);
     setAuthHint(null);
     setMessage(null);
@@ -114,6 +112,9 @@ export default function UserPianoPage() {
     setRatingById({});
 
     if (!selectedAreaId) {
+      if (planRequestIdRef.current !== requestId) {
+        return;
+      }
       setPiano(null);
       setMessage("Seleziona un'area per caricare l'allenamento corrente.");
       setLoading(false);
@@ -125,18 +126,26 @@ export default function UserPianoPage() {
       { credentials: "include" },
     );
 
+    if (planRequestIdRef.current !== requestId) {
+      return;
+    }
+
     if (!response.ok) {
       setPiano(null);
       if (response.status === 401) {
         setAuthHint("Accedi per vedere il tuo allenamento.");
-      } else if (response.status !== 404) {
+      } else if (response.status >= 500) {
         setMessage("Impossibile caricare l'allenamento corrente.");
       }
       setLoading(false);
       return;
     }
 
-    setPiano((await response.json()) as Piano);
+    const nextPlan = (await response.json()) as Piano;
+    if (planRequestIdRef.current !== requestId) {
+      return;
+    }
+    setPiano(nextPlan);
     setLoading(false);
   };
 
@@ -150,9 +159,19 @@ export default function UserPianoPage() {
 
   useEffect(() => {
     if (areaId) {
+      if (Object.prototype.hasOwnProperty.call(plansByArea, areaId)) {
+        planRequestIdRef.current += 1;
+        setAuthHint(null);
+        setMessage(null);
+        setNotesById({});
+        setRatingById({});
+        setPiano(plansByArea[areaId] ?? null);
+        setLoading(false);
+        return;
+      }
       void loadPiano(areaId);
     }
-  }, [areaId]);
+  }, [areaId, plansByArea]);
 
   const completePlanItem = async (itemId: string) => {
     setMessage(null);
@@ -213,16 +232,6 @@ export default function UserPianoPage() {
           value: loading ? "..." : activeItems.length,
           tone: "accent",
         },
-        {
-          label: "Completate",
-          value: loading ? "..." : completedItems.length,
-          tone: "success",
-        },
-        {
-          label: "Versione allenamento",
-          value: plan ? `v${plan.version}` : "-",
-          tone: "warning",
-        },
       ]}
     >
       <section className="pf-panel">
@@ -247,7 +256,16 @@ export default function UserPianoPage() {
                 key={area.id}
                 className={`pf-area-card ${selected ? "selected" : ""} ${active ? "attention" : ""}`}
                 type="button"
-                onClick={() => setAreaId(area.id)}
+                onClick={() => {
+                  planRequestIdRef.current += 1;
+                  setAreaId(area.id);
+                  setPiano(areaPiano ?? null);
+                  setAuthHint(null);
+                  setMessage(null);
+                  setNotesById({});
+                  setRatingById({});
+                  setLoading(false);
+                }}
               >
                 <span>
                   <strong>{area.name}</strong>
@@ -256,14 +274,9 @@ export default function UserPianoPage() {
                       ? `${active} ${active === 1 ? "allenamento" : "allenamenti"} da fare`
                       : completed
                         ? `${completed} completate`
-                        : "Nessun allenamento attivo"}
+                        : "Da assegnare"}
                   </small>
                 </span>
-                <StatusBadge
-                  tone={active ? "accent" : completed ? "success" : "neutral"}
-                >
-                  {active ? "Da fare" : completed ? "Completato" : "Vuoto"}
-                </StatusBadge>
               </button>
             );
           })}
@@ -352,14 +365,9 @@ export default function UserPianoPage() {
           ))}
 
           {!loading && activeItems.length === 0 && (
-            <EmptyState
-              title={areaId ? "Nessun lavoro attivo per questa area" : "Seleziona un'area"}
-              description={
-                areaId
-                  ? "Non ci sono attivita attive pubblicate per l'area selezionata."
-                  : "Scegli un'area per caricare l'allenamento corrente."
-              }
-            />
+            <p className="pf-plain-empty">
+              {areaId ? "Nessun lavoro da fare." : "Seleziona un'area."}
+            </p>
           )}
         </div>
       </section>

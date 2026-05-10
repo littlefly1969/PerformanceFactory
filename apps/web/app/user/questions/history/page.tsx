@@ -36,9 +36,9 @@ const formatStatus = (status: string) =>
   ({
     ACTIVE: "attivo",
     COMPLETED: "completato",
-    CLOSED: "chiuso",
+    CLOSED: "inviato",
     PENDING: "in attesa",
-    PUBLISHED: "pubblicato",
+    PUBLISHED: "inviato",
   })[status] ?? status.replace(/_/g, " ").toLowerCase();
 
 export default function UserQuestionsHistoryPage() {
@@ -139,27 +139,21 @@ export default function UserQuestionsHistoryPage() {
         <div className="pf-panel-header">
           <div>
             <h2>Aree</h2>
-            <p className="pf-muted">Apri lo storico dell'area che vuoi consultare.</p>
           </div>
         </div>
         <div className="pf-area-grid">
           {areas.map((area) => (
             <button
               key={area.id}
-              className={`pf-area-card ${area.id === areaId ? "selected" : ""} ${historyCounts[area.id] ? "attention" : ""}`}
+              className={`pf-area-card ${area.id === areaId ? "selected" : ""}`}
               type="button"
               onClick={() => loadHistory(area.id)}
             >
               <span>
                 <strong>{area.name}</strong>
-                <small>
-                  {historyCounts[area.id]
-                    ? `${historyCounts[area.id]} ${historyCounts[area.id] === 1 ? "storico disponibile" : "storici disponibili"}`
-                    : "Nessuno storico"}
-                </small>
               </span>
               <StatusBadge tone={historyCounts[area.id] ? "accent" : "neutral"}>
-                {historyCounts[area.id] ? "Disponibile" : "Vuoto"}
+                {historyCounts[area.id] ? `${historyCounts[area.id]} disponibili` : "Vuoto"}
               </StatusBadge>
             </button>
           ))}
@@ -170,31 +164,28 @@ export default function UserQuestionsHistoryPage() {
         <div className="pf-panel-header">
           <div>
             <h2>Storico</h2>
-            <p className="pf-muted">Questionari completati o chiusi dell'area selezionata.</p>
+            <p className="pf-muted">Questionari completati dell'area selezionata.</p>
           </div>
         </div>
 
         <div className="pf-stack">
           {history.map((set) => (
             <article key={set.id} className="pf-card">
-              <div className="pf-card-top">
-                <div>
-                  <h3>{new Date(set.createdAt).toLocaleDateString("it-IT")}</h3>
-                  <p className="pf-muted">{set.questions.length} domande</p>
-                </div>
-                <StatusBadge tone={set.status === "CLOSED" ? "success" : "warning"}>
+              <div className="pf-card-top pf-question-history-card-top">
+                <h3>{new Date(set.createdAt).toLocaleDateString("it-IT")}</h3>
+                <StatusBadge tone="accent">
                   {formatStatus(set.status)}
                 </StatusBadge>
               </div>
-              <div className="pf-stack">
+              <div className="pf-stack pf-question-history-list">
                 {set.questions.map((question) => {
                   const answer = question.answers?.[0];
                   const answerLabel = question.options.find(
                     (option) => option.id === answer?.answerOptionId,
                   )?.label;
                   return (
-                    <div key={question.id} className="pf-work-row">
-                      <span>
+                    <div key={question.id} className="pf-work-row pf-question-history-row">
+                      <span className="pf-question-history-content">
                         <strong>{question.orderIndex}. {question.text}</strong>
                         <small>{answerLabel ?? "Nessuna risposta registrata"}</small>
                       </span>
