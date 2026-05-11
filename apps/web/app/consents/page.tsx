@@ -42,7 +42,15 @@ export default function ConsentsPage() {
     () => new Set(status?.missingConsents ?? []),
     [status?.missingConsents],
   );
-
+  
+  const redirectAfterConsent = (current: CurrentUser | null = me) => {
+    if (current?.role === "USER" && current.onboardingRequired) {
+      window.location.href = "/onboarding";
+      return;
+    }
+    window.location.href = roleHome[current?.role ?? ""] ?? "/";
+  };
+  
   const load = async () => {
     setMessage(null);
     const [meRes, statusRes] = await Promise.all([
@@ -65,14 +73,6 @@ export default function ConsentsPage() {
   useEffect(() => {
     void load();
   }, []);
-
-  const redirectAfterConsent = (current: CurrentUser | null = me) => {
-    if (current?.role === "USER" && current.onboardingRequired) {
-      window.location.href = "/onboarding";
-      return;
-    }
-    window.location.href = roleHome[current?.role ?? ""] ?? "/";
-  };
 
   const accept = async () => {
     if (!privacyAccepted || !aiAssistantAccepted) {
