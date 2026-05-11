@@ -51,6 +51,7 @@ export class PerformanceService {
       actor.role === UserRole.PROFESSIONAL && targetUserId !== actor.id
         ? await this.getAllowedAreaIds(actor.id)
         : null;
+    const enabledDriverAreaIds = await this.getEnabledDriverAreaIds(targetUserId);
 
     const snapshot = await this.prisma.performanceProfileSnapshot.findFirst({
       where: { userId: targetUserId },
@@ -76,16 +77,7 @@ export class PerformanceService {
       throw new NotFoundException('Profilo performance non trovato');
     }
 
-    if (!allowedAreaIds) {
-      return snapshot;
-    }
-
-    return {
-      ...snapshot,
-      areas: snapshot.areas.filter((area) =>
-        allowedAreaIds.has(area.areaId),
-      ),
-    };
+    return this.filterSnapshotAreas(snapshot, allowedAreaIds, enabledDriverAreaIds);
   }
 
   async getProfileHistory(actor: Actor, userId?: string) {
@@ -95,6 +87,7 @@ export class PerformanceService {
       actor.role === UserRole.PROFESSIONAL && targetUserId !== actor.id
         ? await this.getAllowedAreaIds(actor.id)
         : null;
+    const enabledDriverAreaIds = await this.getEnabledDriverAreaIds(targetUserId);
 
     const snapshots = await this.prisma.performanceProfileSnapshot.findMany({
       where: { userId: targetUserId },
@@ -116,16 +109,9 @@ export class PerformanceService {
       },
     });
 
-    if (!allowedAreaIds) {
-      return snapshots;
-    }
-
-    return snapshots.map((snapshot) => ({
-      ...snapshot,
-      areas: snapshot.areas.filter((area) =>
-        allowedAreaIds.has(area.areaId),
-      ),
-    }));
+    return snapshots.map((snapshot) =>
+      this.filterSnapshotAreas(snapshot, allowedAreaIds, enabledDriverAreaIds),
+    );
   }
 
   private async getAllowedAreaIds(professionalId: string) {
@@ -136,6 +122,55 @@ export class PerformanceService {
       });
 
     return new Set(competences.map((item) => item.areaId));
+  }
+
+  private async getEnabledDriverAreaIds(userId: string) {
+    const selection = await this.prisma.userSportSelection.findUnique({
+      where: { userId },
+      select: { specializationId: true },
+    });
+    if (!selection) {
+      return null;
+    }
+    const prompts = await this.prisma.sportSpecializationAreaPrompt.findMany({
+      where: {
+        specializationId: selection.specializationId,
+        isActive: true,
+        isEnabledDriver: true,
+      },
+      select: { areaId: true },
+    });
+    return prompts.length ? new Set(prompts.map((prompt) => prompt.areaId)) : null;
+  }
+
+  private filterSnapshotAreas<
+    T extends {
+      rankingGlobal: number;
+      areas: Array<{ areaId: string; realR: number }>;
+    },
+  >(
+    snapshot: T,
+    allowedAreaIds: Set<string> | null,
+    enabledDriverAreaIds: Set<string> | null,
+  ) {
+    const areas = snapshot.areas.filter((area) => {
+      if (allowedAreaIds && !allowedAreaIds.has(area.areaId)) {
+        return false;
+      }
+      if (enabledDriverAreaIds && !enabledDriverAreaIds.has(area.areaId)) {
+        return false;
+      }
+      return true;
+    });
+    return {
+      ...snapshot,
+      rankingGlobal: areas.length
+        ? Math.round(
+            areas.reduce((sum, area) => sum + area.realR, 0) / areas.length,
+          )
+        : snapshot.rankingGlobal,
+      areas,
+    };
   }
 
   private async auditAccess(actor: Actor, targetUserId: string, resource: string) {

@@ -13,6 +13,12 @@ const DEFAULT_SCALE = {
   potentialStep: 5,
   thresholdRatio: 0.85,
 };
+const DEFAULT_TRAINING_ANSWER_OPTIONS = [
+  { label: 'Non completato', score: 0 },
+  { label: 'Parziale', score: 50 },
+  { label: 'Completato', score: 80 },
+  { label: 'Completato bene', score: 100 },
+];
 type AreaRecord = {
   id: string;
   name: string;
@@ -47,15 +53,7 @@ export class OrchestratorService {
       throw new BadRequestException('Scegli una sola area oppure esegui tutte le aree');
     }
 
-    const areas = areaId
-      ? await this.loadArea(areaId)
-      : runAllAreas
-        ? await this.loadAreas()
-        : [];
-
-    if (areas.length === 0) {
-      throw new BadRequestException('Nessuna area configurata');
-    }
+    const selectedAreas = areaId ? await this.loadArea(areaId) : null;
 
     const results: Array<{
       userId: string;
@@ -64,6 +62,10 @@ export class OrchestratorService {
       questionSetId: string;
     }> = [];
     for (const userId of userIds) {
+      const areas = selectedAreas ?? (runAllAreas ? await this.loadAreasForUser(userId) : []);
+      if (areas.length === 0) {
+        throw new BadRequestException('Nessuna area configurata per l utente');
+      }
       for (const area of areas) {
         const result = await this.runCycleForArea(userId, area, actorId);
         results.push({ userId, areaId: area.id, ...result });
@@ -91,6 +93,26 @@ export class OrchestratorService {
       throw new BadRequestException('Area non valida');
     }
     return [area];
+  }
+
+  private async loadAreasForUser(userId: string) {
+    const selection = await this.prisma.userSportSelection.findUnique({
+      where: { userId },
+      select: { specializationId: true },
+    });
+    if (!selection) {
+      return this.loadAreas();
+    }
+    const prompts = await this.prisma.sportSpecializationAreaPrompt.findMany({
+      where: {
+        specializationId: selection.specializationId,
+        isActive: true,
+        isEnabledDriver: true,
+      },
+      select: { area: { select: { id: true, name: true } } },
+      orderBy: { area: { name: 'asc' } },
+    });
+    return prompts.length ? prompts.map((prompt) => prompt.area) : this.loadAreas();
   }
 
   async runCycleForArea(
@@ -287,6 +309,7 @@ export class OrchestratorService {
       currentState,
       areaGenerationConfig,
       userAreaPromptInstruction,
+      sportSpecializationPromptInstruction,
     ] = await Promise.all([
       this.prisma.performanceProfileSnapshot.findFirst({
         where: { userId },
@@ -331,15 +354,11 @@ export class OrchestratorService {
           goal: { select: { goalText: true } },
         },
       }),
+      this.loadSportSpecializationPromptInstruction(userId, area.id),
     ]);
 
     const nextVersion = (lastPlan?.version ?? 0) + 1;
     const areaLevel = currentState?.level ?? this.levelFromSnapshot(previousSnapshot, area.id);
-    const promptConfigs = await this.loadPromptConfigs(
-      userId,
-      area.id,
-      areaLevel,
-    );
     const context = this.buildAiCycleContext({
       userId,
       area,
@@ -350,9 +369,10 @@ export class OrchestratorService {
       history,
       onboardingAssessment,
       areaLevel,
-      promptConfigs,
       areaGenerationConfig,
       userAreaPromptInstruction,
+      sportSpecializationPromptInstruction,
+      trainingPromptInstruction: null,
     });
 
     return {
@@ -424,6 +444,241 @@ export class OrchestratorService {
     });
   }
 
+  async runTrainingPlanBatch(userIds: string[], actorId: string) {
+    if (!actorId) {
+      throw new BadRequestException('ID attore mancante');
+    }
+    if (!userIds?.length) {
+      throw new BadRequestException('ID utenti mancanti');
+    }
+
+    const results: Array<{ userId: string; trainingPlanReleaseId: string }> = [];
+    for (const userId of userIds) {
+      const result = await this.runTrainingPlan(userId, actorId);
+      results.push({ userId, trainingPlanReleaseId: result.trainingPlanReleaseId });
+    }
+    return results;
+  }
+
+  async previewTrainingProposalInput(userId: string) {
+    const input = await this.prepareTrainingProposalInput(userId, 'Allenamento AI generato');
+    return this.aiProposalProvider.buildCycleProposalPreview(input);
+  }
+
+  private async runTrainingPlan(
+    userId: string,
+    actorId: string,
+    reason = 'Allenamento AI generato',
+  ) {
+    const proposalInput = await this.prepareTrainingProposalInput(userId, reason);
+    const proposal =
+      await this.aiProposalProvider.generateCycleProposal(proposalInput);
+
+    return this.prisma.$transaction(async (tx) => {
+      const previousSnapshot = await tx.performanceProfileSnapshot.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+      const lastPlan = await tx.trainingPlanRelease.findFirst({
+        where: { userId },
+        orderBy: { version: 'desc' },
+        select: { version: true },
+      });
+      const nextVersion = (lastPlan?.version ?? 0) + 1;
+
+      await tx.trainingPlanRelease.updateMany({
+        where: { userId, status: 'ACTIVE' },
+        data: { status: 'CLOSED', archivedAt: new Date() },
+      });
+
+      const trainingPlan = await tx.trainingPlanRelease.create({
+        data: {
+          userId,
+          version: nextVersion,
+          status: 'ACTIVE',
+          generatedBy: 'AI',
+          summaryText: proposal.summaryText,
+          outputJson: proposal.audit.outputJson as Prisma.InputJsonObject,
+          provider: proposal.provider,
+          model: proposal.model,
+          promptVersion: proposal.promptVersion,
+          promptHash: proposal.promptHash,
+          sourceSnapshotId: previousSnapshot?.id ?? null,
+          proposedByAdminId: actorId,
+          publishedAt: new Date(),
+        },
+        select: { id: true },
+      });
+
+      await tx.aiContextSummary.create({
+        data: {
+          userId,
+          summaryText: proposal.summaryText,
+          summaryJson: {
+            trainingPlanReleaseId: trainingPlan.id,
+            provider: proposal.provider,
+            model: proposal.model,
+            promptVersion: proposal.promptVersion,
+          },
+          cycleStatus: 'PUBLISHED',
+        },
+      });
+
+      await tx.aiProposalAudit.create({
+        data: {
+          userId,
+          provider: proposal.provider,
+          model: proposal.model,
+          promptVersion: proposal.promptVersion,
+          promptHash: proposal.promptHash,
+          status: proposal.audit.status,
+          inputJson: proposal.audit.inputJson as Prisma.InputJsonObject,
+          outputJson: proposal.audit.outputJson as Prisma.InputJsonObject,
+          latencyMs: proposal.audit.latencyMs,
+        },
+      });
+
+      return { trainingPlanReleaseId: trainingPlan.id };
+    });
+  }
+
+  private async prepareTrainingProposalInput(
+    userId: string,
+    reason: string,
+  ): Promise<CycleProposalInput> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, role: true, isActive: true },
+    });
+    if (!user || user.role !== UserRole.USER || !user.isActive) {
+      throw new BadRequestException('Utente non valido');
+    }
+
+    if (AiProposalProviderService.requiresUserConsent()) {
+      const consent = await this.prisma.consent.findFirst({
+        where: {
+          userId,
+          type: { in: ['AI', 'AI_ASSISTANT'] },
+          withdrawnAt: null,
+        },
+        select: { id: true },
+      });
+      if (!consent) {
+        throw new BadRequestException(
+          'Il consenso AI e obbligatorio per le proposte AI esterne',
+        );
+      }
+    }
+
+    const trainingPromptInstruction =
+      await this.loadTrainingPromptInstruction(userId);
+    if (!trainingPromptInstruction) {
+      throw new BadRequestException(
+        'Prompt allenamento non configurato per la sport-specializzazione utente',
+      );
+    }
+
+    const [
+      previousSnapshot,
+      lastPlan,
+      scale,
+      onboardingAssessment,
+      enabledAreas,
+      goal,
+    ] = await Promise.all([
+      this.prisma.performanceProfileSnapshot.findFirst({
+        where: { userId },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          rankingGlobal: true,
+          reason: true,
+          createdAt: true,
+          areas: {
+            select: {
+              areaId: true,
+              realR: true,
+              potentialP: true,
+              area: { select: { id: true, name: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.trainingPlanRelease.findFirst({
+        where: { userId },
+        orderBy: { version: 'desc' },
+        select: { version: true },
+      }),
+      this.loadScaleConfig(this.prisma),
+      this.prisma.userOnboardingAssessment.findUnique({
+        where: { userId },
+        select: { answersJson: true, profileJson: true },
+      }),
+      this.loadAreasForUser(userId),
+      this.prisma.userPerformanceGoal.findUnique({
+        where: { userId },
+        select: { goalText: true },
+      }),
+    ]);
+
+    const enabledAreaIds = new Set(enabledAreas.map((area) => area.id));
+    const filteredSnapshot = previousSnapshot
+      ? {
+          ...previousSnapshot,
+          areas: previousSnapshot.areas.filter((area) =>
+            enabledAreaIds.has(area.areaId),
+          ),
+        }
+      : null;
+
+    const area = { id: 'training', name: 'Allenamento specifico' };
+    const nextVersion = (lastPlan?.version ?? 0) + 1;
+    const context = this.buildAiCycleContext({
+      userId,
+      area,
+      nextVersion,
+      reason,
+      scale,
+      previousSnapshot: filteredSnapshot,
+      history: [],
+      onboardingAssessment,
+      areaLevel: 'TRAINING',
+      areaGenerationConfig: {
+        initialContext:
+          'Sei un assistente senior di sport performance. Genera un allenamento autonomo e specifico per sport-specializzazione usando solo il contesto atleta fornito. Non generare un ciclo di area specialistica.',
+        responseFormatPrompt:
+          'La risposta deve contenere un allenamento reale, operativo e direttamente eseguibile, con struttura, intensita, volume, recuperi, criteri di successo, progressione e domande di monitoraggio se richieste.',
+        questionnaireLayoutJson: {
+          questionnaire: {
+            questions: 3,
+            answerOptions: DEFAULT_TRAINING_ANSWER_OPTIONS,
+          },
+        },
+      },
+      userAreaPromptInstruction: goal
+        ? {
+            promptText: `Obiettivo atleta: ${goal.goalText}`,
+            promptVersion: 'training-goal-context-v1',
+            updatedAt: new Date(),
+            goal,
+          }
+        : null,
+      sportSpecializationPromptInstruction: null,
+      trainingPromptInstruction,
+    });
+
+    return {
+      userId,
+      area,
+      nextVersion,
+      reason,
+      scale,
+      previousSnapshot: filteredSnapshot,
+      context,
+    };
+  }
+
   private buildAiCycleContext(input: {
     userId: string;
     area: AreaRecord;
@@ -442,7 +697,6 @@ export class OrchestratorService {
       profileJson: Prisma.JsonValue | null;
     } | null;
     areaLevel: string;
-    promptConfigs: Awaited<ReturnType<OrchestratorService['loadPromptConfigs']>>;
     areaGenerationConfig: Awaited<ReturnType<OrchestratorService['loadAreaGenerationConfig']>>;
     userAreaPromptInstruction: {
       promptText: string;
@@ -450,6 +704,12 @@ export class OrchestratorService {
       updatedAt: Date;
       goal: { goalText: string };
     } | null;
+    sportSpecializationPromptInstruction: Awaited<
+      ReturnType<OrchestratorService['loadSportSpecializationPromptInstruction']>
+    >;
+    trainingPromptInstruction: Awaited<
+      ReturnType<OrchestratorService['loadTrainingPromptInstruction']>
+    >;
   }): CycleProposalInput['context'] {
     const latestAreas =
       input.previousSnapshot?.areas.map((area) => ({
@@ -544,18 +804,35 @@ export class OrchestratorService {
                 input.areaGenerationConfig.questionnaireLayoutJson,
             }
           : null,
-        adminPromptInstructions: input.promptConfigs.map((config) => ({
-          name: config.name,
-          scope: config.areaId ? `area:${config.area?.name ?? input.area.name}` : 'global',
-          athleteLevel: config.athleteLevel,
-          version: config.version,
-          basePrompt: config.basePrompt,
-        })),
         userAreaPromptInstruction: input.userAreaPromptInstruction
           ? {
               promptVersion: input.userAreaPromptInstruction.promptVersion,
               updatedAt: input.userAreaPromptInstruction.updatedAt.toISOString(),
               basePrompt: input.userAreaPromptInstruction.promptText,
+            }
+          : null,
+        sportSpecializationPromptInstruction:
+          input.sportSpecializationPromptInstruction
+            ? {
+                sportLabel:
+                  input.sportSpecializationPromptInstruction.specialization.sport
+                    .label,
+                specializationLabel:
+                  input.sportSpecializationPromptInstruction.specialization.label,
+                areaName: input.sportSpecializationPromptInstruction.area.name,
+                version: input.sportSpecializationPromptInstruction.version,
+                updatedAt:
+                  input.sportSpecializationPromptInstruction.updatedAt.toISOString(),
+                basePrompt: input.sportSpecializationPromptInstruction.basePrompt,
+              }
+            : null,
+        trainingPromptInstruction: input.trainingPromptInstruction
+          ? {
+              sportLabel: input.trainingPromptInstruction.sport.label,
+              specializationLabel: input.trainingPromptInstruction.label,
+              version: input.trainingPromptInstruction.trainingPromptVersion,
+              updatedAt: input.trainingPromptInstruction.updatedAt.toISOString(),
+              basePrompt: input.trainingPromptInstruction.trainingPrompt,
             }
           : null,
         planItemRequirements: [
@@ -564,7 +841,7 @@ export class OrchestratorService {
           'Includi criteri di successo misurabili, frequenza o trigger e una progressione chiara.',
         ],
         questionnaireRequirements: [
-          'Crea esattamente tre domande brevi per l area target.',
+          'Crea il numero di domande richiesto dal layout AI dell area target.',
           'Le domande devono monitorare esecuzione o aderenza al lavoro proposto, non l umore generico.',
           'Evita di duplicare domande precedenti salvo quando la continuita e utile; se le ripeti, rendi chiaro il motivo nella formulazione.',
         ],
@@ -676,57 +953,67 @@ export class OrchestratorService {
     });
   }
 
-  private async loadPromptConfigs(
+  private async loadSportSpecializationPromptInstruction(
     userId: string,
     areaId: string,
-    athleteLevel: string,
   ) {
-    const userAreaPrompt = await this.prisma.userAreaPromptInstruction.findUnique({
-      where: { userId_areaId: { userId, areaId } },
-      select: {
-        id: true,
-        promptText: true,
-        promptVersion: true,
-        updatedAt: true,
-        area: { select: { id: true, name: true } },
-      },
+    const selection = await this.prisma.userSportSelection.findUnique({
+      where: { userId },
+      select: { specializationId: true },
     });
-    if (userAreaPrompt) {
-      return [
-        {
-          id: userAreaPrompt.id,
-          name: 'obiettivo-area-utente',
-          basePrompt: userAreaPrompt.promptText,
-          areaId,
-          athleteLevel,
-          version: 1,
-          area: userAreaPrompt.area,
-        },
-      ];
+    if (!selection) {
+      return null;
     }
-
-    const levels = [athleteLevel, 'BASELINE'];
-    return this.prisma.aiPromptConfig.findMany({
+    return this.prisma.sportSpecializationAreaPrompt.findUnique({
       where: {
-        isActive: true,
-        athleteLevel: { in: levels },
-        OR: [{ areaId: null }, { areaId }],
+        specializationId_areaId: {
+          specializationId: selection.specializationId,
+          areaId,
+        },
       },
       select: {
-        id: true,
-        name: true,
         basePrompt: true,
-        areaId: true,
-        athleteLevel: true,
         version: true,
-        area: { select: { id: true, name: true } },
+        updatedAt: true,
+        isActive: true,
+        isEnabledDriver: true,
+        area: { select: { name: true } },
+        specialization: {
+          select: {
+            label: true,
+            sport: { select: { label: true } },
+          },
+        },
       },
-      orderBy: [
-        { areaId: 'asc' },
-        { athleteLevel: 'asc' },
-        { version: 'desc' },
-      ],
+    }).then((prompt) => (prompt?.isActive && prompt.isEnabledDriver ? prompt : null));
+  }
+
+  private async loadTrainingPromptInstruction(userId: string) {
+    const selection = await this.prisma.userSportSelection.findUnique({
+      where: { userId },
+      select: { specializationId: true },
     });
+    if (!selection) {
+      return null;
+    }
+    return this.prisma.sportSpecialization.findUnique({
+      where: { id: selection.specializationId },
+      select: {
+        label: true,
+        trainingPrompt: true,
+        trainingPromptVersion: true,
+        trainingPromptActive: true,
+        updatedAt: true,
+        sport: { select: { label: true } },
+      },
+    }).then((specialization) =>
+      specialization?.trainingPromptActive && specialization.trainingPrompt
+        ? {
+            ...specialization,
+            trainingPrompt: specialization.trainingPrompt,
+          }
+        : null,
+    );
   }
 
   private levelFromSnapshot(

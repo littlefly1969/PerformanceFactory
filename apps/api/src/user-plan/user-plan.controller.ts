@@ -38,6 +38,24 @@ export class UserPlanController {
     return this.userPlan.getPlanHistory(req.user?.id ?? '', areaId);
   }
 
+  @Get('training/current')
+  @ApiOperation({ summary: 'Ottieni allenamento specifico autonomo corrente' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.USER)
+  getCurrentTraining(@Req() req: { user?: { id: string } }) {
+    return this.userPlan.getCurrentTraining(req.user?.id ?? '');
+  }
+
+  @Get('training/history')
+  @ApiOperation({ summary: 'Ottieni storico allenamenti specifici autonomi' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.USER)
+  getTrainingHistory(@Req() req: { user?: { id: string } }) {
+    return this.userPlan.getTrainingHistory(req.user?.id ?? '');
+  }
+
   @Post('plan-items/:id/complete')
   @ApiOperation({ summary: 'Completa una attivita allenamento' })
   @ApiParam({ name: 'id' })

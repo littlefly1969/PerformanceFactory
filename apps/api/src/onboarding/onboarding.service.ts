@@ -16,13 +16,6 @@ import {
   GoalValidationResult,
   SpecialistOnboardingQuestionResult,
 } from '../ai-orchestrator/proposal-provider.service';
-import {
-  FITNESS_LOCATION_OPTIONS,
-  SPORT_OPTIONS,
-  NormalizedSportSelection,
-  formatSportSelection,
-  normalizeSportSelection,
-} from './sport-selection';
 
 type Actor = {
   id: string;
@@ -67,6 +60,21 @@ type OnboardingAnswer = {
 type GoalChatMessage = {
   role: 'user' | 'assistant';
   content: string;
+};
+
+type SportSelectionPayload = {
+  sportId?: string;
+  specializationId?: string;
+};
+
+type FormattedSportSelection = {
+  sportId: string;
+  sportKey: string;
+  sportLabel: string;
+  specializationId: string;
+  specializationKey: string;
+  specializationLabel: string;
+  label: string;
 };
 
 @Injectable()
@@ -132,15 +140,17 @@ export class OnboardingService {
 
   async getQuestionnaire(actor: Actor) {
     this.assertAthlete(actor);
-    const status = await this.getStatus(actor);
-    const templates = await this.loadQuestionnaireQuestions(actor.id);
+    const [status, templates, sports] = await Promise.all([
+      this.getStatus(actor),
+      this.loadQuestionnaireQuestions(actor.id),
+      this.loadActiveSports(),
+    ]);
     return {
       ...status,
       title: 'Anamnesi iniziale di performance',
       description:
         'Le risposte generali creano il contesto anamnestico iniziale; l obiettivo viene definito nello step successivo.',
-      sportOptions: SPORT_OPTIONS,
-      fitnessLocationOptions: FITNESS_LOCATION_OPTIONS,
+      sports,
       options: STARTER_OPTIONS,
       questions: templates.map((template) => ({
         id: template.id,
@@ -158,22 +168,22 @@ export class OnboardingService {
     };
   }
 
-  async saveSportSelection(actor: Actor, input: { sports?: string[]; fitnessLocation?: string | null }) {
+  async saveSportSelection(actor: Actor, input: SportSelectionPayload) {
     this.assertAthlete(actor);
-    const selection = normalizeSportSelection(input);
+    const selection = await this.validateSportSelection(input);
     await this.prisma.userSportSelection.upsert({
       where: { userId: actor.id },
       update: {
-        sports: selection.sports as Prisma.InputJsonValue,
-        fitnessLocation: selection.fitnessLocation,
+        sportId: selection.sportId,
+        specializationId: selection.specializationId,
       },
       create: {
         userId: actor.id,
-        sports: selection.sports as Prisma.InputJsonValue,
-        fitnessLocation: selection.fitnessLocation,
+        sportId: selection.sportId,
+        specializationId: selection.specializationId,
       },
     });
-    return formatSportSelection(selection);
+    return selection;
   }
 
   async validateGoal(actor: Actor, goalTextInput: string) {
@@ -190,15 +200,15 @@ export class OnboardingService {
     }
 
     const goalPromptConfig = await this.loadGoalPromptConfig();
-    const areas = await this.loadConfiguredAreas();
-    const sportContext = await this.requireSportContext(actor.id, areas);
+    const sportContext = await this.requireSportContext(actor.id);
+    const areas = sportContext.areas;
     const validation = await this.aiProvider.validatePerformanceGoal({
       userId: actor.id,
       goalText,
       basePrompt: goalPromptConfig.basePrompt,
       areas,
       sportSelection: sportContext.selection,
-      sportAreaPromptInstructions: sportContext.instructions,
+      sportSpecializationPromptInstructions: sportContext.instructions,
     });
 
     await this.saveGoalValidation(actor.id, goalText, validation, false);
@@ -258,15 +268,15 @@ export class OnboardingService {
       .filter(Boolean)
       .join('\n');
     const goalPromptConfig = await this.loadGoalPromptConfig();
-    const areas = await this.loadConfiguredAreas();
-    const sportContext = await this.requireSportContext(actor.id, areas);
+    const sportContext = await this.requireSportContext(actor.id);
+    const areas = sportContext.areas;
     const validation = await this.aiProvider.validatePerformanceGoal({
       userId: actor.id,
       goalText: refinedGoalInput,
       basePrompt: goalPromptConfig.basePrompt,
       areas,
       sportSelection: sportContext.selection,
-      sportAreaPromptInstructions: sportContext.instructions,
+      sportSpecializationPromptInstructions: sportContext.instructions,
       refinementContext: {
         originalGoal,
         currentDraft,
@@ -318,8 +328,8 @@ export class OnboardingService {
       answers,
     );
     const profile = this.buildGeneralProfile(normalizedGeneralAnswers);
-    const areas = await this.loadConfiguredAreas();
-    const sportContext = await this.requireSportContext(actor.id, areas);
+    const sportContext = await this.requireSportContext(actor.id);
+    const areas = sportContext.areas;
     if (!areas.length) {
       throw new BadRequestException('Nessuna area configurata');
     }
@@ -354,7 +364,7 @@ export class OnboardingService {
         interpretedGoal: goalText,
         normalizedGoal: null,
         sportSelection: sportContext.selection,
-        sportAreaPromptInstructions: sportContext.instructions,
+        sportSpecializationPromptInstructions: sportContext.instructions,
         generalProfile: profile,
         generalAnswers: normalizedGeneralAnswers.map((answer) =>
           this.serializeAnswer(answer),
@@ -533,7 +543,7 @@ export class OnboardingService {
             name: area.areaName,
           })),
       sportSelection: sportContext.selection,
-      sportAreaPromptInstructions: sportContext.instructions,
+      sportSpecializationPromptInstructions: sportContext.instructions,
       onboardingProfile: profile,
       onboardingAnswers: onboardingAnswersForAi,
     });
@@ -712,11 +722,8 @@ export class OnboardingService {
       scoredAreas.reduce((sum, area) => sum + area.realR, 0) /
         scoredAreas.length,
     );
-    const configuredAreas = await this.loadConfiguredAreas();
-    const sportContext = await this.requireSportContext(
-      actor.id,
-      configuredAreas,
-    );
+    const sportContext = await this.requireSportContext(actor.id);
+    const configuredAreas = sportContext.areas;
 
     return {
       goalText,
@@ -749,86 +756,155 @@ export class OnboardingService {
     });
   }
 
+  private async loadActiveSports() {
+    return this.prisma.sport.findMany({
+      where: {
+        isActive: true,
+        specializations: { some: { isActive: true } },
+      },
+      select: {
+        id: true,
+        key: true,
+        label: true,
+        specializations: {
+          where: { isActive: true },
+          select: { id: true, key: true, label: true },
+          orderBy: { label: 'asc' },
+        },
+      },
+      orderBy: { label: 'asc' },
+    });
+  }
+
+  private async validateSportSelection(
+    input: SportSelectionPayload,
+  ): Promise<FormattedSportSelection> {
+    const sportId = input.sportId?.trim();
+    const specializationId = input.specializationId?.trim();
+    if (!sportId || !specializationId) {
+      throw new BadRequestException('Seleziona sport e specializzazione');
+    }
+    const specialization = await this.prisma.sportSpecialization.findFirst({
+      where: {
+        id: specializationId,
+        sportId,
+        isActive: true,
+        sport: { isActive: true },
+      },
+      select: {
+        id: true,
+        key: true,
+        label: true,
+        sport: { select: { id: true, key: true, label: true } },
+      },
+    });
+    if (!specialization) {
+      throw new BadRequestException(
+        'Sport o specializzazione non configurati',
+      );
+    }
+    return {
+      sportId: specialization.sport.id,
+      sportKey: specialization.sport.key,
+      sportLabel: specialization.sport.label,
+      specializationId: specialization.id,
+      specializationKey: specialization.key,
+      specializationLabel: specialization.label,
+      label: `${specialization.sport.label} - ${specialization.label}`,
+    };
+  }
+
   private async loadUserSportSelection(userId: string) {
     const selection = await this.prisma.userSportSelection.findUnique({
       where: { userId },
-      select: { sports: true, fitnessLocation: true },
+      select: {
+        sport: { select: { id: true, key: true, label: true } },
+        specialization: { select: { id: true, key: true, label: true } },
+      },
     });
-    if (!selection || !Array.isArray(selection.sports)) {
+    if (!selection) {
       return null;
     }
-    const normalized = normalizeSportSelection({
-      sports: selection.sports.filter(
-        (sport): sport is string => typeof sport === 'string',
-      ),
-      fitnessLocation: selection.fitnessLocation,
-    });
-    return formatSportSelection(normalized);
+    return {
+      sportId: selection.sport.id,
+      sportKey: selection.sport.key,
+      sportLabel: selection.sport.label,
+      specializationId: selection.specialization.id,
+      specializationKey: selection.specialization.key,
+      specializationLabel: selection.specialization.label,
+      label: `${selection.sport.label} - ${selection.specialization.label}`,
+    };
   }
 
-  private async requireSportContext(userId: string, areas: Array<{ id: string; name: string }>) {
+  private async requireSportContext(userId: string) {
     const selection = await this.loadUserSportSelection(userId);
     if (!selection) {
       throw new BadRequestException(
         'Seleziona prima uno o due sport per personalizzare il percorso',
       );
     }
+    const areas = await this.loadEnabledDriverAreasForSelection(selection);
     const instructions = await this.loadSportAreaPromptInstructions(
       selection,
       areas,
     );
-    return { selection, instructions };
+    return { selection, instructions, areas };
+  }
+
+  private async loadEnabledDriverAreasForSelection(
+    selection: FormattedSportSelection,
+  ) {
+    const prompts = await this.prisma.sportSpecializationAreaPrompt.findMany({
+      where: {
+        specializationId: selection.specializationId,
+        isActive: true,
+        isEnabledDriver: true,
+      },
+      select: { area: { select: { id: true, name: true } } },
+      orderBy: { area: { name: 'asc' } },
+    });
+    return prompts.length
+      ? prompts.map((prompt) => prompt.area)
+      : this.loadConfiguredAreas();
   }
 
   private async loadSportAreaPromptInstructions(
-    selection: ReturnType<typeof formatSportSelection>,
+    selection: FormattedSportSelection,
     areas: Array<{ id: string; name: string }>,
   ) {
     const areaIds = areas.map((area) => area.id);
-    const promptContexts = selection.sports.map((sport) => ({
-      sportKey: sport,
-      fitnessLocation:
-        sport === 'FITNESS' && selection.fitnessLocation
-          ? selection.fitnessLocation
-          : 'NONE',
-    }));
-    const prompts = await this.prisma.aiSportAreaPromptConfig.findMany({
+    const prompts = await this.prisma.sportSpecializationAreaPrompt.findMany({
       where: {
         isActive: true,
+        isEnabledDriver: true,
         areaId: { in: areaIds },
-        OR: promptContexts,
+        specializationId: selection.specializationId,
       },
       select: {
-        sportKey: true,
-        fitnessLocation: true,
+        specializationId: true,
         areaId: true,
         basePrompt: true,
         version: true,
         area: { select: { name: true } },
+        specialization: {
+          select: {
+            key: true,
+            label: true,
+            sport: { select: { key: true, label: true } },
+          },
+        },
       },
     });
     return prompts.map((prompt) => ({
-      sportKey: prompt.sportKey,
-      fitnessLocation:
-        prompt.fitnessLocation === 'NONE' ? null : prompt.fitnessLocation,
-      sportLabel: this.sportPromptLabel(prompt.sportKey, prompt.fitnessLocation),
+      sportKey: prompt.specialization.sport.key,
+      specializationKey: prompt.specialization.key,
+      specializationId: prompt.specializationId,
+      sportLabel: `${prompt.specialization.sport.label} - ${prompt.specialization.label}`,
       areaId: prompt.areaId,
       areaName: prompt.area.name,
       basePrompt: prompt.basePrompt,
       version: prompt.version,
     }));
-  }
-
-  private sportPromptLabel(sportKey: string, fitnessLocation: string) {
-    const sportLabel =
-      SPORT_OPTIONS.find((sport) => sport.key === sportKey)?.label ?? sportKey;
-    if (sportKey !== 'FITNESS') {
-      return sportLabel;
-    }
-    const fitnessLabel = FITNESS_LOCATION_OPTIONS.find(
-      (location) => location.key === fitnessLocation,
-    )?.label;
-    return fitnessLabel ? `${sportLabel} - ${fitnessLabel}` : sportLabel;
   }
 
   private async saveGoalValidation(

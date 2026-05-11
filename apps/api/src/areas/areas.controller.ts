@@ -1,5 +1,6 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Req, UseGuards } from '@nestjs/common';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { UserRole } from '@prisma/client';
 import { AreasService } from './areas.service';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 
@@ -12,7 +13,7 @@ export class AreasController {
   @ApiOperation({ summary: 'Elenca aree disponibili' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
-  list() {
-    return this.areas.listAreas();
+  list(@Req() req: { user?: { id: string; role: UserRole } }) {
+    return this.areas.listAreas(req.user);
   }
 }

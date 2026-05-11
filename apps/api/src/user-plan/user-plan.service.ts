@@ -97,6 +97,59 @@ export class UserPlanService {
     });
   }
 
+  async getCurrentTraining(userId: string) {
+    if (!userId) {
+      throw new BadRequestException('Utente mancante');
+    }
+    const training = await this.prisma.trainingPlanRelease.findFirst({
+      where: { userId, status: 'ACTIVE' },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        userId: true,
+        version: true,
+        status: true,
+        generatedBy: true,
+        summaryText: true,
+        outputJson: true,
+        provider: true,
+        model: true,
+        createdAt: true,
+        publishedAt: true,
+        sourceSnapshotId: true,
+      },
+    });
+    if (!training) {
+      throw new NotFoundException('Allenamento specifico non trovato');
+    }
+    return training;
+  }
+
+  async getTrainingHistory(userId: string) {
+    if (!userId) {
+      throw new BadRequestException('Utente mancante');
+    }
+    return this.prisma.trainingPlanRelease.findMany({
+      where: { userId, status: { in: ['ACTIVE', 'CLOSED'] } },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        userId: true,
+        version: true,
+        status: true,
+        generatedBy: true,
+        summaryText: true,
+        outputJson: true,
+        provider: true,
+        model: true,
+        createdAt: true,
+        publishedAt: true,
+        archivedAt: true,
+        sourceSnapshotId: true,
+      },
+    });
+  }
+
   async completePlanItem(
     userId: string,
     planItemId: string,

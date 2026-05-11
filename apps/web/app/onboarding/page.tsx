@@ -22,8 +22,7 @@ type StarterQuestionario = {
   required: boolean;
   status: string;
   sportSelection?: SportSelection | null;
-  sportOptions?: SportOption[];
-  fitnessLocationOptions?: SportOption[];
+  sports?: SportOption[];
   goalText?: string;
   interpretedGoal?: string | null;
   suggestedReformulatedGoal?: string | null;
@@ -65,10 +64,20 @@ type GoalValidation = {
   nextStep?: string | null;
   rejectionReason?: string | null;
 };
-type SportOption = { key: string; label: string };
+type SportSpecializationOption = { id: string; key: string; label: string };
+type SportOption = {
+  id: string;
+  key: string;
+  label: string;
+  specializations: SportSpecializationOption[];
+};
 type SportSelection = {
-  sports: string[];
-  fitnessLocation: string | null;
+  sportId: string;
+  sportKey: string;
+  sportLabel: string;
+  specializationId: string;
+  specializationKey: string;
+  specializationLabel: string;
   label?: string;
 };
 type GoalChatMessage = {
@@ -85,8 +94,8 @@ type FlowStep = "ANAMNESIS" | "GOAL";
 export default function OnboardingPage() {
   const [questionnaire, setQuestionario] = useState<StarterQuestionario | null>(null);
   const [goalText, setGoalText] = useState("");
-  const [selectedSports, setSelectedSports] = useState<string[]>([]);
-  const [fitnessLocation, setFitnessLocation] = useState("");
+  const [selectedSportId, setSelectedSportId] = useState("");
+  const [selectedSpecializationId, setSelectedSpecializationId] = useState("");
   const [sportSelectionSaved, setSportSelectionSaved] = useState(false);
   const [goalValidation, setGoalValidation] =
     useState<GoalValidation | null>(null);
@@ -144,22 +153,13 @@ export default function OnboardingPage() {
     flowStep === "ANAMNESIS" ? generalQuestions : specialistQuestions;
   const goalReady = sportSelectionSaved && goalText.trim().length >= 10;
   const goalConfirmed = goalReady && goalAssistantClosed;
-  const sportOptions = questionnaire?.sportOptions ?? [
-    { key: "CYCLING", label: "Ciclismo" },
-    { key: "RUNNING", label: "Corsa" },
-    { key: "TENNIS", label: "Tennis" },
-    { key: "PADEL", label: "Padel" },
-    { key: "FITNESS", label: "Fitness" },
-  ];
-  const fitnessLocationOptions = questionnaire?.fitnessLocationOptions ?? [
-    { key: "HOME", label: "In casa" },
-    { key: "GYM", label: "In palestra" },
-    { key: "MIXED", label: "Misto" },
-  ];
+  const sports = questionnaire?.sports ?? [];
+  const selectedSport = sports.find(
+    (sport) => sport.id === selectedSportId,
+  );
+  const specializationOptions = selectedSport?.specializations ?? [];
   const sportSelectionValid =
-    selectedSports.length > 0 &&
-    selectedSports.length <= 2 &&
-    (!selectedSports.includes("FITNESS") || Boolean(fitnessLocation));
+    Boolean(selectedSportId) && Boolean(selectedSpecializationId);
   const generalAnswersComplete =
     generalQuestions.length > 0 &&
     generalQuestions.every(
@@ -199,9 +199,9 @@ export default function OnboardingPage() {
     const data = (await response.json()) as StarterQuestionario;
     setQuestionario(data);
     setGoalText(data.goalText ?? "");
-    setSelectedSports(data.sportSelection?.sports ?? []);
-    setFitnessLocation(data.sportSelection?.fitnessLocation ?? "");
-    setSportSelectionSaved(Boolean(data.sportSelection?.sports?.length));
+    setSelectedSportId(data.sportSelection?.sportId ?? "");
+    setSelectedSpecializationId(data.sportSelection?.specializationId ?? "");
+    setSportSelectionSaved(Boolean(data.sportSelection?.specializationId));
     setGoalAssistantClosed(Boolean(data.goalText));
     setFinalGoalValidated(Boolean(data.goalFrozenAt));
     setFlowStep(
@@ -355,28 +355,10 @@ export default function OnboardingPage() {
     await validateFinalGoal(suggestedGoal);
   };
 
-  const toggleSport = (sportKey: string) => {
-    setSelectedSports((current) => {
-      const next = current.includes(sportKey)
-        ? current.filter((item) => item !== sportKey)
-        : current.length < 2
-          ? [...current, sportKey]
-          : current;
-      if (!next.includes("FITNESS")) {
-        setFitnessLocation("");
-      } else if (!fitnessLocation) {
-        setFitnessLocation("HOME");
-      }
-      setSportSelectionSaved(false);
-      setGoalValidation(null);
-      return next;
-    });
-  };
-
   const saveSportSelection = async () => {
     if (!sportSelectionValid) {
       setMessageTone("warning");
-      setMessage("Seleziona uno o due sport. Per fitness indica casa, palestra o misto.");
+      setMessage("Seleziona sport e specializzazione.");
       return false;
     }
     setMessage(null);
@@ -384,10 +366,8 @@ export default function OnboardingPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        sports: selectedSports,
-        fitnessLocation: selectedSports.includes("FITNESS")
-          ? fitnessLocation
-          : null,
+        sportId: selectedSportId,
+        specializationId: selectedSpecializationId,
       }),
     });
     if (!response.ok) {
@@ -396,8 +376,8 @@ export default function OnboardingPage() {
       return false;
     }
     const saved = (await response.json()) as SportSelection;
-    setSelectedSports(saved.sports);
-    setFitnessLocation(saved.fitnessLocation ?? "");
+    setSelectedSportId(saved.sportId);
+    setSelectedSpecializationId(saved.specializationId);
     setSportSelectionSaved(true);
     setMessageTone("success");
     setMessage("Sport salvato. Ora completa l'anamnesi.");
@@ -712,7 +692,11 @@ export default function OnboardingPage() {
         { label: "Stato", value: loading ? "..." : questionnaire?.status ?? "-", tone: questionnaire?.required ? "warning" : "success" },
         {
           label: "Sport",
-          value: selectedSports.length ? selectedSports.length : "-",
+          value: selectedSport
+            ? selectedSpecializationId
+              ? "1"
+              : "-"
+            : "-",
           tone: sportSelectionSaved ? "success" : "warning",
         },
         { label: "Risposte", value: questionnaire ? `${Object.keys(answers).length}/${questionnaire.questions.length}` : "-", tone: "accent" },
@@ -757,55 +741,65 @@ export default function OnboardingPage() {
                 <div>
                   <h3>Sport</h3>
                   <p className="pf-muted">
-                    Seleziona fino a due sport. Se scegli fitness indica il
-                    contesto di allenamento.
+                    Seleziona uno sport e una specializzazione tra quelle
+                    configurate dall'amministratore.
                   </p>
                 </div>
                 {sportSelectionSaved && (
                   <StatusBadge tone="success">Salvato</StatusBadge>
                 )}
               </div>
-              <div className="pf-option-grid">
-                {sportOptions.map((sport) => (
-                  <button
-                    key={sport.key}
-                    type="button"
-                    className={
-                      selectedSports.includes(sport.key)
-                        ? "pf-button"
-                        : "pf-button-secondary"
-                    }
-                    disabled={
-                      !selectedSports.includes(sport.key) &&
-                      selectedSports.length >= 2
-                    }
-                    onClick={() => toggleSport(sport.key)}
-                  >
-                    {sport.label}
-                  </button>
-                ))}
-              </div>
-              {selectedSports.includes("FITNESS") && (
+              <div className="pf-two-col">
                 <label className="pf-field">
-                  Dove fai fitness
+                  Sport
                   <select
                     className="pf-select"
-                    value={fitnessLocation}
+                    value={selectedSportId}
                     onChange={(event) => {
-                      setFitnessLocation(event.target.value);
+                      const sportId = event.target.value;
+                      const sport = sports.find(
+                        (item) => item.id === sportId,
+                      );
+                      setSelectedSportId(sportId);
+                      setSelectedSpecializationId(
+                        sport?.specializations[0]?.id ?? "",
+                      );
                       setSportSelectionSaved(false);
                       setGoalValidation(null);
                     }}
                   >
-                    <option value="">Seleziona</option>
-                    {fitnessLocationOptions.map((location) => (
-                      <option key={location.key} value={location.key}>
-                        {location.label}
+                    <option value="">Seleziona sport</option>
+                    {sports.map((sport) => (
+                      <option key={sport.id} value={sport.id}>
+                        {sport.label}
                       </option>
                     ))}
                   </select>
                 </label>
-              )}
+                <label className="pf-field">
+                  Specializzazione
+                  <select
+                    className="pf-select"
+                    value={selectedSpecializationId}
+                    disabled={!selectedSportId}
+                    onChange={(event) => {
+                      setSelectedSpecializationId(event.target.value);
+                      setSportSelectionSaved(false);
+                      setGoalValidation(null);
+                    }}
+                  >
+                    <option value="">Seleziona specializzazione</option>
+                    {specializationOptions.map((specialization) => (
+                      <option
+                        key={specialization.id}
+                        value={specialization.id}
+                      >
+                        {specialization.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               <div className="pf-actions">
                 <button
                   className="pf-button-secondary"

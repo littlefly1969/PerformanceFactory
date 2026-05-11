@@ -6,23 +6,16 @@ import {
   UserRole,
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { UpsertAiPromptConfigDto } from './dto/upsert-ai-prompt-config.dto';
 import { UpsertAiAreaGenerationConfigDto } from './dto/upsert-ai-area-generation-config.dto';
 import { UpsertOnboardingTemplateDto } from './dto/upsert-onboarding-template.dto';
 import { UpsertGoalPromptConfigDto } from './dto/upsert-goal-prompt-config.dto';
-import { UpsertSportAreaPromptConfigDto } from './dto/upsert-sport-area-prompt-config.dto';
 import { OrchestratorService } from '../ai-orchestrator/orchestrator.service';
-import {
-  FITNESS_LOCATION_OPTIONS,
-  SPORT_OPTIONS,
-  normalizeSportSelection,
-} from '../onboarding/sport-selection';
 
 const DEFAULT_INITIAL_CONTEXT =
-  'Sei un assistente senior di sport performance a supporto di professionisti umani. Genera una proposta di miglioramento specifica per area e tre domande di monitoraggio usando solo il contesto atleta fornito. Rispondi esclusivamente in italiano e solo con JSON valido conforme allo schema. Il lavoro deve essere pratico, misurabile, progressivo e revisionabile da un professionista. Non inventare diagnosi, indicazioni mediche, dati atleta non presenti o contesto nascosto. Se esistono lavori precedenti, usa note di completamento, punteggi e motivi di rifiuto per migliorare la proposta.';
+  'Sei un assistente senior di sport performance a supporto di professionisti umani. Genera una proposta di miglioramento specifica per area e le domande di monitoraggio richieste dal layout AI usando solo il contesto atleta fornito. Rispondi esclusivamente in italiano e solo con JSON valido conforme allo schema. Il lavoro deve essere pratico, misurabile, progressivo e revisionabile da un professionista. Non inventare diagnosi, indicazioni mediche, dati atleta non presenti o contesto nascosto. Se esistono lavori precedenti, usa note di completamento, punteggi e motivi di rifiuto per migliorare la proposta.';
 
 const DEFAULT_RESPONSE_FORMAT_PROMPT =
-  'La risposta deve contenere una sintesi breve, da uno a tre esercizi/attivita con titolo e descrizione operativa, e tre domande di monitoraggio. Ogni attivita deve indicare azione, frequenza o trigger, criterio misurabile di successo e progressione. Le domande devono essere brevi, osservabili e collegate al lavoro proposto.';
+  'La risposta deve contenere una sintesi breve, da uno a tre esercizi/attivita con titolo e descrizione operativa, e il numero di domande di monitoraggio richiesto dal layout AI. Ogni attivita deve indicare azione, frequenza o trigger, criterio misurabile di successo e progressione. Le domande devono essere brevi, osservabili e collegate al lavoro proposto.';
 
 const DEFAULT_QUESTIONNAIRE_LAYOUT_JSON = {
   questionnaire: {
@@ -42,9 +35,9 @@ const DEFAULT_GOAL_PROMPT = [
   'Sei l AI guida di Performance Factory, una piattaforma orientata al miglioramento della performance sportiva personale.',
   'Performance Factory non promuove il confronto tossico con gli altri, ma il miglioramento progressivo dell utente rispetto al proprio punto di partenza.',
   'Analizza l obiettivo iniziale dichiarato dall utente, valutane qualita, sicurezza, pertinenza, liceita e chiarezza, poi decidi se il sistema puo procedere alla costruzione di un percorso personalizzato.',
-  'Le sei aree ufficiali sono: Preparazione atletica, Equipaggiamento, Allenamento mentale, Nutrizione, Fisioterapia, Tecnico-tattica.',
+  'Le aree ufficiali disponibili sono quelle configurate nel sistema e abilitate per la sport-specializzazione selezionata.',
   'Classifica sempre con uno solo di questi status: OK, NEEDS_ANAMNESIS, GOAL_NEEDS_REFORMULATION, OUT_OF_SCOPE, UNSAFE.',
-  'Usa OK solo se l obiettivo e sportivo o legato alla performance, chiaro, sicuro, orientato al miglioramento personale e i dati disponibili bastano per generare i prompt delle sei aree.',
+  'Usa OK solo se l obiettivo e sportivo o legato alla performance, chiaro, sicuro, orientato al miglioramento personale e i dati disponibili bastano per generare i prompt delle aree abilitate.',
   'Usa NEEDS_ANAMNESIS se l obiettivo e valido ma mancano dati personali indispensabili per costruire il percorso.',
   'Usa GOAL_NEEDS_REFORMULATION se l obiettivo e potenzialmente coerente ma troppo generico, vago, non misurabile o troppo orientato al confronto con altri.',
   'Usa OUT_OF_SCOPE se l obiettivo non riguarda sport, performance, benessere funzionale o miglioramento personale.',
@@ -52,24 +45,68 @@ const DEFAULT_GOAL_PROMPT = [
   'Per Nutrizione e Fisioterapia non fare diagnosi, non prescrivere farmaci, diete cliniche o protocolli terapeutici e non sostituirti a professionisti sanitari. In presenza di segnali di allarme suggerisci valutazione professionale prima di procedere.',
   'Rispondi sempre e solo in JSON valido, senza markdown e senza testo fuori dal JSON.',
   'Il JSON deve contenere: status, goal_evaluation, message_to_user, suggested_reformulated_goal, questions_to_user, normalized_goal, area_prompts, next_step.',
-  'Se status e diverso da OK, area_prompts deve contenere valori null per tutte le sei aree.',
-  'Se status e OK, compila tutti i prompt delle sei aree. Ogni prompt area deve contenere role, objective, required_inputs, initial_questionnaire, exercise_generation_rules, feedback_questions, progression_rules, measurement_indicators, safety_limits, output_format.',
+  'Se status e diverso da OK, area_prompts deve contenere valori null per tutte le aree richieste nel contesto.',
+  'Se status e OK, compila tutti i prompt delle aree richieste nel contesto. Ogni prompt area deve contenere role, objective, required_inputs, initial_questionnaire, exercise_generation_rules, feedback_questions, progression_rules, measurement_indicators, safety_limits, output_format.',
 ].join('\n');
 
-const FITNESS_LOCATION_NONE = 'NONE';
-
-const sportPromptContexts = [
-  ...SPORT_OPTIONS.filter((sport) => sport.key !== 'FITNESS').map((sport) => ({
-    sportKey: sport.key,
-    fitnessLocation: FITNESS_LOCATION_NONE,
-    label: sport.label,
-  })),
-  ...FITNESS_LOCATION_OPTIONS.map((location) => ({
-    sportKey: 'FITNESS',
-    fitnessLocation: location.key,
-    label: `Fitness - ${location.label}`,
-  })),
-];
+const RUNNING_ROAD_TRAINING_PROMPT = [
+  '[Prompt Allenamento Corsa - Strada v1]',
+  '',
+  'Adatta la generazione dell allenamento allo scenario sportivo Corsa - Strada.',
+  '',
+  'Questo prompt non appartiene all area Preparazione atletica complementare. Deve generare allenamenti veri e propri di corsa su strada: sedute operative, microcicli o progressioni finalizzate al miglioramento della performance nella corsa, in base all obiettivo configurato e al contesto atleta disponibile.',
+  '',
+  'Usa la scelta Corsa - Strada come vincolo prioritario per interpretare obiettivo, anamnesi, risposte dell atleta, note, punteggi, lavori assegnati, completamenti, rifiuti, feedback, istruzioni configurate dall amministratore, limiti di sicurezza, indicatori di monitoraggio e regole di progressione.',
+  '',
+  'Usa obbligatoriamente tutto e solo il contesto fornito nei blocchi successivi. Non chiedere nuove informazioni preliminari. Non inventare dati mancanti.',
+  '',
+  'La proposta deve essere un allenamento reale di corsa su strada, non una lista generica di esercizi fisici. Deve indicare cosa deve fare l atleta durante la seduta o nel periodo richiesto, con struttura chiara, intensita, volume, recuperi, criteri di successo e progressione.',
+  '',
+  'Quando l obiettivo riguarda 5 km, 10 km, mezza maratona, maratona o endurance running, costruisci l allenamento in modo coerente con la distanza, il livello di informazioni disponibili, la tolleranza al carico, l anamnesi e la frequenza di allenamento eventualmente indicata.',
+  '',
+  'Gli allenamenti possono includere, quando pertinenti: fondo lento; corsa facile; corsa rigenerante; lungo lento; medio; progressivo; fartlek; ripetute brevi; ripetute medie; ripetute lunghe; lavori a ritmo gara; salite solo se coerenti con il contesto; sedute di recupero; settimane di scarico; progressione del volume; progressione dell intensita; combinazioni prudenti di corsa e recupero attivo.',
+  '',
+  'Non trasformare l allenamento in preparazione atletica complementare. Core stability, forza, mobilita e prevenzione possono essere citati solo come eventuale supporto secondario se previsto dal contesto, ma il contenuto principale deve essere la seduta di corsa.',
+  '',
+  'Non inventare passo gara, ritmo al km, frequenza cardiaca, zone, soglie, FTP, VO2max, chilometraggio settimanale, disponibilita settimanale, livello atletico, storico infortuni, test o attrezzatura se non sono presenti nel contesto.',
+  '',
+  'Se sono disponibili ritmi, zone cardiache, test recenti, passo gara, RPE, chilometraggio o frequenza settimanale, usali per rendere l allenamento piu preciso.',
+  '',
+  'Se ritmi, zone o test non sono disponibili, usa parametri prudenti e osservabili come durata, distanza controllata, RPE, capacita di parlare durante la corsa, recupero percepito, assenza di dolore, qualita del movimento, regolarita del passo e recupero entro il giorno successivo.',
+  '',
+  'La progressione deve rispettare la logica della corsa su strada: prima consolidare regolarita e tolleranza al carico; poi aumentare gradualmente il volume; poi inserire intensita controllata; poi aumentare specificita verso la distanza obiettivo; evitare aumenti simultanei di volume, intensita e complessita.',
+  '',
+  'Se il contesto indica mezza maratona o maratona, privilegia continuita aerobica, lunghi progressivi, gestione del ritmo, capacita di sostenere il carico, recupero tra sedute e progressione sostenibile. Non proporre lavori massimali o eccessivamente intensi se il contesto non li giustifica.',
+  '',
+  'Se il contesto indica fastidi, infortuni precedenti, dolore, problemi alla schiena, sovraccarichi, affaticamento elevato o recupero insufficiente, riduci volume, intensita e complessita. In questi casi privilegia corsa facile, durata controllata, recuperi ampi, monitoraggio della risposta e progressione conservativa.',
+  '',
+  'Ogni allenamento deve essere strutturato in modo operativo e deve includere: obiettivo della seduta; riscaldamento; parte centrale; defaticamento; intensita; volume totale o durata totale; recuperi se presenti; criterio misurabile di successo; progressione consigliata; segnali per ridurre o interrompere il lavoro.',
+  '',
+  'L intensita deve essere indicata con il parametro piu affidabile disponibile nel contesto: ritmo al km se fornito; frequenza cardiaca o zone se fornite; RPE se non sono disponibili dati piu precisi; descrizione percettiva prudente se non sono presenti metriche oggettive.',
+  '',
+  'I criteri di successo devono essere concreti e misurabili, ad esempio completare la seduta senza dolore, mantenere RPE entro il range indicato, mantenere ritmo regolare, chiudere la seduta senza calo marcato, recuperare entro 24 ore, non peggiorare fastidi riferiti, completare il volume previsto senza aumentare la fatica oltre il limite indicato, mantenere buona qualita di corsa nella parte finale.',
+  '',
+  'Le progressioni devono essere semplici, verificabili e coerenti con il contesto, ad esempio aumentare la durata di pochi minuti, aumentare la distanza solo se il recupero e buono, aggiungere una ripetizione solo se la seduta precedente e stata completata senza segnali negativi, mantenere invariata l intensita aumentando prima la continuita, inserire ritmo gara solo dopo consolidamento del fondo, ridurre il carico se compaiono dolore, affaticamento anomalo o recupero insufficiente.',
+  '',
+  'Non generare piani aggressivi. Non proporre incrementi arbitrari. Se il contesto amministratore indica limiti specifici, come incremento massimo settimanale, priorita al volume prima dell intensita o adattamento basato su assenza di dolore, tali limiti prevalgono sempre.',
+  '',
+  'Se devi generare una singola seduta, produci una seduta completa e immediatamente eseguibile.',
+  '',
+  'Se devi generare un microciclo settimanale, distribuisci le sedute in modo coerente con frequenza disponibile, recupero, obiettivo e anamnesi. Non inventare giorni o frequenza se non sono forniti: in quel caso genera solo la prossima seduta o una proposta modulare adattabile.',
+  '',
+  'Se devi generare una progressione verso mezza maratona o maratona, organizza il lavoro in blocchi progressivi, rispettando carico, recupero, settimane di scarico e specificita crescente verso la distanza obiettivo.',
+  '',
+  'Le domande di monitoraggio, se richieste dallo schema, non devono raccogliere dati preliminari generici. Devono servire a valutare la risposta alla seduta proposta, ad esempio dolore o fastidio durante/dopo la corsa, livello di fatica percepita, qualita del recupero, risposta della schiena se pertinente, risposta di polpacci, tendini, ginocchia, anche o piedi, capacita di completare il lavoro mantenendo il ritmo o l RPE previsto, impatto sulla seduta successiva.',
+  '',
+  'Rispondi solo in italiano e solo con JSON valido conforme allo schema richiesto.',
+  '',
+  'La risposta deve contenere una proposta di allenamento reale per Corsa - Strada, coerente con obiettivo, anamnesi, istruzioni configurate e dati disponibili.',
+  '',
+  'Non inserire diagnosi, consigli medici, trattamenti riabilitativi specialistici o dati non presenti nel contesto. In presenza di segnali critici gia indicati, mantieni la proposta conservativa e rimanda alla valutazione di un professionista qualificato.',
+  '',
+  'Schema JSON consigliato per questo modulo:',
+  '{"stato_conoscenza_profilo_atleta":"","sintesi":"","tipo_output":"singola_seduta | microciclo | progressione","obiettivo_allenamento":"","allenamento":{"titolo":"","tipo_seduta":"","durata_totale":"","volume_totale":"","riscaldamento":{"descrizione":"","durata":"","intensita":""},"parte_centrale":{"descrizione":"","serie_o_blocchi":"","recuperi":"","intensita":""},"defaticamento":{"descrizione":"","durata":"","intensita":""},"criterio_successo":"","progressione":"","segnali_riduzione_o_stop":""},"monitoraggio":["","",""]}',
+].join('\n');
 
 @Injectable()
 export class AdminService {
@@ -130,6 +167,19 @@ export class AdminService {
               },
             },
             orderBy: { createdAt: 'desc' },
+          },
+          trainingPlanReleases: {
+            where: { status: 'ACTIVE' },
+            select: {
+              id: true,
+              version: true,
+              status: true,
+              createdAt: true,
+              publishedAt: true,
+              summaryText: true,
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 1,
           },
           questionSets: {
             where: { status: { in: ['PUBLISHED', 'PENDING_APPROVAL'] } },
@@ -406,6 +456,19 @@ export class AdminService {
           createdAt: link.createdAt,
         })),
         latestSnapshot,
+        trainingState: {
+          activeTraining: user.trainingPlanReleases[0] ?? null,
+          generationReady:
+            user.isActive && user.onboardingAssessment?.status === 'COMPLETED',
+          reason:
+            user.isActive && user.onboardingAssessment?.status === 'COMPLETED'
+              ? user.trainingPlanReleases[0]
+                ? 'Pronto per rigenerare allenamento'
+                : 'Pronto per il primo allenamento'
+              : !user.isActive
+                ? 'Atleta in attesa di attivazione amministratore'
+                : 'Onboarding non completato',
+        },
         areaStates,
       };
     });
@@ -502,6 +565,212 @@ export class AdminService {
     });
   }
 
+  async resetUserOperationalData(userId: string) {
+    if (!userId) {
+      throw new BadRequestException('ID utente mancante');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        isActive: true,
+      },
+    });
+    if (!user || user.role !== UserRole.USER) {
+      throw new NotFoundException('Atleta non trovato');
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const questionSetIds = (
+        await tx.questionSet.findMany({
+          where: { userId },
+          select: { id: true },
+        })
+      ).map((item) => item.id);
+      const planReleaseIds = (
+        await tx.improvementPlanRelease.findMany({
+          where: { userId },
+          select: { id: true },
+        })
+      ).map((item) => item.id);
+      const snapshotIds = (
+        await tx.performanceProfileSnapshot.findMany({
+          where: { userId },
+          select: { id: true },
+        })
+      ).map((item) => item.id);
+      const questionIds = questionSetIds.length
+        ? (
+            await tx.question.findMany({
+              where: { questionSetId: { in: questionSetIds } },
+              select: { id: true },
+            })
+          ).map((item) => item.id)
+        : [];
+      const aiProposalAuditWhere: Prisma.AiProposalAuditWhereInput[] = [
+        { userId },
+      ];
+      if (planReleaseIds.length) {
+        aiProposalAuditWhere.push({ planReleaseId: { in: planReleaseIds } });
+      }
+      if (questionSetIds.length) {
+        aiProposalAuditWhere.push({ questionSetId: { in: questionSetIds } });
+      }
+      const aiContextSummaryWhere: Prisma.AiContextSummaryWhereInput[] = [
+        { userId },
+      ];
+      if (planReleaseIds.length) {
+        aiContextSummaryWhere.push({ planReleaseId: { in: planReleaseIds } });
+      }
+      const userAnswerWhere: Prisma.UserAnswerWhereInput[] = [{ userId }];
+      if (questionIds.length) {
+        userAnswerWhere.push({ questionId: { in: questionIds } });
+      }
+
+      const deleted = {
+        dataAccessAudits: (
+          await tx.dataAccessAudit.deleteMany({
+            where: { OR: [{ targetUserId: userId }, { actorId: userId }] },
+          })
+        ).count,
+        cycleAuditLogs: (
+          await tx.cycleAuditLog.deleteMany({
+            where: { OR: [{ userId }, { actorId: userId }] },
+          })
+        ).count,
+        aiProposalAudits: (
+          await tx.aiProposalAudit.deleteMany({
+            where: {
+              OR: aiProposalAuditWhere,
+            },
+          })
+        ).count,
+        aiContextSummaries: (
+          await tx.aiContextSummary.deleteMany({
+            where: {
+              OR: aiContextSummaryWhere,
+            },
+          })
+        ).count,
+        questionSetApprovals: questionSetIds.length
+          ? (
+              await tx.questionSetAreaApproval.deleteMany({
+                where: { questionSetId: { in: questionSetIds } },
+              })
+            ).count
+          : 0,
+        userAnswers: (
+          await tx.userAnswer.deleteMany({
+            where: {
+              OR: userAnswerWhere,
+            },
+          })
+        ).count,
+        answerOptions: questionIds.length
+          ? (
+              await tx.answerOption.deleteMany({
+                where: { questionId: { in: questionIds } },
+              })
+            ).count
+          : 0,
+        questions: questionSetIds.length
+          ? (
+              await tx.question.deleteMany({
+                where: { questionSetId: { in: questionSetIds } },
+              })
+            ).count
+          : 0,
+        questionSets: (
+          await tx.questionSet.deleteMany({ where: { userId } })
+        ).count,
+        planItems: planReleaseIds.length
+          ? (
+              await tx.planItem.deleteMany({
+                where: { planReleaseId: { in: planReleaseIds } },
+              })
+            ).count
+          : 0,
+        planReleases: (
+          await tx.improvementPlanRelease.deleteMany({ where: { userId } })
+        ).count,
+        trainingPlanReleases: (
+          await tx.trainingPlanRelease.deleteMany({ where: { userId } })
+        ).count,
+        snapshotAreas: snapshotIds.length
+          ? (
+              await tx.performanceProfileSnapshotArea.deleteMany({
+                where: { snapshotId: { in: snapshotIds } },
+              })
+            ).count
+          : 0,
+        snapshots: (
+          await tx.performanceProfileSnapshot.deleteMany({ where: { userId } })
+        ).count,
+        professionalLinks: (
+          await tx.professionalUserLink.deleteMany({ where: { userId } })
+        ).count,
+        feedbackEntries: (
+          await tx.feedbackEntry.deleteMany({ where: { userId } })
+        ).count,
+        assignments: (
+          await tx.userAssignment.deleteMany({ where: { userId } })
+        ).count,
+        currentStates: (
+          await tx.currentState.deleteMany({ where: { userId } })
+        ).count,
+        kpiDaily: (await tx.kpiDaily.deleteMany({ where: { userId } })).count,
+        aiInteractions: (
+          await tx.aiInteraction.deleteMany({ where: { userId } })
+        ).count,
+        onboardingQuestions: (
+          await tx.userOnboardingQuestion.deleteMany({ where: { userId } })
+        ).count,
+        sportSelection: (
+          await tx.userSportSelection.deleteMany({ where: { userId } })
+        ).count,
+        areaPromptInstructions: (
+          await tx.userAreaPromptInstruction.deleteMany({ where: { userId } })
+        ).count,
+        performanceGoal: (
+          await tx.userPerformanceGoal.deleteMany({ where: { userId } })
+        ).count,
+      };
+
+      const resetUser = await tx.user.update({
+        where: { id: userId },
+        data: {
+          onboardingAssessment: {
+            upsert: {
+              update: {
+                status: 'PENDING',
+                answersJson: Prisma.JsonNull,
+                profileJson: Prisma.JsonNull,
+                completedAt: null,
+              },
+              create: { status: 'PENDING' },
+            },
+          },
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          isActive: true,
+          role: true,
+          onboardingAssessment: { select: { status: true } },
+        },
+      });
+
+      return { user: resetUser, deleted };
+    });
+  }
+
   async getAiSettings() {
     const areas = await this.prisma.area.findMany({
       select: { id: true, name: true },
@@ -509,30 +778,14 @@ export class AdminService {
     });
     await this.ensureAreaGenerationConfigs(areas.map((area) => area.id));
     await this.ensureGoalPromptConfig();
-    await this.ensureSportAreaPromptConfigs(areas);
+    await this.ensureSportPromptCoverage(areas);
 
     const [
-      promptConfigs,
       goalPromptConfig,
       areaGenerationConfigs,
-      sportAreaPromptConfigs,
+      sports,
       onboardingTemplates,
     ] = await Promise.all([
-      this.prisma.aiPromptConfig.findMany({
-        select: {
-          id: true,
-          name: true,
-          basePrompt: true,
-          areaId: true,
-          athleteLevel: true,
-          version: true,
-          isActive: true,
-          createdAt: true,
-          updatedAt: true,
-          area: { select: { id: true, name: true } },
-        },
-        orderBy: [{ areaId: 'asc' }, { athleteLevel: 'asc' }, { version: 'desc' }],
-      }),
       this.prisma.aiGoalPromptConfig.findFirst({
         where: { isActive: true },
         select: {
@@ -558,23 +811,38 @@ export class AdminService {
         },
         orderBy: [{ area: { name: 'asc' } }],
       }),
-      this.prisma.aiSportAreaPromptConfig.findMany({
+      this.prisma.sport.findMany({
         select: {
           id: true,
-          sportKey: true,
-          fitnessLocation: true,
-          areaId: true,
-          basePrompt: true,
-          version: true,
+          key: true,
+          label: true,
           isActive: true,
-          updatedAt: true,
-          area: { select: { id: true, name: true } },
+          specializations: {
+            select: {
+              id: true,
+              key: true,
+              label: true,
+              trainingPrompt: true,
+              trainingPromptVersion: true,
+              trainingPromptActive: true,
+              isActive: true,
+              prompts: {
+                select: {
+                  id: true,
+                  areaId: true,
+                  basePrompt: true,
+                  isEnabledDriver: true,
+                  version: true,
+                  isActive: true,
+                  area: { select: { id: true, name: true } },
+                },
+                orderBy: [{ area: { name: 'asc' } }],
+              },
+            },
+            orderBy: { label: 'asc' },
+          },
         },
-        orderBy: [
-          { sportKey: 'asc' },
-          { fitnessLocation: 'asc' },
-          { area: { name: 'asc' } },
-        ],
+        orderBy: { label: 'asc' },
       }),
       this.prisma.onboardingQuestionTemplate.findMany({
         select: {
@@ -598,13 +866,9 @@ export class AdminService {
 
     return {
       areas,
-      sportOptions: SPORT_OPTIONS,
-      fitnessLocationOptions: FITNESS_LOCATION_OPTIONS,
-      levels: ['BASELINE', 'STABLE', 'ADVANCED'],
-      promptConfigs,
+      sports,
       goalPromptConfig,
       areaGenerationConfigs,
-      sportAreaPromptConfigs,
       onboardingTemplates,
       inputTypes: Object.values(OnboardingInputType),
       scopes: Object.values(OnboardingQuestionScope),
@@ -641,31 +905,66 @@ export class AdminService {
     });
   }
 
-  private async ensureSportAreaPromptConfigs(areas: Array<{ id: string; name: string }>) {
+  private async ensureSportPromptCoverage(
+    areas: Array<{ id: string; name: string }>,
+  ) {
     if (!areas.length) {
       return;
     }
-    await this.prisma.aiSportAreaPromptConfig.createMany({
-      data: sportPromptContexts.flatMap((context) =>
-        areas.map((area) => ({
-          sportKey: context.sportKey,
-          fitnessLocation: context.fitnessLocation,
+
+    const specializations = await this.prisma.sportSpecialization.findMany({
+      select: {
+        id: true,
+        label: true,
+        sport: { select: { label: true } },
+      },
+    });
+    for (const specialization of specializations) {
+      await this.prisma.sportSpecialization.updateMany({
+        where: { id: specialization.id, trainingPrompt: null },
+        data: {
+          trainingPrompt: this.defaultTrainingPrompt(
+            `${specialization.sport.label} - ${specialization.label}`,
+          ),
+        },
+      });
+      await this.prisma.sportSpecializationAreaPrompt.createMany({
+        data: areas.map((area) => ({
+          specializationId: specialization.id,
           areaId: area.id,
-          basePrompt: this.defaultSportAreaPrompt(
-            context.label,
+          basePrompt: this.defaultSportSpecializationAreaPrompt(
+            `${specialization.sport.label} - ${specialization.label}`,
             area.name,
           ),
         })),
-      ),
-      skipDuplicates: true,
-    });
+        skipDuplicates: true,
+      });
+    }
   }
 
-  private defaultSportAreaPrompt(sportLabel: string, areaName: string) {
+  private defaultSportSpecializationAreaPrompt(
+    sportLabel: string,
+    areaName: string,
+  ) {
     return [
       `Adatta l area ${areaName} allo scenario sportivo ${sportLabel}.`,
       'Usa questa scelta come vincolo prioritario quando interpreti obiettivo, anamnesi e domande specialistiche.',
       'Mantieni il lavoro specifico per il contesto scelto, pratico, misurabile, progressivo e revisionabile da un professionista.',
+    ].join(' ');
+  }
+
+  private defaultTrainingPrompt(sportLabel: string) {
+    const normalized = sportLabel.toLowerCase();
+    if (
+      (normalized.includes('corsa') || normalized.includes('running')) &&
+      (normalized.includes('strada') || normalized.includes('road'))
+    ) {
+      return RUNNING_ROAD_TRAINING_PROMPT;
+    }
+    return [
+      `Genera l allenamento specifico per ${sportLabel}.`,
+      'Usa obiettivo, anamnesi, storico, carico e segnali di recupero.',
+      'Produci un lavoro pratico, progressivo, misurabile e revisionabile da un professionista.',
     ].join(' ');
   }
 
@@ -728,209 +1027,203 @@ export class AdminService {
     });
   }
 
-  async upsertSportAreaPromptConfig(
-    body: UpsertSportAreaPromptConfigDto,
+  async upsertSportCatalog(
+    body: {
+      id?: string;
+      key?: string;
+      label?: string;
+      isActive?: boolean;
+      specializations?: Array<{
+        id?: string;
+        key?: string;
+        label?: string;
+        trainingPrompt?: string;
+        trainingPromptActive?: boolean;
+        isActive?: boolean;
+        prompts?: Array<{
+          id?: string;
+          areaId?: string;
+          basePrompt?: string;
+          isEnabledDriver?: boolean;
+          isActive?: boolean;
+        }>;
+      }>;
+    },
     actorId: string,
   ) {
-    const sportKey = body.sportKey?.trim().toUpperCase();
-    const areaId = body.areaId?.trim();
-    const basePrompt = body.basePrompt?.trim();
-    const isActive = body.isActive ?? true;
-    const normalized = normalizeSportSelection({
-      sports: sportKey ? [sportKey] : [],
-      fitnessLocation:
-        sportKey === 'FITNESS'
-          ? body.fitnessLocation ?? null
-          : null,
-    });
-    const fitnessLocation =
-      normalized.sports.includes('FITNESS') && normalized.fitnessLocation
-        ? normalized.fitnessLocation
-        : FITNESS_LOCATION_NONE;
-
-    if (!actorId || !areaId || !basePrompt) {
-      throw new BadRequestException('Dati prompt sport area mancanti');
+    const key = body.key?.trim().toUpperCase();
+    const label = body.label?.trim();
+    if (!actorId || !key || !label) {
+      throw new BadRequestException('Dati sport mancanti');
     }
-    const area = await this.prisma.area.findUnique({
-      where: { id: areaId },
-      select: { id: true },
-    });
-    if (!area) {
-      throw new BadRequestException('Area non valida');
+    const specializations = body.specializations ?? [];
+    if (!specializations.length) {
+      throw new BadRequestException('Definisci almeno una specializzazione');
     }
 
-    return this.prisma.aiSportAreaPromptConfig.upsert({
-      where: {
-        sportKey_fitnessLocation_areaId: {
-          sportKey,
-          fitnessLocation,
-          areaId,
-        },
-      },
-      update: {
-        basePrompt,
-        isActive,
-        version: { increment: 1 },
-        updatedById: actorId,
-      },
-      create: {
-        sportKey,
-        fitnessLocation,
-        areaId,
-        basePrompt,
-        isActive,
-        createdById: actorId,
-        updatedById: actorId,
-      },
+    const areas = await this.prisma.area.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
     });
-  }
+    const areaIds = new Set(areas.map((area) => area.id));
 
-  async upsertAiPromptConfig(body: UpsertAiPromptConfigDto, actorId: string) {
-    const name = body.name?.trim();
-    const basePrompt = body.basePrompt?.trim();
-    const athleteLevel = body.athleteLevel?.trim().toUpperCase();
-    const areaId = body.areaId || null;
-    const isActive = body.isActive ?? true;
-
-    if (!actorId || !name || !basePrompt || !athleteLevel) {
-      throw new BadRequestException('Dati configurazione prompt mancanti');
-    }
-    if (areaId) {
-      const area = await this.prisma.area.findUnique({
-        where: { id: areaId },
+    return this.prisma.$transaction(async (tx) => {
+      const duplicate = await tx.sport.findUnique({
+        where: { key },
         select: { id: true },
       });
-      if (!area) {
-        throw new BadRequestException('Area non valida');
+      if (duplicate && duplicate.id !== body.id) {
+        throw new BadRequestException('Codice sport gia esistente');
       }
-    }
 
-    const duplicateName = await this.prisma.aiPromptConfig.findUnique({
-      where: { name },
+      const sport = body.id
+        ? await tx.sport.update({
+            where: { id: body.id },
+            data: { key, label, isActive: body.isActive ?? true },
+            select: { id: true, label: true },
+          })
+        : await tx.sport.create({
+            data: { key, label, isActive: body.isActive ?? true },
+            select: { id: true, label: true },
+          });
+
+      const incomingSpecializationIds = specializations
+        .map((item) => item.id)
+        .filter((id): id is string => Boolean(id));
+      await tx.sportSpecialization.deleteMany({
+        where: {
+          sportId: sport.id,
+          id: { notIn: incomingSpecializationIds },
+        },
+      });
+
+      for (const specializationInput of specializations) {
+        const specializationKey = specializationInput.key?.trim().toUpperCase();
+        const specializationLabel = specializationInput.label?.trim();
+        const hasTrainingPrompt = specializationInput.trainingPrompt !== undefined;
+        const trainingPrompt = specializationInput.trainingPrompt?.trim() ?? null;
+        if (!specializationKey || !specializationLabel) {
+          throw new BadRequestException(
+            'Ogni specializzazione richiede codice e nome',
+          );
+        }
+        const specialization = specializationInput.id
+          ? await tx.sportSpecialization.update({
+              where: { id: specializationInput.id },
+              data: {
+                key: specializationKey,
+                label: specializationLabel,
+                ...(hasTrainingPrompt
+                  ? {
+                      trainingPrompt: trainingPrompt || null,
+                      trainingPromptVersion: { increment: 1 },
+                    }
+                  : {}),
+                trainingPromptActive:
+                  specializationInput.trainingPromptActive ?? true,
+                isActive: specializationInput.isActive ?? true,
+              },
+              select: { id: true, label: true },
+            })
+          : await tx.sportSpecialization.create({
+              data: {
+                sportId: sport.id,
+                key: specializationKey,
+                label: specializationLabel,
+                trainingPrompt:
+                  trainingPrompt ||
+                  this.defaultTrainingPrompt(
+                    `${sport.label} - ${specializationLabel}`,
+                  ),
+                trainingPromptActive:
+                  specializationInput.trainingPromptActive ?? true,
+                isActive: specializationInput.isActive ?? true,
+              },
+              select: { id: true, label: true },
+            });
+
+        const prompts = specializationInput.prompts ?? [];
+        for (const prompt of prompts) {
+          const areaId = prompt.areaId?.trim();
+          const basePrompt = prompt.basePrompt?.trim();
+          if (!areaId || !areaIds.has(areaId) || !basePrompt) {
+            continue;
+          }
+          await tx.sportSpecializationAreaPrompt.upsert({
+            where: {
+              specializationId_areaId: {
+                specializationId: specialization.id,
+                areaId,
+              },
+            },
+            update: {
+              basePrompt,
+              isEnabledDriver: prompt.isEnabledDriver ?? true,
+              isActive: prompt.isActive ?? true,
+              version: { increment: 1 },
+              updatedById: actorId,
+            },
+            create: {
+              specializationId: specialization.id,
+              areaId,
+              basePrompt,
+              isEnabledDriver: prompt.isEnabledDriver ?? true,
+              isActive: prompt.isActive ?? true,
+              createdById: actorId,
+              updatedById: actorId,
+            },
+          });
+        }
+
+        for (const area of areas) {
+          await tx.sportSpecializationAreaPrompt.upsert({
+            where: {
+              specializationId_areaId: {
+                specializationId: specialization.id,
+                areaId: area.id,
+              },
+            },
+            update: {},
+            create: {
+              specializationId: specialization.id,
+              areaId: area.id,
+              basePrompt: this.defaultSportSpecializationAreaPrompt(
+                `${sport.label} - ${specialization.label}`,
+                area.name,
+              ),
+              isEnabledDriver: true,
+              createdById: actorId,
+              updatedById: actorId,
+            },
+          });
+        }
+      }
+
+      return tx.sport.findUnique({
+        where: { id: sport.id },
+        include: {
+          specializations: {
+            include: { prompts: { include: { area: true } } },
+            orderBy: { label: 'asc' },
+          },
+        },
+      });
+    });
+  }
+
+  async deleteSport(sportId: string) {
+    if (!sportId) {
+      throw new BadRequestException('ID sport mancante');
+    }
+    const existing = await this.prisma.sport.findUnique({
+      where: { id: sportId },
       select: { id: true },
     });
-
-    if (body.id) {
-      const existing = await this.prisma.aiPromptConfig.findUnique({
-        where: { id: body.id },
-        select: {
-          id: true,
-          name: true,
-          areaId: true,
-          athleteLevel: true,
-          version: true,
-        },
-      });
-      if (!existing) {
-        throw new NotFoundException('Configurazione prompt non trovata');
-      }
-
-      const identityChanged =
-        existing.name !== name ||
-        existing.areaId !== areaId ||
-        existing.athleteLevel !== athleteLevel;
-
-      if (duplicateName && duplicateName.id !== existing.id) {
-        throw new BadRequestException('Nome prompt gia esistente');
-      }
-
-      if (identityChanged) {
-        if (duplicateName) {
-          throw new BadRequestException('Nome prompt gia esistente');
-        }
-        return this.createAiPromptConfig({
-          name,
-          basePrompt,
-          athleteLevel,
-          areaId,
-          isActive,
-          actorId,
-          version: 1,
-        });
-      }
-
-      return this.prisma.$transaction(async (tx) => {
-        if (isActive) {
-          await this.deactivatePromptPeers(tx, areaId, athleteLevel, existing.id);
-        }
-
-        return tx.aiPromptConfig.update({
-          where: { id: body.id },
-          data: {
-            basePrompt,
-            isActive,
-            version: { increment: 1 },
-            updatedById: actorId,
-          },
-        });
-      });
+    if (!existing) {
+      throw new NotFoundException('Sport non trovato');
     }
-
-    if (duplicateName) {
-      throw new BadRequestException('Nome prompt gia esistente');
-    }
-
-    return this.createAiPromptConfig({
-      name,
-      basePrompt,
-      athleteLevel,
-      areaId,
-      isActive,
-      actorId,
-      version: 1,
-    });
-  }
-
-  private async createAiPromptConfig(input: {
-    name: string;
-    basePrompt: string;
-    athleteLevel: string;
-    areaId: string | null;
-    isActive: boolean;
-    actorId: string;
-    version: number;
-  }) {
-    return this.prisma.$transaction(async (tx) => {
-      if (input.isActive) {
-        await this.deactivatePromptPeers(
-          tx,
-          input.areaId,
-          input.athleteLevel,
-        );
-      }
-
-      return tx.aiPromptConfig.create({
-        data: {
-          name: input.name,
-          basePrompt: input.basePrompt,
-          athleteLevel: input.athleteLevel,
-          areaId: input.areaId,
-          isActive: input.isActive,
-          version: input.version,
-          createdById: input.actorId,
-          updatedById: input.actorId,
-        },
-      });
-    });
-  }
-
-  private async deactivatePromptPeers(
-    tx: Prisma.TransactionClient,
-    areaId: string | null,
-    athleteLevel: string,
-    excludeId?: string,
-  ) {
-    await tx.aiPromptConfig.updateMany({
-      where: {
-        athleteLevel,
-        areaId,
-        isActive: true,
-        ...(excludeId ? { id: { not: excludeId } } : {}),
-      },
-      data: {
-        isActive: false,
-      },
-    });
+    await this.prisma.sport.delete({ where: { id: sportId } });
+    return { deleted: true };
   }
 
   async upsertAiAreaGenerationConfig(

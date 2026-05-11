@@ -2,6 +2,7 @@ import {
   Body,
   BadRequestException,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -24,11 +25,9 @@ import { OrchestratorService } from '../ai-orchestrator/orchestrator.service';
 import { ConsentsService } from '../consents/consents.service';
 import { RunCycleDto } from './dto/run-cycle.dto';
 import { AdminService } from './admin.service';
-import { UpsertAiPromptConfigDto } from './dto/upsert-ai-prompt-config.dto';
 import { UpsertAiAreaGenerationConfigDto } from './dto/upsert-ai-area-generation-config.dto';
 import { UpsertOnboardingTemplateDto } from './dto/upsert-onboarding-template.dto';
 import { UpsertGoalPromptConfigDto } from './dto/upsert-goal-prompt-config.dto';
-import { UpsertSportAreaPromptConfigDto } from './dto/upsert-sport-area-prompt-config.dto';
 
 @ApiTags('admin-cycles')
 @Controller('admin')
@@ -83,6 +82,36 @@ export class AdminController {
     return this.orchestrator.previewCycleProposalInput(userId, body.areaId);
   }
 
+  @Post('orchestrator/training/run')
+  @ApiOperation({ summary: 'Genera allenamento autonomo sport-specializzazione' })
+  @ApiBody({ type: RunCycleDto })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  runTraining(
+    @Req() req: { user?: { id: string; role: UserRole } },
+    @Body() body: RunCycleDto,
+  ) {
+    return this.orchestrator.runTrainingPlanBatch(
+      body.userIds,
+      req.user?.id ?? '',
+    );
+  }
+
+  @Post('orchestrator/training/preview')
+  @ApiOperation({ summary: 'Anteprima contesto allenamento autonomo AI' })
+  @ApiBody({ type: RunCycleDto })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  previewTraining(@Body() body: RunCycleDto) {
+    const userId = body.userIds?.[0];
+    if (!userId) {
+      throw new BadRequestException('L anteprima richiede un utente');
+    }
+    return this.orchestrator.previewTrainingProposalInput(userId);
+  }
+
   @Patch('users/:userId/activate')
   @ApiOperation({ summary: 'Abilita account atleta in attesa' })
   @ApiParam({ name: 'userId' })
@@ -111,6 +140,18 @@ export class AdminController {
   @Roles(UserRole.ADMIN)
   rejectUser(@Param('userId') userId: string) {
     return this.admin.rejectUserApplication(userId);
+  }
+
+  @Post('users/:userId/reset-data')
+  @ApiOperation({
+    summary: 'Cancella dati operativi atleta e riporta onboarding a inizio',
+  })
+  @ApiParam({ name: 'userId' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  resetUserData(@Param('userId') userId: string) {
+    return this.admin.resetUserOperationalData(userId);
   }
 
   @Get('ai-settings')
@@ -151,19 +192,6 @@ export class AdminController {
     return this.consents.upsertDocument(body, req.user?.id ?? '');
   }
 
-  @Post('ai-prompts')
-  @ApiOperation({ summary: 'Crea o aggiorna una configurazione prompt AI' })
-  @ApiBody({ type: UpsertAiPromptConfigDto })
-  @ApiCookieAuth()
-  @UseGuards(AuthenticatedGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  upsertAiPrompt(
-    @Req() req: { user?: { id: string } },
-    @Body() body: UpsertAiPromptConfigDto,
-  ) {
-    return this.admin.upsertAiPromptConfig(body, req.user?.id ?? '');
-  }
-
   @Post('goal-prompt')
   @ApiOperation({ summary: 'Crea o aggiorna il prompt AI obiettivo atleta' })
   @ApiBody({ type: UpsertGoalPromptConfigDto })
@@ -177,17 +205,47 @@ export class AdminController {
     return this.admin.upsertGoalPromptConfig(body, req.user?.id ?? '');
   }
 
-  @Post('sport-area-prompts')
-  @ApiOperation({ summary: 'Crea o aggiorna un prompt sportivo per area' })
-  @ApiBody({ type: UpsertSportAreaPromptConfigDto })
+  @Post('sports')
+  @ApiOperation({ summary: 'Crea o aggiorna sport, specializzazioni e prompt area' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
-  upsertSportAreaPrompt(
+  upsertSport(
     @Req() req: { user?: { id: string } },
-    @Body() body: UpsertSportAreaPromptConfigDto,
+    @Body()
+    body: {
+      id?: string;
+      key?: string;
+      label?: string;
+      isActive?: boolean;
+      specializations?: Array<{
+        id?: string;
+        key?: string;
+        label?: string;
+        trainingPrompt?: string;
+        trainingPromptActive?: boolean;
+        isActive?: boolean;
+        prompts?: Array<{
+          id?: string;
+          areaId?: string;
+          basePrompt?: string;
+          isEnabledDriver?: boolean;
+          isActive?: boolean;
+        }>;
+      }>;
+    },
   ) {
-    return this.admin.upsertSportAreaPromptConfig(body, req.user?.id ?? '');
+    return this.admin.upsertSportCatalog(body, req.user?.id ?? '');
+  }
+
+  @Delete('sports/:sportId')
+  @ApiOperation({ summary: 'Cancella uno sport e le specializzazioni collegate' })
+  @ApiParam({ name: 'sportId' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  deleteSport(@Param('sportId') sportId: string) {
+    return this.admin.deleteSport(sportId);
   }
 
   @Post('ai-area-configs')

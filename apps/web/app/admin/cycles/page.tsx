@@ -65,6 +65,18 @@ type Athlete = {
     createdAt: string;
   }>;
   latestSnapshot?: { rankingGlobal: number; createdAt: string } | null;
+  trainingState: {
+    activeTraining?: {
+      id: string;
+      version: number;
+      status: string;
+      createdAt: string;
+      publishedAt?: string | null;
+      summaryText: string;
+    } | null;
+    generationReady: boolean;
+    reason: string;
+  };
   areaStates: AreaState[];
 };
 type Dashboard = {
@@ -117,6 +129,10 @@ type PreviewTarget = {
 type AssignmentTarget = {
   athlete: Athlete;
   state: AreaState;
+};
+
+type ResetTarget = {
+  athlete: Athlete;
 };
 
 const readError = async (response: Response) => {
@@ -194,6 +210,7 @@ export default function AdminCyclesPage() {
   );
   const [assignmentTarget, setAssignmentTarget] =
     useState<AssignmentTarget | null>(null);
+  const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
   const [professionalFilter, setProfessionalFilter] = useState("");
 
   const athletes =
@@ -209,6 +226,10 @@ export default function AdminCyclesPage() {
           .filter((state) => state.generationReady && !state.generationBlocked)
           .map((state) => ({ athlete, state })),
       ),
+    [athletes],
+  );
+  const readyTraining = useMemo(
+    () => athletes.filter((athlete) => athlete.trainingState.generationReady),
     [athletes],
   );
   const waitingApproval =
@@ -415,6 +436,28 @@ export default function AdminCyclesPage() {
     setBusyKey(null);
   };
 
+  const generateTraining = async (athleteId: string) => {
+    setBusyKey(`training:${athleteId}`);
+    setMessage(null);
+    const response = await secureFetch(
+      `${API_BASE}/admin/orchestrator/training/run`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userIds: [athleteId], runAllAreas: false }),
+      },
+    );
+    if (!response.ok) {
+      setMessage(`Generazione allenamento non riuscita: ${await readError(response)}`);
+      setBusyKey(null);
+      return;
+    }
+    setMessage("Allenamento specifico generato e pubblicato per l'atleta.");
+    await loadDashboard();
+    setBusyKey(null);
+  };
+
   const publishCycle = async (cycleId: string) => {
     setBusyKey(`publish:${cycleId}`);
     setMessage(null);
@@ -501,6 +544,33 @@ export default function AdminCyclesPage() {
     setBusyKey(null);
   };
 
+  const resetAthleteData = async () => {
+    if (!resetTarget) {
+      return;
+    }
+    const athleteId = resetTarget.athlete.id;
+    setBusyKey(`reset:${athleteId}`);
+    setMessage(null);
+    const response = await secureFetch(
+      `${API_BASE}/admin/users/${athleteId}/reset-data`,
+      {
+        method: "POST",
+        credentials: "include",
+      },
+    );
+    if (!response.ok) {
+      setMessage(`Reset dati atleta non riuscito: ${await readError(response)}`);
+      setBusyKey(null);
+      return;
+    }
+    setMessage(
+      "Dati atleta cancellati. Account e consensi restano validi, onboarding riportato all'inizio.",
+    );
+    setResetTarget(null);
+    await loadDashboard();
+    setBusyKey(null);
+  };
+
   return (
     <ProductShell
       eyebrow="Ambiente amministratore"
@@ -530,6 +600,11 @@ export default function AdminCyclesPage() {
           label: "Pronti da generare",
           value: loading ? "..." : readyToGenerate.length,
           tone: "accent",
+        },
+        {
+          label: "Allenamenti generabili",
+          value: loading ? "..." : readyTraining.length,
+          tone: "success",
         },
         {
           label: "Approvazioni in attesa",
@@ -661,6 +736,50 @@ export default function AdminCyclesPage() {
             <EmptyState
               title="Niente da generare"
               description="Al momento nessuna area atleta completata e disponibile per una nuova proposta."
+            />
+          )}
+        </div>
+      </section>
+
+      <section className="pf-panel">
+        <div className="pf-panel-header">
+          <div>
+            <h2>Allenamento autonomo</h2>
+            <p className="pf-muted">
+              Genera l'allenamento specifico dello sport-specializzazione usando i driver abilitati come contesto.
+            </p>
+          </div>
+          <StatusBadge tone={readyTraining.length ? "success" : "neutral"}>
+            {readyTraining.length} pronti
+          </StatusBadge>
+        </div>
+        <div className="pf-table">
+          {readyTraining.map((athlete) => (
+            <article key={`training:${athlete.id}`} className="pf-work-row">
+              <div>
+                <strong>{displayUser(athlete)}</strong>
+                <p className="pf-muted">{athlete.trainingState.reason}</p>
+                {athlete.trainingState.activeTraining && (
+                  <p className="pf-muted">
+                    Ultimo allenamento v{athlete.trainingState.activeTraining.version} -{" "}
+                    {formatDate(athlete.trainingState.activeTraining.createdAt)}
+                  </p>
+                )}
+              </div>
+              <button
+                className="pf-button"
+                type="button"
+                disabled={busyKey === `training:${athlete.id}`}
+                onClick={() => generateTraining(athlete.id)}
+              >
+                Genera allenamento
+              </button>
+            </article>
+          ))}
+          {!loading && readyTraining.length === 0 && (
+            <EmptyState
+              title="Nessun allenamento generabile"
+              description="Gli atleti con onboarding completato appariranno qui."
             />
           )}
         </div>
@@ -812,6 +931,14 @@ export default function AdminCyclesPage() {
                     }
                   >
                     {athlete.isActive ? "Disabilita atleta" : "Abilita atleta"}
+                  </button>
+                  <button
+                    className="pf-button-danger"
+                    type="button"
+                    disabled={busyKey === `reset:${athlete.id}`}
+                    onClick={() => setResetTarget({ athlete })}
+                  >
+                    Cancella dati
                   </button>
                 </div>
                 <div className="pf-area-strip">
@@ -974,6 +1101,47 @@ export default function AdminCyclesPage() {
                   Nessun professionista abilitato trovato per questa area.
                 </div>
               )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {resetTarget && (
+        <div className="pf-modal-backdrop" role="dialog" aria-modal="true">
+          <section className="pf-modal">
+            <div className="pf-panel-header">
+              <div>
+                <p className="pf-eyebrow">Conferma amministratore</p>
+                <h2>Cancellare tutti i dati atleta?</h2>
+                <p className="pf-muted">
+                  {displayUser(resetTarget.athlete)}
+                </p>
+              </div>
+              <StatusBadge tone="danger">Azione irreversibile</StatusBadge>
+            </div>
+            <div className="pf-alert warning">
+              Verranno cancellati onboarding, obiettivo, sport, assegnazioni,
+              allenamenti, questionari, risposte, snapshot, storico, audit e
+              dati AI collegati all'atleta. Account, password, identita login e
+              consensi gia accettati resteranno invariati.
+            </div>
+            <div className="pf-actions">
+              <button
+                className="pf-button-danger"
+                type="button"
+                disabled={busyKey === `reset:${resetTarget.athlete.id}`}
+                onClick={resetAthleteData}
+              >
+                Conferma cancellazione
+              </button>
+              <button
+                className="pf-button-secondary"
+                type="button"
+                disabled={busyKey === `reset:${resetTarget.athlete.id}`}
+                onClick={() => setResetTarget(null)}
+              >
+                Annulla
+              </button>
             </div>
           </section>
         </div>

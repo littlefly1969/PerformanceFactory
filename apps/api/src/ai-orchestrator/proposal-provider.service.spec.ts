@@ -31,8 +31,9 @@ const input: CycleProposalInput = {
     history: { previousAreaCycles: [] },
     guidance: {
       areaGenerationConfig: null,
-      adminPromptInstructions: [],
       userAreaPromptInstruction: null,
+      sportSpecializationPromptInstruction: null,
+      trainingPromptInstruction: null,
       planItemRequirements: [
         'Make the work practical, measurable, and reviewable.',
       ],

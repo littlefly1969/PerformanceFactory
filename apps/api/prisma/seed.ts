@@ -11,10 +11,10 @@ import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 const defaultInitialContext =
-  'Sei un assistente senior di sport performance a supporto di professionisti umani. Genera una proposta di miglioramento specifica per area e tre domande di monitoraggio usando solo il contesto atleta fornito. Rispondi esclusivamente in italiano e solo con JSON valido conforme allo schema. Il lavoro deve essere pratico, misurabile, progressivo e revisionabile da un professionista. Non inventare diagnosi, indicazioni mediche, dati atleta non presenti o contesto nascosto. Se esistono lavori precedenti, usa note di completamento, punteggi e motivi di rifiuto per migliorare la proposta.';
+  'Sei un assistente senior di sport performance a supporto di professionisti umani. Genera una proposta di miglioramento specifica per area e le domande di monitoraggio richieste dal layout AI usando solo il contesto atleta fornito. Rispondi esclusivamente in italiano e solo con JSON valido conforme allo schema. Il lavoro deve essere pratico, misurabile, progressivo e revisionabile da un professionista. Non inventare diagnosi, indicazioni mediche, dati atleta non presenti o contesto nascosto. Se esistono lavori precedenti, usa note di completamento, punteggi e motivi di rifiuto per migliorare la proposta.';
 
 const defaultResponseFormatPrompt =
-  'La risposta deve contenere una sintesi breve, da uno a tre esercizi/attivita con titolo e descrizione operativa, e tre domande di monitoraggio. Ogni attivita deve indicare azione, frequenza o trigger, criterio misurabile di successo e progressione. Le domande devono essere brevi, osservabili e collegate al lavoro proposto.';
+  'La risposta deve contenere una sintesi breve, da uno a tre esercizi/attivita con titolo e descrizione operativa, e il numero di domande di monitoraggio richiesto dal layout AI. Ogni attivita deve indicare azione, frequenza o trigger, criterio misurabile di successo e progressione. Le domande devono essere brevi, osservabili e collegate al lavoro proposto.';
 
 const defaultQuestionnaireLayoutJson = {
   questionnaire: {
@@ -34,9 +34,9 @@ const defaultGoalPrompt = [
   'Sei l AI guida di Performance Factory, una piattaforma orientata al miglioramento della performance sportiva personale.',
   'Performance Factory non promuove il confronto tossico con gli altri, ma il miglioramento progressivo dell utente rispetto al proprio punto di partenza.',
   'Analizza l obiettivo iniziale dichiarato dall utente, valutane qualita, sicurezza, pertinenza, liceita e chiarezza, poi decidi se il sistema puo procedere alla costruzione di un percorso personalizzato.',
-  'Le sei aree ufficiali sono: Preparazione atletica, Equipaggiamento, Allenamento mentale, Nutrizione, Fisioterapia, Tecnico-tattica.',
+  'Le aree ufficiali disponibili sono quelle configurate nel sistema e abilitate per la sport-specializzazione selezionata.',
   'Classifica sempre con uno solo di questi status: OK, NEEDS_ANAMNESIS, GOAL_NEEDS_REFORMULATION, OUT_OF_SCOPE, UNSAFE.',
-  'Usa OK solo se l obiettivo e sportivo o legato alla performance, chiaro, sicuro, orientato al miglioramento personale e i dati disponibili bastano per generare i prompt delle sei aree.',
+  'Usa OK solo se l obiettivo e sportivo o legato alla performance, chiaro, sicuro, orientato al miglioramento personale e i dati disponibili bastano per generare i prompt delle aree abilitate.',
   'Usa NEEDS_ANAMNESIS se l obiettivo e valido ma mancano dati personali indispensabili per costruire il percorso.',
   'Usa GOAL_NEEDS_REFORMULATION se l obiettivo e potenzialmente coerente ma troppo generico, vago, non misurabile o troppo orientato al confronto con altri.',
   'Usa OUT_OF_SCOPE se l obiettivo non riguarda sport, performance, benessere funzionale o miglioramento personale.',
@@ -44,8 +44,8 @@ const defaultGoalPrompt = [
   'Per Nutrizione e Fisioterapia non fare diagnosi, non prescrivere farmaci, diete cliniche o protocolli terapeutici e non sostituirti a professionisti sanitari. In presenza di segnali di allarme suggerisci valutazione professionale prima di procedere.',
   'Rispondi sempre e solo in JSON valido, senza markdown e senza testo fuori dal JSON.',
   'Il JSON deve contenere: status, goal_evaluation, message_to_user, suggested_reformulated_goal, questions_to_user, normalized_goal, area_prompts, next_step.',
-  'Se status e diverso da OK, area_prompts deve contenere valori null per tutte le sei aree.',
-  'Se status e OK, compila tutti i prompt delle sei aree. Ogni prompt area deve contenere role, objective, required_inputs, initial_questionnaire, exercise_generation_rules, feedback_questions, progression_rules, measurement_indicators, safety_limits, output_format.',
+  'Se status e diverso da OK, area_prompts deve contenere valori null per tutte le aree richieste nel contesto.',
+  'Se status e OK, compila tutti i prompt delle aree richieste nel contesto. Ogni prompt area deve contenere role, objective, required_inputs, initial_questionnaire, exercise_generation_rules, feedback_questions, progression_rules, measurement_indicators, safety_limits, output_format.',
 ].join('\n');
 
 async function main() {
@@ -341,29 +341,6 @@ async function main() {
     }
   }
 
-  await prisma.aiPromptConfig.upsert({
-    where: { id: 'default-global-baseline-prompt' },
-    update: {
-      name: 'Prompt generale baseline',
-      athleteLevel: 'BASELINE',
-      areaId: null,
-      isActive: true,
-      basePrompt:
-        'Usa le informazioni anamnestiche generali, il livello di sedentarieta, lo stato di salute dichiarato e la baseline per creare lavori prudenti, progressivi e verificabili. Mantieni tono professionale, evita diagnosi e segnala quando serve revisione umana specialistica.',
-      updatedById: admin.id,
-    },
-    create: {
-      id: 'default-global-baseline-prompt',
-      name: 'Prompt generale baseline',
-      athleteLevel: 'BASELINE',
-      areaId: null,
-      isActive: true,
-      basePrompt:
-        'Usa le informazioni anamnestiche generali, il livello di sedentarieta, lo stato di salute dichiarato e la baseline per creare lavori prudenti, progressivi e verificabili. Mantieni tono professionale, evita diagnosi e segnala quando serve revisione umana specialistica.',
-      createdById: admin.id,
-    },
-  });
-
   await prisma.aiGoalPromptConfig.upsert({
     where: { id: 'goal-prompt-default' },
     update: {
@@ -396,27 +373,6 @@ async function main() {
         updatedById: admin.id,
       },
     });
-
-    await prisma.aiPromptConfig.upsert({
-      where: { id: `default-${area.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-baseline-prompt` },
-      update: {
-        name: `${area.name} baseline`,
-        areaId: area.id,
-        athleteLevel: 'BASELINE',
-        isActive: true,
-        basePrompt: `Per l area ${area.name}, genera indicazioni iniziali semplici, misurabili e compatibili con il livello baseline dell atleta. Collega sempre allenamento e domande alle risposte anamnestiche dell area e alla sicurezza operativa.`,
-        updatedById: admin.id,
-      },
-      create: {
-        id: `default-${area.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-baseline-prompt`,
-        name: `${area.name} baseline`,
-        areaId: area.id,
-        athleteLevel: 'BASELINE',
-        isActive: true,
-        basePrompt: `Per l area ${area.name}, genera indicazioni iniziali semplici, misurabili e compatibili con il livello baseline dell atleta. Collega sempre allenamento e domande alle risposte anamnestiche dell area e alla sicurezza operativa.`,
-        createdById: admin.id,
-      },
-    });
   }
 
   const activeScale = await prisma.performanceScaleConfig.findFirst({
@@ -443,7 +399,6 @@ async function main() {
     linkCount,
     scaleCount,
     onboardingTemplateCount,
-    promptConfigCount,
     goalPromptConfigCount,
   ] =
     await Promise.all([
@@ -453,12 +408,11 @@ async function main() {
       prisma.professionalUserLink.count(),
       prisma.performanceScaleConfig.count(),
       prisma.onboardingQuestionTemplate.count(),
-      prisma.aiPromptConfig.count(),
       prisma.aiGoalPromptConfig.count(),
     ]);
 
   console.log(
-    `[seed] done users=${userCount} areas=${areaCount} competences=${competenceCount} links=${linkCount} scales=${scaleCount} onboardingTemplates=${onboardingTemplateCount} promptConfigs=${promptConfigCount} goalPromptConfigs=${goalPromptConfigCount} admin=${admin.email}`,
+    `[seed] done users=${userCount} areas=${areaCount} competences=${competenceCount} links=${linkCount} scales=${scaleCount} onboardingTemplates=${onboardingTemplateCount} goalPromptConfigs=${goalPromptConfigCount} admin=${admin.email}`,
   );
 }
 

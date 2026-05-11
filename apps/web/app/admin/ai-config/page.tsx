@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   EmptyState,
   ProductShell,
@@ -9,16 +9,6 @@ import {
 import { API_BASE, secureFetch } from "@/app/lib/api";
 
 type Area = { id: string; name: string };
-type PromptConfig = {
-  id?: string;
-  name: string;
-  basePrompt: string;
-  areaId?: string | null;
-  athleteLevel: string;
-  version?: number;
-  isActive: boolean;
-  area?: Area | null;
-};
 type GoalPromptConfig = {
   id?: string;
   name: string;
@@ -34,16 +24,31 @@ type AreaGenerationConfig = {
   questionnaireLayoutJson: unknown;
   area?: Area | null;
 };
-type SportOption = { key: string; label: string };
-type SportAreaPromptConfig = {
+type SportPrompt = {
   id?: string;
-  sportKey: string;
-  fitnessLocation: string;
   areaId: string;
   basePrompt: string;
+  isEnabledDriver: boolean;
   version?: number;
   isActive: boolean;
   area?: Area | null;
+};
+type SportSpecialization = {
+  id?: string;
+  key: string;
+  label: string;
+  trainingPrompt?: string | null;
+  trainingPromptVersion?: number;
+  trainingPromptActive: boolean;
+  isActive: boolean;
+  prompts: SportPrompt[];
+};
+type SportCatalogItem = {
+  id?: string;
+  key: string;
+  label: string;
+  isActive: boolean;
+  specializations: SportSpecialization[];
 };
 type OnboardingTemplate = {
   id?: string;
@@ -61,24 +66,12 @@ type OnboardingTemplate = {
 };
 type Settings = {
   areas: Area[];
-  sportOptions: SportOption[];
-  fitnessLocationOptions: SportOption[];
-  levels: string[];
-  promptConfigs: PromptConfig[];
+  sports: SportCatalogItem[];
   goalPromptConfig?: GoalPromptConfig | null;
   areaGenerationConfigs: AreaGenerationConfig[];
-  sportAreaPromptConfigs: SportAreaPromptConfig[];
   onboardingTemplates: OnboardingTemplate[];
   inputTypes: OnboardingTemplate["inputType"][];
   scopes: OnboardingTemplate["scope"][];
-};
-
-const emptyPrompt: PromptConfig = {
-  name: "",
-  basePrompt: "",
-  areaId: null,
-  athleteLevel: "BASELINE",
-  isActive: true,
 };
 
 const emptyGoalPrompt: GoalPromptConfig = {
@@ -107,20 +100,12 @@ const emptyAreaConfig: AreaGenerationConfig = {
   questionnaireLayoutJson: {},
 };
 
-const emptySportAreaPrompt: SportAreaPromptConfig = {
-  sportKey: "CYCLING",
-  fitnessLocation: "NONE",
-  areaId: "",
-  basePrompt: "",
+const emptySportDraft: SportCatalogItem = {
+  key: "",
+  label: "",
   isActive: true,
+  specializations: [],
 };
-
-const athleteLevelLabel = (level: string) =>
-  ({
-    BASELINE: "Base",
-    STABLE: "Stabile",
-    ADVANCED: "Avanzato",
-  })[level] ?? level;
 
 const inputTypeLabel = (type: OnboardingTemplate["inputType"]) =>
   ({
@@ -144,13 +129,12 @@ const stringifyOptions = (value: unknown) =>
 
 export default function AdminAiConfigPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [promptDraft, setPromptDraft] = useState<PromptConfig>(emptyPrompt);
   const [goalPromptDraft, setGoalPromptDraft] =
     useState<GoalPromptConfig>(emptyGoalPrompt);
   const [areaConfigDraft, setAreaConfigDraft] =
     useState<AreaGenerationConfig>(emptyAreaConfig);
-  const [sportAreaPromptDraft, setSportAreaPromptDraft] =
-    useState<SportAreaPromptConfig>(emptySportAreaPrompt);
+  const [sportDraft, setSportDraft] =
+    useState<SportCatalogItem>(emptySportDraft);
   const [areaConfigLayoutText, setAreaConfigLayoutText] = useState("");
   const [templateDraft, setTemplateDraft] =
     useState<OnboardingTemplate>(emptyTemplate);
@@ -159,32 +143,19 @@ export default function AdminAiConfigPage() {
   const [busyKey, setBusyKey] = useState<string | null>(null);
 
   const areas = settings?.areas ?? [];
-  const sportOptions = settings?.sportOptions ?? [];
-  const fitnessLocationOptions = settings?.fitnessLocationOptions ?? [];
-  const levels = settings?.levels ?? ["BASELINE", "STABLE", "ADVANCED"];
-  const promptConfigs = settings?.promptConfigs ?? [];
+  const sports = settings?.sports ?? [];
   const goalPromptConfig = settings?.goalPromptConfig ?? null;
   const areaGenerationConfigs = settings?.areaGenerationConfigs ?? [];
-  const sportAreaPromptConfigs = settings?.sportAreaPromptConfigs ?? [];
+  const sportPromptCount = sports.reduce(
+    (total, sport) =>
+      total +
+      sport.specializations.reduce(
+        (sum, specialization) => sum + specialization.prompts.length,
+        0,
+      ),
+    0,
+  );
   const templates = settings?.onboardingTemplates ?? [];
-  const activePromptCount = useMemo(
-    () => promptConfigs.filter((prompt) => prompt.isActive).length,
-    [promptConfigs],
-  );
-  const selectedPrompt = promptDraft.id
-    ? promptConfigs.find((prompt) => prompt.id === promptDraft.id)
-    : null;
-  const promptIdentityChanged = Boolean(
-    selectedPrompt &&
-      (selectedPrompt.name !== promptDraft.name ||
-        (selectedPrompt.areaId ?? null) !== (promptDraft.areaId ?? null) ||
-        selectedPrompt.athleteLevel !== promptDraft.athleteLevel),
-  );
-  const promptNeedsNewName = Boolean(
-    promptIdentityChanged &&
-      selectedPrompt &&
-      selectedPrompt.name === promptDraft.name,
-  );
 
   const loadSettings = async () => {
     setMessage(null);
@@ -203,26 +174,6 @@ export default function AdminAiConfigPage() {
   useEffect(() => {
     void loadSettings();
   }, []);
-
-  const savePrompt = async () => {
-    setBusyKey("prompt");
-    setMessage(null);
-    const response = await secureFetch(`${API_BASE}/admin/ai-prompts`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(promptDraft),
-    });
-    if (!response.ok) {
-      setMessage(`Salvataggio prompt non riuscito: ${await readError(response)}`);
-      setBusyKey(null);
-      return;
-    }
-    setPromptDraft(emptyPrompt);
-    await loadSettings();
-    setMessage("Configurazione prompt salvata.");
-    setBusyKey(null);
-  };
 
   const saveGoalPrompt = async () => {
     setBusyKey("goal-prompt");
@@ -317,28 +268,44 @@ export default function AdminAiConfigPage() {
     setBusyKey(null);
   };
 
-  const saveSportAreaPrompt = async () => {
-    setBusyKey("sport-area-prompt");
+  const saveSport = async () => {
+    setBusyKey("sport");
     setMessage(null);
-    const response = await secureFetch(`${API_BASE}/admin/sport-area-prompts`, {
+    const response = await secureFetch(`${API_BASE}/admin/sports`, {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...sportAreaPromptDraft,
-        fitnessLocation:
-          sportAreaPromptDraft.sportKey === "FITNESS"
-            ? sportAreaPromptDraft.fitnessLocation
-            : null,
-      }),
+      body: JSON.stringify(sportDraft),
     });
     if (!response.ok) {
-      setMessage(`Salvataggio prompt sport area non riuscito: ${await readError(response)}`);
+      setMessage(`Salvataggio sport non riuscito: ${await readError(response)}`);
       setBusyKey(null);
       return;
     }
+    setSportDraft(emptySportDraft);
     await loadSettings();
-    setMessage("Prompt sport area salvato.");
+    setMessage("Sport salvato.");
+    setBusyKey(null);
+  };
+
+  const deleteSport = async (sportId?: string) => {
+    if (!sportId || !window.confirm("Cancellare questo sport e tutte le specializzazioni?")) {
+      return;
+    }
+    setBusyKey(`sport-delete:${sportId}`);
+    setMessage(null);
+    const response = await secureFetch(`${API_BASE}/admin/sports/${sportId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      setMessage(`Cancellazione sport non riuscita: ${await readError(response)}`);
+      setBusyKey(null);
+      return;
+    }
+    setSportDraft(emptySportDraft);
+    await loadSettings();
+    setMessage("Sport cancellato.");
     setBusyKey(null);
   };
 
@@ -352,26 +319,76 @@ export default function AdminAiConfigPage() {
     setAreaConfigLayoutText(stringifyOptions(config.questionnaireLayoutJson));
   };
 
-  const editSportAreaPrompt = (config: SportAreaPromptConfig) => {
-    setSportAreaPromptDraft({ ...config });
+  const editSport = (sport: SportCatalogItem) => {
+    setSportDraft({
+      ...sport,
+      specializations: sport.specializations.map((specialization) => ({
+        ...specialization,
+        trainingPrompt: specialization.trainingPrompt ?? "",
+        trainingPromptActive: specialization.trainingPromptActive ?? true,
+        prompts: areas.map((area) => {
+          const prompt = specialization.prompts.find(
+            (item) => item.areaId === area.id,
+          );
+          return (
+            prompt ?? {
+              areaId: area.id,
+              basePrompt: "",
+              isEnabledDriver: true,
+              isActive: true,
+              area,
+            }
+          );
+        }),
+      })),
+    });
   };
 
-  const sportLabel = (config: SportAreaPromptConfig) => {
-    const sport = sportOptions.find((item) => item.key === config.sportKey);
-    if (config.sportKey !== "FITNESS") {
-      return sport?.label ?? config.sportKey;
-    }
-    const fitness = fitnessLocationOptions.find(
-      (item) => item.key === config.fitnessLocation,
-    );
-    return `${sport?.label ?? config.sportKey} - ${fitness?.label ?? config.fitnessLocation}`;
+  const updateSpecialization = (
+    index: number,
+    patch: Partial<SportSpecialization>,
+  ) => {
+    setSportDraft((prev) => ({
+      ...prev,
+      specializations: prev.specializations.map((specialization, itemIndex) =>
+        itemIndex === index ? { ...specialization, ...patch } : specialization,
+      ),
+    }));
+  };
+
+  const updateSportPrompt = (
+    specializationIndex: number,
+    areaId: string,
+    patch: Partial<SportPrompt>,
+  ) => {
+    setSportDraft((prev) => ({
+      ...prev,
+      specializations: prev.specializations.map((specialization, itemIndex) => {
+        if (itemIndex !== specializationIndex) {
+          return specialization;
+        }
+        const prompts = areas.map((area) => {
+          const current =
+            specialization.prompts.find((prompt) => prompt.areaId === area.id) ??
+            {
+              areaId: area.id,
+              basePrompt: "",
+              isEnabledDriver: true,
+              isActive: true,
+              area,
+            };
+          return area.id === areaId ? { ...current, ...patch } : current;
+        });
+        return { ...specialization, prompts };
+      }),
+    }));
   };
 
   return (
     <ProductShell
       eyebrow="Amministrazione AI"
       title="Prompt e anamnesi"
-      description="Configura prompt base per livello e area, e mantieni modificabili le domande generali e specifiche di onboarding."
+      description="Configura prompt obiettivo, contesto e layout AI per area, catalogo sport e domande di onboarding."
       actions={
         <button className="pf-button-secondary" type="button" onClick={loadSettings}>
           Aggiorna
@@ -385,7 +402,7 @@ export default function AdminAiConfigPage() {
           tone: "success",
         },
         { label: "Aree", value: areas.length, tone: "neutral" },
-        { label: "Prompt sport", value: sportAreaPromptConfigs.length, tone: "accent" },
+        { label: "Prompt sport", value: sportPromptCount, tone: "accent" },
       ]}
     >
       {message && <div className="pf-alert warning">{message}</div>}
@@ -461,106 +478,50 @@ export default function AdminAiConfigPage() {
         <article className="pf-panel">
           <div className="pf-panel-header">
             <div>
-              <h2>Prompt sport per area</h2>
+              <h2>Catalogo sport</h2>
               <p className="pf-muted">
-                Istruzioni applicate prima della validazione obiettivo, in base
-                agli sport scelti dall'atleta e all'area specialistica.
+                Definisci sport, specializzazioni, prompt allenamento e driver dello spider.
+                L'atleta puo scegliere solo elementi attivi configurati qui.
               </p>
             </div>
           </div>
           <div className="pf-stack">
             <div className="pf-two-col">
               <label className="pf-field">
-                Sport
-                <select
-                  className="pf-select"
-                  value={sportAreaPromptDraft.sportKey}
+                Codice sport
+                <input
+                  className="pf-input"
+                  value={sportDraft.key}
                   onChange={(event) =>
-                    setSportAreaPromptDraft((prev) => ({
+                    setSportDraft((prev) => ({
                       ...prev,
-                      sportKey: event.target.value,
-                      fitnessLocation:
-                        event.target.value === "FITNESS" ? "HOME" : "NONE",
+                      key: event.target.value.toUpperCase(),
                     }))
                   }
-                >
-                  {sportOptions.map((sport) => (
-                    <option key={sport.key} value={sport.key}>
-                      {sport.label}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="CYCLING"
+                />
               </label>
               <label className="pf-field">
-                Contesto fitness
-                <select
-                  className="pf-select"
-                  value={sportAreaPromptDraft.fitnessLocation}
-                  disabled={sportAreaPromptDraft.sportKey !== "FITNESS"}
+                Nome sport
+                <input
+                  className="pf-input"
+                  value={sportDraft.label}
                   onChange={(event) =>
-                    setSportAreaPromptDraft((prev) => ({
+                    setSportDraft((prev) => ({
                       ...prev,
-                      fitnessLocation: event.target.value,
+                      label: event.target.value,
                     }))
                   }
-                >
-                  <option value="NONE">Non applicabile</option>
-                  {fitnessLocationOptions.map((location) => (
-                    <option key={location.key} value={location.key}>
-                      {location.label}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Ciclismo"
+                />
               </label>
             </div>
-            <label className="pf-field">
-              Area
-              <select
-                className="pf-select"
-                value={sportAreaPromptDraft.areaId}
-                onChange={(event) => {
-                  const areaId = event.target.value;
-                  const existing = sportAreaPromptConfigs.find(
-                    (config) =>
-                      config.areaId === areaId &&
-                      config.sportKey === sportAreaPromptDraft.sportKey &&
-                      config.fitnessLocation === sportAreaPromptDraft.fitnessLocation,
-                  );
-                  if (existing) {
-                    editSportAreaPrompt(existing);
-                    return;
-                  }
-                  setSportAreaPromptDraft((prev) => ({ ...prev, areaId }));
-                }}
-              >
-                <option value="">Seleziona area</option>
-                {areas.map((area) => (
-                  <option key={area.id} value={area.id}>
-                    {area.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="pf-field">
-              Prompt
-              <textarea
-                className="pf-textarea"
-                rows={8}
-                value={sportAreaPromptDraft.basePrompt}
-                onChange={(event) =>
-                  setSportAreaPromptDraft((prev) => ({
-                    ...prev,
-                    basePrompt: event.target.value,
-                  }))
-                }
-              />
-            </label>
             <label className="pf-checkbox">
               <input
                 type="checkbox"
-                checked={sportAreaPromptDraft.isActive}
+                checked={sportDraft.isActive}
                 onChange={(event) =>
-                  setSportAreaPromptDraft((prev) => ({
+                  setSportDraft((prev) => ({
                     ...prev,
                     isActive: event.target.checked,
                   }))
@@ -569,16 +530,173 @@ export default function AdminAiConfigPage() {
               Attivo
             </label>
             <button
+              className="pf-button-secondary"
+              type="button"
+              onClick={() =>
+                setSportDraft((prev) => ({
+                  ...prev,
+                  specializations: [
+                    ...prev.specializations,
+                    {
+                      key: "",
+                      label: "",
+                      trainingPrompt: "",
+                      trainingPromptActive: true,
+                      isActive: true,
+                      prompts: areas.map((area) => ({
+                        areaId: area.id,
+                        basePrompt: "",
+                        isEnabledDriver: true,
+                        isActive: true,
+                        area,
+                      })),
+                    },
+                  ],
+                }))
+              }
+            >
+              Aggiungi specializzazione
+            </button>
+            {sportDraft.specializations.map((specialization, index) => (
+              <article key={specialization.id ?? index} className="pf-card">
+                <div className="pf-card-top">
+                  <div className="pf-two-col">
+                    <label className="pf-field">
+                      Codice specializzazione
+                      <input
+                        className="pf-input"
+                        value={specialization.key}
+                        onChange={(event) =>
+                          updateSpecialization(index, {
+                            key: event.target.value.toUpperCase(),
+                          })
+                        }
+                        placeholder="ROAD"
+                      />
+                    </label>
+                    <label className="pf-field">
+                      Nome specializzazione
+                      <input
+                        className="pf-input"
+                        value={specialization.label}
+                        onChange={(event) =>
+                          updateSpecialization(index, {
+                            label: event.target.value,
+                          })
+                        }
+                        placeholder="Strada"
+                      />
+                    </label>
+                  </div>
+                  <button
+                    className="pf-button-secondary"
+                    type="button"
+                    onClick={() =>
+                      setSportDraft((prev) => ({
+                        ...prev,
+                        specializations: prev.specializations.filter(
+                          (_item, itemIndex) => itemIndex !== index,
+                        ),
+                      }))
+                    }
+                  >
+                    Rimuovi
+                  </button>
+                </div>
+                <label className="pf-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={specialization.isActive}
+                    onChange={(event) =>
+                      updateSpecialization(index, {
+                        isActive: event.target.checked,
+                      })
+                    }
+                  />
+                  Specializzazione attiva
+                </label>
+                <label className="pf-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={specialization.trainingPromptActive}
+                    onChange={(event) =>
+                      updateSpecialization(index, {
+                        trainingPromptActive: event.target.checked,
+                      })
+                    }
+                  />
+                  Allenamento specifico attivo
+                </label>
+                <label className="pf-field">
+                  Prompt allenamento specifico
+                  <textarea
+                    className="pf-textarea"
+                    rows={8}
+                    value={specialization.trainingPrompt ?? ""}
+                    onChange={(event) =>
+                      updateSpecialization(index, {
+                        trainingPrompt: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+                <div className="pf-stack">
+                  {areas.map((area) => {
+                    const prompt =
+                      specialization.prompts.find(
+                        (item) => item.areaId === area.id,
+                      ) ?? {
+                        areaId: area.id,
+                        basePrompt: "",
+                        isEnabledDriver: true,
+                        isActive: true,
+                        area,
+                      };
+                    return (
+                      <div key={area.id} className="pf-stack">
+                        <label className="pf-checkbox">
+                          <input
+                            type="checkbox"
+                            checked={prompt.isEnabledDriver}
+                            onChange={(event) =>
+                              updateSportPrompt(index, area.id, {
+                                isEnabledDriver: event.target.checked,
+                              })
+                            }
+                          />
+                          Driver {area.name} nello spider
+                        </label>
+                        <label className="pf-field">
+                          Prompt {area.name}
+                          <textarea
+                            className="pf-textarea"
+                            rows={4}
+                            value={prompt.basePrompt}
+                            onChange={(event) =>
+                              updateSportPrompt(index, area.id, {
+                                basePrompt: event.target.value,
+                              })
+                            }
+                          />
+                        </label>
+                      </div>
+                    );
+                  })}
+                </div>
+              </article>
+            ))}
+            <button
               className="pf-button"
               type="button"
               disabled={
-                busyKey === "sport-area-prompt" ||
-                !sportAreaPromptDraft.areaId ||
-                !sportAreaPromptDraft.basePrompt.trim()
+                busyKey === "sport" ||
+                !sportDraft.key.trim() ||
+                !sportDraft.label.trim() ||
+                !sportDraft.specializations.length
               }
-              onClick={saveSportAreaPrompt}
+              onClick={saveSport}
             >
-              Salva prompt sport area
+              Salva sport
             </button>
           </div>
         </article>
@@ -588,179 +706,41 @@ export default function AdminAiConfigPage() {
             <div>
               <h2>Prompt sport attuali</h2>
               <p className="pf-muted">
-                Seleziona una configurazione per editarla.
+                Seleziona uno sport per modificarlo o cancellarlo.
               </p>
             </div>
           </div>
           <div className="pf-stack">
-            {sportAreaPromptConfigs.map((config) => (
-              <button
-                key={config.id}
+            {sports.map((sport) => (
+              <div
+                key={sport.id}
                 className="pf-config-row"
-                type="button"
-                onClick={() => editSportAreaPrompt(config)}
               >
                 <span>
-                  <strong>{sportLabel(config)}</strong>
+                  <strong>{sport.label}</strong>
                   <small>
-                    {config.area?.name ?? "Area"} - v{config.version ?? 1}
+                    {sport.specializations.length} specializzazioni
                   </small>
                 </span>
-                <StatusBadge tone={config.isActive ? "success" : "neutral"}>
-                  {config.isActive ? "attivo" : "spento"}
-                </StatusBadge>
-              </button>
+                <div className="pf-actions">
+                  <button
+                    className="pf-button-secondary"
+                    type="button"
+                    onClick={() => editSport(sport)}
+                  >
+                    Modifica
+                  </button>
+                  <button
+                    className="pf-button-danger"
+                    type="button"
+                    disabled={busyKey === `sport-delete:${sport.id}`}
+                    onClick={() => deleteSport(sport.id)}
+                  >
+                    Cancella
+                  </button>
+                </div>
+              </div>
             ))}
-          </div>
-        </aside>
-      </section>
-
-      <section className="pf-dashboard-grid">
-        <article className="pf-panel">
-          <div className="pf-panel-header">
-            <div>
-              <h2>Prompt base</h2>
-              <p className="pf-muted">
-                Compatibilita legacy: usato solo quando l atleta non ha ancora
-                prompt area personalizzati generati dall obiettivo.
-              </p>
-            </div>
-          </div>
-          <div className="pf-stack">
-            <label className="pf-field">
-              Nome
-              <input
-                className="pf-input"
-                value={promptDraft.name}
-                onChange={(event) =>
-                  setPromptDraft((prev) => ({ ...prev, name: event.target.value }))
-                }
-              />
-            </label>
-            <div className="pf-two-col">
-              <label className="pf-field">
-                Area
-                <select
-                  className="pf-select"
-                  value={promptDraft.areaId ?? ""}
-                  onChange={(event) =>
-                    setPromptDraft((prev) => ({
-                      ...prev,
-                      areaId: event.target.value || null,
-                    }))
-                  }
-                >
-                  <option value="">Globale</option>
-                  {areas.map((area) => (
-                    <option key={area.id} value={area.id}>
-                      {area.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="pf-field">
-                Livello atleta
-                <select
-                  className="pf-select"
-                  value={promptDraft.athleteLevel}
-                  onChange={(event) =>
-                    setPromptDraft((prev) => ({
-                      ...prev,
-                      athleteLevel: event.target.value,
-                    }))
-                  }
-                >
-                  {levels.map((level) => (
-                    <option key={level} value={level}>
-                      {athleteLevelLabel(level)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <label className="pf-checkbox">
-              <input
-                type="checkbox"
-                checked={promptDraft.isActive}
-                onChange={(event) =>
-                  setPromptDraft((prev) => ({
-                    ...prev,
-                    isActive: event.target.checked,
-                  }))
-                }
-              />
-              Attivo
-            </label>
-            <label className="pf-field">
-              Prompt
-              <textarea
-                className="pf-textarea"
-                rows={8}
-                value={promptDraft.basePrompt}
-                onChange={(event) =>
-                  setPromptDraft((prev) => ({
-                    ...prev,
-                    basePrompt: event.target.value,
-                  }))
-                }
-              />
-            </label>
-            <button
-              className="pf-button"
-              type="button"
-              disabled={busyKey === "prompt" || promptNeedsNewName}
-              onClick={savePrompt}
-            >
-              {promptIdentityChanged ? "Crea nuovo prompt" : "Salva prompt"}
-            </button>
-            {promptNeedsNewName && (
-              <p className="pf-muted">
-                Le modifiche ad area o livello creano un nuovo prompt, quindi assegna un nuovo
-                nome univoco prima di salvare.
-              </p>
-            )}
-            {promptIdentityChanged && (
-              <p className="pf-muted">
-                Modificare nome, area o livello atleta crea un nuovo prompt. Il
-                prompt attivo per la stessa area e livello verra sostituito.
-              </p>
-            )}
-          </div>
-        </article>
-
-        <aside className="pf-panel">
-          <div className="pf-panel-header">
-            <div>
-              <h2>Prompt attuali</h2>
-              <p className="pf-muted">Seleziona una configurazione per editarla.</p>
-            </div>
-          </div>
-          <div className="pf-stack">
-            {promptConfigs.map((prompt) => (
-              <button
-                key={prompt.id}
-                className="pf-config-row"
-                type="button"
-                onClick={() => setPromptDraft(prompt)}
-              >
-                <span>
-                  <strong>{prompt.name}</strong>
-                  <small>
-                    {prompt.area?.name ?? "Globale"} - {athleteLevelLabel(prompt.athleteLevel)} -
-                    v{prompt.version ?? 1}
-                  </small>
-                </span>
-                <StatusBadge tone={prompt.isActive ? "success" : "neutral"}>
-                  {prompt.isActive ? "attivo" : "spento"}
-                </StatusBadge>
-              </button>
-            ))}
-            {!promptConfigs.length && (
-              <EmptyState
-                title="Nessun prompt"
-                description="Crea almeno un prompt globale baseline."
-              />
-            )}
           </div>
         </aside>
       </section>

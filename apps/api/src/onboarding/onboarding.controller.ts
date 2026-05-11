@@ -48,8 +48,8 @@ export class OnboardingController {
     @Req() req: { user?: { id: string; role: UserRole } },
     @Body()
     body: {
-      sports?: string[];
-      fitnessLocation?: string | null;
+      sportId?: string;
+      specializationId?: string;
     },
   ) {
     return this.onboarding.saveSportSelection(

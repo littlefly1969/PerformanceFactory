@@ -43,6 +43,7 @@ const roleNav: Record<string, NavItem[]> = {
       href: "/user/plan",
       label: "Allenamenti",
       children: [
+        { href: "/user/training", label: "Allenamento specifico" },
         { href: "/user/plan", label: "Allenamenti attivi" },
         { href: "/user/plan/history", label: "Storico allenamenti" },
       ],

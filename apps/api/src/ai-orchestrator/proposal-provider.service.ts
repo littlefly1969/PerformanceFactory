@@ -87,15 +87,23 @@ export type AiCycleContext = {
       responseFormatPrompt: string;
       questionnaireLayoutJson: unknown;
     } | null;
-    adminPromptInstructions: Array<{
-      name: string;
-      scope: string;
-      athleteLevel: string;
-      version: number;
-      basePrompt: string;
-    }>;
     userAreaPromptInstruction: {
       promptVersion: string;
+      updatedAt: string;
+      basePrompt: string;
+    } | null;
+    sportSpecializationPromptInstruction: {
+      sportLabel: string;
+      specializationLabel: string;
+      areaName: string;
+      version: number;
+      updatedAt: string;
+      basePrompt: string;
+    } | null;
+    trainingPromptInstruction: {
+      sportLabel: string;
+      specializationLabel: string;
+      version: number;
       updatedAt: string;
       basePrompt: string;
     } | null;
@@ -143,26 +151,10 @@ export type CycleProposal = {
   }>;
 };
 
-export type GoalAreaPromptInput = {
-  userId: string;
-  goalText: string;
-  basePrompt: string;
-  areas: AiAreaInput[];
-  onboardingProfile: unknown;
-  onboardingAnswers: unknown;
-};
-
-export type GoalAreaPromptResult = {
-  provider: AiProvider;
-  model: string;
-  promptVersion: string;
-  promptHash: string;
-  inputJson: Record<string, unknown>;
-  areaPrompts: Array<{
-    areaId: string;
-    areaName: string;
-    promptText: string;
-  }>;
+type CycleQuestionLayout = {
+  questions: number;
+  answerOptions: Array<{ label: string; score: number }>;
+  raw: unknown;
 };
 
 export type GoalValidationInput = {
@@ -171,13 +163,18 @@ export type GoalValidationInput = {
   basePrompt: string;
   areas: AiAreaInput[];
   sportSelection?: {
-    sports: string[];
-    fitnessLocation: string | null;
+    sportId: string;
+    sportKey: string;
+    sportLabel: string;
+    specializationId: string;
+    specializationKey: string;
+    specializationLabel: string;
     label: string;
   };
-  sportAreaPromptInstructions?: Array<{
+  sportSpecializationPromptInstructions?: Array<{
     sportKey: string;
-    fitnessLocation: string | null;
+    specializationKey: string;
+    specializationId: string;
     sportLabel: string;
     areaId: string;
     areaName: string;
@@ -230,13 +227,18 @@ export type SpecialistOnboardingQuestionInput = {
   interpretedGoal: string;
   normalizedGoal?: unknown;
   sportSelection?: {
-    sports: string[];
-    fitnessLocation: string | null;
+    sportId: string;
+    sportKey: string;
+    sportLabel: string;
+    specializationId: string;
+    specializationKey: string;
+    specializationLabel: string;
     label: string;
   };
-  sportAreaPromptInstructions?: Array<{
+  sportSpecializationPromptInstructions?: Array<{
     sportKey: string;
-    fitnessLocation: string | null;
+    specializationKey: string;
+    specializationId: string;
     sportLabel: string;
     areaId: string;
     areaName: string;
@@ -262,14 +264,13 @@ export type SpecialistOnboardingQuestionResult = {
 };
 
 const PROMPT_VERSION = 'cycle-proposal-v2';
-const GOAL_PROMPT_VERSION = 'goal-area-prompts-v1';
 const GOAL_VALIDATION_VERSION = 'goal-validation-v1';
 const SPECIALIST_ONBOARDING_QUESTIONS_VERSION =
   'specialist-onboarding-questions-v1';
 const QUESTIONS_PER_AREA = 3;
 const EXTERNAL_AI_PROVIDERS: AiProvider[] = ['openai', 'gemini'];
 const SYSTEM_PROMPT =
-  'Sei un assistente senior di sport performance a supporto di professionisti umani. Genera una proposta di miglioramento specifica per area e tre domande di monitoraggio usando solo il contesto atleta fornito. Rispondi esclusivamente in italiano e solo con JSON valido conforme allo schema. Il lavoro deve essere pratico, misurabile, progressivo e revisionabile da un professionista. Non inventare diagnosi, indicazioni mediche, dati atleta non presenti o contesto nascosto. Se esistono lavori precedenti, usa note di completamento, punteggi e motivi di rifiuto per migliorare la proposta.';
+  'Sei un assistente senior di sport performance a supporto di professionisti umani. Genera una proposta di miglioramento specifica per area e le domande di monitoraggio richieste dal layout AI usando solo il contesto atleta fornito. Rispondi esclusivamente in italiano e solo con JSON valido conforme allo schema. Il lavoro deve essere pratico, misurabile, progressivo e revisionabile da un professionista. Non inventare diagnosi, indicazioni mediche, dati atleta non presenti o contesto nascosto. Se esistono lavori precedenti, usa note di completamento, punteggi e motivi di rifiuto per migliorare la proposta.';
 const DEFAULT_OPTIONS = [
   { label: 'Non ancora', score: 0 },
   { label: 'A volte', score: 50 },
@@ -305,28 +306,6 @@ export class AiProposalProviderService {
       promptVersion: PROMPT_VERSION,
       promptHash: this.hashJson(inputJson),
       inputJson,
-    };
-  }
-
-  async generateGoalAreaPrompts(
-    input: GoalAreaPromptInput,
-  ): Promise<GoalAreaPromptResult> {
-    const provider = this.resolveProvider();
-    const model = this.resolveModel(provider);
-    const inputJson = this.buildGoalPromptAuditInput(input);
-    if (provider === 'openai') {
-      return this.generateOpenAiGoalAreaPrompts(input, inputJson);
-    }
-    if (provider === 'gemini') {
-      return this.generateGeminiGoalAreaPrompts(input, inputJson);
-    }
-    return {
-      provider,
-      model,
-      promptVersion: GOAL_PROMPT_VERSION,
-      promptHash: this.hashJson(inputJson),
-      inputJson,
-      areaPrompts: this.buildStubGoalAreaPrompts(input),
     };
   }
 
@@ -389,6 +368,7 @@ export class AiProposalProviderService {
     inputJson: Record<string, unknown>,
     startedAt: number,
   ): CycleProposal {
+    const questionLayout = this.cycleQuestionLayout(input);
     const proposal = {
       provider: 'stub',
       model: 'deterministic-stub',
@@ -407,11 +387,11 @@ export class AiProposalProviderService {
           },
         },
       ],
-      questions: Array.from({ length: QUESTIONS_PER_AREA }, (_, index) => ({
+      questions: Array.from({ length: questionLayout.questions }, (_, index) => ({
         text: `${input.area.name}: verifica ${index + 1}`,
         objectiveRef: `area:${input.area.id}`,
         orderIndex: index + 1,
-        options: DEFAULT_OPTIONS,
+        options: questionLayout.answerOptions,
       })),
     } satisfies Omit<CycleProposal, 'audit'>;
 
@@ -463,7 +443,7 @@ export class AiProposalProviderService {
             type: 'json_schema',
             name: 'performance_cycle_proposal',
             strict: true,
-            schema: this.buildProposalJsonSchema(),
+            schema: this.buildProposalJsonSchema(input),
           },
         },
       }),
@@ -540,7 +520,7 @@ export class AiProposalProviderService {
           ],
           generationConfig: {
             responseMimeType: 'application/json',
-            responseJsonSchema: this.buildProposalJsonSchema({
+            responseJsonSchema: this.buildProposalJsonSchema(input, {
               includePropertyOrdering: true,
             }),
           },
@@ -584,76 +564,6 @@ export class AiProposalProviderService {
       parsed,
       inputJson,
       startedAt,
-    );
-  }
-
-  private async generateOpenAiGoalAreaPrompts(
-    input: GoalAreaPromptInput,
-    inputJson: Record<string, unknown>,
-  ): Promise<GoalAreaPromptResult> {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      throw new BadRequestException(
-        'OPENAI_API_KEY e obbligatoria per AI_PROVIDER=openai',
-      );
-    }
-
-    const model = this.resolveModel('openai');
-    this.logDebugPrompt('openai', model, inputJson);
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        input: [
-          {
-            role: 'system',
-            content: input.basePrompt,
-          },
-          {
-            role: 'user',
-            content: JSON.stringify(this.buildGoalPromptTask(input)),
-          },
-        ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'goal_area_prompts',
-            strict: true,
-            schema: this.buildGoalAreaPromptJsonSchema(),
-          },
-        },
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new BadRequestException(`Prompt obiettivo OpenAI non riusciti: ${errorText}`);
-    }
-
-    const payload = (await response.json()) as {
-      output_text?: string;
-      output?: Array<{ content?: Array<{ text?: string }> }>;
-    };
-    const outputText =
-      payload.output_text ??
-      payload.output
-        ?.flatMap((item) => item.content ?? [])
-        .map((content) => content.text)
-        .find((text): text is string => !!text);
-    if (!outputText) {
-      throw new BadRequestException('La risposta prompt obiettivo OpenAI e vuota');
-    }
-
-    return this.normalizeGoalAreaPrompts(
-      input,
-      'openai',
-      model,
-      this.parseGoalAreaPromptJson(outputText, 'OpenAI'),
-      inputJson,
     );
   }
 
@@ -767,7 +677,7 @@ export class AiProposalProviderService {
             type: 'json_schema',
             name: 'goal_validation',
             strict: true,
-            schema: this.buildGoalValidationJsonSchema(),
+            schema: this.buildGoalValidationJsonSchema(input),
           },
         },
       }),
@@ -796,78 +706,6 @@ export class AiProposalProviderService {
       'openai',
       model,
       this.parseGoalValidationJson(outputText, 'OpenAI'),
-      inputJson,
-    );
-  }
-
-  private async generateGeminiGoalAreaPrompts(
-    input: GoalAreaPromptInput,
-    inputJson: Record<string, unknown>,
-  ): Promise<GoalAreaPromptResult> {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new BadRequestException(
-        'GEMINI_API_KEY e obbligatoria per AI_PROVIDER=gemini',
-      );
-    }
-
-    const model = this.resolveModel('gemini');
-    this.logDebugPrompt('gemini', model, inputJson);
-    const modelName = model.startsWith('models/')
-      ? model.slice('models/'.length)
-      : model;
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: input.basePrompt }] },
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: JSON.stringify(this.buildGoalPromptTask(input)) }],
-            },
-          ],
-          generationConfig: {
-            responseMimeType: 'application/json',
-            responseJsonSchema: this.buildGoalAreaPromptJsonSchema({
-              includePropertyOrdering: true,
-            }),
-          },
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new BadRequestException(`Prompt obiettivo Gemini non riusciti: ${errorText}`);
-    }
-
-    const payload = (await response.json()) as {
-      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-      promptFeedback?: { blockReason?: string };
-    };
-    const outputText = payload.candidates?.[0]?.content?.parts
-      ?.map((part) => part.text)
-      .filter((text): text is string => !!text)
-      .join('');
-    if (!outputText) {
-      throw new BadRequestException(
-        `La risposta prompt obiettivo Gemini e vuota: ${
-          payload.promptFeedback?.blockReason ?? 'risposta vuota'
-        }`,
-      );
-    }
-
-    return this.normalizeGoalAreaPrompts(
-      input,
-      'gemini',
-      model,
-      this.parseGoalAreaPromptJson(outputText, 'Gemini'),
       inputJson,
     );
   }
@@ -996,7 +834,7 @@ export class AiProposalProviderService {
           ],
           generationConfig: {
             responseMimeType: 'application/json',
-            responseJsonSchema: this.buildGoalValidationJsonSchema({
+            responseJsonSchema: this.buildGoalValidationJsonSchema(input, {
               includePropertyOrdering: true,
             }),
           },
@@ -1049,6 +887,7 @@ export class AiProposalProviderService {
     inputJson: Record<string, unknown>,
     startedAt: number,
   ): CycleProposal {
+    const questionLayout = this.cycleQuestionLayout(input);
     const planItems = (parsed.planItems ?? [])
       .filter((item) => item.title && item.body)
       .slice(0, 3)
@@ -1069,15 +908,15 @@ export class AiProposalProviderService {
 
     const questions = (parsed.questions ?? [])
       .filter((question) => question.text)
-      .slice(0, QUESTIONS_PER_AREA)
+      .slice(0, questionLayout.questions)
       .map((question, index) => ({
         text: question.text || `${input.area.name}: verifica ${index + 1}`,
         objectiveRef: question.objectiveRef || `area:${input.area.id}`,
         orderIndex: question.orderIndex || index + 1,
-        options: DEFAULT_OPTIONS,
+        options: questionLayout.answerOptions,
       }));
 
-    if (planItems.length === 0 || questions.length !== QUESTIONS_PER_AREA) {
+    if (planItems.length === 0 || questions.length !== questionLayout.questions) {
       throw new BadRequestException(`Validazione proposta ${provider} non riuscita`);
     }
 
@@ -1104,16 +943,18 @@ export class AiProposalProviderService {
 
   private buildProposalPrompt(input: CycleProposalInput) {
     const areaGenerationConfig = input.context.guidance.areaGenerationConfig;
+    const questionLayout = this.cycleQuestionLayout(input);
     return {
-      task: 'Genera una proposta di lavoro specifica per area e tre domande di valutazione basate sul contesto atleta fornito.',
+      task: `Genera una proposta di lavoro specifica per area e ${questionLayout.questions} domande di valutazione basate sul contesto atleta fornito.`,
       constraints: {
-        questions: QUESTIONS_PER_AREA,
-        answerOptions: DEFAULT_OPTIONS,
+        questions: questionLayout.questions,
+        answerOptions: questionLayout.answerOptions,
         responseFormat:
           areaGenerationConfig?.responseFormatPrompt ??
           'Usa il formato JSON richiesto dallo schema tecnico.',
-        questionnaireLayout:
-          areaGenerationConfig?.questionnaireLayoutJson ?? null,
+        questionnaireLayout: questionLayout.raw,
+        questionnaireLayoutSource:
+          'Contesto e layout AI della configurazione area; numero domande e opzioni risposta sono vincolanti.',
         scoreRange: {
           min: input.scale.minScore,
           max: input.scale.maxScore,
@@ -1134,33 +975,6 @@ export class AiProposalProviderService {
     };
   }
 
-  private buildGoalPromptTask(input: GoalAreaPromptInput) {
-    return {
-      task: 'Genera un prompt operativo personalizzato per ogni area di performance dell atleta.',
-      language: 'Italiano',
-      athleteGoal: input.goalText,
-      onboardingProfile: input.onboardingProfile,
-      onboardingAnswers: input.onboardingAnswers,
-      areas: input.areas,
-      constraints: {
-        onePromptPerArea: true,
-        promptUse:
-          'Ogni prompt verra usato come istruzione stabile nei cicli AI futuri per quella specifica coppia atleta-area.',
-        eachPromptMustInclude: [
-          'interpretazione dell obiettivo atleta per l area',
-          'priorita di lavoro',
-          'vincoli di sicurezza e revisione professionale',
-          'criteri per rendere esercizi e questionari coerenti con l obiettivo',
-        ],
-        avoid: [
-          'diagnosi mediche',
-          'promesse di risultato',
-          'dati non presenti nel contesto',
-        ],
-      },
-    };
-  }
-
   private buildSpecialistOnboardingQuestionTask(
     input: SpecialistOnboardingQuestionInput,
   ) {
@@ -1172,8 +986,8 @@ export class AiProposalProviderService {
       interpretedGoal: input.interpretedGoal,
       normalizedGoal: input.normalizedGoal ?? null,
       sportSelection: input.sportSelection ?? null,
-      sportAreaPromptInstructions:
-        input.sportAreaPromptInstructions?.map((instruction) => ({
+      sportSpecializationPromptInstructions:
+        input.sportSpecializationPromptInstructions?.map((instruction) => ({
           sport: instruction.sportLabel,
           areaName: instruction.areaName,
           version: instruction.version,
@@ -1212,24 +1026,17 @@ export class AiProposalProviderService {
   private buildGoalValidationTask(input: GoalValidationInput) {
     const finalValidation = Boolean(input.onboardingProfile || input.onboardingAnswers);
     return {
-      task: 'Valida l obiettivo iniziale Performance Factory e, solo se status=OK, genera prompt specialistici per le aree ufficiali.',
+      task: 'Valida l obiettivo iniziale Performance Factory e, solo se status=OK, genera prompt specialistici per le aree abilitate.',
       evaluationPhase: finalValidation
         ? 'VALIDAZIONE_FINALE_DOPO_ANAMNESI'
         : 'BOZZA_OBIETTIVO_PRIMA_DELL_ANAMNESI',
       platformPrinciple:
         'Performance Factory promuove il miglioramento personale rispetto al punto di partenza, non il confronto tossico con gli altri.',
-      officialAreas: [
-        'Preparazione atletica',
-        'Equipaggiamento',
-        'Allenamento mentale',
-        'Nutrizione',
-        'Fisioterapia',
-        'Tecnico-tattica',
-      ],
+      officialAreas: input.areas.map((area) => area.name),
       athleteGoal: input.goalText,
       sportSelection: input.sportSelection ?? null,
-      sportAreaPromptInstructions:
-        input.sportAreaPromptInstructions?.map((instruction) => ({
+      sportSpecializationPromptInstructions:
+        input.sportSpecializationPromptInstructions?.map((instruction) => ({
           sport: instruction.sportLabel,
           areaName: instruction.areaName,
           version: instruction.version,
@@ -1276,19 +1083,22 @@ export class AiProposalProviderService {
           : 'Questa non e la validazione finale: se mancano dati personali ma l obiettivo e sensato, usa NEEDS_ANAMNESIS.',
         'Se mancano informazioni, fai al massimo 3 domande specifiche e brevi in questions_to_user, riferite solo a: sport/attivita, risultato concreto desiderato, criterio di misura, orizzonte temporale, punto di partenza espresso come prestazione attuale.',
         'La scelta sportiva dell atleta e vincolante: non chiedere quale sport pratica se sportSelection e presente; usa quella selezione per valutare pertinenza e generare prompt area.',
-        'Integra i prompt sportAreaPromptInstructions nei prompt area finali: ogni area deve riflettere sport, eventuale contesto fitness e istruzioni amministrative specifiche.',
+        'Integra i prompt sportSpecializationPromptInstructions nei prompt area finali: ogni area deve riflettere sport, specializzazione e istruzioni amministrative specifiche.',
         'Non chiedere quante volte si allena, quanto spesso si allena, quanto mangia, cosa mangia, dieta, sonno, stress, disponibilita settimanale, attrezzatura, infortuni o dettagli sul metodo per raggiungere l obiettivo. Questi dati appartengono ai questionari successivi.',
         'Se l obiettivo e gia comprensibile ma mancano dettagli sul metodo o sulle abitudini, considera status=OK e lascia che i questionari raccolgano quei dati.',
         'Se status diverso da OK, area_prompts deve avere tutti i valori null.',
-        'Se status OK, compila tutti i sei prompt area.',
+        'Se status OK, compila tutti i prompt delle aree abilitate in availableAreas.',
         'Ogni prompt area deve essere utilizzabile da un modulo AI specialistico e contenere role, objective, required_inputs, initial_questionnaire, exercise_generation_rules, feedback_questions, progression_rules, measurement_indicators, safety_limits, output_format.',
       ],
     };
   }
 
-  private buildGoalValidationJsonSchema(options?: {
-    includePropertyOrdering?: boolean;
-  }) {
+  private buildGoalValidationJsonSchema(
+    input: GoalValidationInput,
+    options?: {
+      includePropertyOrdering?: boolean;
+    },
+  ) {
     const goalEvaluationSchema = {
       type: 'object',
       additionalProperties: false,
@@ -1372,6 +1182,12 @@ export class AiProposalProviderService {
     const nullableAreaPromptSchema = {
       anyOf: [areaPromptSchema, { type: 'null' }],
     };
+    const areaPromptKeys = Array.from(
+      new Set(input.areas.map((area) => this.areaPromptKey(area.name))),
+    );
+    const areaPromptProperties = Object.fromEntries(
+      areaPromptKeys.map((key) => [key, nullableAreaPromptSchema]),
+    );
     return {
       type: 'object',
       additionalProperties: false,
@@ -1408,22 +1224,8 @@ export class AiProposalProviderService {
         area_prompts: {
           type: 'object',
           additionalProperties: false,
-          required: [
-            'preparazione_atletica',
-            'equipaggiamento',
-            'mental_training',
-            'nutrizione',
-            'fisioterapia',
-            'tecnico_tattica',
-          ],
-          properties: {
-            preparazione_atletica: nullableAreaPromptSchema,
-            equipaggiamento: nullableAreaPromptSchema,
-            mental_training: nullableAreaPromptSchema,
-            nutrizione: nullableAreaPromptSchema,
-            fisioterapia: nullableAreaPromptSchema,
-            tecnico_tattica: nullableAreaPromptSchema,
-          },
+          required: areaPromptKeys,
+          properties: areaPromptProperties,
         },
         next_step: { type: 'string' },
       },
@@ -1440,38 +1242,6 @@ export class AiProposalProviderService {
               'next_step',
             ],
           }
-        : {}),
-    };
-  }
-
-  private buildGoalAreaPromptJsonSchema(options?: {
-    includePropertyOrdering?: boolean;
-  }) {
-    const itemSchema = {
-      type: 'object',
-      additionalProperties: false,
-      required: ['areaId', 'promptText'],
-      properties: {
-        areaId: { type: 'string' },
-        promptText: { type: 'string' },
-      },
-      ...(options?.includePropertyOrdering
-        ? { propertyOrdering: ['areaId', 'promptText'] }
-        : {}),
-    };
-    return {
-      type: 'object',
-      additionalProperties: false,
-      required: ['areaPrompts'],
-      properties: {
-        areaPrompts: {
-          type: 'array',
-          minItems: 1,
-          items: itemSchema,
-        },
-      },
-      ...(options?.includePropertyOrdering
-        ? { propertyOrdering: ['areaPrompts'] }
         : {}),
     };
   }
@@ -1531,9 +1301,13 @@ export class AiProposalProviderService {
     return modelContext;
   }
 
-  private buildProposalJsonSchema(options?: {
-    includePropertyOrdering?: boolean;
-  }) {
+  private buildProposalJsonSchema(
+    input: CycleProposalInput,
+    options?: {
+      includePropertyOrdering?: boolean;
+    },
+  ) {
+    const questionLayout = this.cycleQuestionLayout(input);
     const planItemSchema = {
       type: 'object',
       additionalProperties: false,
@@ -1555,7 +1329,11 @@ export class AiProposalProviderService {
       properties: {
         text: { type: 'string' },
         objectiveRef: { type: 'string' },
-        orderIndex: { type: 'integer', minimum: 1, maximum: 3 },
+        orderIndex: {
+          type: 'integer',
+          minimum: 1,
+          maximum: questionLayout.questions,
+        },
       },
       ...(options?.includePropertyOrdering
         ? { propertyOrdering: ['text', 'objectiveRef', 'orderIndex'] }
@@ -1576,14 +1354,63 @@ export class AiProposalProviderService {
         },
         questions: {
           type: 'array',
-          minItems: QUESTIONS_PER_AREA,
-          maxItems: QUESTIONS_PER_AREA,
+          minItems: questionLayout.questions,
+          maxItems: questionLayout.questions,
           items: questionSchema,
         },
       },
       ...(options?.includePropertyOrdering
         ? { propertyOrdering: ['summaryText', 'planItems', 'questions'] }
         : {}),
+    };
+  }
+
+  private cycleQuestionLayout(input: CycleProposalInput): CycleQuestionLayout {
+    const raw = input.context.guidance.areaGenerationConfig?.questionnaireLayoutJson;
+    const root =
+      raw && typeof raw === 'object' && !Array.isArray(raw)
+        ? (raw as Record<string, unknown>)
+        : {};
+    const questionnaire =
+      root.questionnaire &&
+      typeof root.questionnaire === 'object' &&
+      !Array.isArray(root.questionnaire)
+        ? (root.questionnaire as Record<string, unknown>)
+        : root;
+    const rawQuestions = questionnaire.questions;
+    const questions =
+      typeof rawQuestions === 'number' &&
+      Number.isInteger(rawQuestions) &&
+      rawQuestions > 0
+        ? Math.min(rawQuestions, 10)
+        : QUESTIONS_PER_AREA;
+    const rawOptions = questionnaire.answerOptions;
+    const answerOptions = Array.isArray(rawOptions)
+      ? rawOptions
+          .map((option) => {
+            if (!option || typeof option !== 'object' || Array.isArray(option)) {
+              return null;
+            }
+            const item = option as Record<string, unknown>;
+            const label =
+              typeof item.label === 'string' ? item.label.trim() : '';
+            const score =
+              typeof item.score === 'number'
+                ? item.score
+                : typeof item.value === 'number'
+                  ? item.value
+                  : null;
+            return label && score !== null ? { label, score } : null;
+          })
+          .filter(
+            (option): option is { label: string; score: number } =>
+              option !== null,
+          )
+      : [];
+    return {
+      questions,
+      answerOptions: answerOptions.length ? answerOptions : DEFAULT_OPTIONS,
+      raw: raw ?? null,
     };
   }
 
@@ -1601,18 +1428,6 @@ export class AiProposalProviderService {
     } catch {
       throw new BadRequestException(
         `La risposta proposta ${providerName} non e un JSON valido`,
-      );
-    }
-  }
-
-  private parseGoalAreaPromptJson(outputText: string, providerName: string) {
-    try {
-      return JSON.parse(outputText) as {
-        areaPrompts?: Array<{ areaId?: string; promptText?: string }>;
-      };
-    } catch {
-      throw new BadRequestException(
-        `La risposta prompt obiettivo ${providerName} non e un JSON valido`,
       );
     }
   }
@@ -1760,19 +1575,13 @@ export class AiProposalProviderService {
     return input.areas.map((area) => {
       const key = this.areaPromptKey(area.name);
       const prompt = areaPrompts[key] ?? areaPrompts[this.fallbackAreaPromptKey(area.name)];
-      const sportInstructions = this.sportInstructionsForArea(input, area.id);
       return {
         areaId: area.id,
         areaName: area.name,
         promptText:
           prompt && typeof prompt === 'object'
-            ? [JSON.stringify(prompt), sportInstructions].filter(Boolean).join('\n\n')
-            : [
-                this.buildFallbackGoalAreaPrompt(input.goalText, area.name),
-                sportInstructions,
-              ]
-                .filter(Boolean)
-                .join('\n\n'),
+            ? JSON.stringify(prompt)
+            : this.buildFallbackGoalAreaPrompt(input.goalText, area.name),
       };
     });
   }
@@ -1782,7 +1591,7 @@ export class AiProposalProviderService {
     areaId: string,
   ) {
     const instructions =
-      input.sportAreaPromptInstructions?.filter(
+      input.sportSpecializationPromptInstructions?.filter(
         (instruction) => instruction.areaId === areaId,
       ) ?? [];
     if (!instructions.length) {
@@ -1935,40 +1744,6 @@ export class AiProposalProviderService {
     };
   }
 
-  private normalizeGoalAreaPrompts(
-    input: GoalAreaPromptInput,
-    provider: AiProvider,
-    model: string,
-    parsed: { areaPrompts?: Array<{ areaId?: string; promptText?: string }> },
-    inputJson: Record<string, unknown>,
-  ): GoalAreaPromptResult {
-    const promptsByArea = new Map(
-      (parsed.areaPrompts ?? [])
-        .filter((item) => item.areaId && item.promptText)
-        .map((item) => [item.areaId as string, item.promptText as string]),
-    );
-    const areaPrompts = input.areas.map((area) => ({
-      areaId: area.id,
-      areaName: area.name,
-      promptText:
-        promptsByArea.get(area.id) ??
-        this.buildFallbackGoalAreaPrompt(input.goalText, area.name),
-    }));
-
-    if (areaPrompts.some((item) => !item.promptText.trim())) {
-      throw new BadRequestException(`Validazione prompt obiettivo ${provider} non riuscita`);
-    }
-
-    return {
-      provider,
-      model,
-      promptVersion: GOAL_PROMPT_VERSION,
-      promptHash: this.hashJson(inputJson),
-      inputJson,
-      areaPrompts,
-    };
-  }
-
   private normalizeSpecialistOnboardingQuestions(
     input: SpecialistOnboardingQuestionInput,
     provider: AiProvider,
@@ -2041,14 +1816,6 @@ export class AiProposalProviderService {
     ].map((text, index) => ({ text, orderIndex: index + 1 }));
   }
 
-  private buildStubGoalAreaPrompts(input: GoalAreaPromptInput) {
-    return input.areas.map((area) => ({
-      areaId: area.id,
-      areaName: area.name,
-      promptText: this.buildFallbackGoalAreaPrompt(input.goalText, area.name),
-    }));
-  }
-
   private buildFallbackGoalAreaPrompt(goalText: string, areaName: string) {
     return [
       `Personalizza ogni proposta per l area ${areaName} rispetto all obiettivo dichiarato dall atleta: ${goalText}.`,
@@ -2103,17 +1870,7 @@ export class AiProposalProviderService {
       prompt: {
         system: this.buildSystemPrompt(input),
         user: providerPrompt,
-        responseJsonSchema: this.buildProposalJsonSchema(),
-      },
-    };
-  }
-
-  private buildGoalPromptAuditInput(input: GoalAreaPromptInput) {
-    return {
-      prompt: {
-        system: input.basePrompt,
-        user: this.buildGoalPromptTask(input),
-        responseJsonSchema: this.buildGoalAreaPromptJsonSchema(),
+        responseJsonSchema: this.buildProposalJsonSchema(input),
       },
     };
   }
@@ -2136,10 +1893,10 @@ export class AiProposalProviderService {
       prompt: {
         system: input.basePrompt,
         user: this.buildGoalValidationTask(input),
-        responseJsonSchema: this.buildGoalValidationJsonSchema(),
+        responseJsonSchema: this.buildGoalValidationJsonSchema(input),
       },
       sportSelection: input.sportSelection ?? null,
-      sportAreaPromptInstructions: input.sportAreaPromptInstructions ?? [],
+      sportSpecializationPromptInstructions: input.sportSpecializationPromptInstructions ?? [],
     };
   }
 
@@ -2149,23 +1906,47 @@ export class AiProposalProviderService {
       SYSTEM_PROMPT;
     const responseFormatPrompt =
       input.context.guidance.areaGenerationConfig?.responseFormatPrompt;
-    const instructions = input.context.guidance.adminPromptInstructions;
     const sections = [basePrompt];
     if (responseFormatPrompt) {
       sections.push(`Forma della risposta configurata:\n${responseFormatPrompt}`);
     }
-    if (!instructions.length) {
-      return sections.join('\n\n');
+    if (input.context.guidance.userAreaPromptInstruction) {
+      sections.push(
+        [
+          'Prompt area personalizzato dell atleta:',
+          this.stripEmbeddedSportPromptInstructions(
+            input.context.guidance.userAreaPromptInstruction.basePrompt,
+          ),
+        ].join('\n'),
+      );
     }
-    const adminInstructions = instructions
-      .map(
-        (instruction) =>
-          `[${instruction.scope} ${instruction.athleteLevel} v${instruction.version} - ${instruction.name}]\n${instruction.basePrompt}`,
-      )
-      .join('\n\n');
-
-    sections.push(`Istruzioni configurate dall amministratore:\n${adminInstructions}`);
+    if (input.context.guidance.sportSpecializationPromptInstruction) {
+      const sportPrompt = input.context.guidance.sportSpecializationPromptInstruction;
+      sections.push(
+        [
+          'Prompt sport-specializzazione corrente configurato dall amministratore. Questo prompt prevale su eventuali istruzioni sport vecchie presenti nello storico atleta.',
+          `[${sportPrompt.sportLabel} - ${sportPrompt.specializationLabel} / ${sportPrompt.areaName} v${sportPrompt.version}]`,
+          sportPrompt.basePrompt,
+        ].join('\n'),
+      );
+    }
+    if (input.context.guidance.trainingPromptInstruction) {
+      const trainingPrompt = input.context.guidance.trainingPromptInstruction;
+      sections.push(
+        [
+          'Prompt allenamento specifico corrente configurato dall amministratore.',
+          `[Allenamento ${trainingPrompt.sportLabel} - ${trainingPrompt.specializationLabel} v${trainingPrompt.version}]`,
+          trainingPrompt.basePrompt,
+        ].join('\n'),
+      );
+    }
     return sections.join('\n\n');
+  }
+
+  private stripEmbeddedSportPromptInstructions(promptText: string) {
+    return promptText
+      .replace(/\n*\[Prompt sport [^\]]+\]\n[\s\S]*?(?=\n\n\{|$)/g, '')
+      .trim();
   }
 
   private buildAuditOutput(proposal: Omit<CycleProposal, 'audit'>) {
