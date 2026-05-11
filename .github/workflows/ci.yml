@@ -9,11 +9,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
-        with:
-          version: latest
+      - uses: pnpm/action-setup@v5
+
 
       - run: pnpm install
 
