@@ -9,6 +9,16 @@ import {
 import { API_BASE, secureFetch } from "@/app/lib/api";
 
 type Area = { id: string; name: string };
+type Sport = {
+  id: string;
+  label: string;
+  specializations: Array<{ id: string; label: string }>;
+};
+type SportSpecializationRef = {
+  id: string;
+  label: string;
+  sport: { id?: string; label: string };
+};
 type UserRef = {
   id: string;
   email: string;
@@ -22,6 +32,17 @@ type Professional = UserRef & {
     user: UserRef;
     createdAt: string;
   }>;
+  coachSpecializationCompetences: Array<{
+    specializationId: string;
+    specialization: SportSpecializationRef;
+  }>;
+  coachUserLinks: Array<{
+    userId: string;
+    specializationId: string;
+    user: UserRef;
+    specialization: SportSpecializationRef;
+    createdAt: string;
+  }>;
 };
 type Cycle = {
   id: string;
@@ -29,7 +50,7 @@ type Cycle = {
   areaId: string;
   version: number;
   status?: string;
-  cycleStato: string;
+  cycleStatus: string;
   createdAt: string;
   user: UserRef;
   area: Area;
@@ -66,13 +87,29 @@ type Athlete = {
   }>;
   latestSnapshot?: { rankingGlobal: number; createdAt: string } | null;
   trainingState: {
+    sportSelection?: {
+      specializationId: string;
+      sport: { id: string; label: string };
+      specialization: { id: string; label: string };
+    } | null;
+    linkedCoach?: UserRef | null;
+    pendingTraining?: {
+      id: string;
+      version: number;
+      status: string;
+      cycleStatus: string;
+      createdAt: string;
+      specialization: SportSpecializationRef;
+    } | null;
     activeTraining?: {
       id: string;
       version: number;
       status: string;
+      cycleStatus?: string;
       createdAt: string;
       publishedAt?: string | null;
       summaryText: string;
+      specialization?: SportSpecializationRef;
     } | null;
     generationReady: boolean;
     reason: string;
@@ -83,8 +120,31 @@ type Dashboard = {
   areas: Area[];
   athletes: Athlete[];
   professionals: Professional[];
+  sports: Sport[];
   pendingCycles: Cycle[];
   readyCycles: Cycle[];
+  pendingTrainingPlans: Array<{
+    id: string;
+    version: number;
+    cycleStatus: string;
+    createdAt: string;
+    user: UserRef;
+    specialization: SportSpecializationRef;
+    items: Array<{ id: string; status: string }>;
+    questionSets: Array<{
+      id: string;
+      status: string;
+      approvals: Array<{ id: string; status: string; coach: UserRef }>;
+    }>;
+  }>;
+  readyTrainingPlans: Array<{
+    id: string;
+    version: number;
+    cycleStatus: string;
+    createdAt: string;
+    user: UserRef;
+    specialization: SportSpecializationRef;
+  }>;
   pendingQuestionApprovals: Array<{
     id: string;
     professional: UserRef;
@@ -129,6 +189,11 @@ type PreviewTarget = {
 type AssignmentTarget = {
   athlete: Athlete;
   state: AreaState;
+};
+type CoachAssignmentTarget = {
+  athlete: Athlete;
+  specializationId: string;
+  label: string;
 };
 
 type ResetTarget = {
@@ -204,14 +269,19 @@ export default function AdminCyclesPage() {
   const [competencesByProfessional, setCompetencesByProfessional] = useState<
     Record<string, Record<string, boolean>>
   >({});
+  const [coachCompetencesByProfessional, setCoachCompetencesByProfessional] =
+    useState<Record<string, Record<string, boolean>>>({});
   const [aiPreview, setAiPreview] = useState<AiPreview | null>(null);
   const [previewTarget, setPreviewTarget] = useState<PreviewTarget | null>(
     null,
   );
   const [assignmentTarget, setAssignmentTarget] =
     useState<AssignmentTarget | null>(null);
+  const [coachAssignmentTarget, setCoachAssignmentTarget] =
+    useState<CoachAssignmentTarget | null>(null);
   const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
   const [professionalFilter, setProfessionalFilter] = useState("");
+  const [coachFilter, setCoachFilter] = useState("");
 
   const athletes =
     dashboard?.athletes.filter(
@@ -232,11 +302,20 @@ export default function AdminCyclesPage() {
     () => athletes.filter((athlete) => athlete.trainingState.generationReady),
     [athletes],
   );
+  const trainingCandidates = useMemo(
+    () =>
+      athletes.filter(
+        (athlete) =>
+          athlete.isActive && athlete.onboarding.status === "COMPLETED",
+      ),
+    [athletes],
+  );
   const waitingApproval =
     dashboard?.pendingCycles.filter(
-      (cycle) => cycle.cycleStato !== "READY_TO_PUBLISH",
+      (cycle) => cycle.cycleStatus !== "READY_TO_PUBLISH",
     ) ?? [];
   const readyCycles = dashboard?.readyCycles ?? [];
+  const readyTrainingPlans = dashboard?.readyTrainingPlans ?? [];
   const pendingActivation = athletes.filter(
     (athlete) => !athlete.isActive && athlete.onboarding.status !== "REJECTED",
   );
@@ -256,12 +335,40 @@ export default function AdminCyclesPage() {
           ),
         )
       : [];
+  const coachCanHandleSpecialization = (
+    coachId: string,
+    specializationId: string,
+  ) =>
+    Boolean(
+      professionals
+        .find((professional) => professional.id === coachId)
+        ?.coachSpecializationCompetences.some(
+          (competence) => competence.specializationId === specializationId,
+        ),
+    );
+  const enabledCoachesForSpecialization = (specializationId: string) =>
+    specializationId
+      ? professionals.filter((professional) =>
+          professional.coachSpecializationCompetences.some(
+            (competence) => competence.specializationId === specializationId,
+          ),
+        )
+      : [];
   const filteredAssignmentProfessionals = assignmentTarget
     ? enabledProfessionalsForArea(assignmentTarget.state.area.id).filter(
         (professional) =>
           displayUser(professional)
             .toLowerCase()
             .includes(professionalFilter.trim().toLowerCase()),
+      )
+    : [];
+  const filteredCoachAssignmentProfessionals = coachAssignmentTarget
+    ? enabledCoachesForSpecialization(
+        coachAssignmentTarget.specializationId,
+      ).filter((professional) =>
+        displayUser(professional)
+          .toLowerCase()
+          .includes(coachFilter.trim().toLowerCase()),
       )
     : [];
 
@@ -296,6 +403,19 @@ export default function AdminCyclesPage() {
         ]),
       ),
     );
+    setCoachCompetencesByProfessional(
+      Object.fromEntries(
+        data.professionals.map((professional) => [
+          professional.id,
+          Object.fromEntries(
+            professional.coachSpecializationCompetences.map((competence) => [
+              competence.specializationId,
+              true,
+            ]),
+          ),
+        ]),
+      ),
+    );
     setLoading(false);
   };
 
@@ -311,6 +431,20 @@ export default function AdminCyclesPage() {
   const closeAssignmentModal = () => {
     setAssignmentTarget(null);
     setProfessionalFilter("");
+  };
+
+  const openCoachAssignmentModal = (
+    athlete: Athlete,
+    specializationId: string,
+    label: string,
+  ) => {
+    setCoachAssignmentTarget({ athlete, specializationId, label });
+    setCoachFilter("");
+  };
+
+  const closeCoachAssignmentModal = () => {
+    setCoachAssignmentTarget(null);
+    setCoachFilter("");
   };
 
   const assignProfessional = async (
@@ -377,6 +511,68 @@ export default function AdminCyclesPage() {
     setMessage(
       "Competenze salvate. Il professionista vede gli atleti collegati e le approvazioni coerenti.",
     );
+    await loadDashboard();
+    setBusyKey(null);
+  };
+
+  const assignCoach = async (
+    athleteId: string,
+    specializationId: string,
+    coachId: string,
+  ) => {
+    if (!coachId) {
+      setMessage("Seleziona un allenatore prima dell'assegnazione.");
+      return;
+    }
+    if (!coachCanHandleSpecialization(coachId, specializationId)) {
+      setMessage(
+        "L'allenatore selezionato non e abilitato per questa specializzazione.",
+      );
+      return;
+    }
+    setBusyKey(`coach-link:${athleteId}:${specializationId}`);
+    setMessage(null);
+    const response = await secureFetch(`${API_BASE}/inspect/coach-links`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: athleteId, coachId, specializationId }),
+    });
+    if (!response.ok) {
+      setMessage(`Assegnazione allenatore non riuscita: ${await readError(response)}`);
+      setBusyKey(null);
+      return;
+    }
+    setMessage("Allenatore assegnato alla sport-specializzazione dell'atleta.");
+    closeCoachAssignmentModal();
+    await loadDashboard();
+    setBusyKey(null);
+  };
+
+  const saveCoachCompetences = async (coachId: string) => {
+    const selected = Object.entries(
+      coachCompetencesByProfessional[coachId] ?? {},
+    )
+      .filter(([, checked]) => checked)
+      .map(([specializationId]) => specializationId);
+    if (!selected.length) {
+      setMessage("Seleziona almeno una specializzazione per l'allenatore.");
+      return;
+    }
+    setBusyKey(`coach-competences:${coachId}`);
+    setMessage(null);
+    const response = await secureFetch(`${API_BASE}/inspect/coach-competences`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coachId, specializationIds: selected }),
+    });
+    if (!response.ok) {
+      setMessage(`Aggiornamento competenze allenatore non riuscito: ${await readError(response)}`);
+      setBusyKey(null);
+      return;
+    }
+    setMessage("Competenze allenatore salvate.");
     await loadDashboard();
     setBusyKey(null);
   };
@@ -453,7 +649,7 @@ export default function AdminCyclesPage() {
       setBusyKey(null);
       return;
     }
-    setMessage("Allenamento specifico generato e pubblicato per l'atleta.");
+    setMessage("Allenamento specifico generato e inviato all'approvazione dell'allenatore.");
     await loadDashboard();
     setBusyKey(null);
   };
@@ -474,6 +670,26 @@ export default function AdminCyclesPage() {
       return;
     }
     setMessage("Ciclo pubblicato. L'atleta ora vede allenamento e questionario.");
+    await loadDashboard();
+    setBusyKey(null);
+  };
+
+  const publishTrainingPlan = async (trainingPlanId: string) => {
+    setBusyKey(`training-publish:${trainingPlanId}`);
+    setMessage(null);
+    const response = await secureFetch(
+      `${API_BASE}/admin/training-plans/${trainingPlanId}/publish`,
+      {
+        method: "POST",
+        credentials: "include",
+      },
+    );
+    if (!response.ok) {
+      setMessage(`Pubblicazione allenamento non riuscita: ${await readError(response)}`);
+      setBusyKey(null);
+      return;
+    }
+    setMessage("Allenamento pubblicato. L'atleta ora vede esercizi e questionario.");
     await loadDashboard();
     setBusyKey(null);
   };
@@ -750,15 +966,28 @@ export default function AdminCyclesPage() {
             </p>
           </div>
           <StatusBadge tone={readyTraining.length ? "success" : "neutral"}>
-            {readyTraining.length} pronti
+            {readyTraining.length}/{trainingCandidates.length} pronti
           </StatusBadge>
         </div>
         <div className="pf-table">
-          {readyTraining.map((athlete) => (
+          {trainingCandidates.map((athlete) => (
             <article key={`training:${athlete.id}`} className="pf-work-row">
               <div>
                 <strong>{displayUser(athlete)}</strong>
                 <p className="pf-muted">{athlete.trainingState.reason}</p>
+                {athlete.trainingState.sportSelection && (
+                  <p className="pf-muted">
+                    {athlete.trainingState.sportSelection.sport.label} -{" "}
+                    {athlete.trainingState.sportSelection.specialization.label} -{" "}
+                    allenatore:{" "}
+                    {athlete.trainingState.linkedCoach?.email ?? "non assegnato"}
+                  </p>
+                )}
+                {athlete.trainingState.pendingTraining && (
+                  <p className="pf-muted">
+                    In approvazione v{athlete.trainingState.pendingTraining.version}
+                  </p>
+                )}
                 {athlete.trainingState.activeTraining && (
                   <p className="pf-muted">
                     Ultimo allenamento v{athlete.trainingState.activeTraining.version} -{" "}
@@ -766,17 +995,36 @@ export default function AdminCyclesPage() {
                   </p>
                 )}
               </div>
+              {athlete.trainingState.sportSelection &&
+                !athlete.trainingState.linkedCoach && (
+                  <button
+                    className="pf-button-secondary"
+                    type="button"
+                    onClick={() =>
+                      openCoachAssignmentModal(
+                        athlete,
+                        athlete.trainingState.sportSelection!.specializationId,
+                        `${athlete.trainingState.sportSelection!.sport.label} - ${athlete.trainingState.sportSelection!.specialization.label}`,
+                      )
+                    }
+                  >
+                    Assegna allenatore
+                  </button>
+                )}
               <button
                 className="pf-button"
                 type="button"
-                disabled={busyKey === `training:${athlete.id}`}
+                disabled={
+                  busyKey === `training:${athlete.id}` ||
+                  !athlete.trainingState.generationReady
+                }
                 onClick={() => generateTraining(athlete.id)}
               >
                 Genera allenamento
               </button>
             </article>
           ))}
-          {!loading && readyTraining.length === 0 && (
+          {!loading && trainingCandidates.length === 0 && (
             <EmptyState
               title="Nessun allenamento generabile"
               description="Gli atleti con onboarding completato appariranno qui."
@@ -821,7 +1069,34 @@ export default function AdminCyclesPage() {
                 </div>
               </div>
             ))}
-            {!loading && readyCycles.length === 0 && (
+            {readyTrainingPlans.map((training) => (
+              <div key={training.id} className="pf-card">
+                <div className="pf-card-top">
+                  <div>
+                    <h3>
+                      {training.specialization.sport.label} -{" "}
+                      {training.specialization.label}
+                    </h3>
+                    <p className="pf-muted">
+                      {displayUser(training.user)} - v{training.version} -{" "}
+                      {formatDate(training.createdAt)}
+                    </p>
+                  </div>
+                  <StatusBadge tone="success">Allenamento pronto</StatusBadge>
+                </div>
+                <div className="pf-actions">
+                  <button
+                    className="pf-button"
+                    type="button"
+                    disabled={busyKey === `training-publish:${training.id}`}
+                    onClick={() => publishTrainingPlan(training.id)}
+                  >
+                    Pubblica allenamento
+                  </button>
+                </div>
+              </div>
+            ))}
+            {!loading && readyCycles.length === 0 && readyTrainingPlans.length === 0 && (
               <EmptyState
                 title="Nessun ciclo pronto"
                 description="I cicli approvati appariranno qui per la pubblicazione diretta."
@@ -866,10 +1141,28 @@ export default function AdminCyclesPage() {
                 <StatusBadge tone="warning">Attivita allenamento</StatusBadge>
               </div>
             ))}
+            {(dashboard?.pendingTrainingPlans ?? []).map((training) => {
+              const approval = training.questionSets[0]?.approvals[0];
+              return (
+                <div key={training.id} className="pf-metric-row">
+                  <span>
+                    {approval?.coach.email ?? "Allenatore non assegnato"}
+                    <br />
+                    <small>
+                      {displayUser(training.user)} -{" "}
+                      {training.specialization.sport.label} /{" "}
+                      {training.specialization.label}
+                    </small>
+                  </span>
+                  <StatusBadge tone="warning">Allenamento</StatusBadge>
+                </div>
+              );
+            })}
             {!loading &&
               !(
                 dashboard?.pendingQuestionApprovals.length ||
-                dashboard?.pendingPlanItems.length
+                dashboard?.pendingPlanItems.length ||
+                dashboard?.pendingTrainingPlans.length
               ) && (
                 <EmptyState
                   title="Nessuna approvazione pendente"
@@ -1010,7 +1303,45 @@ export default function AdminCyclesPage() {
                 disabled={busyKey === `competences:${professional.id}`}
                 onClick={() => saveCompetences(professional.id)}
               >
-                Salva competenze
+                Salva aree
+              </button>
+              <div className="pf-divider" />
+              <p className="pf-muted">Competenze allenatore</p>
+              <div className="pf-checkbox-grid">
+                {(dashboard?.sports ?? []).flatMap((sport) =>
+                  sport.specializations.map((specialization) => (
+                    <label key={specialization.id} className="pf-checkbox">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(
+                          coachCompetencesByProfessional[professional.id]?.[
+                            specialization.id
+                          ],
+                        )}
+                        onChange={(event) =>
+                          setCoachCompetencesByProfessional((prev) => ({
+                            ...prev,
+                            [professional.id]: {
+                              ...(prev[professional.id] ?? {}),
+                              [specialization.id]: event.target.checked,
+                            },
+                          }))
+                        }
+                      />
+                      <span>
+                        {sport.label} - {specialization.label}
+                      </span>
+                    </label>
+                  )),
+                )}
+              </div>
+              <button
+                className="pf-button-secondary"
+                type="button"
+                disabled={busyKey === `coach-competences:${professional.id}`}
+                onClick={() => saveCoachCompetences(professional.id)}
+              >
+                Salva allenatore
               </button>
             </article>
           ))}
@@ -1099,6 +1430,91 @@ export default function AdminCyclesPage() {
               {!filteredAssignmentProfessionals.length && (
                 <div className="pf-alert warning">
                   Nessun professionista abilitato trovato per questa area.
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+      )}
+
+      {coachAssignmentTarget && (
+        <div className="pf-modal-backdrop" role="dialog" aria-modal="true">
+          <section className="pf-modal pf-assignment-modal">
+            <div className="pf-panel-header">
+              <div>
+                <p className="pf-eyebrow">Assegnazione allenatore</p>
+                <h2>Seleziona allenatore</h2>
+              </div>
+              <button
+                className="pf-button-secondary"
+                type="button"
+                onClick={closeCoachAssignmentModal}
+              >
+                Chiudi
+              </button>
+            </div>
+
+            <div className="pf-assignment-summary">
+              <div>
+                <span>Utente</span>
+                <strong>{displayUser(coachAssignmentTarget.athlete)}</strong>
+              </div>
+              <div>
+                <span>Sport-specializzazione</span>
+                <strong>{coachAssignmentTarget.label}</strong>
+              </div>
+              <div>
+                <span>Attualmente assegnato</span>
+                <strong>
+                  {coachAssignmentTarget.athlete.trainingState.linkedCoach?.email ??
+                    "Nessun allenatore"}
+                </strong>
+              </div>
+            </div>
+
+            <label className="pf-field pf-combobox-field">
+              Allenatore
+              <input
+                className="pf-input"
+                value={coachFilter}
+                onChange={(event) => setCoachFilter(event.target.value)}
+                placeholder="Cerca per nome o email"
+                role="combobox"
+                aria-expanded="true"
+                autoFocus
+                autoComplete="off"
+              />
+            </label>
+
+            <div className="pf-combobox-menu">
+              {filteredCoachAssignmentProfessionals.map((professional) => (
+                <button
+                  key={professional.id}
+                  className={`pf-combobox-option ${
+                    coachAssignmentTarget.athlete.trainingState.linkedCoach?.id ===
+                    professional.id
+                      ? "selected"
+                      : ""
+                  }`}
+                  type="button"
+                  disabled={
+                    busyKey ===
+                    `coach-link:${coachAssignmentTarget.athlete.id}:${coachAssignmentTarget.specializationId}`
+                  }
+                  onClick={() =>
+                    assignCoach(
+                      coachAssignmentTarget.athlete.id,
+                      coachAssignmentTarget.specializationId,
+                      professional.id,
+                    )
+                  }
+                >
+                  {displayUser(professional)}
+                </button>
+              ))}
+              {!filteredCoachAssignmentProfessionals.length && (
+                <div className="pf-alert warning">
+                  Nessun allenatore abilitato trovato per questa specializzazione.
                 </div>
               )}
             </div>

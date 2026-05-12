@@ -71,4 +71,24 @@ export class UserPlanController {
   ) {
     return this.userPlan.completePlanItem(req.user?.id ?? '', id, body);
   }
+
+  @Post('training-plan-items/:id/complete')
+  @ApiOperation({ summary: 'Completa un esercizio allenamento specifico' })
+  @ApiParam({ name: 'id' })
+  @ApiBody({ type: CompletePlanItemDto })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.USER)
+  @HttpCode(200)
+  completeTrainingPlanItem(
+    @Req() req: { user?: { id: string } },
+    @Param('id') id: string,
+    @Body() body: CompletePlanItemDto,
+  ) {
+    return this.userPlan.completeTrainingPlanItem(
+      req.user?.id ?? '',
+      id,
+      body,
+    );
+  }
 }

@@ -24,4 +24,19 @@ export class AnswersController {
       body,
     );
   }
+
+  @Post('training/batch')
+  @ApiOperation({ summary: 'Invia risposte questionario allenamento' })
+  @ApiBody({ type: SubmitAnswersDto })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard)
+  submitTrainingBatch(
+    @Req() req: { user?: { id: string; role: UserRole } },
+    @Body() body: SubmitAnswersDto,
+  ) {
+    return this.answers.submitTrainingBatch(
+      { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },
+      body,
+    );
+  }
 }

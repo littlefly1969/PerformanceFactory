@@ -300,4 +300,20 @@ export class AdminController {
   ) {
     return this.orchestrator.publishCycle(cycleId, req.user?.id ?? '');
   }
+
+  @Post('training-plans/:trainingPlanId/publish')
+  @ApiOperation({ summary: 'Pubblica un allenamento approvato dall allenatore' })
+  @ApiParam({ name: 'trainingPlanId' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  publishTrainingPlan(
+    @Req() req: { user?: { id: string; role: UserRole } },
+    @Param('trainingPlanId') trainingPlanId: string,
+  ) {
+    return this.orchestrator.publishTrainingPlan(
+      trainingPlanId,
+      req.user?.id ?? '',
+    );
+  }
 }

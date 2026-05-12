@@ -91,4 +91,74 @@ export class ProfessionalController {
       body.rejectionReason,
     );
   }
+
+  @Post('training-questionsets/:id/approve')
+  @ApiOperation({ summary: 'Approva un questionario allenamento' })
+  @ApiParam({ name: 'id' })
+  @ApiBody({ type: ApprovalDto, required: false })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard)
+  approveTrainingQuestionSet(
+    @Req() req: { user?: { id: string; role: UserRole } },
+    @Param('id') id: string,
+    @Body() body: ApprovalDto,
+  ) {
+    return this.professional.approveTrainingQuestionSet(
+      { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },
+      id,
+      body?.approvalId,
+    );
+  }
+
+  @Post('training-questionsets/:id/reject')
+  @ApiOperation({ summary: 'Rifiuta un questionario allenamento' })
+  @ApiParam({ name: 'id' })
+  @ApiBody({ type: RejectionDto })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard)
+  rejectTrainingQuestionSet(
+    @Req() req: { user?: { id: string; role: UserRole } },
+    @Param('id') id: string,
+    @Body() body: RejectionDto,
+  ) {
+    return this.professional.rejectTrainingQuestionSet(
+      { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },
+      id,
+      body.rejectionReason,
+      body.approvalId,
+    );
+  }
+
+  @Post('training-plan-items/:id/approve')
+  @ApiOperation({ summary: 'Approva un esercizio allenamento' })
+  @ApiParam({ name: 'id' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard)
+  approveTrainingPlanItem(
+    @Req() req: { user?: { id: string; role: UserRole } },
+    @Param('id') id: string,
+  ) {
+    return this.professional.approveTrainingPlanItem(
+      { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },
+      id,
+    );
+  }
+
+  @Post('training-plan-items/:id/reject')
+  @ApiOperation({ summary: 'Rifiuta un esercizio allenamento' })
+  @ApiParam({ name: 'id' })
+  @ApiBody({ type: RejectionDto })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard)
+  rejectTrainingPlanItem(
+    @Req() req: { user?: { id: string; role: UserRole } },
+    @Param('id') id: string,
+    @Body() body: RejectionDto,
+  ) {
+    return this.professional.rejectTrainingPlanItem(
+      { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },
+      id,
+      body.rejectionReason,
+    );
+  }
 }

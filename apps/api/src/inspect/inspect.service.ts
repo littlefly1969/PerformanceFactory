@@ -357,6 +357,19 @@ export class InspectService {
           },
           orderBy: { createdAt: 'asc' },
         },
+        coachSpecializationCompetences: {
+          select: {
+            specializationId: true,
+            specialization: {
+              select: {
+                id: true,
+                label: true,
+                sport: { select: { id: true, label: true } },
+              },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
       },
     });
   }
@@ -492,6 +505,134 @@ export class InspectService {
     }
 
     return { professionalId, areaIds: results.map((item) => item.areaId) };
+  }
+
+  async linkUserToCoach(
+    coachId: string,
+    userId: string,
+    specializationId: string,
+  ) {
+    if (!coachId || !userId || !specializationId) {
+      throw new BadRequestException('Dati collegamento allenatore mancanti');
+    }
+
+    const [coach, user, competence] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: coachId },
+        select: { id: true, role: true },
+      }),
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, role: true },
+      }),
+      this.prisma.coachSpecializationCompetence.findUnique({
+        where: { coachId_specializationId: { coachId, specializationId } },
+        select: { id: true },
+      }),
+    ]);
+
+    if (!coach || coach.role !== UserRole.PROFESSIONAL) {
+      throw new BadRequestException('Allenatore non valido');
+    }
+    if (!user || user.role !== UserRole.USER) {
+      throw new BadRequestException('Utente non valido');
+    }
+    if (!competence) {
+      throw new BadRequestException(
+        'L allenatore non e abilitato per questa specializzazione',
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const link = await tx.coachUserLink.upsert({
+        where: {
+          userId_specializationId: {
+            userId,
+            specializationId,
+          },
+        },
+        update: { coachId },
+        create: {
+          coachId,
+          userId,
+          specializationId,
+        },
+        select: {
+          id: true,
+          coachId: true,
+          userId: true,
+          specializationId: true,
+          createdAt: true,
+        },
+      });
+
+      await tx.trainingQuestionSetCoachApproval.updateMany({
+        where: {
+          status: 'PENDING',
+          coachId: { not: coachId },
+          questionSet: {
+            userId,
+            specializationId,
+            status: 'PENDING_APPROVAL',
+          },
+        },
+        data: {
+          coachId,
+          approvedByCoachId: null,
+          approvedAt: null,
+          rejectedAt: null,
+          rejectionReason: null,
+        },
+      });
+
+      return link;
+    });
+  }
+
+  async assignCoachCompetences(coachId: string, specializationIds: string[]) {
+    if (!coachId || !specializationIds?.length) {
+      throw new BadRequestException('Dati competenze allenatore mancanti');
+    }
+
+    const coach = await this.prisma.user.findUnique({
+      where: { id: coachId },
+      select: { id: true, role: true },
+    });
+    if (!coach || coach.role !== UserRole.PROFESSIONAL) {
+      throw new BadRequestException('Allenatore non valido');
+    }
+
+    const specializations = await this.prisma.sportSpecialization.findMany({
+      where: { id: { in: specializationIds } },
+      select: { id: true },
+    });
+    if (specializations.length !== specializationIds.length) {
+      throw new BadRequestException('ID specializzazione non validi');
+    }
+
+    const results = [] as Array<{ specializationId: string }>;
+    for (const specializationId of specializationIds) {
+      const entry = await this.prisma.coachSpecializationCompetence.upsert({
+        where: {
+          coachId_specializationId: {
+            coachId,
+            specializationId,
+          },
+        },
+        update: {},
+        create: {
+          coachId,
+          specializationId,
+        },
+        select: { specializationId: true },
+      });
+      results.push(entry);
+    }
+
+    return {
+      coachId,
+      specializationIds: results.map((item) => item.specializationId),
+    };
   }
 
   async getProfessional(professionalId: string) {

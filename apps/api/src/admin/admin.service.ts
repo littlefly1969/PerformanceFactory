@@ -124,6 +124,9 @@ export class AdminService {
       readyCycles,
       pendingQuestionApprovals,
       pendingPlanItems,
+      sports,
+      pendingTrainingPlans,
+      readyTrainingPlans,
     ] = await Promise.all([
       this.prisma.user.findMany({
         where: { role: 'USER' },
@@ -138,12 +141,35 @@ export class AdminService {
           onboardingAssessment: {
             select: { status: true, completedAt: true },
           },
+          sportSelection: {
+            select: {
+              specializationId: true,
+              sport: { select: { id: true, label: true } },
+              specialization: { select: { id: true, label: true } },
+            },
+          },
           userLinks: {
             select: {
               professionalId: true,
               areaId: true,
               professional: { select: { id: true, email: true } },
               area: { select: { id: true, name: true } },
+              createdAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+          athleteCoachLinks: {
+            select: {
+              coachId: true,
+              specializationId: true,
+              coach: { select: { id: true, email: true } },
+              specialization: {
+                select: {
+                  id: true,
+                  label: true,
+                  sport: { select: { id: true, label: true } },
+                },
+              },
               createdAt: true,
             },
             orderBy: { createdAt: 'desc' },
@@ -169,17 +195,37 @@ export class AdminService {
             orderBy: { createdAt: 'desc' },
           },
           trainingPlanReleases: {
-            where: { status: 'ACTIVE' },
+            where: { status: { in: ['PENDING_APPROVAL', 'ACTIVE'] } },
             select: {
               id: true,
               version: true,
               status: true,
+              cycleStatus: true,
               createdAt: true,
               publishedAt: true,
               summaryText: true,
+              specialization: {
+                select: {
+                  id: true,
+                  label: true,
+                  sport: { select: { id: true, label: true } },
+                },
+              },
+              items: { select: { status: true } },
+              questionSets: {
+                select: {
+                  status: true,
+                  approvals: {
+                    select: {
+                      status: true,
+                      coach: { select: { id: true, email: true } },
+                    },
+                  },
+                },
+                take: 1,
+              },
             },
             orderBy: { createdAt: 'desc' },
-            take: 1,
           },
           questionSets: {
             where: { status: { in: ['PUBLISHED', 'PENDING_APPROVAL'] } },
@@ -239,6 +285,35 @@ export class AdminService {
               areaId: true,
               user: { select: { id: true, email: true } },
               area: { select: { id: true, name: true } },
+              createdAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          },
+          coachSpecializationCompetences: {
+            select: {
+              specializationId: true,
+              specialization: {
+                select: {
+                  id: true,
+                  label: true,
+                  sport: { select: { id: true, label: true } },
+                },
+              },
+            },
+            orderBy: { createdAt: 'asc' },
+          },
+          coachUserLinks: {
+            select: {
+              userId: true,
+              specializationId: true,
+              user: { select: { id: true, email: true } },
+              specialization: {
+                select: {
+                  id: true,
+                  label: true,
+                  sport: { select: { id: true, label: true } },
+                },
+              },
               createdAt: true,
             },
             orderBy: { createdAt: 'desc' },
@@ -335,6 +410,74 @@ export class AdminService {
           },
         },
         orderBy: { id: 'asc' },
+      }),
+      this.prisma.sport.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          label: true,
+          specializations: {
+            where: { isActive: true },
+            select: { id: true, label: true },
+            orderBy: { label: 'asc' },
+          },
+        },
+        orderBy: { label: 'asc' },
+      }),
+      this.prisma.trainingPlanRelease.findMany({
+        where: { status: 'PENDING_APPROVAL' },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          userId: true,
+          specializationId: true,
+          version: true,
+          status: true,
+          cycleStatus: true,
+          createdAt: true,
+          user: { select: { id: true, email: true } },
+          specialization: {
+            select: {
+              id: true,
+              label: true,
+              sport: { select: { id: true, label: true } },
+            },
+          },
+          items: { select: { id: true, status: true } },
+          questionSets: {
+            select: {
+              id: true,
+              status: true,
+              approvals: {
+                select: {
+                  id: true,
+                  status: true,
+                  coach: { select: { id: true, email: true } },
+                },
+              },
+            },
+          },
+        },
+      }),
+      this.prisma.trainingPlanRelease.findMany({
+        where: { status: 'PENDING_APPROVAL', cycleStatus: 'READY_TO_PUBLISH' },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          userId: true,
+          specializationId: true,
+          version: true,
+          cycleStatus: true,
+          createdAt: true,
+          user: { select: { id: true, email: true } },
+          specialization: {
+            select: {
+              id: true,
+              label: true,
+              sport: { select: { id: true, label: true } },
+            },
+          },
+        },
       }),
     ]);
 
@@ -457,17 +600,58 @@ export class AdminService {
         })),
         latestSnapshot,
         trainingState: {
-          activeTraining: user.trainingPlanReleases[0] ?? null,
+          sportSelection: user.sportSelection,
+          linkedCoach:
+            user.sportSelection
+              ? (user.athleteCoachLinks.find(
+                  (link) =>
+                    link.specializationId === user.sportSelection?.specializationId,
+                )?.coach ?? null)
+              : null,
+          pendingTraining:
+            user.trainingPlanReleases.find(
+              (training) => training.status === 'PENDING_APPROVAL',
+            ) ?? null,
+          activeTraining:
+            user.trainingPlanReleases.find(
+              (training) => training.status === 'ACTIVE',
+            ) ?? null,
           generationReady:
-            user.isActive && user.onboardingAssessment?.status === 'COMPLETED',
+            user.isActive &&
+            user.onboardingAssessment?.status === 'COMPLETED' &&
+            Boolean(user.sportSelection) &&
+            Boolean(
+              user.sportSelection &&
+                user.athleteCoachLinks.some(
+                  (link) =>
+                    link.specializationId === user.sportSelection?.specializationId,
+                ),
+            ) &&
+            !user.trainingPlanReleases.some(
+              (training) => training.status === 'PENDING_APPROVAL',
+            ),
           reason:
-            user.isActive && user.onboardingAssessment?.status === 'COMPLETED'
-              ? user.trainingPlanReleases[0]
-                ? 'Pronto per rigenerare allenamento'
-                : 'Pronto per il primo allenamento'
-              : !user.isActive
-                ? 'Atleta in attesa di attivazione amministratore'
-                : 'Onboarding non completato',
+            !user.isActive
+              ? 'Atleta in attesa di attivazione amministratore'
+              : user.onboardingAssessment?.status !== 'COMPLETED'
+                ? 'Onboarding non completato'
+                : !user.sportSelection
+                  ? 'Sport-specializzazione non selezionata'
+                  : !user.athleteCoachLinks.some(
+                        (link) =>
+                          link.specializationId ===
+                          user.sportSelection?.specializationId,
+                      )
+                    ? 'Allenatore non assegnato'
+                    : user.trainingPlanReleases.some(
+                          (training) => training.status === 'PENDING_APPROVAL',
+                        )
+                      ? 'Allenamento gia in approvazione'
+                      : user.trainingPlanReleases.some(
+                            (training) => training.status === 'ACTIVE',
+                          )
+                        ? 'Pronto per rigenerare allenamento'
+                        : 'Pronto per il primo allenamento',
         },
         areaStates,
       };
@@ -479,8 +663,11 @@ export class AdminService {
       professionals,
       pendingCycles,
       readyCycles,
+      pendingTrainingPlans,
+      readyTrainingPlans,
       pendingQuestionApprovals: pendingQuestionApprovalsWithRouting,
       pendingPlanItems: pendingPlanItemsByProfessional,
+      sports,
     };
   }
 

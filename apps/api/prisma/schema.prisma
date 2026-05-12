@@ -66,6 +66,8 @@ model User {
   sportSelection       UserSportSelection?
   userAreaPromptInstructions UserAreaPromptInstruction[]
   trainingPlanReleases TrainingPlanRelease[]
+  trainingQuestionSets TrainingQuestionSet[]
+  trainingUserAnswers  TrainingUserAnswer[]
 
   performanceProfileSnapshots PerformanceProfileSnapshot[]
   planReleases                ImprovementPlanRelease[]
@@ -74,9 +76,15 @@ model User {
   aiContextSummaries          AiContextSummary[]
   aiProposalAudits            AiProposalAudit[]
   professionalAreaCompetences ProfessionalAreaCompetence[] @relation("ProfessionalAreaCompetence")
+  coachSpecializationCompetences CoachSpecializationCompetence[] @relation("CoachSpecializationCompetence")
+  coachUserLinks             CoachUserLink[]              @relation("CoachLinks")
+  athleteCoachLinks          CoachUserLink[]              @relation("AthleteCoachLinks")
   approvedPlanItems           PlanItem[]                   @relation("PlanItemApprovedBy")
+  approvedTrainingItems       TrainingPlanItem[]           @relation("TrainingPlanItemApprovedBy")
   questionSetApprovals        QuestionSetAreaApproval[]    @relation("QuestionSetAreaProfessional")
   questionSetApprovalActors   QuestionSetAreaApproval[]    @relation("QuestionSetAreaApprovedBy")
+  trainingQuestionSetApprovals TrainingQuestionSetCoachApproval[] @relation("TrainingQuestionSetCoach")
+  trainingQuestionSetApprovalActors TrainingQuestionSetCoachApproval[] @relation("TrainingQuestionSetApprovedBy")
   proposedPlanReleases        ImprovementPlanRelease[]     @relation("PlanReleaseProposedBy")
   proposedTrainingReleases    TrainingPlanRelease[]        @relation("TrainingPlanReleaseProposedBy")
   publishedPlanReleases       ImprovementPlanRelease[]     @relation("PlanReleasePublishedBy")
@@ -269,6 +277,10 @@ model SportSpecialization {
   sport      Sport                           @relation(fields: [sportId], references: [id], onDelete: Cascade)
   prompts    SportSpecializationAreaPrompt[]
   selections UserSportSelection[]
+  coachCompetences CoachSpecializationCompetence[]
+  coachLinks        CoachUserLink[]
+  trainingPlanReleases TrainingPlanRelease[]
+  trainingQuestionSets TrainingQuestionSet[]
 
   @@unique([sportId, key])
   @@index([sportId, isActive])
@@ -551,7 +563,8 @@ model TrainingPlanRelease {
   id               String   @id @default(uuid())
   userId           String
   version          Int
-  status           String   @default("ACTIVE")
+  status           String   @default("PENDING_APPROVAL")
+  cycleStatus      CycleStatus @default(WAITING_APPROVALS)
   generatedBy      String   @default("AI")
   summaryText      String
   outputJson       Json
@@ -564,13 +577,147 @@ model TrainingPlanRelease {
   archivedAt       DateTime?
   sourceSnapshotId String?
   proposedByAdminId String?
+  specializationId String
 
   user           User                       @relation(fields: [userId], references: [id])
   sourceSnapshot PerformanceProfileSnapshot? @relation(fields: [sourceSnapshotId], references: [id])
   proposedBy     User?                      @relation("TrainingPlanReleaseProposedBy", fields: [proposedByAdminId], references: [id])
+  specialization SportSpecialization        @relation(fields: [specializationId], references: [id])
+  items          TrainingPlanItem[]
+  questionSets   TrainingQuestionSet[]
 
   @@unique([userId, version])
   @@index([userId, status, createdAt])
+  @@index([specializationId, status])
+}
+
+model TrainingPlanItem {
+  id                    String @id @default(uuid())
+  trainingPlanReleaseId String
+
+  type     String
+  title    String
+  body     String
+  metadata Json?
+  status   String @default("PROPOSED")
+
+  approvedByCoachId String?
+  approvedAt        DateTime?
+  rejectedAt        DateTime?
+  rejectionReason   String?
+  completedAt       DateTime?
+  completionNotes   String?
+  completionRating  Int?
+
+  trainingPlanRelease TrainingPlanRelease @relation(fields: [trainingPlanReleaseId], references: [id], onDelete: Cascade)
+  approvedBy          User?               @relation("TrainingPlanItemApprovedBy", fields: [approvedByCoachId], references: [id])
+
+  @@index([trainingPlanReleaseId, status])
+}
+
+model TrainingQuestionSet {
+  id                    String @id @default(uuid())
+  userId                String
+  trainingPlanReleaseId String
+  specializationId      String
+
+  type        String
+  status      String    @default("PENDING_APPROVAL")
+  createdAt   DateTime  @default(now())
+  publishedAt DateTime?
+  closedAt    DateTime?
+
+  trainingPlanRelease TrainingPlanRelease @relation(fields: [trainingPlanReleaseId], references: [id], onDelete: Cascade)
+  user                User                @relation(fields: [userId], references: [id])
+  specialization      SportSpecialization @relation(fields: [specializationId], references: [id])
+  questions           TrainingQuestion[]
+  approvals           TrainingQuestionSetCoachApproval[]
+
+  @@index([userId, specializationId, status, createdAt])
+}
+
+model TrainingQuestion {
+  id                    String @id @default(uuid())
+  trainingQuestionSetId String
+
+  text         String
+  objectiveRef String?
+  orderIndex   Int
+
+  questionSet TrainingQuestionSet @relation(fields: [trainingQuestionSetId], references: [id], onDelete: Cascade)
+  options     TrainingAnswerOption[]
+  answers     TrainingUserAnswer[]
+}
+
+model TrainingAnswerOption {
+  id                 String @id @default(uuid())
+  trainingQuestionId String
+
+  label String
+  score Float
+
+  question TrainingQuestion @relation(fields: [trainingQuestionId], references: [id], onDelete: Cascade)
+  answers  TrainingUserAnswer[]
+}
+
+model TrainingUserAnswer {
+  id                     String  @id @default(uuid())
+  userId                 String
+  trainingQuestionId     String
+  trainingAnswerOptionId String?
+
+  scoreAwarded Float
+  answeredAt   DateTime @default(now())
+
+  user         User                  @relation(fields: [userId], references: [id])
+  question     TrainingQuestion      @relation(fields: [trainingQuestionId], references: [id], onDelete: Cascade)
+  answerOption TrainingAnswerOption? @relation(fields: [trainingAnswerOptionId], references: [id])
+}
+
+model TrainingQuestionSetCoachApproval {
+  id                String    @id @default(uuid())
+  trainingQuestionSetId String
+  coachId           String
+  status            String    @default("PENDING")
+  approvedByCoachId String?
+  approvedAt        DateTime?
+  rejectedAt        DateTime?
+  rejectionReason   String?
+
+  questionSet TrainingQuestionSet @relation(fields: [trainingQuestionSetId], references: [id], onDelete: Cascade)
+  coach       User                @relation("TrainingQuestionSetCoach", fields: [coachId], references: [id])
+  approvedBy  User?               @relation("TrainingQuestionSetApprovedBy", fields: [approvedByCoachId], references: [id])
+
+  @@unique([trainingQuestionSetId, coachId])
+  @@index([coachId, status])
+}
+
+model CoachSpecializationCompetence {
+  id               String   @id @default(uuid())
+  coachId          String
+  specializationId String
+  createdAt        DateTime @default(now())
+
+  coach          User                @relation("CoachSpecializationCompetence", fields: [coachId], references: [id])
+  specialization SportSpecialization @relation(fields: [specializationId], references: [id], onDelete: Cascade)
+
+  @@unique([coachId, specializationId])
+  @@index([specializationId])
+}
+
+model CoachUserLink {
+  id               String @id @default(uuid())
+  coachId          String
+  userId           String
+  specializationId String
+  createdAt        DateTime @default(now())
+
+  coach          User                @relation("CoachLinks", fields: [coachId], references: [id])
+  user           User                @relation("AthleteCoachLinks", fields: [userId], references: [id])
+  specialization SportSpecialization @relation(fields: [specializationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, specializationId])
+  @@index([coachId, specializationId])
 }
 
 model PlanItem {

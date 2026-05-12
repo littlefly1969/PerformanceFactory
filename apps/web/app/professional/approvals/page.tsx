@@ -47,9 +47,53 @@ type QuestionApproval = {
     }>;
   };
 };
+type TrainingPlanItem = {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  status: string;
+  trainingPlanRelease: {
+    id: string;
+    version: number;
+    user: UserRef;
+    specialization: {
+      id: string;
+      label: string;
+      sport: { label: string };
+    };
+  };
+};
+type TrainingQuestionApproval = {
+  id: string;
+  status: string;
+  trainingQuestionSetId: string;
+  questionSet: {
+    id: string;
+    user: UserRef;
+    specialization: {
+      id: string;
+      label: string;
+      sport: { label: string };
+    };
+    trainingPlanRelease: {
+      id: string;
+      version: number;
+      summaryText: string;
+    };
+    questions: Array<{
+      id: string;
+      text: string;
+      orderIndex: number;
+      options: Array<{ id: string; label: string; score: number }>;
+    }>;
+  };
+};
 type InboxResponse = {
   planItems: PlanItem[];
   questionApprovals: QuestionApproval[];
+  trainingPlanItems: TrainingPlanItem[];
+  trainingQuestionApprovals: TrainingQuestionApproval[];
 };
 
 const readError = async (response: Response) => {
@@ -84,6 +128,8 @@ export default function ProfessionalApprovazioniPage() {
   const [inbox, setInbox] = useState<InboxResponse>({
     planItems: [],
     questionApprovals: [],
+    trainingPlanItems: [],
+    trainingQuestionApprovals: [],
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -96,29 +142,84 @@ export default function ProfessionalApprovazioniPage() {
   const groups = useMemo(() => {
     const map = new Map<
       string,
-      { user: UserRef; questions: QuestionApproval[]; plans: PlanItem[] }
+      {
+        user: UserRef;
+        questions: QuestionApproval[];
+        plans: PlanItem[];
+        trainingQuestions: TrainingQuestionApproval[];
+        trainingPlans: TrainingPlanItem[];
+      }
     >();
     for (const approval of inbox.questionApprovals) {
       const user = approval.questionSet.user;
-      const entry = map.get(user.id) ?? { user, questions: [], plans: [] };
+      const entry = map.get(user.id) ?? {
+        user,
+        questions: [],
+        plans: [],
+        trainingQuestions: [],
+        trainingPlans: [],
+      };
       entry.questions.push(approval);
       map.set(user.id, entry);
     }
     for (const item of inbox.planItems) {
       const user = item.planRelease.user;
-      const entry = map.get(user.id) ?? { user, questions: [], plans: [] };
+      const entry = map.get(user.id) ?? {
+        user,
+        questions: [],
+        plans: [],
+        trainingQuestions: [],
+        trainingPlans: [],
+      };
       entry.plans.push(item);
       map.set(user.id, entry);
     }
+    for (const approval of inbox.trainingQuestionApprovals ?? []) {
+      const user = approval.questionSet.user;
+      const entry = map.get(user.id) ?? {
+        user,
+        questions: [],
+        plans: [],
+        trainingQuestions: [],
+        trainingPlans: [],
+      };
+      entry.trainingQuestions.push(approval);
+      map.set(user.id, entry);
+    }
+    for (const item of inbox.trainingPlanItems ?? []) {
+      const user = item.trainingPlanRelease.user;
+      const entry = map.get(user.id) ?? {
+        user,
+        questions: [],
+        plans: [],
+        trainingQuestions: [],
+        trainingPlans: [],
+      };
+      entry.trainingPlans.push(item);
+      map.set(user.id, entry);
+    }
     return Array.from(map.values()).sort(
-      (a, b) =>
-        b.questions.length +
-        b.plans.length -
-        (a.questions.length + a.plans.length),
+      (a, b) => {
+        const totalA =
+          a.questions.length +
+          a.plans.length +
+          a.trainingQuestions.length +
+          a.trainingPlans.length;
+        const totalB =
+          b.questions.length +
+          b.plans.length +
+          b.trainingQuestions.length +
+          b.trainingPlans.length;
+        return totalB - totalA;
+      },
     );
   }, [inbox]);
 
-  const totalPending = inbox.questionApprovals.length + inbox.planItems.length;
+  const totalPending =
+    inbox.questionApprovals.length +
+    inbox.planItems.length +
+    (inbox.trainingQuestionApprovals?.length ?? 0) +
+    (inbox.trainingPlanItems?.length ?? 0);
 
   const loadInbox = async () => {
     setLoading(true);
@@ -247,6 +348,97 @@ export default function ProfessionalApprovazioniPage() {
     setBusy(planItemId, false);
   };
 
+  const approveTrainingQuestionSet = async (
+    questionSetId: string,
+    approvalId: string,
+  ) => {
+    setBusy(approvalId, true);
+    const response = await secureFetch(
+      `${API_BASE}/professional/training-questionsets/${questionSetId}/approve`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approvalId }),
+      },
+    );
+    if (!response.ok) {
+      setMessage(`Approvazione questionario allenamento non riuscita: ${await readError(response)}`);
+      setBusy(approvalId, false);
+      return;
+    }
+    await loadInbox();
+    setBusy(approvalId, false);
+  };
+
+  const rejectTrainingQuestionSet = async (
+    questionSetId: string,
+    approvalId: string,
+  ) => {
+    const reason = rejectReasons[approvalId]?.trim();
+    if (!reason) {
+      setMessage("Il motivo del rifiuto e obbligatorio.");
+      return;
+    }
+    setBusy(approvalId, true);
+    const response = await secureFetch(
+      `${API_BASE}/professional/training-questionsets/${questionSetId}/reject`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rejectionReason: reason, approvalId }),
+      },
+    );
+    if (!response.ok) {
+      setMessage(`Rifiuto questionario allenamento non riuscito: ${await readError(response)}`);
+      setBusy(approvalId, false);
+      return;
+    }
+    await loadInbox();
+    setBusy(approvalId, false);
+  };
+
+  const approveTrainingPlanItem = async (planItemId: string) => {
+    setBusy(planItemId, true);
+    const response = await secureFetch(
+      `${API_BASE}/professional/training-plan-items/${planItemId}/approve`,
+      { method: "POST", credentials: "include" },
+    );
+    if (!response.ok) {
+      setMessage(`Approvazione esercizio allenamento non riuscita: ${await readError(response)}`);
+      setBusy(planItemId, false);
+      return;
+    }
+    await loadInbox();
+    setBusy(planItemId, false);
+  };
+
+  const rejectTrainingPlanItem = async (planItemId: string) => {
+    const reason = rejectReasons[planItemId]?.trim();
+    if (!reason) {
+      setMessage("Il motivo del rifiuto e obbligatorio.");
+      return;
+    }
+    setBusy(planItemId, true);
+    const response = await secureFetch(
+      `${API_BASE}/professional/training-plan-items/${planItemId}/reject`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rejectionReason: reason }),
+      },
+    );
+    if (!response.ok) {
+      setMessage(`Rifiuto esercizio allenamento non riuscito: ${await readError(response)}`);
+      setBusy(planItemId, false);
+      return;
+    }
+    await loadInbox();
+    setBusy(planItemId, false);
+  };
+
   return (
     <ProductShell
       eyebrow="Ambiente professionista"
@@ -279,7 +471,9 @@ export default function ProfessionalApprovazioniPage() {
         },
         {
           label: "Attivita allenamento",
-          value: loading ? "..." : inbox.planItems.length,
+          value: loading
+            ? "..."
+            : inbox.planItems.length + (inbox.trainingPlanItems?.length ?? 0),
           tone: "success",
         },
       ]}
@@ -308,7 +502,9 @@ export default function ProfessionalApprovazioniPage() {
                   <h3>{group.user.email}</h3>
                   <p className="pf-muted">
                     {group.questions.length} questionari -{" "}
-                    {group.plans.length} attivita allenamento
+                    {group.plans.length} attivita area -{" "}
+                    {group.trainingQuestions.length + group.trainingPlans.length}{" "}
+                    revisioni allenatore
                   </p>
                 </div>
                 <div className="pf-actions">
@@ -456,6 +652,130 @@ export default function ProfessionalApprovazioniPage() {
                   </div>
                 );
               })}
+
+              {group.trainingQuestions.map((approval) => (
+                <div key={approval.id} className="pf-review-section">
+                  <div className="pf-card-top">
+                    <div>
+                      <h4>Questionario allenamento</h4>
+                      <p className="pf-muted">
+                        {approval.questionSet.specialization.sport.label} -{" "}
+                        {approval.questionSet.specialization.label} - v
+                        {approval.questionSet.trainingPlanRelease.version}
+                      </p>
+                    </div>
+                    <StatusBadge tone="warning">In attesa</StatusBadge>
+                  </div>
+                  <p className="pf-muted">
+                    Sintesi AI: {approval.questionSet.trainingPlanRelease.summaryText}
+                  </p>
+                  <div className="pf-stack compact">
+                    {approval.questionSet.questions.map((question) => (
+                      <div key={question.id} className="pf-question-preview">
+                        <strong>
+                          {question.orderIndex}. {question.text}
+                        </strong>
+                        <span>
+                          {question.options
+                            .map((option) => option.label)
+                            .join(" - ")}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <label className="pf-field">
+                    Motivo del rifiuto
+                    <input
+                      className="pf-input"
+                      value={rejectReasons[approval.id] ?? ""}
+                      onChange={(event) =>
+                        setRejectReasons((prev) => ({
+                          ...prev,
+                          [approval.id]: event.target.value,
+                        }))
+                      }
+                      placeholder="Obbligatorio solo in caso di rifiuto"
+                    />
+                  </label>
+                  <div className="pf-actions">
+                    <button
+                      className="pf-button-danger"
+                      type="button"
+                      disabled={busyIds[approval.id]}
+                      onClick={() =>
+                        rejectTrainingQuestionSet(
+                          approval.trainingQuestionSetId,
+                          approval.id,
+                        )
+                      }
+                    >
+                      Rifiuta questionario
+                    </button>
+                    <button
+                      className="pf-button"
+                      type="button"
+                      disabled={busyIds[approval.id]}
+                      onClick={() =>
+                        approveTrainingQuestionSet(
+                          approval.trainingQuestionSetId,
+                          approval.id,
+                        )
+                      }
+                    >
+                      Approva questionario
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {group.trainingPlans.map((item) => (
+                <div key={item.id} className="pf-review-section">
+                  <div className="pf-card-top">
+                    <div>
+                      <h4>{item.title}</h4>
+                      <p className="pf-muted">
+                        {item.trainingPlanRelease.specialization.sport.label} -{" "}
+                        {item.trainingPlanRelease.specialization.label} - v
+                        {item.trainingPlanRelease.version}
+                      </p>
+                    </div>
+                    <StatusBadge tone="warning">Proposto</StatusBadge>
+                  </div>
+                  <p>{item.body}</p>
+                  <label className="pf-field">
+                    Motivo del rifiuto
+                    <input
+                      className="pf-input"
+                      value={rejectReasons[item.id] ?? ""}
+                      onChange={(event) =>
+                        setRejectReasons((prev) => ({
+                          ...prev,
+                          [item.id]: event.target.value,
+                        }))
+                      }
+                      placeholder="Obbligatorio solo in caso di rifiuto"
+                    />
+                  </label>
+                  <div className="pf-actions">
+                    <button
+                      className="pf-button-danger"
+                      type="button"
+                      disabled={busyIds[item.id]}
+                      onClick={() => rejectTrainingPlanItem(item.id)}
+                    >
+                      Rifiuta esercizio
+                    </button>
+                    <button
+                      className="pf-button"
+                      type="button"
+                      disabled={busyIds[item.id]}
+                      onClick={() => approveTrainingPlanItem(item.id)}
+                    >
+                      Approva esercizio
+                    </button>
+                  </div>
+                </div>
+              ))}
             </article>
           ))}
 

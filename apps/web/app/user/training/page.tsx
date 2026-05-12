@@ -35,6 +35,26 @@ type TrainingPlan = {
   model: string;
   createdAt: string;
   publishedAt?: string | null;
+  specialization?: {
+    label: string;
+    sport: { label: string };
+  };
+  items?: Array<{
+    id: string;
+    type: string;
+    title: string;
+    body: string;
+    status: string;
+  }>;
+  questionSets?: Array<{
+    id: string;
+    questions: Array<{
+      id: string;
+      text: string;
+      orderIndex: number;
+      options: Array<{ id: string; label: string; score: number }>;
+    }>;
+  }>;
 };
 
 const formatDate = (value?: string | null) => {
@@ -64,11 +84,17 @@ export default function UserTrainingPage() {
   const [message, setMessage] = useState<string | null>(null);
 
   const items = useMemo(
-    () => training?.outputJson?.planItems ?? [],
+    () =>
+      training?.items?.length
+        ? training.items
+        : (training?.outputJson?.planItems ?? []),
     [training],
   );
   const questions = useMemo(
-    () => training?.outputJson?.questions ?? [],
+    () =>
+      training?.questionSets?.[0]?.questions?.length
+        ? training.questionSets[0].questions
+        : (training?.outputJson?.questions ?? []),
     [training],
   );
 
@@ -156,6 +182,9 @@ export default function UserTrainingPage() {
               <p className="pf-muted">
                 Generato il {formatDate(training.createdAt)} - {training.provider} /{" "}
                 {training.model}
+                {training.specialization
+                  ? ` - ${training.specialization.sport.label} / ${training.specialization.label}`
+                  : ""}
               </p>
             </div>
             <StatusBadge tone="success">{statusLabel(training.status)}</StatusBadge>

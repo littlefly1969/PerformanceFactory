@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AbacService } from '../common/policies/abac.service';
 import { OrchestratorService } from '../ai-orchestrator/orchestrator.service';
@@ -27,7 +27,7 @@ export class ProfessionalService {
       throw new ForbiddenException('Solo i professionisti possono accedere alla coda');
     }
 
-    const [linkedUsers, areas] = await Promise.all([
+    const [linkedUsers, areas, coachLinks, coachCompetences] = await Promise.all([
       this.prisma.professionalUserLink.findMany({
         where: { professionalId: actor.id },
         select: { userId: true, areaId: true },
@@ -36,13 +36,29 @@ export class ProfessionalService {
         where: { professionalId: actor.id },
         select: { areaId: true },
       }),
+      this.prisma.coachUserLink.findMany({
+        where: { coachId: actor.id },
+        select: { userId: true, specializationId: true },
+      }),
+      this.prisma.coachSpecializationCompetence.findMany({
+        where: { coachId: actor.id },
+        select: { specializationId: true },
+      }),
     ]);
 
     const userIds = linkedUsers.map((link) => link.userId);
     const areaIds = areas.map((area) => area.areaId);
+    const coachUserIds = coachLinks.map((link) => link.userId);
+    const coachSpecializationIds = coachCompetences.map(
+      (competence) => competence.specializationId,
+    );
     const linkedAreaFilters = linkedUsers.map((link) => ({
       areaId: link.areaId,
       planRelease: { userId: link.userId },
+    }));
+    const linkedTrainingFilters = coachLinks.map((link) => ({
+      specializationId: link.specializationId,
+      userId: link.userId,
     }));
 
     await Promise.all(
@@ -164,9 +180,96 @@ export class ProfessionalService {
       },
     }));
 
+    const trainingPlanItems = linkedTrainingFilters.length
+      ? await this.prisma.trainingPlanItem.findMany({
+          where: {
+            status: 'PROPOSED',
+            trainingPlanRelease: {
+              status: 'PENDING_APPROVAL',
+              OR: linkedTrainingFilters,
+            },
+          },
+          select: {
+            id: true,
+            type: true,
+            title: true,
+            body: true,
+            metadata: true,
+            status: true,
+            trainingPlanRelease: {
+              select: {
+                id: true,
+                version: true,
+                user: { select: { id: true, email: true } },
+                specialization: {
+                  select: {
+                    id: true,
+                    label: true,
+                    sport: { select: { label: true } },
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { id: 'asc' },
+        })
+      : [];
+
+    const trainingQuestionApprovals =
+      await this.prisma.trainingQuestionSetCoachApproval.findMany({
+        where: {
+          coachId: actor.id,
+          status: 'PENDING',
+          questionSet: {
+            userId: { in: coachUserIds },
+            specializationId: { in: coachSpecializationIds },
+            status: 'PENDING_APPROVAL',
+          },
+        },
+        select: {
+          id: true,
+          status: true,
+          coachId: true,
+          trainingQuestionSetId: true,
+          questionSet: {
+            select: {
+              id: true,
+              user: { select: { id: true, email: true } },
+              specialization: {
+                select: {
+                  id: true,
+                  label: true,
+                  sport: { select: { label: true } },
+                },
+              },
+              trainingPlanRelease: {
+                select: {
+                  id: true,
+                  version: true,
+                  summaryText: true,
+                },
+              },
+              questions: {
+                select: {
+                  id: true,
+                  text: true,
+                  objectiveRef: true,
+                  orderIndex: true,
+                  options: { select: { id: true, label: true, score: true } },
+                },
+                orderBy: { orderIndex: 'asc' },
+              },
+            },
+          },
+        },
+        orderBy: { id: 'asc' },
+      });
+
     return {
       planItems,
       questionApprovals: filteredQuestionApprovals,
+      trainingPlanItems,
+      trainingQuestionApprovals,
     };
   }
 
@@ -515,6 +618,277 @@ export class ProfessionalService {
     }
 
     return updated;
+  }
+
+  async approveTrainingQuestionSet(
+    actor: Actor,
+    questionSetId: string,
+    approvalId?: string,
+  ) {
+    if (actor.role !== UserRole.PROFESSIONAL) {
+      throw new ForbiddenException('Solo gli allenatori possono approvare');
+    }
+
+    const approval = await this.findTrainingApproval(
+      actor.id,
+      questionSetId,
+      approvalId,
+    );
+
+    if (approval.status !== 'PENDING') {
+      throw new BadRequestException('Approvazione gia decisa');
+    }
+    if (approval.questionSet.status !== 'PENDING_APPROVAL') {
+      throw new BadRequestException('Il questionario non e in approvazione');
+    }
+
+    const allowed = await this.abac.canCoachAccessUserSpecialization(
+      actor.id,
+      approval.questionSet.userId,
+      approval.questionSet.specializationId,
+    );
+    if (!allowed) {
+      throw new ForbiddenException('Operazione non consentita per questo allenamento');
+    }
+
+    const updated = await this.prisma.trainingQuestionSetCoachApproval.update({
+      where: { id: approval.id },
+      data: {
+        status: 'APPROVED',
+        approvedByCoachId: actor.id,
+        approvedAt: new Date(),
+        rejectedAt: null,
+        rejectionReason: null,
+      },
+      select: { id: true, status: true, trainingQuestionSetId: true },
+    });
+
+    await this.orchestrator.refreshTrainingReadiness(
+      approval.questionSet.trainingPlanReleaseId,
+    );
+
+    return updated;
+  }
+
+  async rejectTrainingQuestionSet(
+    actor: Actor,
+    questionSetId: string,
+    rejectionReason: string,
+    approvalId?: string,
+  ) {
+    if (actor.role !== UserRole.PROFESSIONAL) {
+      throw new ForbiddenException('Solo gli allenatori possono rifiutare');
+    }
+    if (!rejectionReason) {
+      throw new BadRequestException('Motivo del rifiuto mancante');
+    }
+
+    const approval = await this.findTrainingApproval(
+      actor.id,
+      questionSetId,
+      approvalId,
+    );
+
+    if (approval.status !== 'PENDING') {
+      throw new BadRequestException('Approvazione gia decisa');
+    }
+    if (approval.questionSet.status !== 'PENDING_APPROVAL') {
+      throw new BadRequestException('Il questionario non e in approvazione');
+    }
+
+    const allowed = await this.abac.canCoachAccessUserSpecialization(
+      actor.id,
+      approval.questionSet.userId,
+      approval.questionSet.specializationId,
+    );
+    if (!allowed) {
+      throw new ForbiddenException('Operazione non consentita per questo allenamento');
+    }
+
+    const updated = await this.prisma.trainingQuestionSetCoachApproval.update({
+      where: { id: approval.id },
+      data: {
+        status: 'REJECTED',
+        approvedByCoachId: actor.id,
+        rejectedAt: new Date(),
+        rejectionReason,
+      },
+      select: { id: true, status: true, trainingQuestionSetId: true },
+    });
+
+    await this.orchestrator.rejectTrainingProposal(
+      approval.questionSet.trainingPlanReleaseId,
+      actor.id,
+      rejectionReason,
+    );
+
+    return updated;
+  }
+
+  async approveTrainingPlanItem(actor: Actor, planItemId: string) {
+    if (actor.role !== UserRole.PROFESSIONAL) {
+      throw new ForbiddenException('Solo gli allenatori possono approvare');
+    }
+
+    const planItem = await this.prisma.trainingPlanItem.findUnique({
+      where: { id: planItemId },
+      select: {
+        id: true,
+        status: true,
+        trainingPlanReleaseId: true,
+        trainingPlanRelease: {
+          select: {
+            userId: true,
+            status: true,
+            specializationId: true,
+          },
+        },
+      },
+    });
+
+    if (!planItem) {
+      throw new NotFoundException('Esercizio allenamento non trovato');
+    }
+    if (planItem.status !== 'PROPOSED') {
+      throw new BadRequestException('Esercizio allenamento gia deciso');
+    }
+    if (planItem.trainingPlanRelease.status !== 'PENDING_APPROVAL') {
+      throw new BadRequestException('L allenamento non e in approvazione');
+    }
+
+    const allowed = await this.abac.canCoachAccessUserSpecialization(
+      actor.id,
+      planItem.trainingPlanRelease.userId,
+      planItem.trainingPlanRelease.specializationId,
+    );
+    if (!allowed) {
+      throw new ForbiddenException('Operazione non consentita per questo allenamento');
+    }
+
+    const updated = await this.prisma.trainingPlanItem.update({
+      where: { id: planItem.id },
+      data: {
+        status: 'APPROVED',
+        approvedByCoachId: actor.id,
+        approvedAt: new Date(),
+        rejectedAt: null,
+        rejectionReason: null,
+      },
+      select: { id: true, status: true },
+    });
+
+    await this.orchestrator.refreshTrainingReadiness(
+      planItem.trainingPlanReleaseId,
+    );
+
+    return updated;
+  }
+
+  async rejectTrainingPlanItem(
+    actor: Actor,
+    planItemId: string,
+    rejectionReason: string,
+  ) {
+    if (actor.role !== UserRole.PROFESSIONAL) {
+      throw new ForbiddenException('Solo gli allenatori possono rifiutare');
+    }
+    if (!rejectionReason) {
+      throw new BadRequestException('Motivo del rifiuto mancante');
+    }
+
+    const planItem = await this.prisma.trainingPlanItem.findUnique({
+      where: { id: planItemId },
+      select: {
+        id: true,
+        status: true,
+        trainingPlanReleaseId: true,
+        trainingPlanRelease: {
+          select: {
+            userId: true,
+            status: true,
+            specializationId: true,
+          },
+        },
+      },
+    });
+
+    if (!planItem) {
+      throw new NotFoundException('Esercizio allenamento non trovato');
+    }
+    if (planItem.status !== 'PROPOSED') {
+      throw new BadRequestException('Esercizio allenamento gia deciso');
+    }
+    if (planItem.trainingPlanRelease.status !== 'PENDING_APPROVAL') {
+      throw new BadRequestException('L allenamento non e in approvazione');
+    }
+
+    const allowed = await this.abac.canCoachAccessUserSpecialization(
+      actor.id,
+      planItem.trainingPlanRelease.userId,
+      planItem.trainingPlanRelease.specializationId,
+    );
+    if (!allowed) {
+      throw new ForbiddenException('Operazione non consentita per questo allenamento');
+    }
+
+    const updated = await this.prisma.trainingPlanItem.update({
+      where: { id: planItem.id },
+      data: {
+        status: 'REJECTED',
+        approvedByCoachId: actor.id,
+        rejectedAt: new Date(),
+        rejectionReason,
+      },
+      select: { id: true, status: true },
+    });
+
+    await this.orchestrator.rejectTrainingProposal(
+      planItem.trainingPlanReleaseId,
+      actor.id,
+      rejectionReason,
+    );
+
+    return updated;
+  }
+
+  private async findTrainingApproval(
+    coachId: string,
+    questionSetId: string,
+    approvalId?: string,
+  ) {
+    if (!questionSetId) {
+      throw new BadRequestException('ID questionario mancante');
+    }
+
+    const select = {
+      id: true,
+      status: true,
+      questionSet: {
+        select: {
+          userId: true,
+          status: true,
+          specializationId: true,
+          trainingPlanReleaseId: true,
+        },
+      },
+    } satisfies Prisma.TrainingQuestionSetCoachApprovalSelect;
+
+    const approval = approvalId
+      ? await this.prisma.trainingQuestionSetCoachApproval.findFirst({
+          where: { id: approvalId, coachId },
+          select,
+        })
+      : await this.prisma.trainingQuestionSetCoachApproval.findFirst({
+          where: { trainingQuestionSetId: questionSetId, coachId },
+          select,
+          orderBy: { id: 'asc' },
+        });
+
+    if (!approval) {
+      throw new NotFoundException('Record approvazione allenatore non trovato');
+    }
+
+    return approval;
   }
 
   async getCycleStatus(actor: Actor, cycleId: string) {

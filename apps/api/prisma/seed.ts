@@ -82,21 +82,28 @@ async function main() {
     },
   });
 
-  const areas = [
-    'Tecnico-tattica',
-    'Preparazione atletica',
-    'Equipaggiamento',
-    'Fisioterapia',
-    'Nutrizione',
-    'Allenamento mentale',
+  const areaCatalog = [
+    { name: 'Tecnico-tattica', aliases: ['Technical-Tactical'] },
+    { name: 'Preparazione atletica', aliases: ['Athletic Preparation'] },
+    { name: 'Equipaggiamento', aliases: ['Equipment'] },
+    { name: 'Fisioterapia', aliases: ['Physiotherapy'] },
+    { name: 'Nutrizione', aliases: ['Nutrition'] },
+    { name: 'Allenamento mentale', aliases: ['Mental Training'] },
   ];
 
-  for (const name of areas) {
-    await prisma.area.upsert({
-      where: { name },
-      update: {},
-      create: { name },
+  for (const area of areaCatalog) {
+    const existing = await prisma.area.findFirst({
+      where: { name: { in: [area.name, ...area.aliases] } },
+      select: { id: true },
     });
+    if (existing) {
+      await prisma.area.update({
+        where: { id: existing.id },
+        data: { name: area.name },
+      });
+    } else {
+      await prisma.area.create({ data: { name: area.name } });
+    }
   }
 
   const professionalEmailsByArea: Record<string, string> = {
@@ -118,6 +125,68 @@ async function main() {
         role: UserRole.PROFESSIONAL,
       },
     });
+  }
+
+  const demoCoachEmailsBySport = new Map([
+    ['ciclismo', 'coach_cycling@example.it'],
+    ['corsa', 'coach_running@example.it'],
+  ]);
+
+  for (const email of demoCoachEmailsBySport.values()) {
+    await prisma.user.upsert({
+      where: { email },
+      update: {},
+      create: {
+        email,
+        password: passwordHash,
+        role: UserRole.PROFESSIONAL,
+      },
+    });
+  }
+
+  const demoSports = await prisma.sport.findMany({
+    where: { isActive: true },
+    select: {
+      id: true,
+      label: true,
+      specializations: {
+        where: { isActive: true },
+        select: { id: true },
+      },
+    },
+  });
+
+  for (const sport of demoSports) {
+    const sportKey = sport.label.toLowerCase();
+    const coachEmail =
+      [...demoCoachEmailsBySport.entries()].find(([label]) =>
+        sportKey.includes(label),
+      )?.[1] ?? null;
+    if (!coachEmail) {
+      continue;
+    }
+    const coach = await prisma.user.findUnique({
+      where: { email: coachEmail },
+      select: { id: true },
+    });
+    if (!coach) {
+      continue;
+    }
+    for (const specialization of sport.specializations) {
+      await prisma.coachSpecializationCompetence.upsert({
+        where: {
+          coachId_specializationId: {
+            coachId: coach.id,
+            specializationId: specialization.id,
+          },
+        },
+        update: {},
+        create: {
+          coachId: coach.id,
+          specializationId: specialization.id,
+        },
+      });
+    }
   }
 
   const areaRecords = await prisma.area.findMany({

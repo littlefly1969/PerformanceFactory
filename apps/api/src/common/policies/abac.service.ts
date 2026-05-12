@@ -46,4 +46,23 @@ export class AbacService {
     });
     return !!link;
   }
+
+  async canCoachAccessUserSpecialization(
+    coachId: string,
+    userId: string,
+    specializationId: string,
+  ): Promise<boolean> {
+    if (!coachId || !userId || !specializationId) {
+      return false;
+    }
+
+    const link = await this.prisma.coachUserLink.findUnique({
+      where: {
+        userId_specializationId: { userId, specializationId },
+      },
+      select: { coachId: true },
+    });
+
+    return link?.coachId === coachId;
+  }
 }

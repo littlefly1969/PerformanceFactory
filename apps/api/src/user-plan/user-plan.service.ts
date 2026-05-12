@@ -117,6 +117,50 @@ export class UserPlanService {
         createdAt: true,
         publishedAt: true,
         sourceSnapshotId: true,
+        specialization: {
+          select: {
+            id: true,
+            label: true,
+            sport: { select: { id: true, label: true } },
+          },
+        },
+        items: {
+          where: { status: { in: ['ACTIVE', 'COMPLETED'] } },
+          select: {
+            id: true,
+            type: true,
+            title: true,
+            body: true,
+            metadata: true,
+            status: true,
+            completedAt: true,
+            completionNotes: true,
+            completionRating: true,
+          },
+          orderBy: { id: 'asc' },
+        },
+        questionSets: {
+          where: { status: 'PUBLISHED' },
+          select: {
+            id: true,
+            type: true,
+            status: true,
+            publishedAt: true,
+            questions: {
+              select: {
+                id: true,
+                text: true,
+                objectiveRef: true,
+                orderIndex: true,
+                options: {
+                  select: { id: true, label: true, score: true },
+                },
+              },
+              orderBy: { orderIndex: 'asc' },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+        },
       },
     });
     if (!training) {
@@ -215,6 +259,83 @@ export class UserPlanService {
     }
 
     return this.prisma.planItem.update({
+      where: { id: planItemId },
+      data,
+      select: {
+        id: true,
+        status: true,
+        completedAt: true,
+        completionNotes: true,
+        completionRating: true,
+      },
+    });
+  }
+
+  async completeTrainingPlanItem(
+    userId: string,
+    planItemId: string,
+    input: CompletePlanItemDto = {},
+  ) {
+    if (!userId || !planItemId) {
+      throw new BadRequestException('Esercizio allenamento mancante');
+    }
+
+    if (
+      input.completionRating !== undefined &&
+      (!Number.isFinite(input.completionRating) ||
+        !Number.isInteger(input.completionRating))
+    ) {
+      throw new BadRequestException('Valutazione completamento non valida');
+    }
+
+    const planItem = await this.prisma.trainingPlanItem.findUnique({
+      where: { id: planItemId },
+      select: {
+        id: true,
+        status: true,
+        trainingPlanRelease: { select: { userId: true, status: true } },
+      },
+    });
+
+    if (!planItem) {
+      throw new NotFoundException('Esercizio allenamento non trovato');
+    }
+
+    if (planItem.trainingPlanRelease.userId !== userId) {
+      throw new ForbiddenException('Non puoi completare questo esercizio');
+    }
+
+    if (planItem.trainingPlanRelease.status !== 'ACTIVE') {
+      throw new BadRequestException('Allenamento non attivo');
+    }
+
+    if (planItem.status === 'COMPLETED') {
+      throw new ConflictException('Esercizio allenamento gia completato');
+    }
+
+    if (planItem.status !== 'ACTIVE') {
+      throw new BadRequestException('Esercizio allenamento non attivo');
+    }
+
+    const data: {
+      status: string;
+      completedAt: Date;
+      completionNotes?: string;
+      completionRating?: number;
+    } = {
+      status: 'COMPLETED',
+      completedAt: new Date(),
+    };
+
+    if (input.completionNotes !== undefined) {
+      data.completionNotes = input.completionNotes;
+    }
+
+    if (input.completionRating !== undefined) {
+      data.completionRating = input.completionRating;
+    }
+
+    return this.prisma.trainingPlanItem.update({
       where: { id: planItemId },
       data,
       select: {

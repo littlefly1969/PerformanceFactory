@@ -14,6 +14,8 @@ import { InspectService } from './inspect.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { AdminLinkUserDto } from './dto/link-user.dto';
 import { AssignCompetenceDto } from './dto/assign-competence.dto';
+import { AdminLinkCoachDto } from './dto/link-coach.dto';
+import { AssignCoachCompetenceDto } from './dto/assign-coach-competence.dto';
 
 @ApiTags('inspect')
 @Controller('inspect')
@@ -109,5 +111,32 @@ export class InspectController {
   @Roles(UserRole.ADMIN)
   assignCompetences(@Body() body: AssignCompetenceDto) {
     return this.inspect.assignCompetences(body.professionalId, body.areaIds);
+  }
+
+  @Post('coach-links')
+  @ApiOperation({ summary: 'Collega utente ad allenatore (solo amministratore)' })
+  @ApiBody({ type: AdminLinkCoachDto })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  linkCoach(@Body() body: AdminLinkCoachDto) {
+    return this.inspect.linkUserToCoach(
+      body.coachId,
+      body.userId,
+      body.specializationId,
+    );
+  }
+
+  @Post('coach-competences')
+  @ApiOperation({ summary: 'Assegna competenze allenatore (solo amministratore)' })
+  @ApiBody({ type: AssignCoachCompetenceDto })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  assignCoachCompetences(@Body() body: AssignCoachCompetenceDto) {
+    return this.inspect.assignCoachCompetences(
+      body.coachId,
+      body.specializationIds,
+    );
   }
 }

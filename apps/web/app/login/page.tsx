@@ -60,6 +60,18 @@ const demoAccounts = [
     email: "prof_MT@example.it",
     password: "password123",
   },
+  {
+    group: "Allenatori",
+    label: "Ciclismo",
+    email: "coach_cycling@example.it",
+    password: "password123",
+  },
+  {
+    group: "Allenatori",
+    label: "Corsa",
+    email: "coach_running@example.it",
+    password: "password123",
+  },
 ];
 
 const demoAccessAccounts = [
@@ -78,6 +90,13 @@ const demoAccessAccounts = [
 ];
 
 const coachDemoAccounts = demoAccounts
+  .filter((account) => account.group === "Allenatori")
+  .map((account) => ({
+    label: `${account.label} allenatore`,
+    account,
+  }));
+
+const professionalDemoAccounts = demoAccounts
   .filter((account) => account.group === "Professionisti")
   .map((account) => ({
     label: `${account.label} professionista`,
@@ -320,6 +339,21 @@ export default function LoginPage() {
               </div>
               <div className="pf-demo-group">
                 <span>Professionisti area</span>
+                <div className="pf-demo-actions coach">
+                  {professionalDemoAccounts.map(({ label, account }) => (
+                    <button
+                      key={account.email}
+                      className="pf-button-secondary"
+                      type="button"
+                      onClick={() => fill(account)}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="pf-demo-group">
+                <span>Allenatori sport</span>
                 <div className="pf-demo-actions coach">
                   {coachDemoAccounts.map(({ label, account }) => (
                     <button
