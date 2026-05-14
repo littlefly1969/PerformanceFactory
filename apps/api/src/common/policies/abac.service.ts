@@ -16,7 +16,14 @@ export class AbacService {
     const link = await this.prisma.professionalUserLink.findFirst({
       where: { professionalId, userId },
     });
-    return !!link;
+    if (link) {
+      return true;
+    }
+
+    const coachLink = await this.prisma.coachUserLink.findFirst({
+      where: { coachId: professionalId, userId },
+    });
+    return !!coachLink;
   }
 
   async canAccessArea(

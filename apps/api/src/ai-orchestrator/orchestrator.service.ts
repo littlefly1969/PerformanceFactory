@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -19,6 +20,7 @@ const DEFAULT_TRAINING_ANSWER_OPTIONS = [
   { label: 'Completato', score: 80 },
   { label: 'Completato bene', score: 100 },
 ];
+const RECENT_HISTORY_CYCLES = 3;
 type AreaRecord = {
   id: string;
   name: string;
@@ -305,6 +307,7 @@ export class OrchestratorService {
       lastPlan,
       scale,
       history,
+      olderCyclesSummary,
       onboardingAssessment,
       currentState,
       areaGenerationConfig,
@@ -336,6 +339,7 @@ export class OrchestratorService {
       }),
       this.loadScaleConfig(this.prisma),
       this.loadAreaCycleHistory(userId, area.id),
+      this.loadAreaOlderCyclesSummary(userId, area.id, area.name),
       this.prisma.userOnboardingAssessment.findUnique({
         where: { userId },
         select: { answersJson: true, profileJson: true },
@@ -367,6 +371,7 @@ export class OrchestratorService {
       scale,
       previousSnapshot,
       history,
+      olderCyclesSummary,
       onboardingAssessment,
       areaLevel,
       areaGenerationConfig,
@@ -386,11 +391,17 @@ export class OrchestratorService {
     };
   }
 
-  private async loadAreaCycleHistory(userId: string, areaId: string) {
+  private async loadAreaCycleHistory(
+    userId: string,
+    areaId: string,
+    skip = 0,
+    take: number | undefined = RECENT_HISTORY_CYCLES,
+  ) {
     return this.prisma.improvementPlanRelease.findMany({
       where: { userId, areaId },
       orderBy: { version: 'desc' },
-      take: 3,
+      skip,
+      take,
       select: {
         id: true,
         version: true,
@@ -440,6 +451,181 @@ export class OrchestratorService {
             },
           },
         },
+      },
+    });
+  }
+
+  private async loadAreaOlderCyclesSummary(
+    userId: string,
+    areaId: string,
+    areaName: string,
+  ) {
+    const olderCycles = await this.loadAreaCycleHistory(
+      userId,
+      areaId,
+      RECENT_HISTORY_CYCLES,
+      undefined,
+    );
+    return this.loadOrCreateOlderCyclesSummary({
+      userId,
+      scope: 'AREA',
+      areaId,
+      specializationId: null,
+      targetLabel: areaName,
+      olderCycles,
+    });
+  }
+
+  private async loadTrainingCycleHistory(
+    userId: string,
+    skip = 0,
+    take: number | undefined = RECENT_HISTORY_CYCLES,
+  ) {
+    const releases = await this.prisma.trainingPlanRelease.findMany({
+      where: { userId },
+      orderBy: { version: 'desc' },
+      skip,
+      take,
+      select: {
+        id: true,
+        version: true,
+        status: true,
+        cycleStatus: true,
+        createdAt: true,
+        publishedAt: true,
+        archivedAt: true,
+        items: {
+          orderBy: { id: 'asc' },
+          select: {
+            title: true,
+            body: true,
+            status: true,
+            completedAt: true,
+            completionRating: true,
+            completionNotes: true,
+            rejectionReason: true,
+          },
+        },
+        questionSets: {
+          orderBy: { createdAt: 'desc' },
+          select: {
+            status: true,
+            createdAt: true,
+            publishedAt: true,
+            closedAt: true,
+            approvals: {
+              select: {
+                status: true,
+                rejectionReason: true,
+              },
+            },
+            questions: {
+              orderBy: { orderIndex: 'asc' },
+              select: {
+                text: true,
+                orderIndex: true,
+                answers: {
+                  select: {
+                    scoreAwarded: true,
+                    answeredAt: true,
+                    answerOption: { select: { label: true } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return releases.map((release) => ({
+      ...release,
+      questionSets: release.questionSets.map((set) => ({
+        ...set,
+        questions: set.questions.map((question) => ({
+          ...question,
+          answers: question.answers.map((answer) => ({
+            scoreAwarded: answer.scoreAwarded,
+            answeredAt: answer.answeredAt,
+            answerOption: answer.answerOption,
+          })),
+        })),
+      })),
+    }));
+  }
+
+  private async loadTrainingOlderCyclesSummary(
+    userId: string,
+    specializationId: string,
+    targetLabel: string,
+  ) {
+    const olderCycles = await this.loadTrainingCycleHistory(
+      userId,
+      RECENT_HISTORY_CYCLES,
+      undefined,
+    );
+    return this.loadOrCreateOlderCyclesSummary({
+      userId,
+      scope: 'TRAINING',
+      areaId: null,
+      specializationId,
+      targetLabel,
+      olderCycles,
+    });
+  }
+
+  private async loadOrCreateOlderCyclesSummary(input: {
+    userId: string;
+    scope: 'AREA' | 'TRAINING';
+    areaId: string | null;
+    specializationId: string | null;
+    targetLabel: string;
+    olderCycles: Awaited<ReturnType<OrchestratorService['loadAreaCycleHistory']>>;
+  }) {
+    if (input.olderCycles.length === 0) {
+      return null;
+    }
+
+    const compactCycles = input.olderCycles
+      .slice()
+      .reverse()
+      .map((cycle) => this.compactCycleForPrompt(cycle));
+    const sourceHash = this.hashJson(compactCycles);
+    const existing = await this.prisma.aiCycleHistorySummary.findFirst({
+      where: {
+        userId: input.userId,
+        scope: input.scope,
+        areaId: input.areaId,
+        specializationId: input.specializationId,
+        sourceHash,
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+    if (existing) {
+      return existing;
+    }
+
+    const summary = await this.aiProposalProvider.summarizeCycleHistory({
+      userId: input.userId,
+      scope: input.scope,
+      targetLabel: input.targetLabel,
+      coveredCycles: compactCycles,
+    });
+    return this.prisma.aiCycleHistorySummary.create({
+      data: {
+        userId: input.userId,
+        scope: input.scope,
+        areaId: input.areaId,
+        specializationId: input.specializationId,
+        targetLabel: input.targetLabel,
+        summaryText: summary.summaryText,
+        summaryJson: summary.summaryJson as Prisma.InputJsonObject,
+        sourceHash,
+        coveredVersionsJson: compactCycles.map((cycle) => cycle.version),
+        provider: summary.provider,
+        model: summary.model,
+        promptVersion: summary.promptVersion,
+        promptHash: summary.promptHash,
       },
     });
   }
@@ -617,6 +803,8 @@ export class OrchestratorService {
       previousSnapshot,
       lastPlan,
       scale,
+      history,
+      olderCyclesSummary,
       onboardingAssessment,
       enabledAreas,
       goal,
@@ -645,6 +833,12 @@ export class OrchestratorService {
         select: { version: true },
       }),
       this.loadScaleConfig(this.prisma),
+      this.loadTrainingCycleHistory(userId),
+      this.loadTrainingOlderCyclesSummary(
+        userId,
+        trainingPromptInstruction.id,
+        `${trainingPromptInstruction.sport.label} - ${trainingPromptInstruction.label}`,
+      ),
       this.prisma.userOnboardingAssessment.findUnique({
         where: { userId },
         select: { answersJson: true, profileJson: true },
@@ -675,7 +869,8 @@ export class OrchestratorService {
       reason,
       scale,
       previousSnapshot: filteredSnapshot,
-      history: [],
+      history,
+      olderCyclesSummary,
       onboardingAssessment,
       areaLevel: 'TRAINING',
       areaGenerationConfig: {
@@ -726,6 +921,9 @@ export class OrchestratorService {
     };
     previousSnapshot: CycleProposalInput['previousSnapshot'];
     history: Awaited<ReturnType<OrchestratorService['loadAreaCycleHistory']>>;
+    olderCyclesSummary: Awaited<
+      ReturnType<OrchestratorService['loadOrCreateOlderCyclesSummary']>
+    >;
     onboardingAssessment: {
       answersJson: Prisma.JsonValue | null;
       profileJson: Prisma.JsonValue | null;
@@ -801,32 +999,25 @@ export class OrchestratorService {
           : null,
       },
       history: {
-        previousAreaCycles: input.history.slice(0, 2).map((cycle) => ({
-          version: cycle.version,
-          status: cycle.status,
-          cycleStatus: cycle.cycleStatus,
-          exercises: cycle.items.map((item) => ({
-            title: item.title,
-            body: item.body,
-            status: item.status,
-            completionRating: item.completionRating,
-            completionNotes: item.completionNotes,
-            rejectionReason: item.rejectionReason,
-          })),
-          questionnaires: cycle.questionSets.map((set) => ({
-            status: set.status,
-            rejectionReasons: set.approvals
-              .map((approval) => approval.rejectionReason)
-              .filter((reason): reason is string => Boolean(reason)),
-            questions: set.questions.map((question) => ({
-              text: question.text,
-              answers: question.answers.map((answer) => ({
-                scoreAwarded: answer.scoreAwarded,
-                optionLabel: answer.answerOption?.label ?? null,
-              })),
-            })),
-          })),
-        })),
+        olderCyclesSummary: input.olderCyclesSummary
+          ? {
+              scope: input.olderCyclesSummary.scope as 'AREA' | 'TRAINING',
+              targetLabel: input.olderCyclesSummary.targetLabel,
+              summaryText: input.olderCyclesSummary.summaryText,
+              summaryJson: input.olderCyclesSummary.summaryJson,
+              coveredVersions: Array.isArray(
+                input.olderCyclesSummary.coveredVersionsJson,
+              )
+                ? input.olderCyclesSummary.coveredVersionsJson.filter(
+                    (version): version is number => typeof version === 'number',
+                  )
+                : [],
+              updatedAt: input.olderCyclesSummary.updatedAt.toISOString(),
+            }
+          : null,
+        previousAreaCycles: input.history
+          .slice(0, RECENT_HISTORY_CYCLES)
+          .map((cycle) => this.compactCycleForPrompt(cycle)),
       },
       guidance: {
         areaGenerationConfig: input.areaGenerationConfig
@@ -885,6 +1076,37 @@ export class OrchestratorService {
           'Mantieni le raccomandazioni adatte alla revisione professionale prima della pubblicazione.',
         ],
       },
+    };
+  }
+
+  private compactCycleForPrompt(
+    cycle: Awaited<ReturnType<OrchestratorService['loadAreaCycleHistory']>>[number],
+  ) {
+    return {
+      version: cycle.version,
+      status: cycle.status,
+      cycleStatus: cycle.cycleStatus,
+      exercises: cycle.items.map((item) => ({
+        title: item.title,
+        body: item.body,
+        status: item.status,
+        completionRating: item.completionRating,
+        completionNotes: item.completionNotes,
+        rejectionReason: item.rejectionReason,
+      })),
+      questionnaires: cycle.questionSets.map((set) => ({
+        status: set.status,
+        rejectionReasons: set.approvals
+          .map((approval) => approval.rejectionReason)
+          .filter((reason): reason is string => Boolean(reason)),
+        questions: set.questions.map((question) => ({
+          text: question.text,
+          answers: question.answers.map((answer) => ({
+            scoreAwarded: answer.scoreAwarded,
+            optionLabel: answer.answerOption?.label ?? null,
+          })),
+        })),
+      })),
     };
   }
 
@@ -976,6 +1198,12 @@ export class OrchestratorService {
     return Math.round(value * 10) / 10;
   }
 
+  private hashJson(value: unknown) {
+    return createHash('sha256')
+      .update(JSON.stringify(value))
+      .digest('hex');
+  }
+
   private async loadAreaGenerationConfig(areaId: string) {
     return this.prisma.aiAreaGenerationConfig.findUnique({
       where: { areaId },
@@ -1033,6 +1261,7 @@ export class OrchestratorService {
     return this.prisma.sportSpecialization.findUnique({
       where: { id: selection.specializationId },
       select: {
+        id: true,
         label: true,
         trainingPrompt: true,
         trainingPromptVersion: true,
@@ -1614,12 +1843,12 @@ export class OrchestratorService {
       return { snapshotId: snapshot.id };
   }
 
-  async refreshCycleReadiness(planReleaseId: string) {
+  async refreshCycleReadiness(planReleaseId: string, actorId?: string) {
     if (!planReleaseId) {
       throw new BadRequestException('ID rilascio allenamento mancante');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const readiness = await this.prisma.$transaction(async (tx) => {
       const plan = await tx.improvementPlanRelease.findUnique({
         where: { id: planReleaseId },
         select: {
@@ -1666,14 +1895,24 @@ export class OrchestratorService {
 
       return { planReleaseId, cycleStatus: nextStatus };
     });
+
+    if (readiness.cycleStatus === 'READY_TO_PUBLISH' && actorId) {
+      const published = await this.publishCycle(planReleaseId, actorId);
+      return { ...readiness, cycleStatus: 'PUBLISHED', published };
+    }
+
+    return readiness;
   }
 
-  async refreshTrainingReadiness(trainingPlanReleaseId: string) {
+  async refreshTrainingReadiness(
+    trainingPlanReleaseId: string,
+    actorId?: string,
+  ) {
     if (!trainingPlanReleaseId) {
       throw new BadRequestException('ID allenamento mancante');
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const readiness = await this.prisma.$transaction(async (tx) => {
       const plan = await tx.trainingPlanRelease.findUnique({
         where: { id: trainingPlanReleaseId },
         select: {
@@ -1730,6 +1969,16 @@ export class OrchestratorService {
 
       return { trainingPlanReleaseId, cycleStatus: nextStatus };
     });
+
+    if (readiness.cycleStatus === 'READY_TO_PUBLISH' && actorId) {
+      const published = await this.publishTrainingPlan(
+        trainingPlanReleaseId,
+        actorId,
+      );
+      return { ...readiness, cycleStatus: 'PUBLISHED', published };
+    }
+
+    return readiness;
   }
 
   async rejectTrainingProposal(

@@ -185,6 +185,9 @@ type PreviewTarget = {
   athlete: UserRef;
   area: Area;
 };
+type TrainingPreviewTarget = {
+  athlete: Athlete;
+};
 
 type AssignmentTarget = {
   athlete: Athlete;
@@ -275,6 +278,8 @@ export default function AdminCyclesPage() {
   const [previewTarget, setPreviewTarget] = useState<PreviewTarget | null>(
     null,
   );
+  const [trainingPreviewTarget, setTrainingPreviewTarget] =
+    useState<TrainingPreviewTarget | null>(null);
   const [assignmentTarget, setAssignmentTarget] =
     useState<AssignmentTarget | null>(null);
   const [coachAssignmentTarget, setCoachAssignmentTarget] =
@@ -346,6 +351,12 @@ export default function AdminCyclesPage() {
           (competence) => competence.specializationId === specializationId,
         ),
     );
+
+  const previewAthlete = previewTarget?.athlete ?? trainingPreviewTarget?.athlete;
+  const previewLabel = previewTarget
+    ? previewTarget.area.name
+    : "Allenamento specifico";
+  const previewIsTraining = Boolean(trainingPreviewTarget);
   const enabledCoachesForSpecialization = (specializationId: string) =>
     specializationId
       ? professionals.filter((professional) =>
@@ -600,12 +611,40 @@ export default function AdminCyclesPage() {
     }
     setAiPreview((await response.json()) as AiPreview);
     setPreviewTarget({ athlete, area });
+    setTrainingPreviewTarget(null);
+    setBusyKey(null);
+  };
+
+  const openTrainingPreview = async (athlete: Athlete) => {
+    setBusyKey(`training-preview:${athlete.id}`);
+    setMessage(null);
+    const response = await secureFetch(
+      `${API_BASE}/admin/orchestrator/training/preview`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userIds: [athlete.id],
+          runAllAreas: false,
+        }),
+      },
+    );
+    if (!response.ok) {
+      setMessage(`Anteprima allenamento non riuscita: ${await readError(response)}`);
+      setBusyKey(null);
+      return;
+    }
+    setAiPreview((await response.json()) as AiPreview);
+    setPreviewTarget(null);
+    setTrainingPreviewTarget({ athlete });
     setBusyKey(null);
   };
 
   const closeAiPreview = () => {
     setAiPreview(null);
     setPreviewTarget(null);
+    setTrainingPreviewTarget(null);
   };
 
   const generateCycle = async (athleteId: string, areaId: string) => {
@@ -650,6 +689,7 @@ export default function AdminCyclesPage() {
       return;
     }
     setMessage("Allenamento specifico generato e inviato all'approvazione dell'allenatore.");
+    closeAiPreview();
     await loadDashboard();
     setBusyKey(null);
   };
@@ -780,7 +820,7 @@ export default function AdminCyclesPage() {
       return;
     }
     setMessage(
-      "Dati atleta cancellati. Account e consensi restano validi, onboarding riportato all'inizio.",
+      "Dati atleta cancellati. Resta solo l'account: consensi e onboarding dovranno ripartire.",
     );
     setResetTarget(null);
     await loadDashboard();
@@ -1015,12 +1055,12 @@ export default function AdminCyclesPage() {
                 className="pf-button"
                 type="button"
                 disabled={
-                  busyKey === `training:${athlete.id}` ||
+                  busyKey === `training-preview:${athlete.id}` ||
                   !athlete.trainingState.generationReady
                 }
-                onClick={() => generateTraining(athlete.id)}
+                onClick={() => openTrainingPreview(athlete)}
               >
-                Genera allenamento
+                Anteprima AI
               </button>
             </article>
           ))}
@@ -1536,10 +1576,10 @@ export default function AdminCyclesPage() {
               <StatusBadge tone="danger">Azione irreversibile</StatusBadge>
             </div>
             <div className="pf-alert warning">
-              Verranno cancellati onboarding, obiettivo, sport, assegnazioni,
-              allenamenti, questionari, risposte, snapshot, storico, audit e
-              dati AI collegati all'atleta. Account, password, identita login e
-              consensi gia accettati resteranno invariati.
+              Verranno cancellati consensi privacy/AI, onboarding, obiettivo,
+              sport, assegnazioni, allenamenti, questionari, risposte,
+              snapshot, storico, audit e dati AI collegati all'atleta.
+              Resteranno solo account, password e identita login.
             </div>
             <div className="pf-actions">
               <button
@@ -1563,7 +1603,7 @@ export default function AdminCyclesPage() {
         </div>
       )}
 
-      {aiPreview && previewTarget && (
+      {aiPreview && previewAthlete && (
         <div className="pf-modal-backdrop" role="dialog" aria-modal="true">
           <section className="pf-modal">
             <div className="pf-panel-header">
@@ -1571,7 +1611,7 @@ export default function AdminCyclesPage() {
                 <p className="pf-eyebrow">Anteprima AI</p>
                 <h2>Contesto inviato all'AI</h2>
                 <p className="pf-muted">
-                  {previewTarget.athlete.email} - {previewTarget.area.name} -{" "}
+                  {previewAthlete.email} - {previewLabel} -{" "}
                   {aiPreview.provider}/{aiPreview.model}
                 </p>
               </div>
@@ -1613,14 +1653,20 @@ export default function AdminCyclesPage() {
                 className="pf-button"
                 type="button"
                 disabled={
-                  busyKey ===
-                  `generate:${previewTarget.athlete.id}:${previewTarget.area.id}`
+                  previewTarget
+                    ? busyKey ===
+                      `generate:${previewTarget.athlete.id}:${previewTarget.area.id}`
+                    : busyKey === `training:${previewAthlete.id}`
                 }
                 onClick={() =>
-                  generateCycle(previewTarget.athlete.id, previewTarget.area.id)
+                  previewTarget
+                    ? generateCycle(previewTarget.athlete.id, previewTarget.area.id)
+                    : generateTraining(previewAthlete.id)
                 }
               >
-                Conferma e invia all'AI
+                {previewIsTraining
+                  ? "Conferma e genera allenamento"
+                  : "Conferma e invia all'AI"}
               </button>
               <button
                 className="pf-button-secondary"

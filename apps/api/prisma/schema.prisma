@@ -60,6 +60,7 @@ model User {
   currentStates        CurrentState[]
   kpiDaily             KpiDaily[]
   aiInteractions       AiInteraction[]
+  aiCycleHistorySummaries AiCycleHistorySummary[]
   onboardingAssessment UserOnboardingAssessment?
   onboardingQuestions  UserOnboardingQuestion[]
   performanceGoal      UserPerformanceGoal?
@@ -840,6 +841,30 @@ model AiContextSummary {
 
   user        User                    @relation(fields: [userId], references: [id])
   planRelease ImprovementPlanRelease? @relation(fields: [planReleaseId], references: [id])
+}
+
+model AiCycleHistorySummary {
+  id                  String   @id @default(uuid())
+  userId              String
+  scope               String
+  areaId              String?
+  specializationId    String?
+  targetLabel         String
+  summaryText         String
+  summaryJson         Json?
+  sourceHash          String
+  coveredVersionsJson Json
+  provider            String
+  model               String
+  promptVersion       String
+  promptHash          String
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, scope, areaId, updatedAt])
+  @@index([userId, scope, specializationId, updatedAt])
 }
 
 model AiProposalAudit {

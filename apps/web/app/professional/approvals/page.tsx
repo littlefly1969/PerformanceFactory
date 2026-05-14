@@ -273,6 +273,7 @@ export default function ProfessionalApprovazioniPage() {
       setBusy(approvalId, false);
       return;
     }
+    setMessage("Questionario approvato. Se tutte le revisioni sono completate, il ciclo viene pubblicato automaticamente.");
     await loadInbox();
     setBusy(approvalId, false);
   };
@@ -319,6 +320,7 @@ export default function ProfessionalApprovazioniPage() {
       setBusy(planItemId, false);
       return;
     }
+    setMessage("Attivita approvata. Se tutte le revisioni sono completate, il ciclo viene pubblicato automaticamente.");
     await loadInbox();
     setBusy(planItemId, false);
   };
@@ -367,6 +369,7 @@ export default function ProfessionalApprovazioniPage() {
       setBusy(approvalId, false);
       return;
     }
+    setMessage("Questionario allenamento approvato. Se tutte le revisioni sono completate, l'allenamento viene pubblicato automaticamente.");
     await loadInbox();
     setBusy(approvalId, false);
   };
@@ -410,6 +413,7 @@ export default function ProfessionalApprovazioniPage() {
       setBusy(planItemId, false);
       return;
     }
+    setMessage("Esercizio allenamento approvato. Se tutte le revisioni sono completate, l'allenamento viene pubblicato automaticamente.");
     await loadInbox();
     setBusy(planItemId, false);
   };

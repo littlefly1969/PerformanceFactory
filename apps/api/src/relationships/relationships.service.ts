@@ -112,17 +112,26 @@ export class RelationshipsService {
   }
 
   async getMyUsers(professionalId: string) {
-    const links = await this.prisma.professionalUserLink.findMany({
-      where: { professionalId },
-      select: {
-        userId: true,
-        user: { select: safeUserSelect },
-      },
-    });
+    const [areaLinks, coachLinks] = await Promise.all([
+      this.prisma.professionalUserLink.findMany({
+        where: { professionalId },
+        select: {
+          userId: true,
+          user: { select: safeUserSelect },
+        },
+      }),
+      this.prisma.coachUserLink.findMany({
+        where: { coachId: professionalId },
+        select: {
+          userId: true,
+          user: { select: safeUserSelect },
+        },
+      }),
+    ]);
 
     const allowed: SafeUser[] = [];
     const seen = new Set<string>();
-    for (const link of links) {
+    for (const link of [...areaLinks, ...coachLinks]) {
       if (seen.has(link.userId)) {
         continue;
       }

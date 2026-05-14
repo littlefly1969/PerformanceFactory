@@ -31,6 +31,8 @@ type StarterQuestionario = {
   validationStatus?: string;
   validationMessage?: string | null;
   goalFrozenAt?: string | null;
+  updatedAt?: string | null;
+  goalUpdatedAt?: string | null;
   title: string;
   description: string;
   options: StarterOption[];
@@ -90,6 +92,52 @@ type GoalRefinement = GoalValidation & {
 };
 type MessageTone = "success" | "warning";
 type FlowStep = "ANAMNESIS" | "GOAL";
+type WarningPopup = {
+  title: string;
+  message: string;
+};
+type OnboardingDraft = {
+  answers?: Record<string, string | number>;
+  goalText?: string;
+  selectedSportId?: string;
+  selectedSpecializationId?: string;
+  sportSelectionSaved?: boolean;
+  flowStep?: FlowStep;
+  goalAssistantClosed?: boolean;
+  finalGoalValidated?: boolean;
+  goalValidation?: GoalValidation | null;
+  refinedGoalDraft?: string;
+  serverSignature?: string;
+};
+
+const ONBOARDING_DRAFT_KEY = "performance:onboarding:draft:v1";
+
+const readOnboardingDraft = () => {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  try {
+    const raw = window.sessionStorage.getItem(ONBOARDING_DRAFT_KEY);
+    return raw ? (JSON.parse(raw) as OnboardingDraft) : null;
+  } catch {
+    window.sessionStorage.removeItem(ONBOARDING_DRAFT_KEY);
+    return null;
+  }
+};
+
+const onboardingDraftSignature = (data: StarterQuestionario) =>
+  [
+    data.sportSelection?.sportId ?? "no-sport",
+    data.sportSelection?.specializationId ?? "no-specialization",
+    data.goalUpdatedAt ?? "no-goal",
+    data.goalFrozenAt ?? "no-frozen-goal",
+    data.updatedAt ?? "no-assessment",
+    data.questions
+      .filter((question) => question.scope === "AREA")
+      .map((question) => question.id)
+      .sort()
+      .join(",") || "no-specialist-questions",
+  ].join("|");
 
 export default function OnboardingPage() {
   const [questionnaire, setQuestionario] = useState<StarterQuestionario | null>(null);
@@ -118,9 +166,11 @@ export default function OnboardingPage() {
   const [goalRiskModalOpen, setGoalRiskModalOpen] = useState(false);
   const [pendingGoalRisk, setPendingGoalRisk] = useState<GoalRiskResponse | null>(null);
   const [goalRiskAcknowledged, setGoalRiskAcknowledged] = useState(false);
+  const [warningPopup, setWarningPopup] = useState<WarningPopup | null>(null);
   const [finalGoalValidated, setFinalGoalValidated] = useState(false);
   const [validatingFinalGoal, setValidatingFinalGoal] = useState(false);
   const [redirecting, setRedirecting] = useState(false);
+  const [draftReady, setDraftReady] = useState(false);
   const redirectTimeout = useRef<number | null>(null);
 
   const radarAree = useMemo(
@@ -178,6 +228,7 @@ export default function OnboardingPage() {
       )
     : false;
   const canCreatePerformance = completed && finalGoalValidated;
+  const validationLocksQuestionList = finalGoalValidated && completed;
   const specialistScoreOptions: StarterOption[] = [
     { value: 1, label: "1" },
     { value: 2, label: "2" },
@@ -185,9 +236,27 @@ export default function OnboardingPage() {
     { value: 4, label: "4" },
     { value: 5, label: "5" },
   ];
+  const showGoalValidationResult =
+    flowStep === "GOAL" &&
+    validationLocksQuestionList &&
+    Boolean(goalValidation);
+  const missingRequiredAnswers = questionnaire
+    ? questionnaire.questions.filter(
+        (question) =>
+          question.required &&
+          (answers[question.id] === undefined || answers[question.id] === ""),
+      ).length
+    : 0;
+
+  const showWarning = (title: string, detail: string) => {
+    setMessageTone("warning");
+    setMessage(detail);
+    setWarningPopup({ title, message: detail });
+  };
 
   const loadQuestionario = async () => {
     setLoading(true);
+    setDraftReady(false);
     setMessage(null);
     const response = await secureFetch(`${API_BASE}/onboarding/questionnaire`);
     if (!response.ok) {
@@ -197,19 +266,45 @@ export default function OnboardingPage() {
       return;
     }
     const data = (await response.json()) as StarterQuestionario;
-    setQuestionario(data);
-    setGoalText(data.goalText ?? "");
-    setSelectedSportId(data.sportSelection?.sportId ?? "");
-    setSelectedSpecializationId(data.sportSelection?.specializationId ?? "");
-    setSportSelectionSaved(Boolean(data.sportSelection?.specializationId));
-    setGoalAssistantClosed(Boolean(data.goalText));
-    setFinalGoalValidated(Boolean(data.goalFrozenAt));
-    setFlowStep(
+    const serverSignature = onboardingDraftSignature(data);
+    const storedDraft = data.required ? readOnboardingDraft() : null;
+    const draft =
+      storedDraft?.serverSignature === serverSignature ? storedDraft : null;
+    if (storedDraft && !draft) {
+      window.sessionStorage.removeItem(ONBOARDING_DRAFT_KEY);
+    }
+    const validQuestionIds = new Set(data.questions.map((question) => question.id));
+    const draftAnswers = Object.fromEntries(
+      Object.entries(draft?.answers ?? {}).filter(([questionId]) =>
+        validQuestionIds.has(questionId),
+      ),
+    );
+    const initialFlowStep =
       data.goalText || data.questions.some((question) => question.scope === "AREA")
         ? "GOAL"
-        : "ANAMNESIS",
+        : "ANAMNESIS";
+
+    setQuestionario(data);
+    setAnswers(draftAnswers);
+    setGoalText(draft?.goalText ?? data.goalText ?? "");
+    setSelectedSportId(draft?.selectedSportId ?? data.sportSelection?.sportId ?? "");
+    setSelectedSpecializationId(
+      draft?.selectedSpecializationId ??
+        data.sportSelection?.specializationId ??
+        "",
     );
+    setSportSelectionSaved(
+      draft?.sportSelectionSaved ?? Boolean(data.sportSelection?.specializationId),
+    );
+    setGoalAssistantClosed(draft?.goalAssistantClosed ?? Boolean(data.goalText));
+    setFinalGoalValidated(draft?.finalGoalValidated ?? Boolean(data.goalFrozenAt));
+    setFlowStep(draft?.flowStep ?? initialFlowStep);
+    setRefinedGoalDraft(draft?.refinedGoalDraft ?? "");
+    if (draft?.goalValidation) {
+      setGoalValidation(draft.goalValidation);
+    }
     if (
+      !draft?.goalValidation &&
       (data.validationStatus === "OK" || data.validationStatus === "NEEDS_ANAMNESIS") &&
       data.interpretedGoal
     ) {
@@ -228,9 +323,11 @@ export default function OnboardingPage() {
       setGoalAssistantClosed(true);
     }
     if (!data.required) {
+      window.sessionStorage.removeItem(ONBOARDING_DRAFT_KEY);
       setMessageTone("success");
       setMessage("Questionario iniziale gia completato.");
     }
+    setDraftReady(true);
     setLoading(false);
   };
 
@@ -485,6 +582,7 @@ export default function OnboardingPage() {
     });
     if (!response.ok) {
       const errorText = await readError(response);
+      showWarning("Errore API AI", errorText);
       setGoalChatMessages((current) => [
         ...current,
         { role: "assistant", content: errorText },
@@ -550,8 +648,7 @@ export default function OnboardingPage() {
       },
     );
     if (!response.ok) {
-      setMessageTone("warning");
-      setMessage(await readError(response));
+      showWarning("Errore API AI", await readError(response));
       setGeneratingSpecialistQuestions(false);
       return;
     }
@@ -600,23 +697,58 @@ export default function OnboardingPage() {
         if (risk.code === "GOAL_RISK_ACK_REQUIRED") {
           setPendingGoalRisk(risk);
           setGoalRiskModalOpen(true);
+          setGoalValidation({
+            status:
+              risk.goalValidation?.status ??
+              "GOAL_NEEDS_REFORMULATION",
+            accepted: false,
+            canProceedToAnamnesis: false,
+            interpretedGoal:
+              risk.goalValidation?.interpretedGoal ?? goalForValidation,
+            userMessage:
+              risk.goalValidation?.userMessage ??
+              risk.message ??
+              "L'obiettivo non risulta validato.",
+            suggestedReformulatedGoal:
+              risk.goalValidation?.suggestedReformulatedGoal ?? null,
+            questionsToUser: risk.goalValidation?.questionsToUser ?? [],
+            nextStep: risk.goalValidation?.nextStep ?? null,
+            rejectionReason:
+              risk.goalValidation?.rejectionReason ??
+              risk.message ??
+              null,
+          });
+          setMessageTone("warning");
+          setMessage(
+            risk.message ??
+              risk.goalValidation?.userMessage ??
+              "L'AI non ha validato l'obiettivo rispetto alle risposte inserite.",
+          );
           setValidatingFinalGoal(false);
           return;
         }
-        setMessageTone("warning");
-        setMessage(risk.message ?? "Validazione obiettivo non disponibile.");
+        showWarning(
+          "Validazione obiettivo non riuscita",
+          risk.message ?? "Validazione obiettivo non disponibile.",
+        );
         setValidatingFinalGoal(false);
         return;
       }
-      setMessageTone("warning");
-      setMessage(await readError(response));
+      showWarning(
+        "Errore API AI",
+        await readError(response),
+      );
       setValidatingFinalGoal(false);
       return;
     }
 
     const validation = (await response.json()) as GoalValidation;
     setGoalText(goalForValidation);
-    setGoalValidation(validation);
+    setGoalValidation({
+      ...validation,
+      accepted: validation.accepted ?? true,
+      canProceedToAnamnesis: true,
+    });
     setFinalGoalValidated(true);
     setGoalRiskAcknowledged(false);
     setMessageTone("success");
@@ -633,6 +765,47 @@ export default function OnboardingPage() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!draftReady || !questionnaire?.required || typeof window === "undefined") {
+      return;
+    }
+    const validQuestionIds = new Set(
+      questionnaire.questions.map((question) => question.id),
+    );
+    const draftAnswers = Object.fromEntries(
+      Object.entries(answers).filter(([questionId]) =>
+        validQuestionIds.has(questionId),
+      ),
+    );
+    const draft: OnboardingDraft = {
+      answers: draftAnswers,
+      goalText,
+      selectedSportId,
+      selectedSpecializationId,
+      sportSelectionSaved,
+      flowStep,
+      goalAssistantClosed,
+      finalGoalValidated,
+      goalValidation,
+      refinedGoalDraft,
+      serverSignature: onboardingDraftSignature(questionnaire),
+    };
+    window.sessionStorage.setItem(ONBOARDING_DRAFT_KEY, JSON.stringify(draft));
+  }, [
+    answers,
+    draftReady,
+    finalGoalValidated,
+    flowStep,
+    goalAssistantClosed,
+    goalText,
+    goalValidation,
+    questionnaire,
+    refinedGoalDraft,
+    selectedSpecializationId,
+    selectedSportId,
+    sportSelectionSaved,
+  ]);
 
   const submit = async () => {
     if (!questionnaire || !completed) {
@@ -663,6 +836,7 @@ export default function OnboardingPage() {
     }
 
     setResult((await response.json()) as SubmitResult);
+    window.sessionStorage.removeItem(ONBOARDING_DRAFT_KEY);
     setMessageTone("success");
     setMessage("Anamnesi iniziale creata. Apertura ambiente atleta...");
     setSubmitting(false);
@@ -923,7 +1097,56 @@ export default function OnboardingPage() {
               ) : null}
             </article>
             )}
-            {visibleQuestions.map((question) => {
+
+            {finalGoalValidated && missingRequiredAnswers > 0 && (
+              <div className="pf-alert warning">
+                <strong>Risposte mancanti</strong>
+                <p>
+                  L'obiettivo risulta gia validato, ma mancano ancora{" "}
+                  {missingRequiredAnswers} risposte in questa sessione.
+                  Completa le domande visibili e poi valida di nuovo o crea la
+                  performance quando il pulsante si abilita.
+                </p>
+              </div>
+            )}
+
+            {showGoalValidationResult && goalValidation && (
+              <article className="pf-card pf-next-step-card">
+                <div className="pf-card-top">
+                  <div>
+                    <p className="pf-eyebrow">Risposta AI</p>
+                    <h3>
+                      {goalValidation.status === "OK"
+                        ? "Obiettivo validato"
+                        : "Obiettivo da gestire con attenzione"}
+                    </h3>
+                  </div>
+                  <StatusBadge
+                    tone={goalValidation.status === "OK" ? "success" : "warning"}
+                  >
+                    {goalValidation.status}
+                  </StatusBadge>
+                </div>
+                <div className="pf-goal-validated-summary">
+                  <div>
+                    <span>Cosa ha capito l'AI</span>
+                    <strong>{goalValidation.interpretedGoal}</strong>
+                  </div>
+                </div>
+                <p>{goalValidation.userMessage}</p>
+                {goalValidation.suggestedReformulatedGoal && (
+                  <div className="pf-alert warning">
+                    <strong>Riformulazione suggerita</strong>
+                    <p>{goalValidation.suggestedReformulatedGoal}</p>
+                  </div>
+                )}
+                {goalValidation.nextStep && (
+                  <p className="pf-muted">{goalValidation.nextStep}</p>
+                )}
+              </article>
+            )}
+
+            {!validationLocksQuestionList && visibleQuestions.map((question) => {
               const questionLocked =
                 specialistQuestionsGenerated && question.scope === "GENERAL";
               return (
@@ -1198,6 +1421,31 @@ export default function OnboardingPage() {
           </section>
         </div>
       )}
+      {warningPopup && (
+        <div className="pf-modal-backdrop" role="alertdialog" aria-modal="true">
+          <section className="pf-modal pf-goal-modal">
+            <div className="pf-panel-header">
+              <div>
+                <p className="pf-eyebrow">Avviso</p>
+                <h2>{warningPopup.title}</h2>
+              </div>
+              <StatusBadge tone="warning">Attenzione</StatusBadge>
+            </div>
+            <div className="pf-alert warning">
+              <p>{warningPopup.message}</p>
+            </div>
+            <div className="pf-actions">
+              <button
+                className="pf-button"
+                type="button"
+                onClick={() => setWarningPopup(null)}
+              >
+                OK
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
       {goalRiskModalOpen && pendingGoalRisk && (
         <div className="pf-modal-backdrop" role="dialog" aria-modal="true">
           <section className="pf-modal pf-goal-modal">
@@ -1257,6 +1505,30 @@ export default function OnboardingPage() {
                 onClick={() => {
                   setGoalRiskAcknowledged(true);
                   setFinalGoalValidated(true);
+                  setGoalValidation({
+                    status:
+                      pendingGoalRisk.goalValidation?.status ??
+                      "GOAL_NEEDS_REFORMULATION",
+                    accepted: false,
+                    canProceedToAnamnesis: false,
+                    interpretedGoal:
+                      pendingGoalRisk.goalValidation?.interpretedGoal ??
+                      goalText,
+                    userMessage:
+                      pendingGoalRisk.goalValidation?.userMessage ??
+                      pendingGoalRisk.message ??
+                      "Obiettivo salvato come non realistico rispetto ai dati attuali.",
+                    suggestedReformulatedGoal:
+                      pendingGoalRisk.goalValidation
+                        ?.suggestedReformulatedGoal ?? null,
+                    questionsToUser:
+                      pendingGoalRisk.goalValidation?.questionsToUser ?? [],
+                    nextStep: pendingGoalRisk.goalValidation?.nextStep ?? null,
+                    rejectionReason:
+                      pendingGoalRisk.goalValidation?.rejectionReason ??
+                      pendingGoalRisk.message ??
+                      null,
+                  });
                   setGoalRiskModalOpen(false);
                   setMessageTone("warning");
                   setMessage(

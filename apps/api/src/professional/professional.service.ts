@@ -27,7 +27,7 @@ export class ProfessionalService {
       throw new ForbiddenException('Solo i professionisti possono accedere alla coda');
     }
 
-    const [linkedUsers, areas, coachLinks, coachCompetences] = await Promise.all([
+    const [linkedUsers, areas, coachLinks] = await Promise.all([
       this.prisma.professionalUserLink.findMany({
         where: { professionalId: actor.id },
         select: { userId: true, areaId: true },
@@ -40,18 +40,11 @@ export class ProfessionalService {
         where: { coachId: actor.id },
         select: { userId: true, specializationId: true },
       }),
-      this.prisma.coachSpecializationCompetence.findMany({
-        where: { coachId: actor.id },
-        select: { specializationId: true },
-      }),
     ]);
 
     const userIds = linkedUsers.map((link) => link.userId);
     const areaIds = areas.map((area) => area.areaId);
     const coachUserIds = coachLinks.map((link) => link.userId);
-    const coachSpecializationIds = coachCompetences.map(
-      (competence) => competence.specializationId,
-    );
     const linkedAreaFilters = linkedUsers.map((link) => ({
       areaId: link.areaId,
       planRelease: { userId: link.userId },
@@ -62,26 +55,48 @@ export class ProfessionalService {
     }));
 
     await Promise.all(
-      linkedUsers.map((link) =>
-        this.prisma.questionSetAreaApproval.updateMany({
-          where: {
-            areaId: link.areaId,
-            status: 'PENDING',
-            professionalId: { not: actor.id },
-            questionSet: {
-              userId: link.userId,
-              status: 'PENDING_APPROVAL',
+      [
+        ...linkedUsers.map((link) =>
+          this.prisma.questionSetAreaApproval.updateMany({
+            where: {
+              areaId: link.areaId,
+              status: 'PENDING',
+              professionalId: { not: actor.id },
+              questionSet: {
+                userId: link.userId,
+                status: 'PENDING_APPROVAL',
+              },
             },
-          },
-          data: {
-            professionalId: actor.id,
-            approvedByProfessionalId: null,
-            approvedAt: null,
-            rejectedAt: null,
-            rejectionReason: null,
-          },
-        }),
-      ),
+            data: {
+              professionalId: actor.id,
+              approvedByProfessionalId: null,
+              approvedAt: null,
+              rejectedAt: null,
+              rejectionReason: null,
+            },
+          }),
+        ),
+        ...coachLinks.map((link) =>
+          this.prisma.trainingQuestionSetCoachApproval.updateMany({
+            where: {
+              status: 'PENDING',
+              coachId: { not: actor.id },
+              questionSet: {
+                userId: link.userId,
+                specializationId: link.specializationId,
+                status: 'PENDING_APPROVAL',
+              },
+            },
+            data: {
+              coachId: actor.id,
+              approvedByCoachId: null,
+              approvedAt: null,
+              rejectedAt: null,
+              rejectionReason: null,
+            },
+          }),
+        ),
+      ],
     );
 
     const planItems = linkedAreaFilters.length
@@ -220,11 +235,15 @@ export class ProfessionalService {
         where: {
           coachId: actor.id,
           status: 'PENDING',
-          questionSet: {
-            userId: { in: coachUserIds },
-            specializationId: { in: coachSpecializationIds },
-            status: 'PENDING_APPROVAL',
-          },
+          questionSet: linkedTrainingFilters.length
+            ? {
+                OR: linkedTrainingFilters,
+                status: 'PENDING_APPROVAL',
+              }
+            : {
+                userId: { in: coachUserIds },
+                status: 'PENDING_APPROVAL',
+              },
         },
         select: {
           id: true,
@@ -377,6 +396,7 @@ export class ProfessionalService {
     if (approval.questionSet.planReleaseId) {
       await this.orchestrator.refreshCycleReadiness(
         approval.questionSet.planReleaseId,
+        actor.id,
       );
     }
 
@@ -548,7 +568,10 @@ export class ProfessionalService {
     });
 
     if (planItem.planReleaseId) {
-      await this.orchestrator.refreshCycleReadiness(planItem.planReleaseId);
+      await this.orchestrator.refreshCycleReadiness(
+        planItem.planReleaseId,
+        actor.id,
+      );
     }
 
     return updated;
@@ -665,6 +688,7 @@ export class ProfessionalService {
 
     await this.orchestrator.refreshTrainingReadiness(
       approval.questionSet.trainingPlanReleaseId,
+      actor.id,
     );
 
     return updated;
@@ -779,6 +803,7 @@ export class ProfessionalService {
 
     await this.orchestrator.refreshTrainingReadiness(
       planItem.trainingPlanReleaseId,
+      actor.id,
     );
 
     return updated;

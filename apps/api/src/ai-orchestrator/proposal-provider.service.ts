@@ -56,6 +56,14 @@ export type AiCycleContext = {
     };
   };
   history: {
+    olderCyclesSummary: {
+      scope: 'AREA' | 'TRAINING';
+      targetLabel: string;
+      summaryText: string;
+      summaryJson: unknown;
+      coveredVersions: number[];
+      updatedAt: string;
+    } | null;
     previousAreaCycles: Array<{
       version: number;
       status: string;
@@ -149,6 +157,25 @@ export type CycleProposal = {
     orderIndex: number;
     options: Array<{ label: string; score: number }>;
   }>;
+};
+
+export type CycleHistorySummaryInput = {
+  userId: string;
+  scope: 'AREA' | 'TRAINING';
+  targetLabel: string;
+  coveredCycles: unknown[];
+};
+
+export type CycleHistorySummaryResult = {
+  provider: AiProvider;
+  model: string;
+  promptVersion: string;
+  promptHash: string;
+  summaryText: string;
+  summaryJson: Record<string, unknown>;
+  inputJson: Record<string, unknown>;
+  outputJson: Record<string, unknown>;
+  latencyMs: number;
 };
 
 type CycleQuestionLayout = {
@@ -267,6 +294,7 @@ const PROMPT_VERSION = 'cycle-proposal-v2';
 const GOAL_VALIDATION_VERSION = 'goal-validation-v1';
 const SPECIALIST_ONBOARDING_QUESTIONS_VERSION =
   'specialist-onboarding-questions-v1';
+const HISTORY_SUMMARY_VERSION = 'cycle-history-summary-v1';
 const QUESTIONS_PER_AREA = 3;
 const EXTERNAL_AI_PROVIDERS: AiProvider[] = ['openai', 'gemini'];
 const SYSTEM_PROMPT =
@@ -295,6 +323,34 @@ export class AiProposalProviderService {
       return this.generateGeminiProposal(input, inputJson, startedAt);
     }
     return this.generateStubProposal(input, inputJson, startedAt);
+  }
+
+  async summarizeCycleHistory(
+    input: CycleHistorySummaryInput,
+  ): Promise<CycleHistorySummaryResult> {
+    const startedAt = Date.now();
+    const provider = this.resolveProvider();
+    const model = this.resolveModel(provider);
+    const inputJson = this.buildHistorySummaryAuditInput(input);
+    if (provider === 'openai') {
+      return this.summarizeOpenAiCycleHistory(input, inputJson, startedAt);
+    }
+    if (provider === 'gemini') {
+      return this.summarizeGeminiCycleHistory(input, inputJson, startedAt);
+    }
+    return this.normalizeHistorySummary(
+      provider,
+      model,
+      {
+        summaryText: `Storico sintetico ${input.targetLabel}: ${input.coveredCycles.length} cicli precedenti oltre agli ultimi tre.`,
+        stableSignals: [],
+        completedWork: [],
+        unresolvedRisks: [],
+        progressionNotes: [],
+      },
+      inputJson,
+      startedAt,
+    );
   }
 
   buildCycleProposalPreview(input: CycleProposalInput) {
@@ -562,6 +618,158 @@ export class AiProposalProviderService {
       'gemini',
       model,
       parsed,
+      inputJson,
+      startedAt,
+    );
+  }
+
+  private async summarizeOpenAiCycleHistory(
+    input: CycleHistorySummaryInput,
+    inputJson: Record<string, unknown>,
+    startedAt: number,
+  ): Promise<CycleHistorySummaryResult> {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new BadRequestException(
+        'OPENAI_API_KEY e obbligatoria per AI_PROVIDER=openai',
+      );
+    }
+
+    const model = this.resolveModel('openai');
+    this.logDebugPrompt('openai', model, inputJson);
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        input: [
+          {
+            role: 'system',
+            content:
+              'Riassumi lo storico atleta per uso tecnico in prompt futuri. Rispondi solo con JSON valido, in italiano, senza inventare dati non presenti.',
+          },
+          {
+            role: 'user',
+            content: JSON.stringify(this.buildHistorySummaryPrompt(input)),
+          },
+        ],
+        text: {
+          format: {
+            type: 'json_schema',
+            name: 'cycle_history_summary',
+            strict: true,
+            schema: this.buildHistorySummaryJsonSchema(),
+          },
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new BadRequestException(`Sunto storico OpenAI non riuscito: ${errorText}`);
+    }
+
+    const payload = (await response.json()) as {
+      output_text?: string;
+      output?: Array<{ content?: Array<{ text?: string }> }>;
+    };
+    const outputText =
+      payload.output_text ??
+      payload.output
+        ?.flatMap((item) => item.content ?? [])
+        .map((content) => content.text)
+        .find((text): text is string => !!text);
+    if (!outputText) {
+      throw new BadRequestException('La risposta sunto storico OpenAI e vuota');
+    }
+
+    return this.normalizeHistorySummary(
+      'openai',
+      model,
+      this.parseHistorySummaryJson(outputText, 'OpenAI'),
+      inputJson,
+      startedAt,
+    );
+  }
+
+  private async summarizeGeminiCycleHistory(
+    input: CycleHistorySummaryInput,
+    inputJson: Record<string, unknown>,
+    startedAt: number,
+  ): Promise<CycleHistorySummaryResult> {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new BadRequestException(
+        'GEMINI_API_KEY e obbligatoria per AI_PROVIDER=gemini',
+      );
+    }
+
+    const model = this.resolveModel('gemini');
+    this.logDebugPrompt('gemini', model, inputJson);
+    const modelName = model.startsWith('models/')
+      ? model.slice('models/'.length)
+      : model;
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          systemInstruction: {
+            parts: [
+              {
+                text:
+                  'Riassumi lo storico atleta per uso tecnico in prompt futuri. Rispondi solo con JSON valido, in italiano, senza inventare dati non presenti.',
+              },
+            ],
+          },
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: JSON.stringify(this.buildHistorySummaryPrompt(input)) }],
+            },
+          ],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            responseJsonSchema: this.buildHistorySummaryJsonSchema({
+              includePropertyOrdering: true,
+            }),
+          },
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new BadRequestException(`Sunto storico Gemini non riuscito: ${errorText}`);
+    }
+
+    const payload = (await response.json()) as {
+      candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      promptFeedback?: { blockReason?: string };
+    };
+    const outputText = payload.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text)
+      .filter((text): text is string => !!text)
+      .join('');
+    if (!outputText) {
+      throw new BadRequestException(
+        `La risposta sunto storico Gemini e vuota: ${
+          payload.promptFeedback?.blockReason ?? 'risposta vuota'
+        }`,
+      );
+    }
+
+    return this.normalizeHistorySummary(
+      'gemini',
+      model,
+      this.parseHistorySummaryJson(outputText, 'Gemini'),
       inputJson,
       startedAt,
     );
@@ -975,6 +1183,25 @@ export class AiProposalProviderService {
     };
   }
 
+  private buildHistorySummaryPrompt(input: CycleHistorySummaryInput) {
+    return {
+      task:
+        'Produci un sunto tecnico dei cicli storici piu vecchi, da aggiungere ai prompt futuri senza sostituire gli ultimi tre cicli completi.',
+      scope: input.scope,
+      targetLabel: input.targetLabel,
+      coveredCycles: input.coveredCycles,
+      rules: [
+        'Usa solo i dati presenti nei cicli forniti.',
+        'Non inventare diagnosi, metriche, ritmi, frequenze o vincoli mancanti.',
+        'Conserva solo informazioni utili a generare il prossimo lavoro: cosa e stato assegnato, completato, rifiutato, feedback, punteggi, segnali di rischio e progressione.',
+        'Distingui fatti osservati da inferenze prudenti.',
+        'Il testo deve essere sintetico ma operativo per il prossimo prompt AI.',
+      ],
+      outputShape:
+        'Restituisci summaryText e liste stableSignals, completedWork, unresolvedRisks, progressionNotes.',
+    };
+  }
+
   private buildSpecialistOnboardingQuestionTask(
     input: SpecialistOnboardingQuestionInput,
   ) {
@@ -1365,6 +1592,45 @@ export class AiProposalProviderService {
     };
   }
 
+  private buildHistorySummaryJsonSchema(options?: {
+    includePropertyOrdering?: boolean;
+  }) {
+    const stringArraySchema = {
+      type: 'array',
+      items: { type: 'string' },
+      maxItems: 12,
+    };
+    return {
+      type: 'object',
+      additionalProperties: false,
+      required: [
+        'summaryText',
+        'stableSignals',
+        'completedWork',
+        'unresolvedRisks',
+        'progressionNotes',
+      ],
+      properties: {
+        summaryText: { type: 'string' },
+        stableSignals: stringArraySchema,
+        completedWork: stringArraySchema,
+        unresolvedRisks: stringArraySchema,
+        progressionNotes: stringArraySchema,
+      },
+      ...(options?.includePropertyOrdering
+        ? {
+            propertyOrdering: [
+              'summaryText',
+              'stableSignals',
+              'completedWork',
+              'unresolvedRisks',
+              'progressionNotes',
+            ],
+          }
+        : {}),
+    };
+  }
+
   private cycleQuestionLayout(input: CycleProposalInput): CycleQuestionLayout {
     const raw = input.context.guidance.areaGenerationConfig?.questionnaireLayoutJson;
     const root =
@@ -1430,6 +1696,70 @@ export class AiProposalProviderService {
         `La risposta proposta ${providerName} non e un JSON valido`,
       );
     }
+  }
+
+  private parseHistorySummaryJson(outputText: string, providerName: string) {
+    try {
+      return JSON.parse(outputText) as {
+        summaryText?: string;
+        stableSignals?: string[];
+        completedWork?: string[];
+        unresolvedRisks?: string[];
+        progressionNotes?: string[];
+      };
+    } catch {
+      throw new BadRequestException(
+        `La risposta sunto storico ${providerName} non e un JSON valido`,
+      );
+    }
+  }
+
+  private normalizeHistorySummary(
+    provider: AiProvider,
+    model: string,
+    parsed: {
+      summaryText?: string;
+      stableSignals?: string[];
+      completedWork?: string[];
+      unresolvedRisks?: string[];
+      progressionNotes?: string[];
+    },
+    inputJson: Record<string, unknown>,
+    startedAt: number,
+  ): CycleHistorySummaryResult {
+    const summaryJson = {
+      stableSignals: this.stringList(parsed.stableSignals),
+      completedWork: this.stringList(parsed.completedWork),
+      unresolvedRisks: this.stringList(parsed.unresolvedRisks),
+      progressionNotes: this.stringList(parsed.progressionNotes),
+    };
+    const summaryText =
+      parsed.summaryText?.trim() ||
+      [
+        ...summaryJson.stableSignals,
+        ...summaryJson.completedWork,
+        ...summaryJson.unresolvedRisks,
+        ...summaryJson.progressionNotes,
+      ].join('\n') ||
+      'Nessun elemento storico sintetizzabile oltre agli ultimi tre cicli.';
+
+    return {
+      provider,
+      model,
+      promptVersion: HISTORY_SUMMARY_VERSION,
+      promptHash: this.hashJson(inputJson),
+      summaryText,
+      summaryJson,
+      inputJson,
+      outputJson: { summaryText, ...summaryJson },
+      latencyMs: Date.now() - startedAt,
+    };
+  }
+
+  private stringList(value?: unknown) {
+    return Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === 'string').slice(0, 12)
+      : [];
   }
 
   private parseSpecialistOnboardingQuestionJson(
@@ -1871,6 +2201,17 @@ export class AiProposalProviderService {
         system: this.buildSystemPrompt(input),
         user: providerPrompt,
         responseJsonSchema: this.buildProposalJsonSchema(input),
+      },
+    };
+  }
+
+  private buildHistorySummaryAuditInput(input: CycleHistorySummaryInput) {
+    return {
+      prompt: {
+        system:
+          'Riassumi storico atleta vecchio per prompt futuri, senza inventare dati.',
+        user: this.buildHistorySummaryPrompt(input),
+        responseJsonSchema: this.buildHistorySummaryJsonSchema(),
       },
     };
   }

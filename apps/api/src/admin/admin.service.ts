@@ -785,6 +785,12 @@ export class AdminService {
           select: { id: true },
         })
       ).map((item) => item.id);
+      const trainingPlanReleaseIds = (
+        await tx.trainingPlanRelease.findMany({
+          where: { userId },
+          select: { id: true },
+        })
+      ).map((item) => item.id);
       const snapshotIds = (
         await tx.performanceProfileSnapshot.findMany({
           where: { userId },
@@ -795,6 +801,35 @@ export class AdminService {
         ? (
             await tx.question.findMany({
               where: { questionSetId: { in: questionSetIds } },
+              select: { id: true },
+            })
+          ).map((item) => item.id)
+        : [];
+      const trainingQuestionSetIds = (
+        await tx.trainingQuestionSet.findMany({
+          where: {
+            OR: [
+              { userId },
+              ...(trainingPlanReleaseIds.length
+                ? [
+                    {
+                      trainingPlanReleaseId: {
+                        in: trainingPlanReleaseIds,
+                      },
+                    },
+                  ]
+                : []),
+            ],
+          },
+          select: { id: true },
+        })
+      ).map((item) => item.id);
+      const trainingQuestionIds = trainingQuestionSetIds.length
+        ? (
+            await tx.trainingQuestion.findMany({
+              where: {
+                trainingQuestionSetId: { in: trainingQuestionSetIds },
+              },
               select: { id: true },
             })
           ).map((item) => item.id)
@@ -818,8 +853,17 @@ export class AdminService {
       if (questionIds.length) {
         userAnswerWhere.push({ questionId: { in: questionIds } });
       }
+      const trainingUserAnswerWhere: Prisma.TrainingUserAnswerWhereInput[] = [
+        { userId },
+      ];
+      if (trainingQuestionIds.length) {
+        trainingUserAnswerWhere.push({
+          trainingQuestionId: { in: trainingQuestionIds },
+        });
+      }
 
       const deleted = {
+        consents: (await tx.consent.deleteMany({ where: { userId } })).count,
         dataAccessAudits: (
           await tx.dataAccessAudit.deleteMany({
             where: { OR: [{ targetUserId: userId }, { actorId: userId }] },
@@ -843,6 +887,9 @@ export class AdminService {
               OR: aiContextSummaryWhere,
             },
           })
+        ).count,
+        aiCycleHistorySummaries: (
+          await tx.aiCycleHistorySummary.deleteMany({ where: { userId } })
         ).count,
         questionSetApprovals: questionSetIds.length
           ? (
@@ -885,6 +932,48 @@ export class AdminService {
         planReleases: (
           await tx.improvementPlanRelease.deleteMany({ where: { userId } })
         ).count,
+        trainingUserAnswers: (
+          await tx.trainingUserAnswer.deleteMany({
+            where: { OR: trainingUserAnswerWhere },
+          })
+        ).count,
+        trainingAnswerOptions: trainingQuestionIds.length
+          ? (
+              await tx.trainingAnswerOption.deleteMany({
+                where: { trainingQuestionId: { in: trainingQuestionIds } },
+              })
+            ).count
+          : 0,
+        trainingQuestions: trainingQuestionSetIds.length
+          ? (
+              await tx.trainingQuestion.deleteMany({
+                where: {
+                  trainingQuestionSetId: { in: trainingQuestionSetIds },
+                },
+              })
+            ).count
+          : 0,
+        trainingQuestionSetApprovals: trainingQuestionSetIds.length
+          ? (
+              await tx.trainingQuestionSetCoachApproval.deleteMany({
+                where: {
+                  trainingQuestionSetId: { in: trainingQuestionSetIds },
+                },
+              })
+            ).count
+          : 0,
+        trainingQuestionSets: (
+          await tx.trainingQuestionSet.deleteMany({ where: { userId } })
+        ).count,
+        trainingPlanItems: trainingPlanReleaseIds.length
+          ? (
+              await tx.trainingPlanItem.deleteMany({
+                where: {
+                  trainingPlanReleaseId: { in: trainingPlanReleaseIds },
+                },
+              })
+            ).count
+          : 0,
         trainingPlanReleases: (
           await tx.trainingPlanRelease.deleteMany({ where: { userId } })
         ).count,
@@ -899,7 +988,14 @@ export class AdminService {
           await tx.performanceProfileSnapshot.deleteMany({ where: { userId } })
         ).count,
         professionalLinks: (
-          await tx.professionalUserLink.deleteMany({ where: { userId } })
+          await tx.professionalUserLink.deleteMany({
+            where: { OR: [{ userId }, { professionalId: userId }] },
+          })
+        ).count,
+        coachLinks: (
+          await tx.coachUserLink.deleteMany({
+            where: { OR: [{ userId }, { coachId: userId }] },
+          })
         ).count,
         feedbackEntries: (
           await tx.feedbackEntry.deleteMany({ where: { userId } })
@@ -926,23 +1022,13 @@ export class AdminService {
         performanceGoal: (
           await tx.userPerformanceGoal.deleteMany({ where: { userId } })
         ).count,
+        onboardingAssessment: (
+          await tx.userOnboardingAssessment.deleteMany({ where: { userId } })
+        ).count,
       };
 
-      const resetUser = await tx.user.update({
+      const resetUser = await tx.user.findUniqueOrThrow({
         where: { id: userId },
-        data: {
-          onboardingAssessment: {
-            upsert: {
-              update: {
-                status: 'PENDING',
-                answersJson: Prisma.JsonNull,
-                profileJson: Prisma.JsonNull,
-                completedAt: null,
-              },
-              create: { status: 'PENDING' },
-            },
-          },
-        },
         select: {
           id: true,
           email: true,
@@ -954,7 +1040,59 @@ export class AdminService {
         },
       });
 
-      return { user: resetUser, deleted };
+      const residual = {
+        consents: await tx.consent.count({ where: { userId } }),
+        onboardingAssessment: await tx.userOnboardingAssessment.count({
+          where: { userId },
+        }),
+        onboardingQuestions: await tx.userOnboardingQuestion.count({
+          where: { userId },
+        }),
+        sportSelection: await tx.userSportSelection.count({ where: { userId } }),
+        performanceGoal: await tx.userPerformanceGoal.count({ where: { userId } }),
+        areaPromptInstructions: await tx.userAreaPromptInstruction.count({
+          where: { userId },
+        }),
+        planReleases: await tx.improvementPlanRelease.count({ where: { userId } }),
+        trainingPlanReleases: await tx.trainingPlanRelease.count({
+          where: { userId },
+        }),
+        questionSets: await tx.questionSet.count({ where: { userId } }),
+        trainingQuestionSets: await tx.trainingQuestionSet.count({
+          where: { userId },
+        }),
+        userAnswers: await tx.userAnswer.count({ where: { userId } }),
+        trainingUserAnswers: await tx.trainingUserAnswer.count({
+          where: { userId },
+        }),
+        snapshots: await tx.performanceProfileSnapshot.count({
+          where: { userId },
+        }),
+        professionalLinks: await tx.professionalUserLink.count({
+          where: { OR: [{ userId }, { professionalId: userId }] },
+        }),
+        coachLinks: await tx.coachUserLink.count({
+          where: { OR: [{ userId }, { coachId: userId }] },
+        }),
+        feedbackEntries: await tx.feedbackEntry.count({ where: { userId } }),
+        assignments: await tx.userAssignment.count({ where: { userId } }),
+        currentStates: await tx.currentState.count({ where: { userId } }),
+        kpiDaily: await tx.kpiDaily.count({ where: { userId } }),
+        aiInteractions: await tx.aiInteraction.count({ where: { userId } }),
+        aiContextSummaries: await tx.aiContextSummary.count({ where: { userId } }),
+        aiCycleHistorySummaries: await tx.aiCycleHistorySummary.count({
+          where: { userId },
+        }),
+        aiProposalAudits: await tx.aiProposalAudit.count({ where: { userId } }),
+        dataAccessAudits: await tx.dataAccessAudit.count({
+          where: { OR: [{ targetUserId: userId }, { actorId: userId }] },
+        }),
+        cycleAuditLogs: await tx.cycleAuditLog.count({
+          where: { OR: [{ userId }, { actorId: userId }] },
+        }),
+      };
+
+      return { user: resetUser, deleted, residual };
     });
   }
 
