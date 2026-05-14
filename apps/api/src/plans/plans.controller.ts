@@ -1,5 +1,21 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiBody, ApiCookieAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBody,
+  ApiCookieAuth,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { PlansService } from './plans.service';
@@ -11,7 +27,9 @@ export class PlansController {
   constructor(private readonly plans: PlansService) {}
 
   @Get('current')
-  @ApiOperation({ summary: 'Ottieni rilascio allenamento miglioramento corrente' })
+  @ApiOperation({
+    summary: 'Ottieni rilascio allenamento miglioramento corrente',
+  })
   @ApiQuery({ name: 'userId', required: false })
   @ApiQuery({ name: 'areaId', required: true })
   @ApiCookieAuth()
@@ -47,7 +65,10 @@ export class PlansController {
   }
 
   @Get('approvals/pending')
-  @ApiOperation({ summary: 'Elenca approvazioni attivita allenamento in attesa per professionista' })
+  @ApiOperation({
+    summary:
+      'Elenca approvazioni attivita allenamento in attesa per professionista',
+  })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
   getPendingApprovals(@Req() req: { user?: { id: string; role: UserRole } }) {
@@ -58,7 +79,9 @@ export class PlansController {
   }
 
   @Post('items/:itemId/approve')
-  @ApiOperation({ summary: 'Approva una attivita allenamento (professionista)' })
+  @ApiOperation({
+    summary: 'Approva una attivita allenamento (professionista)',
+  })
   @ApiParam({ name: 'itemId' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
@@ -73,7 +96,9 @@ export class PlansController {
   }
 
   @Post('items/:itemId/reject')
-  @ApiOperation({ summary: 'Rifiuta una attivita allenamento (professionista)' })
+  @ApiOperation({
+    summary: 'Rifiuta una attivita allenamento (professionista)',
+  })
   @ApiParam({ name: 'itemId' })
   @ApiBody({ type: PlanItemApprovalDto })
   @ApiCookieAuth()

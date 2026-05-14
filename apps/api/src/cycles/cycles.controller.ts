@@ -1,5 +1,10 @@
 import { Controller, Get, Param, Req, UseGuards } from '@nestjs/common';
-import { ApiCookieAuth, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCookieAuth,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { CyclesService } from './cycles.service';
@@ -10,7 +15,9 @@ export class CyclesController {
   constructor(private readonly cycles: CyclesService) {}
 
   @Get(':cycleId/status')
-  @ApiOperation({ summary: 'Ottieni stato ciclo (amministratore/professionista)' })
+  @ApiOperation({
+    summary: 'Ottieni stato ciclo (amministratore/professionista)',
+  })
   @ApiParam({ name: 'cycleId' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)

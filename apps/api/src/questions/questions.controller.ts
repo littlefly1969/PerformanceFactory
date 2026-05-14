@@ -81,7 +81,9 @@ export class QuestionsController {
   }
 
   @Get('approvals/pending')
-  @ApiOperation({ summary: 'Elenca approvazioni questionari in attesa per professionista' })
+  @ApiOperation({
+    summary: 'Elenca approvazioni questionari in attesa per professionista',
+  })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
   getPendingApprovals(@Req() req: { user?: { id: string; role: UserRole } }) {
@@ -155,7 +157,9 @@ export class QuestionsController {
   }
 
   @Patch('questions/:questionId/options/:optionId')
-  @ApiOperation({ summary: 'Aggiorna una opzione risposta (solo professionista)' })
+  @ApiOperation({
+    summary: 'Aggiorna una opzione risposta (solo professionista)',
+  })
   @ApiParam({ name: 'questionId' })
   @ApiParam({ name: 'optionId' })
   @ApiBody({ type: UpdateAnswerOptionDto })

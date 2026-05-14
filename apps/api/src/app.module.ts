@@ -1,4 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Logger, Module } from '@nestjs/common';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -19,9 +21,38 @@ import { ProfessionalModule } from './professional/professional.module';
 import { CyclesModule } from './cycles/cycles.module';
 import { InspectModule } from './inspect/inspect.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
+import { AiTuningModule } from './ai-tuning/ai-tuning.module';
+
+function buildThrottlerStorage() {
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'REDIS_URL e obbligatorio in produzione per il rate limiter',
+      );
+    }
+    new Logger('Throttler').warn(
+      'REDIS_URL assente, rate limiter in modalita in-memory (solo dev)',
+    );
+    return undefined;
+  }
+  return new ThrottlerStorageRedisService(redisUrl);
+}
 
 @Module({
   imports: [
+    ThrottlerModule.forRootAsync({
+      useFactory: () => ({
+        throttlers: [
+          {
+            name: 'register-athlete',
+            ttl: 15 * 60 * 1000,
+            limit: 3,
+          },
+        ],
+        storage: buildThrottlerStorage(),
+      }),
+    }),
     PrismaModule,
     AuthModule,
     RelationshipsModule,
@@ -40,6 +71,7 @@ import { OnboardingModule } from './onboarding/onboarding.module';
     CyclesModule,
     InspectModule,
     OnboardingModule,
+    AiTuningModule,
   ],
   controllers: [AppController],
   providers: [AppService],

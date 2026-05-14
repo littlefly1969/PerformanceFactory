@@ -47,7 +47,9 @@ export class AuthService {
           'Candidatura rifiutata. Puoi riproporre una nuova richiesta di registrazione.',
         );
       }
-      throw new UnauthorizedException('Account in attesa di attivazione amministratore');
+      throw new UnauthorizedException(
+        'Account in attesa di attivazione amministratore',
+      );
     }
 
     const ok = await bcrypt.compare(password, user.password);
@@ -78,7 +80,9 @@ export class AuthService {
       throw new BadRequestException('Dati registrazione atleta mancanti');
     }
     if (password.length < 8) {
-      throw new BadRequestException('La password deve avere almeno 8 caratteri');
+      throw new BadRequestException(
+        'La password deve avere almeno 8 caratteri',
+      );
     }
     if (this.consents) {
       await this.consents.assertAcceptedCurrentDocuments(input);
@@ -318,7 +322,9 @@ export class AuthService {
   }
 
   issueAccessToken(user: unknown) {
-    const safe = this.sanitizeUser(user as { password?: string }) as SafeUser & {
+    const safe = this.sanitizeUser(
+      user as { password?: string },
+    ) as SafeUser & {
       role: UserRole;
     };
     const token = signAccessToken({

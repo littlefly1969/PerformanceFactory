@@ -1,5 +1,10 @@
 import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiCookieAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCookieAuth,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -12,7 +17,9 @@ export class UserQuestionsController {
   constructor(private readonly questions: QuestionsService) {}
 
   @Get('current')
-  @ApiOperation({ summary: 'Ottieni questionario pubblicato corrente per utente' })
+  @ApiOperation({
+    summary: 'Ottieni questionario pubblicato corrente per utente',
+  })
   @ApiQuery({ name: 'areaId', required: true })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -21,10 +28,14 @@ export class UserQuestionsController {
     @Req() req: { user?: { id: string; role: UserRole } },
     @Query('areaId') areaId?: string,
   ) {
-    return this.questions.getCurrentQuestionSet({
-      id: req.user?.id ?? '',
-      role: req.user?.role ?? UserRole.USER,
-    }, undefined, areaId);
+    return this.questions.getCurrentQuestionSet(
+      {
+        id: req.user?.id ?? '',
+        role: req.user?.role ?? UserRole.USER,
+      },
+      undefined,
+      areaId,
+    );
   }
 
   @Get('history')
@@ -37,9 +48,13 @@ export class UserQuestionsController {
     @Req() req: { user?: { id: string; role: UserRole } },
     @Query('areaId') areaId?: string,
   ) {
-    return this.questions.getQuestionSetHistory({
-      id: req.user?.id ?? '',
-      role: req.user?.role ?? UserRole.USER,
-    }, undefined, areaId);
+    return this.questions.getQuestionSetHistory(
+      {
+        id: req.user?.id ?? '',
+        role: req.user?.role ?? UserRole.USER,
+      },
+      undefined,
+      areaId,
+    );
   }
 }

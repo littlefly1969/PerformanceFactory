@@ -51,7 +51,8 @@ export class PerformanceService {
       actor.role === UserRole.PROFESSIONAL && targetUserId !== actor.id
         ? await this.getAllowedAreaIds(actor.id)
         : null;
-    const enabledDriverAreaIds = await this.getEnabledDriverAreaIds(targetUserId);
+    const enabledDriverAreaIds =
+      await this.getEnabledDriverAreaIds(targetUserId);
 
     const snapshot = await this.prisma.performanceProfileSnapshot.findFirst({
       where: { userId: targetUserId },
@@ -77,7 +78,11 @@ export class PerformanceService {
       throw new NotFoundException('Profilo performance non trovato');
     }
 
-    return this.filterSnapshotAreas(snapshot, allowedAreaIds, enabledDriverAreaIds);
+    return this.filterSnapshotAreas(
+      snapshot,
+      allowedAreaIds,
+      enabledDriverAreaIds,
+    );
   }
 
   async getProfileHistory(actor: Actor, userId?: string) {
@@ -87,7 +92,8 @@ export class PerformanceService {
       actor.role === UserRole.PROFESSIONAL && targetUserId !== actor.id
         ? await this.getAllowedAreaIds(actor.id)
         : null;
-    const enabledDriverAreaIds = await this.getEnabledDriverAreaIds(targetUserId);
+    const enabledDriverAreaIds =
+      await this.getEnabledDriverAreaIds(targetUserId);
 
     const snapshots = await this.prisma.performanceProfileSnapshot.findMany({
       where: { userId: targetUserId },
@@ -115,11 +121,10 @@ export class PerformanceService {
   }
 
   private async getAllowedAreaIds(professionalId: string) {
-    const competences =
-      await this.prisma.professionalAreaCompetence.findMany({
-        where: { professionalId },
-        select: { areaId: true },
-      });
+    const competences = await this.prisma.professionalAreaCompetence.findMany({
+      where: { professionalId },
+      select: { areaId: true },
+    });
 
     return new Set(competences.map((item) => item.areaId));
   }
@@ -140,7 +145,9 @@ export class PerformanceService {
       },
       select: { areaId: true },
     });
-    return prompts.length ? new Set(prompts.map((prompt) => prompt.areaId)) : null;
+    return prompts.length
+      ? new Set(prompts.map((prompt) => prompt.areaId))
+      : null;
   }
 
   private filterSnapshotAreas<
@@ -173,7 +180,11 @@ export class PerformanceService {
     };
   }
 
-  private async auditAccess(actor: Actor, targetUserId: string, resource: string) {
+  private async auditAccess(
+    actor: Actor,
+    targetUserId: string,
+    resource: string,
+  ) {
     await this.prisma.dataAccessAudit.create({
       data: {
         actorId: actor.id,

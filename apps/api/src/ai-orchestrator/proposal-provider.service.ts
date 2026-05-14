@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
+import { aiFetch } from '../common/ai-fetch';
 
 export type AiScaleConfig = {
   minScore: number;
@@ -144,6 +145,10 @@ export type CycleProposal = {
     inputJson: Record<string, unknown>;
     outputJson: Record<string, unknown>;
     latencyMs: number;
+    correlationId: string;
+    inputTokens?: number | null;
+    outputTokens?: number | null;
+    totalTokens?: number | null;
   };
   planItems: Array<{
     type: string;
@@ -443,12 +448,15 @@ export class AiProposalProviderService {
           },
         },
       ],
-      questions: Array.from({ length: questionLayout.questions }, (_, index) => ({
-        text: `${input.area.name}: verifica ${index + 1}`,
-        objectiveRef: `area:${input.area.id}`,
-        orderIndex: index + 1,
-        options: questionLayout.answerOptions,
-      })),
+      questions: Array.from(
+        { length: questionLayout.questions },
+        (_, index) => ({
+          text: `${input.area.name}: verifica ${index + 1}`,
+          objectiveRef: `area:${input.area.id}`,
+          orderIndex: index + 1,
+          options: questionLayout.answerOptions,
+        }),
+      ),
     } satisfies Omit<CycleProposal, 'audit'>;
 
     return {
@@ -458,6 +466,10 @@ export class AiProposalProviderService {
         inputJson,
         outputJson: this.buildAuditOutput(proposal),
         latencyMs: Date.now() - startedAt,
+        correlationId: randomUUID(),
+        inputTokens: null,
+        outputTokens: null,
+        totalTokens: null,
       },
     };
   }
@@ -476,43 +488,47 @@ export class AiProposalProviderService {
 
     const model = this.resolveModel('openai');
     this.logDebugPrompt('openai', model, inputJson);
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        input: [
-          {
-            role: 'system',
-            content: this.buildSystemPrompt(input),
-          },
-          {
-            role: 'user',
-            content: JSON.stringify(this.buildProposalPrompt(input)),
-          },
-        ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'performance_cycle_proposal',
-            strict: true,
-            schema: this.buildProposalJsonSchema(input),
-          },
+    const response = await aiFetch(
+      'https://api.openai.com/v1/responses',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
         },
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new BadRequestException(`Proposta OpenAI non riuscita: ${errorText}`);
-    }
+        body: JSON.stringify({
+          model,
+          input: [
+            {
+              role: 'system',
+              content: this.buildSystemPrompt(input),
+            },
+            {
+              role: 'user',
+              content: JSON.stringify(this.buildProposalPrompt(input)),
+            },
+          ],
+          text: {
+            format: {
+              type: 'json_schema',
+              name: 'performance_cycle_proposal',
+              strict: true,
+              schema: this.buildProposalJsonSchema(input),
+            },
+          },
+        }),
+      },
+      { provider: 'openai' },
+    );
 
     const payload = (await response.json()) as {
       output_text?: string;
       output?: Array<{ content?: Array<{ text?: string }> }>;
+      usage?: {
+        input_tokens?: number;
+        output_tokens?: number;
+        total_tokens?: number;
+      };
     };
     const outputText =
       payload.output_text ??
@@ -534,6 +550,11 @@ export class AiProposalProviderService {
       parsed,
       inputJson,
       startedAt,
+      {
+        inputTokens: payload.usage?.input_tokens ?? null,
+        outputTokens: payload.usage?.output_tokens ?? null,
+        totalTokens: payload.usage?.total_tokens ?? null,
+      },
     );
   }
 
@@ -554,7 +575,7 @@ export class AiProposalProviderService {
     const modelName = model.startsWith('models/')
       ? model.slice('models/'.length)
       : model;
-    const response = await fetch(
+    const response = await aiFetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent`,
       {
         method: 'POST',
@@ -582,12 +603,8 @@ export class AiProposalProviderService {
           },
         }),
       },
+      { provider: 'gemini' },
     );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new BadRequestException(`Proposta Gemini non riuscita: ${errorText}`);
-    }
 
     const payload = (await response.json()) as {
       candidates?: Array<{
@@ -595,6 +612,11 @@ export class AiProposalProviderService {
         content?: { parts?: Array<{ text?: string }> };
       }>;
       promptFeedback?: { blockReason?: string };
+      usageMetadata?: {
+        promptTokenCount?: number;
+        candidatesTokenCount?: number;
+        totalTokenCount?: number;
+      };
     };
     const outputText = payload.candidates?.[0]?.content?.parts
       ?.map((part) => part.text)
@@ -620,6 +642,11 @@ export class AiProposalProviderService {
       parsed,
       inputJson,
       startedAt,
+      {
+        inputTokens: payload.usageMetadata?.promptTokenCount ?? null,
+        outputTokens: payload.usageMetadata?.candidatesTokenCount ?? null,
+        totalTokens: payload.usageMetadata?.totalTokenCount ?? null,
+      },
     );
   }
 
@@ -637,40 +664,39 @@ export class AiProposalProviderService {
 
     const model = this.resolveModel('openai');
     this.logDebugPrompt('openai', model, inputJson);
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        input: [
-          {
-            role: 'system',
-            content:
-              'Riassumi lo storico atleta per uso tecnico in prompt futuri. Rispondi solo con JSON valido, in italiano, senza inventare dati non presenti.',
-          },
-          {
-            role: 'user',
-            content: JSON.stringify(this.buildHistorySummaryPrompt(input)),
-          },
-        ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'cycle_history_summary',
-            strict: true,
-            schema: this.buildHistorySummaryJsonSchema(),
-          },
+    const response = await aiFetch(
+      'https://api.openai.com/v1/responses',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
         },
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new BadRequestException(`Sunto storico OpenAI non riuscito: ${errorText}`);
-    }
+        body: JSON.stringify({
+          model,
+          input: [
+            {
+              role: 'system',
+              content:
+                'Riassumi lo storico atleta per uso tecnico in prompt futuri. Rispondi solo con JSON valido, in italiano, senza inventare dati non presenti.',
+            },
+            {
+              role: 'user',
+              content: JSON.stringify(this.buildHistorySummaryPrompt(input)),
+            },
+          ],
+          text: {
+            format: {
+              type: 'json_schema',
+              name: 'cycle_history_summary',
+              strict: true,
+              schema: this.buildHistorySummaryJsonSchema(),
+            },
+          },
+        }),
+      },
+      { provider: 'openai' },
+    );
 
     const payload = (await response.json()) as {
       output_text?: string;
@@ -712,7 +738,7 @@ export class AiProposalProviderService {
     const modelName = model.startsWith('models/')
       ? model.slice('models/'.length)
       : model;
-    const response = await fetch(
+    const response = await aiFetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent`,
       {
         method: 'POST',
@@ -724,15 +750,16 @@ export class AiProposalProviderService {
           systemInstruction: {
             parts: [
               {
-                text:
-                  'Riassumi lo storico atleta per uso tecnico in prompt futuri. Rispondi solo con JSON valido, in italiano, senza inventare dati non presenti.',
+                text: 'Riassumi lo storico atleta per uso tecnico in prompt futuri. Rispondi solo con JSON valido, in italiano, senza inventare dati non presenti.',
               },
             ],
           },
           contents: [
             {
               role: 'user',
-              parts: [{ text: JSON.stringify(this.buildHistorySummaryPrompt(input)) }],
+              parts: [
+                { text: JSON.stringify(this.buildHistorySummaryPrompt(input)) },
+              ],
             },
           ],
           generationConfig: {
@@ -743,12 +770,8 @@ export class AiProposalProviderService {
           },
         }),
       },
+      { provider: 'gemini' },
     );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new BadRequestException(`Sunto storico Gemini non riuscito: ${errorText}`);
-    }
 
     const payload = (await response.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
@@ -788,44 +811,41 @@ export class AiProposalProviderService {
 
     const model = this.resolveModel('openai');
     this.logDebugPrompt('openai', model, inputJson);
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        input: [
-          {
-            role: 'system',
-            content:
-              'Genera domande anamnestiche specialistiche per sport performance. Rispondi solo con JSON valido, in italiano, senza diagnosi o prescrizioni cliniche.',
-          },
-          {
-            role: 'user',
-            content: JSON.stringify(
-              this.buildSpecialistOnboardingQuestionTask(input),
-            ),
-          },
-        ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'specialist_onboarding_questions',
-            strict: true,
-            schema: this.buildSpecialistOnboardingQuestionJsonSchema(),
-          },
+    const response = await aiFetch(
+      'https://api.openai.com/v1/responses',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
         },
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new BadRequestException(
-        `Domande specialistiche OpenAI non riuscite: ${errorText}`,
-      );
-    }
+        body: JSON.stringify({
+          model,
+          input: [
+            {
+              role: 'system',
+              content:
+                'Genera domande anamnestiche specialistiche per sport performance. Rispondi solo con JSON valido, in italiano, senza diagnosi o prescrizioni cliniche.',
+            },
+            {
+              role: 'user',
+              content: JSON.stringify(
+                this.buildSpecialistOnboardingQuestionTask(input),
+              ),
+            },
+          ],
+          text: {
+            format: {
+              type: 'json_schema',
+              name: 'specialist_onboarding_questions',
+              strict: true,
+              schema: this.buildSpecialistOnboardingQuestionJsonSchema(),
+            },
+          },
+        }),
+      },
+      { provider: 'openai' },
+    );
 
     const payload = (await response.json()) as {
       output_text?: string;
@@ -865,36 +885,35 @@ export class AiProposalProviderService {
 
     const model = this.resolveModel('openai');
     this.logDebugPrompt('openai', model, inputJson);
-    const response = await fetch('https://api.openai.com/v1/responses', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        input: [
-          { role: 'system', content: input.basePrompt },
-          {
-            role: 'user',
-            content: JSON.stringify(this.buildGoalValidationTask(input)),
-          },
-        ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'goal_validation',
-            strict: true,
-            schema: this.buildGoalValidationJsonSchema(input),
-          },
+    const response = await aiFetch(
+      'https://api.openai.com/v1/responses',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
         },
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new BadRequestException(`Validazione obiettivo OpenAI non riuscita: ${errorText}`);
-    }
+        body: JSON.stringify({
+          model,
+          input: [
+            { role: 'system', content: input.basePrompt },
+            {
+              role: 'user',
+              content: JSON.stringify(this.buildGoalValidationTask(input)),
+            },
+          ],
+          text: {
+            format: {
+              type: 'json_schema',
+              name: 'goal_validation',
+              strict: true,
+              schema: this.buildGoalValidationJsonSchema(input),
+            },
+          },
+        }),
+      },
+      { provider: 'openai' },
+    );
 
     const payload = (await response.json()) as {
       output_text?: string;
@@ -907,7 +926,9 @@ export class AiProposalProviderService {
         .map((content) => content.text)
         .find((text): text is string => !!text);
     if (!outputText) {
-      throw new BadRequestException('La risposta validazione obiettivo OpenAI e vuota');
+      throw new BadRequestException(
+        'La risposta validazione obiettivo OpenAI e vuota',
+      );
     }
     return this.normalizeGoalValidation(
       input,
@@ -934,7 +955,7 @@ export class AiProposalProviderService {
     const modelName = model.startsWith('models/')
       ? model.slice('models/'.length)
       : model;
-    const response = await fetch(
+    const response = await aiFetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent`,
       {
         method: 'POST',
@@ -946,8 +967,7 @@ export class AiProposalProviderService {
           systemInstruction: {
             parts: [
               {
-                text:
-                  'Genera domande anamnestiche specialistiche per sport performance. Rispondi solo con JSON valido, in italiano, senza diagnosi o prescrizioni cliniche.',
+                text: 'Genera domande anamnestiche specialistiche per sport performance. Rispondi solo con JSON valido, in italiano, senza diagnosi o prescrizioni cliniche.',
               },
             ],
           },
@@ -972,14 +992,8 @@ export class AiProposalProviderService {
           },
         }),
       },
+      { provider: 'gemini' },
     );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new BadRequestException(
-        `Domande specialistiche Gemini non riuscite: ${errorText}`,
-      );
-    }
 
     const payload = (await response.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
@@ -1022,7 +1036,7 @@ export class AiProposalProviderService {
     const modelName = model.startsWith('models/')
       ? model.slice('models/'.length)
       : model;
-    const response = await fetch(
+    const response = await aiFetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent`,
       {
         method: 'POST',
@@ -1048,12 +1062,8 @@ export class AiProposalProviderService {
           },
         }),
       },
+      { provider: 'gemini' },
     );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new BadRequestException(`Validazione obiettivo Gemini non riuscita: ${errorText}`);
-    }
 
     const payload = (await response.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
@@ -1094,6 +1104,11 @@ export class AiProposalProviderService {
     },
     inputJson: Record<string, unknown>,
     startedAt: number,
+    usage?: {
+      inputTokens?: number | null;
+      outputTokens?: number | null;
+      totalTokens?: number | null;
+    },
   ): CycleProposal {
     const questionLayout = this.cycleQuestionLayout(input);
     const planItems = (parsed.planItems ?? [])
@@ -1124,8 +1139,13 @@ export class AiProposalProviderService {
         options: questionLayout.answerOptions,
       }));
 
-    if (planItems.length === 0 || questions.length !== questionLayout.questions) {
-      throw new BadRequestException(`Validazione proposta ${provider} non riuscita`);
+    if (
+      planItems.length === 0 ||
+      questions.length !== questionLayout.questions
+    ) {
+      throw new BadRequestException(
+        `Validazione proposta ${provider} non riuscita`,
+      );
     }
 
     const proposal = {
@@ -1145,6 +1165,10 @@ export class AiProposalProviderService {
         inputJson,
         outputJson: this.buildAuditOutput(proposal),
         latencyMs: Date.now() - startedAt,
+        correlationId: randomUUID(),
+        inputTokens: usage?.inputTokens ?? null,
+        outputTokens: usage?.outputTokens ?? null,
+        totalTokens: usage?.totalTokens ?? null,
       },
     };
   }
@@ -1185,8 +1209,7 @@ export class AiProposalProviderService {
 
   private buildHistorySummaryPrompt(input: CycleHistorySummaryInput) {
     return {
-      task:
-        'Produci un sunto tecnico dei cicli storici piu vecchi, da aggiungere ai prompt futuri senza sostituire gli ultimi tre cicli completi.',
+      task: 'Produci un sunto tecnico dei cicli storici piu vecchi, da aggiungere ai prompt futuri senza sostituire gli ultimi tre cicli completi.',
       scope: input.scope,
       targetLabel: input.targetLabel,
       coveredCycles: input.coveredCycles,
@@ -1206,8 +1229,7 @@ export class AiProposalProviderService {
     input: SpecialistOnboardingQuestionInput,
   ) {
     return {
-      task:
-        'Genera esattamente tre domande anamnestiche specialistiche per ciascuna area ufficiale. Le domande saranno mostrate all atleta dopo l anamnesi generale.',
+      task: 'Genera esattamente tre domande anamnestiche specialistiche per ciascuna area ufficiale. Le domande saranno mostrate all atleta dopo l anamnesi generale.',
       language: 'Italiano',
       athleteGoal: input.goalText,
       interpretedGoal: input.interpretedGoal,
@@ -1251,7 +1273,9 @@ export class AiProposalProviderService {
   }
 
   private buildGoalValidationTask(input: GoalValidationInput) {
-    const finalValidation = Boolean(input.onboardingProfile || input.onboardingAnswers);
+    const finalValidation = Boolean(
+      input.onboardingProfile || input.onboardingAnswers,
+    );
     return {
       task: 'Valida l obiettivo iniziale Performance Factory e, solo se status=OK, genera prompt specialistici per le aree abilitate.',
       evaluationPhase: finalValidation
@@ -1632,7 +1656,8 @@ export class AiProposalProviderService {
   }
 
   private cycleQuestionLayout(input: CycleProposalInput): CycleQuestionLayout {
-    const raw = input.context.guidance.areaGenerationConfig?.questionnaireLayoutJson;
+    const raw =
+      input.context.guidance.areaGenerationConfig?.questionnaireLayoutJson;
     const root =
       raw && typeof raw === 'object' && !Array.isArray(raw)
         ? (raw as Record<string, unknown>)
@@ -1654,7 +1679,11 @@ export class AiProposalProviderService {
     const answerOptions = Array.isArray(rawOptions)
       ? rawOptions
           .map((option) => {
-            if (!option || typeof option !== 'object' || Array.isArray(option)) {
+            if (
+              !option ||
+              typeof option !== 'object' ||
+              Array.isArray(option)
+            ) {
               return null;
             }
             const item = option as Record<string, unknown>;
@@ -1758,7 +1787,9 @@ export class AiProposalProviderService {
 
   private stringList(value?: unknown) {
     return Array.isArray(value)
-      ? value.filter((item): item is string => typeof item === 'string').slice(0, 12)
+      ? value
+          .filter((item): item is string => typeof item === 'string')
+          .slice(0, 12)
       : [];
   }
 
@@ -1830,7 +1861,10 @@ export class AiProposalProviderService {
         ? `Ho capito questo obiettivo: ${interpretedGoal}`
         : 'Quanto richiesto non e consono a un percorso di performance sportiva.');
     const areaPrompts = accepted
-      ? this.normalizeAreaPromptsFromValidation(input, parsed.area_prompts ?? {})
+      ? this.normalizeAreaPromptsFromValidation(
+          input,
+          parsed.area_prompts ?? {},
+        )
       : [];
     return {
       provider,
@@ -1848,7 +1882,11 @@ export class AiProposalProviderService {
       ),
       normalizedGoal,
       goalEvaluation,
-      nextStep: parsed.next_step ?? (accepted ? 'Procedere con il percorso.' : 'Attendere nuovo obiettivo.'),
+      nextStep:
+        parsed.next_step ??
+        (accepted
+          ? 'Procedere con il percorso.'
+          : 'Attendere nuovo obiettivo.'),
       rejectionReason: accepted
         ? null
         : parsed.suggested_reformulated_goal ||
@@ -1904,7 +1942,8 @@ export class AiProposalProviderService {
   ) {
     return input.areas.map((area) => {
       const key = this.areaPromptKey(area.name);
-      const prompt = areaPrompts[key] ?? areaPrompts[this.fallbackAreaPromptKey(area.name)];
+      const prompt =
+        areaPrompts[key] ?? areaPrompts[this.fallbackAreaPromptKey(area.name)];
       return {
         areaId: area.id,
         areaName: area.name,
@@ -1916,10 +1955,7 @@ export class AiProposalProviderService {
     });
   }
 
-  private sportInstructionsForArea(
-    input: GoalValidationInput,
-    areaId: string,
-  ) {
+  private sportInstructionsForArea(input: GoalValidationInput, areaId: string) {
     const instructions =
       input.sportSpecializationPromptInstructions?.filter(
         (instruction) => instruction.areaId === areaId,
@@ -2013,7 +2049,9 @@ export class AiProposalProviderService {
     }
     const hasOnboarding = input.onboardingProfile || input.onboardingAnswers;
     return {
-      status: (hasOnboarding ? 'OK' : 'NEEDS_ANAMNESIS') as GoalValidationStatus,
+      status: (hasOnboarding
+        ? 'OK'
+        : 'NEEDS_ANAMNESIS') as GoalValidationStatus,
       goal_evaluation: {
         original_goal: input.goalText,
         is_sport_related: true,
@@ -2053,14 +2091,22 @@ export class AiProposalProviderService {
               {
                 role: `Modulo ${area.name}`,
                 objective: `Personalizzare il lavoro ${area.name} rispetto all obiettivo: ${input.goalText.trim()}${input.sportSelection ? ` nel contesto ${input.sportSelection.label}` : ''}`,
-                required_inputs: ['obiettivo normalizzato', 'anamnesi', 'storico risposte'],
+                required_inputs: [
+                  'obiettivo normalizzato',
+                  'anamnesi',
+                  'storico risposte',
+                ],
                 initial_questionnaire: [],
                 exercise_generation_rules: [
                   'Genera azioni concrete, misurabili e progressive.',
                 ],
                 feedback_questions: [],
                 progression_rules: ['Progredisci in modo prudente.'],
-                measurement_indicators: ['aderenza', 'qualita esecuzione', 'progresso percepito'],
+                measurement_indicators: [
+                  'aderenza',
+                  'qualita esecuzione',
+                  'progresso percepito',
+                ],
                 safety_limits: ['Non fare diagnosi o prescrizioni cliniche.'],
                 output_format: {},
                 sport_context: this.sportInstructionsForArea(input, area.id),
@@ -2237,7 +2283,8 @@ export class AiProposalProviderService {
         responseJsonSchema: this.buildGoalValidationJsonSchema(input),
       },
       sportSelection: input.sportSelection ?? null,
-      sportSpecializationPromptInstructions: input.sportSpecializationPromptInstructions ?? [],
+      sportSpecializationPromptInstructions:
+        input.sportSpecializationPromptInstructions ?? [],
     };
   }
 
@@ -2249,7 +2296,9 @@ export class AiProposalProviderService {
       input.context.guidance.areaGenerationConfig?.responseFormatPrompt;
     const sections = [basePrompt];
     if (responseFormatPrompt) {
-      sections.push(`Forma della risposta configurata:\n${responseFormatPrompt}`);
+      sections.push(
+        `Forma della risposta configurata:\n${responseFormatPrompt}`,
+      );
     }
     if (input.context.guidance.userAreaPromptInstruction) {
       sections.push(
@@ -2262,7 +2311,8 @@ export class AiProposalProviderService {
       );
     }
     if (input.context.guidance.sportSpecializationPromptInstruction) {
-      const sportPrompt = input.context.guidance.sportSpecializationPromptInstruction;
+      const sportPrompt =
+        input.context.guidance.sportSpecializationPromptInstruction;
       sections.push(
         [
           'Prompt sport-specializzazione corrente configurato dall amministratore. Questo prompt prevale su eventuali istruzioni sport vecchie presenti nello storico atleta.',

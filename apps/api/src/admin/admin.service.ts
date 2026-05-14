@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   OnboardingInputType,
   OnboardingQuestionScope,
@@ -342,7 +346,7 @@ export class AdminService {
                 select: {
                   id: true,
                   status: true,
-              professional: { select: { id: true, email: true } },
+                  professional: { select: { id: true, email: true } },
                 },
               },
             },
@@ -571,9 +575,9 @@ export class AdminService {
               ? 'Approvazione gia in attesa'
               : !user.isActive
                 ? 'Atleta in attesa di attivazione amministratore'
-              : !activeActivitiesCompleted
-                ? 'Attivita precedente non completata'
-                : 'Questionario precedente non completato'
+                : !activeActivitiesCompleted
+                  ? 'Attivita precedente non completata'
+                  : 'Questionario precedente non completato'
             : generationReady
               ? active
                 ? 'Pronto per il prossimo ciclo'
@@ -601,13 +605,13 @@ export class AdminService {
         latestSnapshot,
         trainingState: {
           sportSelection: user.sportSelection,
-          linkedCoach:
-            user.sportSelection
-              ? (user.athleteCoachLinks.find(
-                  (link) =>
-                    link.specializationId === user.sportSelection?.specializationId,
-                )?.coach ?? null)
-              : null,
+          linkedCoach: user.sportSelection
+            ? (user.athleteCoachLinks.find(
+                (link) =>
+                  link.specializationId ===
+                  user.sportSelection?.specializationId,
+              )?.coach ?? null)
+            : null,
           pendingTraining:
             user.trainingPlanReleases.find(
               (training) => training.status === 'PENDING_APPROVAL',
@@ -622,36 +626,36 @@ export class AdminService {
             Boolean(user.sportSelection) &&
             Boolean(
               user.sportSelection &&
-                user.athleteCoachLinks.some(
-                  (link) =>
-                    link.specializationId === user.sportSelection?.specializationId,
-                ),
+              user.athleteCoachLinks.some(
+                (link) =>
+                  link.specializationId ===
+                  user.sportSelection?.specializationId,
+              ),
             ) &&
             !user.trainingPlanReleases.some(
               (training) => training.status === 'PENDING_APPROVAL',
             ),
-          reason:
-            !user.isActive
-              ? 'Atleta in attesa di attivazione amministratore'
-              : user.onboardingAssessment?.status !== 'COMPLETED'
-                ? 'Onboarding non completato'
-                : !user.sportSelection
-                  ? 'Sport-specializzazione non selezionata'
-                  : !user.athleteCoachLinks.some(
-                        (link) =>
-                          link.specializationId ===
-                          user.sportSelection?.specializationId,
+          reason: !user.isActive
+            ? 'Atleta in attesa di attivazione amministratore'
+            : user.onboardingAssessment?.status !== 'COMPLETED'
+              ? 'Onboarding non completato'
+              : !user.sportSelection
+                ? 'Sport-specializzazione non selezionata'
+                : !user.athleteCoachLinks.some(
+                      (link) =>
+                        link.specializationId ===
+                        user.sportSelection?.specializationId,
+                    )
+                  ? 'Allenatore non assegnato'
+                  : user.trainingPlanReleases.some(
+                        (training) => training.status === 'PENDING_APPROVAL',
                       )
-                    ? 'Allenatore non assegnato'
+                    ? 'Allenamento gia in approvazione'
                     : user.trainingPlanReleases.some(
-                          (training) => training.status === 'PENDING_APPROVAL',
+                          (training) => training.status === 'ACTIVE',
                         )
-                      ? 'Allenamento gia in approvazione'
-                      : user.trainingPlanReleases.some(
-                            (training) => training.status === 'ACTIVE',
-                          )
-                        ? 'Pronto per rigenerare allenamento'
-                        : 'Pronto per il primo allenamento',
+                      ? 'Pronto per rigenerare allenamento'
+                      : 'Pronto per il primo allenamento',
         },
         areaStates,
       };
@@ -919,9 +923,8 @@ export class AdminService {
               })
             ).count
           : 0,
-        questionSets: (
-          await tx.questionSet.deleteMany({ where: { userId } })
-        ).count,
+        questionSets: (await tx.questionSet.deleteMany({ where: { userId } }))
+          .count,
         planItems: planReleaseIds.length
           ? (
               await tx.planItem.deleteMany({
@@ -1000,12 +1003,10 @@ export class AdminService {
         feedbackEntries: (
           await tx.feedbackEntry.deleteMany({ where: { userId } })
         ).count,
-        assignments: (
-          await tx.userAssignment.deleteMany({ where: { userId } })
-        ).count,
-        currentStates: (
-          await tx.currentState.deleteMany({ where: { userId } })
-        ).count,
+        assignments: (await tx.userAssignment.deleteMany({ where: { userId } }))
+          .count,
+        currentStates: (await tx.currentState.deleteMany({ where: { userId } }))
+          .count,
         kpiDaily: (await tx.kpiDaily.deleteMany({ where: { userId } })).count,
         aiInteractions: (
           await tx.aiInteraction.deleteMany({ where: { userId } })
@@ -1048,12 +1049,18 @@ export class AdminService {
         onboardingQuestions: await tx.userOnboardingQuestion.count({
           where: { userId },
         }),
-        sportSelection: await tx.userSportSelection.count({ where: { userId } }),
-        performanceGoal: await tx.userPerformanceGoal.count({ where: { userId } }),
+        sportSelection: await tx.userSportSelection.count({
+          where: { userId },
+        }),
+        performanceGoal: await tx.userPerformanceGoal.count({
+          where: { userId },
+        }),
         areaPromptInstructions: await tx.userAreaPromptInstruction.count({
           where: { userId },
         }),
-        planReleases: await tx.improvementPlanRelease.count({ where: { userId } }),
+        planReleases: await tx.improvementPlanRelease.count({
+          where: { userId },
+        }),
         trainingPlanReleases: await tx.trainingPlanRelease.count({
           where: { userId },
         }),
@@ -1079,7 +1086,9 @@ export class AdminService {
         currentStates: await tx.currentState.count({ where: { userId } }),
         kpiDaily: await tx.kpiDaily.count({ where: { userId } }),
         aiInteractions: await tx.aiInteraction.count({ where: { userId } }),
-        aiContextSummaries: await tx.aiContextSummary.count({ where: { userId } }),
+        aiContextSummaries: await tx.aiContextSummary.count({
+          where: { userId },
+        }),
         aiCycleHistorySummaries: await tx.aiCycleHistorySummary.count({
           where: { userId },
         }),
@@ -1310,7 +1319,9 @@ export class AdminService {
         select: { id: true, name: true },
       });
       if (!existing) {
-        throw new NotFoundException('Configurazione prompt obiettivo non trovata');
+        throw new NotFoundException(
+          'Configurazione prompt obiettivo non trovata',
+        );
       }
 
       return this.prisma.$transaction(async (tx) => {
@@ -1425,8 +1436,10 @@ export class AdminService {
       for (const specializationInput of specializations) {
         const specializationKey = specializationInput.key?.trim().toUpperCase();
         const specializationLabel = specializationInput.label?.trim();
-        const hasTrainingPrompt = specializationInput.trainingPrompt !== undefined;
-        const trainingPrompt = specializationInput.trainingPrompt?.trim() ?? null;
+        const hasTrainingPrompt =
+          specializationInput.trainingPrompt !== undefined;
+        const trainingPrompt =
+          specializationInput.trainingPrompt?.trim() ?? null;
         if (!specializationKey || !specializationLabel) {
           throw new BadRequestException(
             'Ogni specializzazione richiede codice e nome',
@@ -1568,7 +1581,9 @@ export class AdminService {
       Array.isArray(body.questionnaireLayoutJson) ||
       typeof body.questionnaireLayoutJson !== 'object'
     ) {
-      throw new BadRequestException('Il layout questionario deve essere un oggetto JSON');
+      throw new BadRequestException(
+        'Il layout questionario deve essere un oggetto JSON',
+      );
     }
 
     const area = await this.prisma.area.findUnique({
@@ -1625,10 +1640,7 @@ export class AdminService {
       throw new BadRequestException('Dati template onboarding mancanti');
     }
 
-    if (
-      body.scope === OnboardingQuestionScope.AREA &&
-      !body.areaId
-    ) {
+    if (body.scope === OnboardingQuestionScope.AREA && !body.areaId) {
       throw new BadRequestException('Le domande area richiedono un area');
     }
     if (body.areaId) {
@@ -1645,7 +1657,9 @@ export class AdminService {
       key,
       scope: body.scope,
       areaId:
-        body.scope === OnboardingQuestionScope.AREA ? body.areaId ?? null : null,
+        body.scope === OnboardingQuestionScope.AREA
+          ? (body.areaId ?? null)
+          : null,
       label,
       helpText: body.helpText?.trim() || null,
       inputType: body.inputType,

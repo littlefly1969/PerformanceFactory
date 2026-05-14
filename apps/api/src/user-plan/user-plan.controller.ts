@@ -1,5 +1,22 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
-import { ApiBody, ApiCookieAuth, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBody,
+  ApiCookieAuth,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -85,10 +102,6 @@ export class UserPlanController {
     @Param('id') id: string,
     @Body() body: CompletePlanItemDto,
   ) {
-    return this.userPlan.completeTrainingPlanItem(
-      req.user?.id ?? '',
-      id,
-      body,
-    );
+    return this.userPlan.completeTrainingPlanItem(req.user?.id ?? '', id, body);
   }
 }

@@ -67,7 +67,9 @@ export class AdminController {
   }
 
   @Post('orchestrator/preview')
-  @ApiOperation({ summary: 'Anteprima contesto proposta AI prima della generazione' })
+  @ApiOperation({
+    summary: 'Anteprima contesto proposta AI prima della generazione',
+  })
   @ApiBody({ type: RunCycleDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -83,7 +85,9 @@ export class AdminController {
   }
 
   @Post('orchestrator/training/run')
-  @ApiOperation({ summary: 'Genera allenamento autonomo sport-specializzazione' })
+  @ApiOperation({
+    summary: 'Genera allenamento autonomo sport-specializzazione',
+  })
   @ApiBody({ type: RunCycleDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -155,7 +159,9 @@ export class AdminController {
   }
 
   @Get('ai-settings')
-  @ApiOperation({ summary: 'Configurazione prompt AI e onboarding amministratore' })
+  @ApiOperation({
+    summary: 'Configurazione prompt AI e onboarding amministratore',
+  })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -173,7 +179,9 @@ export class AdminController {
   }
 
   @Post('consent-documents')
-  @ApiOperation({ summary: 'Pubblica una nuova versione di documento consenso' })
+  @ApiOperation({
+    summary: 'Pubblica una nuova versione di documento consenso',
+  })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -206,7 +214,9 @@ export class AdminController {
   }
 
   @Post('sports')
-  @ApiOperation({ summary: 'Crea o aggiorna sport, specializzazioni e prompt area' })
+  @ApiOperation({
+    summary: 'Crea o aggiorna sport, specializzazioni e prompt area',
+  })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -239,7 +249,9 @@ export class AdminController {
   }
 
   @Delete('sports/:sportId')
-  @ApiOperation({ summary: 'Cancella uno sport e le specializzazioni collegate' })
+  @ApiOperation({
+    summary: 'Cancella uno sport e le specializzazioni collegate',
+  })
   @ApiParam({ name: 'sportId' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -302,7 +314,9 @@ export class AdminController {
   }
 
   @Post('training-plans/:trainingPlanId/publish')
-  @ApiOperation({ summary: 'Pubblica un allenamento approvato dall allenatore' })
+  @ApiOperation({
+    summary: 'Pubblica un allenamento approvato dall allenatore',
+  })
   @ApiParam({ name: 'trainingPlanId' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)

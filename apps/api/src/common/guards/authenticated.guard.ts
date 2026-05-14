@@ -101,12 +101,14 @@ export class AuthenticatedGuard implements CanActivate {
     return false;
   }
 
-  private async assertRequiredConsents(
-    request: Request,
-    userId: string,
-  ) {
-    const path = request.originalUrl?.split('?')[0] ?? request.url?.split('?')[0] ?? '';
-    if (consentExemptPaths.some((item) => path === item || path.startsWith(`${item}/`))) {
+  private async assertRequiredConsents(request: Request, userId: string) {
+    const path =
+      request.originalUrl?.split('?')[0] ?? request.url?.split('?')[0] ?? '';
+    if (
+      consentExemptPaths.some(
+        (item) => path === item || path.startsWith(`${item}/`),
+      )
+    ) {
       return;
     }
     const fallbackDocuments = REQUIRED_CONSENTS.map((consent) => ({
@@ -137,15 +139,19 @@ export class AuthenticatedGuard implements CanActivate {
       },
       select: { type: true, version: true, documentHash: true },
     });
-    const accepted = new Map(consents.map((consent) => [consent.type, consent]));
-    const missing = requiredDocuments.filter((document) => {
-      const current = accepted.get(document.type);
-      return (
-        !current ||
-        current.version !== document.version ||
-        current.documentHash !== document.documentHash
-      );
-    }).map((document) => document.type);
+    const accepted = new Map(
+      consents.map((consent) => [consent.type, consent]),
+    );
+    const missing = requiredDocuments
+      .filter((document) => {
+        const current = accepted.get(document.type);
+        return (
+          !current ||
+          current.version !== document.version ||
+          current.documentHash !== document.documentHash
+        );
+      })
+      .map((document) => document.type);
     if (missing.length) {
       throw new ForbiddenException({
         code: 'REQUIRED_CONSENTS_MISSING',

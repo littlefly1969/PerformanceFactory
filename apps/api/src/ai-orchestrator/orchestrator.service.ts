@@ -52,7 +52,9 @@ export class OrchestratorService {
     }
 
     if (areaId && runAllAreas) {
-      throw new BadRequestException('Scegli una sola area oppure esegui tutte le aree');
+      throw new BadRequestException(
+        'Scegli una sola area oppure esegui tutte le aree',
+      );
     }
 
     const selectedAreas = areaId ? await this.loadArea(areaId) : null;
@@ -64,7 +66,9 @@ export class OrchestratorService {
       questionSetId: string;
     }> = [];
     for (const userId of userIds) {
-      const areas = selectedAreas ?? (runAllAreas ? await this.loadAreasForUser(userId) : []);
+      const areas =
+        selectedAreas ??
+        (runAllAreas ? await this.loadAreasForUser(userId) : []);
       if (areas.length === 0) {
         throw new BadRequestException('Nessuna area configurata per l utente');
       }
@@ -114,7 +118,9 @@ export class OrchestratorService {
       select: { area: { select: { id: true, name: true } } },
       orderBy: { area: { name: 'asc' } },
     });
-    return prompts.length ? prompts.map((prompt) => prompt.area) : this.loadAreas();
+    return prompts.length
+      ? prompts.map((prompt) => prompt.area)
+      : this.loadAreas();
   }
 
   async runCycleForArea(
@@ -153,7 +159,9 @@ export class OrchestratorService {
         select: { id: true },
       });
       if (existingPending) {
-        throw new BadRequestException('Esiste gia un ciclo in attesa per questa area');
+        throw new BadRequestException(
+          'Esiste gia un ciclo in attesa per questa area',
+        );
       }
 
       await this.assertPreviousCycleCompleted(tx, userId, area.id);
@@ -233,6 +241,10 @@ export class OrchestratorService {
           inputJson: proposal.audit.inputJson as Prisma.InputJsonObject,
           outputJson: proposal.audit.outputJson as Prisma.InputJsonObject,
           latencyMs: proposal.audit.latencyMs,
+          correlationId: proposal.audit.correlationId,
+          inputTokens: proposal.audit.inputTokens ?? null,
+          outputTokens: proposal.audit.outputTokens ?? null,
+          totalTokens: proposal.audit.totalTokens ?? null,
         },
       });
 
@@ -281,7 +293,9 @@ export class OrchestratorService {
       select: { id: true },
     });
     if (existingPending) {
-      throw new BadRequestException('Esiste gia un ciclo in attesa per questa area');
+      throw new BadRequestException(
+        'Esiste gia un ciclo in attesa per questa area',
+      );
     }
 
     await this.assertPreviousCycleCompleted(this.prisma, userId, area.id);
@@ -362,7 +376,8 @@ export class OrchestratorService {
     ]);
 
     const nextVersion = (lastPlan?.version ?? 0) + 1;
-    const areaLevel = currentState?.level ?? this.levelFromSnapshot(previousSnapshot, area.id);
+    const areaLevel =
+      currentState?.level ?? this.levelFromSnapshot(previousSnapshot, area.id);
     const context = this.buildAiCycleContext({
       userId,
       area,
@@ -580,7 +595,9 @@ export class OrchestratorService {
     areaId: string | null;
     specializationId: string | null;
     targetLabel: string;
-    olderCycles: Awaited<ReturnType<OrchestratorService['loadAreaCycleHistory']>>;
+    olderCycles: Awaited<
+      ReturnType<OrchestratorService['loadAreaCycleHistory']>
+    >;
   }) {
     if (input.olderCycles.length === 0) {
       return null;
@@ -638,16 +655,23 @@ export class OrchestratorService {
       throw new BadRequestException('ID utenti mancanti');
     }
 
-    const results: Array<{ userId: string; trainingPlanReleaseId: string }> = [];
+    const results: Array<{ userId: string; trainingPlanReleaseId: string }> =
+      [];
     for (const userId of userIds) {
       const result = await this.runTrainingPlan(userId, actorId);
-      results.push({ userId, trainingPlanReleaseId: result.trainingPlanReleaseId });
+      results.push({
+        userId,
+        trainingPlanReleaseId: result.trainingPlanReleaseId,
+      });
     }
     return results;
   }
 
   async previewTrainingProposalInput(userId: string) {
-    const input = await this.prepareTrainingProposalInput(userId, 'Allenamento AI generato');
+    const input = await this.prepareTrainingProposalInput(
+      userId,
+      'Allenamento AI generato',
+    );
     return this.aiProposalProvider.buildCycleProposalPreview(input);
   }
 
@@ -656,7 +680,10 @@ export class OrchestratorService {
     actorId: string,
     reason = 'Allenamento AI generato',
   ) {
-    const proposalInput = await this.prepareTrainingProposalInput(userId, reason);
+    const proposalInput = await this.prepareTrainingProposalInput(
+      userId,
+      reason,
+    );
     const proposal =
       await this.aiProposalProvider.generateCycleProposal(proposalInput);
 
@@ -753,6 +780,10 @@ export class OrchestratorService {
           inputJson: proposal.audit.inputJson as Prisma.InputJsonObject,
           outputJson: proposal.audit.outputJson as Prisma.InputJsonObject,
           latencyMs: proposal.audit.latencyMs,
+          correlationId: proposal.audit.correlationId,
+          inputTokens: proposal.audit.inputTokens ?? null,
+          outputTokens: proposal.audit.outputTokens ?? null,
+          totalTokens: proposal.audit.totalTokens ?? null,
         },
       });
 
@@ -929,7 +960,9 @@ export class OrchestratorService {
       profileJson: Prisma.JsonValue | null;
     } | null;
     areaLevel: string;
-    areaGenerationConfig: Awaited<ReturnType<OrchestratorService['loadAreaGenerationConfig']>>;
+    areaGenerationConfig: Awaited<
+      ReturnType<OrchestratorService['loadAreaGenerationConfig']>
+    >;
     userAreaPromptInstruction: {
       promptText: string;
       promptVersion: string;
@@ -937,7 +970,9 @@ export class OrchestratorService {
       goal: { goalText: string };
     } | null;
     sportSpecializationPromptInstruction: Awaited<
-      ReturnType<OrchestratorService['loadSportSpecializationPromptInstruction']>
+      ReturnType<
+        OrchestratorService['loadSportSpecializationPromptInstruction']
+      >
     >;
     trainingPromptInstruction: Awaited<
       ReturnType<OrchestratorService['loadTrainingPromptInstruction']>
@@ -957,7 +992,9 @@ export class OrchestratorService {
       ? {
           realR: this.roundScore(targetArea.realR),
           potentialP: this.roundScore(targetArea.potentialP),
-          gap: this.roundScore(Math.max(0, targetArea.potentialP - targetArea.realR)),
+          gap: this.roundScore(
+            Math.max(0, targetArea.potentialP - targetArea.realR),
+          ),
         }
       : null;
     const onboardingAnswers = input.onboardingAssessment?.answersJson ?? null;
@@ -1032,7 +1069,8 @@ export class OrchestratorService {
         userAreaPromptInstruction: input.userAreaPromptInstruction
           ? {
               promptVersion: input.userAreaPromptInstruction.promptVersion,
-              updatedAt: input.userAreaPromptInstruction.updatedAt.toISOString(),
+              updatedAt:
+                input.userAreaPromptInstruction.updatedAt.toISOString(),
               basePrompt: input.userAreaPromptInstruction.promptText,
             }
           : null,
@@ -1040,15 +1078,17 @@ export class OrchestratorService {
           input.sportSpecializationPromptInstruction
             ? {
                 sportLabel:
-                  input.sportSpecializationPromptInstruction.specialization.sport
-                    .label,
+                  input.sportSpecializationPromptInstruction.specialization
+                    .sport.label,
                 specializationLabel:
-                  input.sportSpecializationPromptInstruction.specialization.label,
+                  input.sportSpecializationPromptInstruction.specialization
+                    .label,
                 areaName: input.sportSpecializationPromptInstruction.area.name,
                 version: input.sportSpecializationPromptInstruction.version,
                 updatedAt:
                   input.sportSpecializationPromptInstruction.updatedAt.toISOString(),
-                basePrompt: input.sportSpecializationPromptInstruction.basePrompt,
+                basePrompt:
+                  input.sportSpecializationPromptInstruction.basePrompt,
               }
             : null,
         trainingPromptInstruction: input.trainingPromptInstruction
@@ -1056,7 +1096,8 @@ export class OrchestratorService {
               sportLabel: input.trainingPromptInstruction.sport.label,
               specializationLabel: input.trainingPromptInstruction.label,
               version: input.trainingPromptInstruction.trainingPromptVersion,
-              updatedAt: input.trainingPromptInstruction.updatedAt.toISOString(),
+              updatedAt:
+                input.trainingPromptInstruction.updatedAt.toISOString(),
               basePrompt: input.trainingPromptInstruction.trainingPrompt,
             }
           : null,
@@ -1080,7 +1121,9 @@ export class OrchestratorService {
   }
 
   private compactCycleForPrompt(
-    cycle: Awaited<ReturnType<OrchestratorService['loadAreaCycleHistory']>>[number],
+    cycle: Awaited<
+      ReturnType<OrchestratorService['loadAreaCycleHistory']>
+    >[number],
   ) {
     return {
       version: cycle.version,
@@ -1114,7 +1157,11 @@ export class OrchestratorService {
     profileJson: Prisma.JsonValue | null,
     answersJson: Prisma.JsonValue | null,
   ) {
-    if (profileJson && typeof profileJson === 'object' && !Array.isArray(profileJson)) {
+    if (
+      profileJson &&
+      typeof profileJson === 'object' &&
+      !Array.isArray(profileJson)
+    ) {
       return profileJson;
     }
 
@@ -1187,6 +1234,7 @@ export class OrchestratorService {
   }
 
   private isNormalizedOnboardingAnswer(
+    this: void,
     value: ReturnType<OrchestratorService['normalizeOnboardingAnswer']>,
   ): value is NonNullable<
     ReturnType<OrchestratorService['normalizeOnboardingAnswer']>
@@ -1199,9 +1247,7 @@ export class OrchestratorService {
   }
 
   private hashJson(value: unknown) {
-    return createHash('sha256')
-      .update(JSON.stringify(value))
-      .digest('hex');
+    return createHash('sha256').update(JSON.stringify(value)).digest('hex');
   }
 
   private async loadAreaGenerationConfig(areaId: string) {
@@ -1226,28 +1272,32 @@ export class OrchestratorService {
     if (!selection) {
       return null;
     }
-    return this.prisma.sportSpecializationAreaPrompt.findUnique({
-      where: {
-        specializationId_areaId: {
-          specializationId: selection.specializationId,
-          areaId,
-        },
-      },
-      select: {
-        basePrompt: true,
-        version: true,
-        updatedAt: true,
-        isActive: true,
-        isEnabledDriver: true,
-        area: { select: { name: true } },
-        specialization: {
-          select: {
-            label: true,
-            sport: { select: { label: true } },
+    return this.prisma.sportSpecializationAreaPrompt
+      .findUnique({
+        where: {
+          specializationId_areaId: {
+            specializationId: selection.specializationId,
+            areaId,
           },
         },
-      },
-    }).then((prompt) => (prompt?.isActive && prompt.isEnabledDriver ? prompt : null));
+        select: {
+          basePrompt: true,
+          version: true,
+          updatedAt: true,
+          isActive: true,
+          isEnabledDriver: true,
+          area: { select: { name: true } },
+          specialization: {
+            select: {
+              label: true,
+              sport: { select: { label: true } },
+            },
+          },
+        },
+      })
+      .then((prompt) =>
+        prompt?.isActive && prompt.isEnabledDriver ? prompt : null,
+      );
   }
 
   private async loadTrainingPromptInstruction(userId: string) {
@@ -1258,25 +1308,27 @@ export class OrchestratorService {
     if (!selection) {
       return null;
     }
-    return this.prisma.sportSpecialization.findUnique({
-      where: { id: selection.specializationId },
-      select: {
-        id: true,
-        label: true,
-        trainingPrompt: true,
-        trainingPromptVersion: true,
-        trainingPromptActive: true,
-        updatedAt: true,
-        sport: { select: { label: true } },
-      },
-    }).then((specialization) =>
-      specialization?.trainingPromptActive && specialization.trainingPrompt
-        ? {
-            ...specialization,
-            trainingPrompt: specialization.trainingPrompt,
-          }
-        : null,
-    );
+    return this.prisma.sportSpecialization
+      .findUnique({
+        where: { id: selection.specializationId },
+        select: {
+          id: true,
+          label: true,
+          trainingPrompt: true,
+          trainingPromptVersion: true,
+          trainingPromptActive: true,
+          updatedAt: true,
+          sport: { select: { label: true } },
+        },
+      })
+      .then((specialization) =>
+        specialization?.trainingPromptActive && specialization.trainingPrompt
+          ? {
+              ...specialization,
+              trainingPrompt: specialization.trainingPrompt,
+            }
+          : null,
+      );
   }
 
   private levelFromSnapshot(
@@ -1642,14 +1694,18 @@ export class OrchestratorService {
       }
 
       if (plan.status !== 'PENDING_APPROVAL') {
-        throw new BadRequestException('Il rilascio allenamento non e in approvazione');
+        throw new BadRequestException(
+          'Il rilascio allenamento non e in approvazione',
+        );
       }
 
       const allItemsApproved = plan.items.every(
         (item) => item.status === 'APPROVED',
       );
       if (!allItemsApproved) {
-        throw new BadRequestException('Non tutte le attivita allenamento sono approvate');
+        throw new BadRequestException(
+          'Non tutte le attivita allenamento sono approvate',
+        );
       }
 
       const questionSet = plan.questionSets[0];
@@ -1665,7 +1721,9 @@ export class OrchestratorService {
         (approval) => approval.status === 'APPROVED',
       );
       if (!allAreasApproved) {
-        throw new BadRequestException('Non tutte le aree del questionario sono approvate');
+        throw new BadRequestException(
+          'Non tutte le aree del questionario sono approvate',
+        );
       }
 
       await tx.improvementPlanRelease.updateMany({
@@ -1730,117 +1788,117 @@ export class OrchestratorService {
     questionSetId: string,
     reason: string,
   ) {
-      const questionSet = await tx.questionSet.findUnique({
-        where: { id: questionSetId },
-        select: {
-          id: true,
-          userId: true,
-          status: true,
-          areaId: true,
-          planReleaseId: true,
-          questions: {
-            select: {
-              areaId: true,
-              answers: { select: { scoreAwarded: true } },
-            },
+    const questionSet = await tx.questionSet.findUnique({
+      where: { id: questionSetId },
+      select: {
+        id: true,
+        userId: true,
+        status: true,
+        areaId: true,
+        planReleaseId: true,
+        questions: {
+          select: {
+            areaId: true,
+            answers: { select: { scoreAwarded: true } },
           },
         },
+      },
+    });
+
+    if (!questionSet) {
+      throw new BadRequestException('Questionario non trovato');
+    }
+
+    if (questionSet.status !== 'PUBLISHED') {
+      throw new BadRequestException('Questionario non pubblicato');
+    }
+
+    if (
+      questionSet.areaId &&
+      questionSet.questions.some(
+        (question) => question.areaId !== questionSet.areaId,
+      )
+    ) {
+      throw new BadRequestException('Il questionario contiene piu aree');
+    }
+
+    const scale = await this.loadScaleConfig(tx);
+    const areas = await tx.area.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    });
+
+    const historicalSnapshots = await tx.performanceProfileSnapshot.findMany({
+      where: { userId: questionSet.userId },
+      orderBy: { createdAt: 'desc' },
+      take: 12,
+      include: { areas: true },
+    });
+
+    const scoresByArea = new Map<string, { total: number; count: number }>();
+    for (const question of questionSet.questions) {
+      if (!question.answers || question.answers.length === 0) {
+        throw new BadRequestException('Questionario incompleto');
+      }
+      for (const answer of question.answers) {
+        const entry = scoresByArea.get(question.areaId) ?? {
+          total: 0,
+          count: 0,
+        };
+        entry.total += answer.scoreAwarded;
+        entry.count += 1;
+        scoresByArea.set(question.areaId, entry);
+      }
+    }
+
+    const historicalAreas = new Map<string, SnapshotAreaHistoryItem[]>();
+    for (const snapshot of historicalSnapshots) {
+      for (const snapshotArea of snapshot.areas) {
+        const entries = historicalAreas.get(snapshotArea.areaId) ?? [];
+        entries.push(snapshotArea);
+        historicalAreas.set(snapshotArea.areaId, entries);
+      }
+    }
+
+    const snapshotAreas = areas.map((area) =>
+      this.buildSnapshotArea(
+        area,
+        historicalAreas.get(area.id) ?? [],
+        scoresByArea,
+        scale,
+      ),
+    );
+
+    const rankingGlobal = this.computeRankingGlobal(snapshotAreas, scale);
+
+    const snapshot = await tx.performanceProfileSnapshot.create({
+      data: {
+        userId: questionSet.userId,
+        rankingGlobal,
+        reason,
+        areas: { create: snapshotAreas },
+      },
+      select: { id: true, createdAt: true },
+    });
+
+    await tx.questionSet.update({
+      where: { id: questionSet.id },
+      data: { status: 'CLOSED', closedAt: new Date() },
+    });
+
+    if (questionSet.planReleaseId) {
+      await tx.improvementPlanRelease.update({
+        where: { id: questionSet.planReleaseId },
+        data: { cycleStatus: 'CLOSED' },
       });
 
-      if (!questionSet) {
-        throw new BadRequestException('Questionario non trovato');
-      }
-
-      if (questionSet.status !== 'PUBLISHED') {
-        throw new BadRequestException('Questionario non pubblicato');
-      }
-
-      if (
-        questionSet.areaId &&
-        questionSet.questions.some(
-          (question) => question.areaId !== questionSet.areaId,
-        )
-      ) {
-        throw new BadRequestException('Il questionario contiene piu aree');
-      }
-
-      const scale = await this.loadScaleConfig(tx);
-      const areas = await tx.area.findMany({
-        select: { id: true, name: true },
-        orderBy: { name: 'asc' },
+      await tx.aiContextSummary.updateMany({
+        where: { planReleaseId: questionSet.planReleaseId },
+        data: { cycleStatus: 'CLOSED' },
       });
+    }
 
-      const historicalSnapshots = await tx.performanceProfileSnapshot.findMany({
-        where: { userId: questionSet.userId },
-        orderBy: { createdAt: 'desc' },
-        take: 12,
-        include: { areas: true },
-      });
-
-      const scoresByArea = new Map<string, { total: number; count: number }>();
-      for (const question of questionSet.questions) {
-        if (!question.answers || question.answers.length === 0) {
-          throw new BadRequestException('Questionario incompleto');
-        }
-        for (const answer of question.answers) {
-          const entry = scoresByArea.get(question.areaId) ?? {
-            total: 0,
-            count: 0,
-          };
-          entry.total += answer.scoreAwarded;
-          entry.count += 1;
-          scoresByArea.set(question.areaId, entry);
-        }
-      }
-
-      const historicalAreas = new Map<string, SnapshotAreaHistoryItem[]>();
-      for (const snapshot of historicalSnapshots) {
-        for (const snapshotArea of snapshot.areas) {
-          const entries = historicalAreas.get(snapshotArea.areaId) ?? [];
-          entries.push(snapshotArea);
-          historicalAreas.set(snapshotArea.areaId, entries);
-        }
-      }
-
-      const snapshotAreas = areas.map((area) =>
-        this.buildSnapshotArea(
-          area,
-          historicalAreas.get(area.id) ?? [],
-          scoresByArea,
-          scale,
-        ),
-      );
-
-      const rankingGlobal = this.computeRankingGlobal(snapshotAreas, scale);
-
-      const snapshot = await tx.performanceProfileSnapshot.create({
-        data: {
-          userId: questionSet.userId,
-          rankingGlobal,
-          reason,
-          areas: { create: snapshotAreas },
-        },
-        select: { id: true, createdAt: true },
-      });
-
-      await tx.questionSet.update({
-        where: { id: questionSet.id },
-        data: { status: 'CLOSED', closedAt: new Date() },
-      });
-
-      if (questionSet.planReleaseId) {
-        await tx.improvementPlanRelease.update({
-          where: { id: questionSet.planReleaseId },
-          data: { cycleStatus: 'CLOSED' },
-        });
-
-        await tx.aiContextSummary.updateMany({
-          where: { planReleaseId: questionSet.planReleaseId },
-          data: { cycleStatus: 'CLOSED' },
-        });
-      }
-
-      return { snapshotId: snapshot.id };
+    return { snapshotId: snapshot.id };
   }
 
   async refreshCycleReadiness(planReleaseId: string, actorId?: string) {
@@ -2061,7 +2119,11 @@ export class OrchestratorService {
         data: { cycleStatus: 'CLOSED' },
       });
 
-      return { trainingPlanReleaseId, status: 'REJECTED', cycleStatus: 'CLOSED' };
+      return {
+        trainingPlanReleaseId,
+        status: 'REJECTED',
+        cycleStatus: 'CLOSED',
+      };
     });
   }
 
@@ -2109,13 +2171,23 @@ export class OrchestratorService {
         throw new BadRequestException('Questionario allenamento mancante');
       }
 
-      if (!questionSet.approvals.every((approval) => approval.status === 'APPROVED')) {
-        throw new BadRequestException('Questionario non approvato dall allenatore');
+      if (
+        !questionSet.approvals.every(
+          (approval) => approval.status === 'APPROVED',
+        )
+      ) {
+        throw new BadRequestException(
+          'Questionario non approvato dall allenatore',
+        );
       }
 
       await tx.trainingPlanRelease.updateMany({
         where: { userId: plan.userId, status: 'ACTIVE' },
-        data: { status: 'CLOSED', cycleStatus: 'CLOSED', archivedAt: new Date() },
+        data: {
+          status: 'CLOSED',
+          cycleStatus: 'CLOSED',
+          archivedAt: new Date(),
+        },
       });
 
       await tx.trainingPlanRelease.update({
@@ -2186,7 +2258,9 @@ export class OrchestratorService {
       }
 
       if (plan.status !== 'PENDING_APPROVAL') {
-        throw new BadRequestException('Il rilascio allenamento non e in approvazione');
+        throw new BadRequestException(
+          'Il rilascio allenamento non e in approvazione',
+        );
       }
 
       const rejectedAt = new Date();

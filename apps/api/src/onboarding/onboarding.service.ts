@@ -257,7 +257,9 @@ export class OnboardingService {
       throw new BadRequestException('Inserisci prima un obiettivo iniziale.');
     }
     if (!userReply || userReply.length < 2) {
-      throw new BadRequestException('Scrivi una risposta per definire meglio l obiettivo.');
+      throw new BadRequestException(
+        'Scrivi una risposta per definire meglio l obiettivo.',
+      );
     }
 
     const refinedGoalInput = [
@@ -597,7 +599,7 @@ export class OnboardingService {
         rejectionReason:
           validation.status === 'OK'
             ? null
-            : validation.rejectionReason ?? validation.userMessage,
+            : (validation.rejectionReason ?? validation.userMessage),
         frozenAt: new Date(),
       },
       create: {
@@ -614,7 +616,7 @@ export class OnboardingService {
         rejectionReason:
           validation.status === 'OK'
             ? null
-            : validation.rejectionReason ?? validation.userMessage,
+            : (validation.rejectionReason ?? validation.userMessage),
         frozenAt: new Date(),
       },
       select: { id: true, goalText: true, interpretedGoal: true },
@@ -670,7 +672,13 @@ export class OnboardingService {
 
     const areaScores = new Map<
       string,
-      { areaId: string; areaName: string; total: number; count: number; answers: unknown[] }
+      {
+        areaId: string;
+        areaName: string;
+        total: number;
+        count: number;
+        answers: unknown[];
+      }
     >();
     for (const answer of normalizedAnswers) {
       const template = answer.template;
@@ -682,14 +690,13 @@ export class OnboardingService {
       ) {
         continue;
       }
-      const current =
-        areaScores.get(template.areaId) ?? {
-          areaId: template.areaId,
-          areaName: template.area.name,
-          total: 0,
-          count: 0,
-          answers: [],
-        };
+      const current = areaScores.get(template.areaId) ?? {
+        areaId: template.areaId,
+        areaName: template.area.name,
+        total: 0,
+        count: 0,
+        answers: [],
+      };
       current.total += answer.score;
       current.count += 1;
       current.answers.push({
@@ -799,9 +806,7 @@ export class OnboardingService {
       },
     });
     if (!specialization) {
-      throw new BadRequestException(
-        'Sport o specializzazione non configurati',
-      );
+      throw new BadRequestException('Sport o specializzazione non configurati');
     }
     return {
       sportId: specialization.sport.id,
@@ -978,8 +983,7 @@ export class OnboardingService {
     return Object.fromEntries(
       normalizedAnswers
         .filter(
-          (answer) =>
-            answer.template.scope === OnboardingQuestionScope.GENERAL,
+          (answer) => answer.template.scope === OnboardingQuestionScope.GENERAL,
         )
         .map((answer) => [
           answer.template.key,
@@ -1083,7 +1087,8 @@ export class OnboardingService {
         key: 'general_health_status',
         scope: OnboardingQuestionScope.GENERAL,
         areaId: null,
-        label: 'Stato di salute generale, eventuali limitazioni o infortuni noti',
+        label:
+          'Stato di salute generale, eventuali limitazioni o infortuni noti',
         helpText: null,
         inputType: OnboardingInputType.TEXT,
         optionsJson: null,
@@ -1160,7 +1165,9 @@ export class OnboardingService {
       value?: unknown;
       score?: unknown;
     }>;
-    const selected = options.find((option) => String(option.value) === String(value));
+    const selected = options.find(
+      (option) => String(option.value) === String(value),
+    );
     if (selected?.score !== undefined) {
       const score = Number(selected.score);
       if (!Number.isNaN(score)) {

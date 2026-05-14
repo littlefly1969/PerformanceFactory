@@ -28,7 +28,7 @@ const input: CycleProposalInput = {
     performance: {
       latestSnapshot: null,
     },
-    history: { previousAreaCycles: [] },
+    history: { olderCyclesSummary: null, previousAreaCycles: [] },
     guidance: {
       areaGenerationConfig: null,
       userAreaPromptInstruction: null,

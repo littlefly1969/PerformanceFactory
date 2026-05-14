@@ -124,13 +124,24 @@ const makePrismaMock = () => {
     generatedBy: 'AI',
     createdAt: new Date('2026-02-01T09:00:00.000Z'),
     sourceSnapshotId: 'snap-1',
-    items: planItems.filter((item) => item.planRelease.userId === 'user-1' && item.status !== 'PROPOSED'),
+    items: planItems.filter(
+      (item) =>
+        item.planRelease.userId === 'user-1' && item.status !== 'PROPOSED',
+    ),
   };
 
   const prismaMock = {
     improvementPlanRelease: {
-      findFirst: ({ where }: { where: { userId: string; areaId?: string; status: string } }) => {
-        if (where.userId === 'user-1' && where.status === 'ACTIVE' && where.areaId === 'area-1') {
+      findFirst: ({
+        where,
+      }: {
+        where: { userId: string; areaId?: string; status: string };
+      }) => {
+        if (
+          where.userId === 'user-1' &&
+          where.status === 'ACTIVE' &&
+          where.areaId === 'area-1'
+        ) {
           return planRelease;
         }
         return null;
@@ -139,7 +150,18 @@ const makePrismaMock = () => {
     planItem: {
       findUnique: ({ where }: { where: { id: string } }) =>
         planItems.find((item) => item.id === where.id) ?? null,
-      update: ({ where, data }: { where: { id: string }; data: { status: string; completedAt: Date; completionNotes?: string; completionRating?: number } }) => {
+      update: ({
+        where,
+        data,
+      }: {
+        where: { id: string };
+        data: {
+          status: string;
+          completedAt: Date;
+          completionNotes?: string;
+          completionRating?: number;
+        };
+      }) => {
         const item = planItems.find((entry) => entry.id === where.id);
         if (!item) {
           return null;
@@ -198,9 +220,10 @@ describe('User plan (e2e)', () => {
     await app.init();
     await app.getHttpAdapter().getInstance().ready();
 
-    inject = app.getHttpAdapter().getInstance().inject.bind(
-      app.getHttpAdapter().getInstance(),
-    );
+    inject = app
+      .getHttpAdapter()
+      .getInstance()
+      .inject.bind(app.getHttpAdapter().getInstance());
   });
 
   afterAll(async () => {
@@ -218,9 +241,15 @@ describe('User plan (e2e)', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    const payload = response.json() as { id: string; userId: string; items: Array<{ id: string; status: string }> };
+    const payload = response.json() as {
+      id: string;
+      userId: string;
+      items: Array<{ id: string; status: string }>;
+    };
     expect(payload.userId).toBe('user-1');
-    expect(payload.items.every((item) => item.status !== 'PROPOSED')).toBe(true);
+    expect(payload.items.every((item) => item.status !== 'PROPOSED')).toBe(
+      true,
+    );
   });
 
   it('does not expose other user plans', async () => {

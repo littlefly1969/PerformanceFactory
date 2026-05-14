@@ -60,7 +60,9 @@ export class QuestionsService {
         areaId,
       );
       if (!allowed) {
-        throw new ForbiddenException('Operazione non consentita per questa area');
+        throw new ForbiddenException(
+          'Operazione non consentita per questa area',
+        );
       }
     }
 
@@ -119,7 +121,9 @@ export class QuestionsService {
         areaId,
       );
       if (!allowed) {
-        throw new ForbiddenException('Operazione non consentita per questa area');
+        throw new ForbiddenException(
+          'Operazione non consentita per questa area',
+        );
       }
     }
 
@@ -128,7 +132,9 @@ export class QuestionsService {
         userId: targetUserId,
         areaId,
         status:
-          actor.role === UserRole.USER ? { in: ['PUBLISHED', 'CLOSED'] } : undefined,
+          actor.role === UserRole.USER
+            ? { in: ['PUBLISHED', 'CLOSED'] }
+            : undefined,
       },
       orderBy: { createdAt: 'desc' },
       select: {
@@ -206,7 +212,9 @@ export class QuestionsService {
 
   async getPendingApprovalsForProfessional(actor: Actor) {
     if (actor.role !== UserRole.PROFESSIONAL) {
-      throw new ForbiddenException('Solo i professionisti possono vedere le approvazioni');
+      throw new ForbiddenException(
+        'Solo i professionisti possono vedere le approvazioni',
+      );
     }
 
     const areaIds = Array.from(await this.getAllowedAreaIds(actor.id));
@@ -388,7 +396,9 @@ export class QuestionsService {
     payload: { text?: string; objectiveRef?: string; orderIndex?: number },
   ) {
     if (actor.role !== UserRole.PROFESSIONAL) {
-      throw new ForbiddenException('Solo i professionisti possono aggiornare le domande');
+      throw new ForbiddenException(
+        'Solo i professionisti possono aggiornare le domande',
+      );
     }
 
     const question = await this.prisma.question.findUnique({
@@ -432,7 +442,9 @@ export class QuestionsService {
     payload: { label?: string; score?: number },
   ) {
     if (actor.role !== UserRole.PROFESSIONAL) {
-      throw new ForbiddenException('Solo i professionisti possono aggiornare le opzioni');
+      throw new ForbiddenException(
+        'Solo i professionisti possono aggiornare le opzioni',
+      );
     }
 
     const question = await this.prisma.question.findUnique({

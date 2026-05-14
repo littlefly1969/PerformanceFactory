@@ -59,7 +59,9 @@ export class PlansService {
         areaId,
       );
       if (!allowed) {
-        throw new ForbiddenException('Operazione non consentita per questa area');
+        throw new ForbiddenException(
+          'Operazione non consentita per questa area',
+        );
       }
     }
 
@@ -118,7 +120,9 @@ export class PlansService {
         areaId,
       );
       if (!allowed) {
-        throw new ForbiddenException('Operazione non consentita per questa area');
+        throw new ForbiddenException(
+          'Operazione non consentita per questa area',
+        );
       }
     }
 
@@ -166,10 +170,12 @@ export class PlansService {
 
   async getPendingApprovalsForProfessional(actor: Actor) {
     if (actor.role !== UserRole.PROFESSIONAL) {
-      throw new ForbiddenException('Solo i professionisti possono vedere le approvazioni');
+      throw new ForbiddenException(
+        'Solo i professionisti possono vedere le approvazioni',
+      );
     }
 
-    const [linkedUsers, areas] = await Promise.all([
+    const [linkedUsers] = await Promise.all([
       this.prisma.professionalUserLink.findMany({
         where: { professionalId: actor.id },
         select: { userId: true, areaId: true },
@@ -235,7 +241,9 @@ export class PlansService {
       planItem.areaId,
     );
     if (!allowed) {
-      throw new ForbiddenException('Operazione non consentita per questa attivita allenamento');
+      throw new ForbiddenException(
+        'Operazione non consentita per questa attivita allenamento',
+      );
     }
 
     const updated = await this.prisma.planItem.update({
@@ -283,7 +291,9 @@ export class PlansService {
       planItem.areaId,
     );
     if (!allowed) {
-      throw new ForbiddenException('Operazione non consentita per questa attivita allenamento');
+      throw new ForbiddenException(
+        'Operazione non consentita per questa attivita allenamento',
+      );
     }
 
     const updated = await this.prisma.planItem.update({

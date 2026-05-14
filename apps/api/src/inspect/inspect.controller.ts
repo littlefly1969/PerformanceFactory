@@ -80,7 +80,9 @@ export class InspectController {
   }
 
   @Get('professionals/:id')
-  @ApiOperation({ summary: 'Ottieni dettagli professionista (solo amministratore)' })
+  @ApiOperation({
+    summary: 'Ottieni dettagli professionista (solo amministratore)',
+  })
   @ApiParam({ name: 'id' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -90,7 +92,9 @@ export class InspectController {
   }
 
   @Post('links')
-  @ApiOperation({ summary: 'Collega utente a professionista (solo amministratore)' })
+  @ApiOperation({
+    summary: 'Collega utente a professionista (solo amministratore)',
+  })
   @ApiBody({ type: AdminLinkUserDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -104,7 +108,9 @@ export class InspectController {
   }
 
   @Post('competences')
-  @ApiOperation({ summary: 'Assegna competenze professionista (solo amministratore)' })
+  @ApiOperation({
+    summary: 'Assegna competenze professionista (solo amministratore)',
+  })
   @ApiBody({ type: AssignCompetenceDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -114,7 +120,9 @@ export class InspectController {
   }
 
   @Post('coach-links')
-  @ApiOperation({ summary: 'Collega utente ad allenatore (solo amministratore)' })
+  @ApiOperation({
+    summary: 'Collega utente ad allenatore (solo amministratore)',
+  })
   @ApiBody({ type: AdminLinkCoachDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -128,7 +136,9 @@ export class InspectController {
   }
 
   @Post('coach-competences')
-  @ApiOperation({ summary: 'Assegna competenze allenatore (solo amministratore)' })
+  @ApiOperation({
+    summary: 'Assegna competenze allenatore (solo amministratore)',
+  })
   @ApiBody({ type: AssignCoachCompetenceDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)

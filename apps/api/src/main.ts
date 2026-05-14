@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import {
@@ -12,7 +13,40 @@ import cookieParser from 'cookie-parser';
 import passport from 'passport';
 import { randomBytes } from 'crypto';
 
-type RedisStoreCtor = new (options: { client: unknown; prefix?: string }) => session.Store;
+function warnIfAiPromptLogEnabled(isProduction: boolean) {
+  if (process.env.AI_DEBUG_PROMPT_LOG !== 'true') {
+    return;
+  }
+  const logger = new Logger('AiDebugPromptLog');
+  const banner = '='.repeat(72);
+  logger.warn(banner);
+  logger.warn('ATTENZIONE: AI_DEBUG_PROMPT_LOG=true');
+  logger.warn('I prompt AI vengono scritti nei log applicativi.');
+  logger.warn(
+    'Il payload non include identificativi diretti (nome, email, userId)',
+  );
+  logger.warn('ma contiene dati personali pseudonimizzati dell atleta:');
+  logger.warn('  - obiettivo prestazione (testo libero)');
+  logger.warn('  - anamnesi generale (eta, peso, sport, condizioni di salute)');
+  logger.warn('  - anamnesi area, note e rifiuti dei cicli precedenti');
+  logger.warn(
+    'La combinazione e sufficiente a re-identificare in piccoli set.',
+  );
+  logger.warn(
+    'Impostare AI_DEBUG_PROMPT_LOG=false prima di esporre il servizio.',
+  );
+  if (isProduction) {
+    logger.warn(
+      '!!! NODE_ENV=production: rischio privacy ATTIVO in questo momento !!!',
+    );
+  }
+  logger.warn(banner);
+}
+
+type RedisStoreCtor = new (options: {
+  client: unknown;
+  prefix?: string;
+}) => session.Store;
 
 function getCsvEnv(name: string, fallback: string) {
   const value = process.env[name] ?? fallback;
@@ -70,6 +104,7 @@ async function buildSessionStore() {
 
 async function bootstrap() {
   const isProduction = process.env.NODE_ENV === 'production';
+  warnIfAiPromptLogEnabled(isProduction);
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({ trustProxy: isProduction }),
@@ -87,17 +122,29 @@ async function bootstrap() {
   });
 
   app.use(cookieParser());
-  app.use((req: unknown, res: { setHeader?: (name: string, value: string) => void }, next: () => void) => {
-    res.setHeader?.('X-Content-Type-Options', 'nosniff');
-    res.setHeader?.('X-Frame-Options', 'DENY');
-    res.setHeader?.('Referrer-Policy', 'strict-origin-when-cross-origin');
-    res.setHeader?.('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-    if (isProduction) {
-      res.setHeader?.('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-    }
-    void req;
-    next();
-  });
+  app.use(
+    (
+      req: unknown,
+      res: { setHeader?: (name: string, value: string) => void },
+      next: () => void,
+    ) => {
+      res.setHeader?.('X-Content-Type-Options', 'nosniff');
+      res.setHeader?.('X-Frame-Options', 'DENY');
+      res.setHeader?.('Referrer-Policy', 'strict-origin-when-cross-origin');
+      res.setHeader?.(
+        'Permissions-Policy',
+        'camera=(), microphone=(), geolocation=()',
+      );
+      if (isProduction) {
+        res.setHeader?.(
+          'Strict-Transport-Security',
+          'max-age=31536000; includeSubDomains',
+        );
+      }
+      void req;
+      next();
+    },
+  );
 
   const sessionSecret = process.env.SESSION_SECRET;
   if (process.env.NODE_ENV === 'production' && !sessionSecret) {
@@ -136,6 +183,16 @@ async function bootstrap() {
 
   app.use(passport.initialize());
   app.use(passport.session());
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+      transformOptions: { enableImplicitConversion: false },
+      stopAtFirstError: false,
+    }),
+  );
 
   if (process.env.SWAGGER_ENABLED !== 'false') {
     const config = new DocumentBuilder()

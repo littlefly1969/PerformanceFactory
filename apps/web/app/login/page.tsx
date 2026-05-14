@@ -72,6 +72,12 @@ const demoAccounts = [
     email: "coach_running@example.it",
     password: "password123",
   },
+  {
+    group: "AI Tuner",
+    label: "AI Tuner",
+    email: "tuner@example.com",
+    password: "password123",
+  },
 ];
 
 const demoAccessAccounts = [
@@ -85,6 +91,12 @@ const demoAccessAccounts = [
     label: "Atleta demo",
     account: demoAccounts.find(
       (account) => account.email === "user@example.com",
+    )!,
+  },
+  {
+    label: "AI Tuner demo",
+    account: demoAccounts.find(
+      (account) => account.email === "tuner@example.com",
     )!,
   },
 ];
@@ -213,7 +225,9 @@ export default function LoginPage() {
           ? "/professional"
           : user.role === "ADMIN"
             ? "/admin/cycles"
-            : "/";
+            : user.role === "AI_TUNER"
+              ? "/ai-tuner"
+              : "/";
     window.location.href = destination;
   };
 

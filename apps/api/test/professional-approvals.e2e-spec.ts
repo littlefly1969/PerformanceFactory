@@ -264,7 +264,7 @@ describe('Professional approvals workspace (e2e)', () => {
     const fastify = app.getHttpAdapter().getInstance() as unknown as {
       inject: InjectFn;
     };
-    inject = fastify.inject.bind(fastify) as InjectFn;
+    inject = fastify.inject.bind(fastify);
   });
 
   afterAll(async () => {

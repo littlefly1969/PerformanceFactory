@@ -1,5 +1,10 @@
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiCookieAuth,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { OnboardingService } from './onboarding.service';
@@ -13,7 +18,9 @@ export class OnboardingController {
   constructor(private readonly onboarding: OnboardingService) {}
 
   @Get('questionnaire')
-  @ApiOperation({ summary: 'Ottieni questionario iniziale per onboarding atleta' })
+  @ApiOperation({
+    summary: 'Ottieni questionario iniziale per onboarding atleta',
+  })
   getQuestionnaire(@Req() req: { user?: { id: string; role: UserRole } }) {
     return this.onboarding.getQuestionnaire({
       id: req.user?.id ?? '',
@@ -31,7 +38,9 @@ export class OnboardingController {
   }
 
   @Post('goal/validate')
-  @ApiOperation({ summary: 'Valida obiettivo performance atleta prima dell invio onboarding' })
+  @ApiOperation({
+    summary: 'Valida obiettivo performance atleta prima dell invio onboarding',
+  })
   validateGoal(
     @Req() req: { user?: { id: string; role: UserRole } },
     @Body() body: { goalText?: string },
@@ -43,7 +52,9 @@ export class OnboardingController {
   }
 
   @Post('sport-selection')
-  @ApiOperation({ summary: 'Salva sport e contesto scelti prima dell obiettivo' })
+  @ApiOperation({
+    summary: 'Salva sport e contesto scelti prima dell obiettivo',
+  })
   saveSportSelection(
     @Req() req: { user?: { id: string; role: UserRole } },
     @Body()
@@ -108,7 +119,10 @@ export class OnboardingController {
     @Body()
     body: {
       goalText?: string;
-      answers?: Array<{ questionId: string; value: string | number | boolean | null }>;
+      answers?: Array<{
+        questionId: string;
+        value: string | number | boolean | null;
+      }>;
     },
   ) {
     return this.onboarding.validateFinalGoal(
@@ -119,13 +133,18 @@ export class OnboardingController {
   }
 
   @Post('submit')
-  @ApiOperation({ summary: 'Invia questionario iniziale e genera profilo baseline' })
+  @ApiOperation({
+    summary: 'Invia questionario iniziale e genera profilo baseline',
+  })
   submit(
     @Req() req: { user?: { id: string; role: UserRole } },
     @Body()
     body: {
       goalText?: string;
-      answers?: Array<{ questionId: string; value: string | number | boolean | null }>;
+      answers?: Array<{
+        questionId: string;
+        value: string | number | boolean | null;
+      }>;
     },
   ) {
     return this.onboarding.submit(

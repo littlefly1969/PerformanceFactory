@@ -17,6 +17,14 @@ enum UserRole {
   USER
   PROFESSIONAL
   ADMIN
+  AI_TUNER
+}
+
+enum AiEvaluationRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
 }
 
 enum CycleStatus {
@@ -99,6 +107,11 @@ model User {
   updatedGoalPromptConfigs    AiGoalPromptConfig[]         @relation("AiGoalPromptConfigUpdatedBy")
   createdSportSpecializationPrompts SportSpecializationAreaPrompt[] @relation("SportSpecializationPromptCreatedBy")
   updatedSportSpecializationPrompts SportSpecializationAreaPrompt[] @relation("SportSpecializationPromptUpdatedBy")
+  createdAiPromptReplays      AiPromptReplay[]             @relation("AiPromptReplayCreatedBy")
+  createdAiGoldenContexts     AiGoldenContext[]            @relation("AiGoldenContextCreatedBy")
+  createdAiEvaluationRuns     AiEvaluationRun[]            @relation("AiEvaluationRunCreatedBy")
+  aiReplayFeedbacks           AiReplayFeedback[]           @relation("AiReplayFeedbackCreatedBy")
+  ratedAiEvaluationResults    AiEvaluationResult[]         @relation("AiEvaluationResultRatedBy")
 }
 
 model AuthIdentity {
@@ -249,6 +262,8 @@ model AiAreaGenerationConfig {
   area      Area  @relation(fields: [areaId], references: [id], onDelete: Cascade)
   createdBy User? @relation("AiAreaGenerationConfigCreatedBy", fields: [createdById], references: [id])
   updatedBy User? @relation("AiAreaGenerationConfigUpdatedBy", fields: [updatedById], references: [id])
+  replays   AiPromptReplay[]     @relation("AiPromptReplayAreaConfig")
+  evalResults AiEvaluationResult[] @relation("AiEvaluationResultAreaConfig")
 }
 
 model Sport {
@@ -385,6 +400,7 @@ model Area {
   aiAreaGenerationConfig      AiAreaGenerationConfig?
   sportSpecializationPrompts  SportSpecializationAreaPrompt[]
   userAreaPromptInstructions  UserAreaPromptInstruction[]
+  aiGoldenContexts            AiGoldenContext[]                @relation("AiGoldenContextArea")
 }
 
 model FeedbackEntry {
@@ -881,16 +897,22 @@ model AiProposalAudit {
   outputJson    Json?
   errorMessage  String?
   latencyMs     Int?
+  correlationId String?
+  inputTokens   Int?
+  outputTokens  Int?
+  totalTokens   Int?
   createdAt     DateTime @default(now())
 
   user        User                    @relation(fields: [userId], references: [id])
   planRelease ImprovementPlanRelease? @relation(fields: [planReleaseId], references: [id])
   questionSet QuestionSet?            @relation(fields: [questionSetId], references: [id])
+  replays     AiPromptReplay[]
 
   @@index([userId, createdAt])
   @@index([planReleaseId])
   @@index([questionSetId])
   @@index([provider, model, createdAt])
+  @@index([createdAt])
 }
 
 model PerformanceScaleConfig {
@@ -928,4 +950,125 @@ model ProfessionalAreaCompetence {
   area         Area @relation("ProfessionalAreaCompetence", fields: [areaId], references: [id])
 
   @@unique([professionalId, areaId])
+}
+
+model AiPromptReplay {
+  id                          String   @id @default(uuid())
+  sourceAuditId               String
+  areaConfigId                String?
+  createdById                 String
+  initialContextOverride      String?
+  responseFormatOverride      String?
+  status                      String
+  input                       Json?
+  output                      Json?
+  errorMessage                String?
+  inputTokens                 Int?
+  outputTokens                Int?
+  totalTokens                 Int?
+  durationMs                  Int?
+  provider                    String
+  model                       String
+  correlationId               String?
+  createdAt                   DateTime @default(now())
+
+  sourceAudit AiProposalAudit         @relation(fields: [sourceAuditId], references: [id], onDelete: Cascade)
+  areaConfig  AiAreaGenerationConfig? @relation("AiPromptReplayAreaConfig", fields: [areaConfigId], references: [id])
+  createdBy   User                    @relation("AiPromptReplayCreatedBy", fields: [createdById], references: [id])
+  feedback    AiReplayFeedback?
+
+  @@index([sourceAuditId])
+  @@index([createdById, createdAt])
+}
+
+model AiReplayFeedback {
+  id                String   @id @default(uuid())
+  replayId          String   @unique
+  chosenSide        String
+  relevanceArea     Int?
+  planConcreteness  Int?
+  questionRelevance Int?
+  tone              Int?
+  overall           Int?
+  notes             String?
+  createdById       String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  replay    AiPromptReplay @relation(fields: [replayId], references: [id], onDelete: Cascade)
+  createdBy User           @relation("AiReplayFeedbackCreatedBy", fields: [createdById], references: [id])
+}
+
+model AiGoldenContext {
+  id           String   @id @default(uuid())
+  label        String   @unique
+  description  String?
+  areaId       String
+  contextJson  Json
+  athleteLevel String?
+  isActive     Boolean  @default(true)
+  createdById  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  area        Area                 @relation("AiGoldenContextArea", fields: [areaId], references: [id], onDelete: Cascade)
+  createdBy   User                 @relation("AiGoldenContextCreatedBy", fields: [createdById], references: [id])
+  evalResults AiEvaluationResult[]
+
+  @@index([areaId])
+}
+
+model AiEvaluationRun {
+  id                     String                @id @default(uuid())
+  name                   String
+  status                 AiEvaluationRunStatus @default(PENDING)
+  createdById            String
+  goldenContextIds       String[]
+  initialContextVariants Json
+  responseFormatVariants Json
+  createdAt              DateTime              @default(now())
+  startedAt              DateTime?
+  completedAt            DateTime?
+  errorMessage           String?
+
+  createdBy User                 @relation("AiEvaluationRunCreatedBy", fields: [createdById], references: [id])
+  results   AiEvaluationResult[]
+
+  @@index([createdById, createdAt])
+}
+
+model AiEvaluationResult {
+  id                String   @id @default(uuid())
+  runId             String
+  goldenContextId   String
+  areaConfigId      String?
+  variantLabel      String
+  status            String
+  provider          String   @default("unknown")
+  model             String   @default("unknown")
+  input             Json?
+  output            Json?
+  errorMessage      String?
+  inputTokens       Int?
+  outputTokens      Int?
+  totalTokens       Int?
+  durationMs        Int?
+  correlationId     String?
+  relevanceArea     Int?
+  planConcreteness  Int?
+  questionRelevance Int?
+  tone              Int?
+  overall           Int?
+  notes             String?
+  ratedById         String?
+  ratedAt           DateTime?
+  createdAt         DateTime @default(now())
+
+  run           AiEvaluationRun         @relation(fields: [runId], references: [id], onDelete: Cascade)
+  goldenContext AiGoldenContext         @relation(fields: [goldenContextId], references: [id], onDelete: Cascade)
+  areaConfig    AiAreaGenerationConfig? @relation("AiEvaluationResultAreaConfig", fields: [areaConfigId], references: [id])
+  ratedBy       User?                   @relation("AiEvaluationResultRatedBy", fields: [ratedById], references: [id])
+
+  @@index([runId])
+  @@index([goldenContextId])
 }

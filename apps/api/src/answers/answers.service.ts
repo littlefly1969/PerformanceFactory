@@ -27,7 +27,9 @@ export class AnswersService {
     }
 
     if (actor.role !== UserRole.USER) {
-      throw new ForbiddenException('Solo gli utenti atleta possono inviare risposte');
+      throw new ForbiddenException(
+        'Solo gli utenti atleta possono inviare risposte',
+      );
     }
 
     if (!input.questionSetId || !input.answers?.length) {
@@ -76,7 +78,9 @@ export class AnswersService {
       }
       seenQuestions.add(answer.questionId);
       if (!questionMap.has(answer.questionId)) {
-        throw new BadRequestException('Domanda non valida per questo questionario');
+        throw new BadRequestException(
+          'Domanda non valida per questo questionario',
+        );
       }
     }
 
@@ -133,7 +137,9 @@ export class AnswersService {
     }
 
     if (actor.role !== UserRole.USER) {
-      throw new ForbiddenException('Solo gli utenti atleta possono inviare risposte');
+      throw new ForbiddenException(
+        'Solo gli utenti atleta possono inviare risposte',
+      );
     }
 
     if (!input.questionSetId || !input.answers?.length) {
@@ -181,7 +187,9 @@ export class AnswersService {
       }
       seenQuestions.add(answer.questionId);
       if (!questionMap.has(answer.questionId)) {
-        throw new BadRequestException('Domanda non valida per questo questionario');
+        throw new BadRequestException(
+          'Domanda non valida per questo questionario',
+        );
       }
     }
 

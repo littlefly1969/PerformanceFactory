@@ -43,7 +43,7 @@ describe('AppController (e2e)', () => {
     const fastify = app.getHttpAdapter().getInstance() as unknown as {
       inject: InjectFn;
     };
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
     inject = fastify.inject.bind(fastify);
   });
 

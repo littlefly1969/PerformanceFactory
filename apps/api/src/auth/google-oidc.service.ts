@@ -125,7 +125,10 @@ export class GoogleOidcService {
     url.searchParams.set('scope', 'openid email profile');
     url.searchParams.set('state', state);
     url.searchParams.set('nonce', nonce);
-    url.searchParams.set('code_challenge', this.codeChallengeForVerifier(codeVerifier));
+    url.searchParams.set(
+      'code_challenge',
+      this.codeChallengeForVerifier(codeVerifier),
+    );
     url.searchParams.set('code_challenge_method', 'S256');
     url.searchParams.set('prompt', 'select_account');
 
@@ -149,7 +152,11 @@ export class GoogleOidcService {
       session.save?.((error?: unknown) => {
         clearTimeout(timeout);
         if (error) {
-          reject(error);
+          reject(
+            error instanceof Error
+              ? error
+              : new Error('Salvataggio sessione fallito'),
+          );
           return;
         }
         resolve();
@@ -179,7 +186,10 @@ export class GoogleOidcService {
 
     this.logger.log(`Google OIDC callback state valid; mode=${oidc.mode}`);
     this.logger.log('Google OIDC exchanging authorization code');
-    const tokenResponse = await this.exchangeCode(input.code, oidc.codeVerifier);
+    const tokenResponse = await this.exchangeCode(
+      input.code,
+      oidc.codeVerifier,
+    );
     if (!tokenResponse.id_token) {
       throw new UnauthorizedException('Google non ha restituito id_token');
     }
@@ -207,10 +217,12 @@ export class GoogleOidcService {
     return { user, returnTo: oidc.returnTo };
   }
 
-  async pendingRegistration(req: SessionCarrier) {
+  pendingRegistration(req: SessionCarrier) {
     const pending = this.session(req).pendingGoogleRegistration;
     if (!pending || Date.now() - pending.createdAt > STATE_TTL_MS) {
-      throw new UnauthorizedException('Registrazione Google non disponibile o scaduta');
+      throw new UnauthorizedException(
+        'Registrazione Google non disponibile o scaduta',
+      );
     }
     return {
       email: pending.email,
@@ -235,7 +247,9 @@ export class GoogleOidcService {
     const session = this.session(req);
     const pending = session.pendingGoogleRegistration;
     if (!pending || Date.now() - pending.createdAt > STATE_TTL_MS) {
-      throw new UnauthorizedException('Registrazione Google non disponibile o scaduta');
+      throw new UnauthorizedException(
+        'Registrazione Google non disponibile o scaduta',
+      );
     }
     await this.consents.assertAcceptedCurrentDocuments(input);
     const [existingIdentity, existingUser] = await Promise.all([
@@ -303,7 +317,8 @@ export class GoogleOidcService {
   }
 
   failureRedirect(error: unknown) {
-    const base = process.env.WEB_LOGIN_FAILURE_URL ?? `${this.webOrigin()}/login`;
+    const base =
+      process.env.WEB_LOGIN_FAILURE_URL ?? `${this.webOrigin()}/login`;
     const url = new URL(base);
     const message =
       error instanceof Error ? error.message : 'Autenticazione Google fallita';
@@ -319,18 +334,22 @@ export class GoogleOidcService {
     code: string,
     codeVerifier: string,
   ): Promise<GoogleTokenResponse> {
-    const response = await this.fetchWithTimeout(GOOGLE_TOKEN_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code,
-        client_id: this.requiredEnv('GOOGLE_OIDC_CLIENT_ID'),
-        client_secret: this.requiredEnv('GOOGLE_OIDC_CLIENT_SECRET'),
-        redirect_uri: this.requiredEnv('GOOGLE_OIDC_REDIRECT_URI'),
-        grant_type: 'authorization_code',
-        code_verifier: codeVerifier,
-      }),
-    }, 'Google token endpoint');
+    const response = await this.fetchWithTimeout(
+      GOOGLE_TOKEN_ENDPOINT,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code,
+          client_id: this.requiredEnv('GOOGLE_OIDC_CLIENT_ID'),
+          client_secret: this.requiredEnv('GOOGLE_OIDC_CLIENT_SECRET'),
+          redirect_uri: this.requiredEnv('GOOGLE_OIDC_REDIRECT_URI'),
+          grant_type: 'authorization_code',
+          code_verifier: codeVerifier,
+        }),
+      },
+      'Google token endpoint',
+    );
     if (!response.ok) {
       const responseBody = await response.text();
       this.logger.warn(
@@ -407,7 +426,9 @@ export class GoogleOidcService {
 
     const hostedDomain = process.env.GOOGLE_OIDC_HOSTED_DOMAIN?.trim();
     if (hostedDomain && claims.hd !== hostedDomain) {
-      throw new UnauthorizedException('Dominio Google Workspace non autorizzato');
+      throw new UnauthorizedException(
+        'Dominio Google Workspace non autorizzato',
+      );
     }
 
     return claims;
@@ -432,7 +453,9 @@ export class GoogleOidcService {
     });
     if (existingIdentity) {
       if (!existingIdentity.user.isActive) {
-        throw new UnauthorizedException('Account in attesa di attivazione amministratore');
+        throw new UnauthorizedException(
+          'Account in attesa di attivazione amministratore',
+        );
       }
       await this.prisma.authIdentity.update({
         where: { id: existingIdentity.id },
@@ -500,7 +523,10 @@ export class GoogleOidcService {
     label: string,
   ) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), GOOGLE_FETCH_TIMEOUT_MS);
+    const timeout = setTimeout(
+      () => controller.abort(),
+      GOOGLE_FETCH_TIMEOUT_MS,
+    );
     try {
       return await fetch(url, {
         ...(init ?? {}),
@@ -524,7 +550,8 @@ export class GoogleOidcService {
   }
 
   private safeReturnTo(returnToInput?: string) {
-    const fallback = process.env.WEB_LOGIN_SUCCESS_URL ?? `${this.webOrigin()}/`;
+    const fallback =
+      process.env.WEB_LOGIN_SUCCESS_URL ?? `${this.webOrigin()}/`;
     if (!returnToInput) {
       return fallback;
     }

@@ -11,6 +11,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ApiBody, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { GoogleOidcService } from './google-oidc.service';
 import { LocalAuthGuard } from '../common/guards/local-auth.guard';
@@ -42,8 +43,12 @@ export class AuthController {
   }
 
   @Post('register-athlete')
-  @ApiOperation({ summary: 'Registra un nuovo atleta in attesa di attivazione amministratore' })
+  @ApiOperation({
+    summary: 'Registra un nuovo atleta in attesa di attivazione amministratore',
+  })
   @ApiBody({ type: RegisterAthleteDto })
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ 'register-athlete': { limit: 3, ttl: 15 * 60 * 1000 } })
   registerAthlete(
     @Body() body: RegisterAthleteDto,
     @Req()
@@ -59,13 +64,11 @@ export class AuthController {
   @Get('google/login')
   @ApiOperation({ summary: 'Avvia login con Google OIDC' })
   @Redirect()
-  async googleLogin(
-    @Req() req: unknown,
-    @Query('returnTo') returnTo?: string,
-  ) {
+  async googleLogin(@Req() req: unknown, @Query('returnTo') returnTo?: string) {
     const google = this.google();
-    const typedReq =
-      req as Parameters<GoogleOidcService['buildAuthorizationUrl']>[0];
+    const typedReq = req as Parameters<
+      GoogleOidcService['buildAuthorizationUrl']
+    >[0];
     const url = google.buildAuthorizationUrl(typedReq, 'login', returnTo);
     await google.persistSession(typedReq);
     return {
@@ -81,8 +84,9 @@ export class AuthController {
     @Query('returnTo') returnTo?: string,
   ) {
     const google = this.google();
-    const typedReq =
-      req as Parameters<GoogleOidcService['buildAuthorizationUrl']>[0];
+    const typedReq = req as Parameters<
+      GoogleOidcService['buildAuthorizationUrl']
+    >[0];
     const url = google.buildAuthorizationUrl(typedReq, 'register', returnTo);
     await google.persistSession(typedReq);
     return {
@@ -111,12 +115,19 @@ export class AuthController {
         { code, state, error },
       );
       if ('pendingRegistration' in result) {
-        this.logger.log('Google OIDC pending registration created; saving session');
+        this.logger.log(
+          'Google OIDC pending registration created; saving session',
+        );
         await this.google().persistSession(
           req as Parameters<GoogleOidcService['persistSession']>[0],
         );
-        this.logger.log('Google OIDC redirecting pending registration to consents');
-        return this.redirect(reply, this.google().successRedirect(result.returnTo));
+        this.logger.log(
+          'Google OIDC redirecting pending registration to consents',
+        );
+        return this.redirect(
+          reply,
+          this.google().successRedirect(result.returnTo),
+        );
       }
       await this.authService.createApplicationSession(
         req as Parameters<AuthService['createApplicationSession']>[0],
@@ -126,7 +137,10 @@ export class AuthController {
         req as Parameters<GoogleOidcService['persistSession']>[0],
       );
       this.logger.log('Google OIDC login session saved; redirecting user');
-      return this.redirect(reply, this.google().successRedirect(result.returnTo));
+      return this.redirect(
+        reply,
+        this.google().successRedirect(result.returnTo),
+      );
     } catch (callbackError) {
       this.logger.warn(
         `Google OIDC callback failed: ${this.errorMessage(callbackError)}`,
@@ -245,7 +259,9 @@ export class AuthController {
   }
 
   @Get('token')
-  @ApiOperation({ summary: 'Emetti token bearer breve da sessione sicura attiva' })
+  @ApiOperation({
+    summary: 'Emetti token bearer breve da sessione sicura attiva',
+  })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
   token(@Req() req: { user?: unknown }) {

@@ -82,6 +82,19 @@ async function main() {
     },
   });
 
+  await prisma.user.upsert({
+    where: { email: 'tuner@example.com' },
+    update: { role: UserRole.AI_TUNER, isActive: true },
+    create: {
+      email: 'tuner@example.com',
+      password: passwordHash,
+      role: UserRole.AI_TUNER,
+      firstName: 'AI',
+      lastName: 'Tuner',
+      isActive: true,
+    },
+  });
+
   const areaCatalog = [
     { name: 'Tecnico-tattica', aliases: ['Technical-Tactical'] },
     { name: 'Preparazione atletica', aliases: ['Athletic Preparation'] },

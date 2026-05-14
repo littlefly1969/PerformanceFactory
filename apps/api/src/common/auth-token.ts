@@ -27,15 +27,23 @@ const decodeBase64Url = (input: string) => {
 const getSecret = () => {
   const secret = process.env.ACCESS_TOKEN_SECRET || process.env.SESSION_SECRET;
   if (!secret && process.env.NODE_ENV === 'production') {
-    throw new Error('ACCESS_TOKEN_SECRET o SESSION_SECRET e obbligatorio in produzione');
+    throw new Error(
+      'ACCESS_TOKEN_SECRET o SESSION_SECRET e obbligatorio in produzione',
+    );
   }
   return secret ?? 'dev-access-token-secret';
 };
 
 const signatureFor = (header: string, payload: string) =>
-  base64Url(createHmac('sha256', getSecret()).update(`${header}.${payload}`).digest());
+  base64Url(
+    createHmac('sha256', getSecret()).update(`${header}.${payload}`).digest(),
+  );
 
-export function signAccessToken(user: { id: string; role: UserRole; email: string }) {
+export function signAccessToken(user: {
+  id: string;
+  role: UserRole;
+  email: string;
+}) {
   const now = Math.floor(Date.now() / 1000);
   const header = base64Url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const payload = base64Url(

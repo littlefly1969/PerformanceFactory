@@ -121,7 +121,11 @@ const makePrismaMock = () => {
         questionSets.find((set) => set.id === where.id) ?? null,
     },
     userAnswer: {
-      findMany: ({ where }: { where: { userId: string; questionId: { in: string[] } } }) =>
+      findMany: ({
+        where,
+      }: {
+        where: { userId: string; questionId: { in: string[] } };
+      }) =>
         answers.filter(
           (answer) =>
             answer.userId === where.userId &&
@@ -169,7 +173,7 @@ describe('Answers (e2e)', () => {
     const fastify = app.getHttpAdapter().getInstance() as unknown as {
       inject: InjectFn;
     };
-    inject = fastify.inject.bind(fastify) as InjectFn;
+    inject = fastify.inject.bind(fastify);
   });
 
   afterAll(async () => {

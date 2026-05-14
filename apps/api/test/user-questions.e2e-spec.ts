@@ -103,7 +103,11 @@ const makePrismaMock = () => {
 
   const prismaMock = {
     questionSet: {
-      findFirst: ({ where }: { where: { userId: string; status?: string; areaId?: string } }) => {
+      findFirst: ({
+        where,
+      }: {
+        where: { userId: string; status?: string; areaId?: string };
+      }) => {
         return (
           questionSets.find((set) => {
             if (set.userId !== where.userId) {
@@ -150,7 +154,7 @@ describe('User questions (e2e)', () => {
     const fastify = app.getHttpAdapter().getInstance() as unknown as {
       inject: InjectFn;
     };
-    inject = fastify.inject.bind(fastify) as InjectFn;
+    inject = fastify.inject.bind(fastify);
   });
 
   afterAll(async () => {
@@ -168,7 +172,11 @@ describe('User questions (e2e)', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    const payload = response.json() as { id: string; status: string; userId: string };
+    const payload = response.json() as {
+      id: string;
+      status: string;
+      userId: string;
+    };
     expect(payload.id).toBe('set-1');
     expect(payload.status).toBe('PUBLISHED');
     expect(payload.userId).toBe('user-1');

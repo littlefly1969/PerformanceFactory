@@ -24,7 +24,9 @@ export class ProfessionalService {
 
   async getApprovalsInbox(actor: Actor) {
     if (actor.role !== UserRole.PROFESSIONAL) {
-      throw new ForbiddenException('Solo i professionisti possono accedere alla coda');
+      throw new ForbiddenException(
+        'Solo i professionisti possono accedere alla coda',
+      );
     }
 
     const [linkedUsers, areas, coachLinks] = await Promise.all([
@@ -54,50 +56,48 @@ export class ProfessionalService {
       userId: link.userId,
     }));
 
-    await Promise.all(
-      [
-        ...linkedUsers.map((link) =>
-          this.prisma.questionSetAreaApproval.updateMany({
-            where: {
-              areaId: link.areaId,
-              status: 'PENDING',
-              professionalId: { not: actor.id },
-              questionSet: {
-                userId: link.userId,
-                status: 'PENDING_APPROVAL',
-              },
+    await Promise.all([
+      ...linkedUsers.map((link) =>
+        this.prisma.questionSetAreaApproval.updateMany({
+          where: {
+            areaId: link.areaId,
+            status: 'PENDING',
+            professionalId: { not: actor.id },
+            questionSet: {
+              userId: link.userId,
+              status: 'PENDING_APPROVAL',
             },
-            data: {
-              professionalId: actor.id,
-              approvedByProfessionalId: null,
-              approvedAt: null,
-              rejectedAt: null,
-              rejectionReason: null,
+          },
+          data: {
+            professionalId: actor.id,
+            approvedByProfessionalId: null,
+            approvedAt: null,
+            rejectedAt: null,
+            rejectionReason: null,
+          },
+        }),
+      ),
+      ...coachLinks.map((link) =>
+        this.prisma.trainingQuestionSetCoachApproval.updateMany({
+          where: {
+            status: 'PENDING',
+            coachId: { not: actor.id },
+            questionSet: {
+              userId: link.userId,
+              specializationId: link.specializationId,
+              status: 'PENDING_APPROVAL',
             },
-          }),
-        ),
-        ...coachLinks.map((link) =>
-          this.prisma.trainingQuestionSetCoachApproval.updateMany({
-            where: {
-              status: 'PENDING',
-              coachId: { not: actor.id },
-              questionSet: {
-                userId: link.userId,
-                specializationId: link.specializationId,
-                status: 'PENDING_APPROVAL',
-              },
-            },
-            data: {
-              coachId: actor.id,
-              approvedByCoachId: null,
-              approvedAt: null,
-              rejectedAt: null,
-              rejectionReason: null,
-            },
-          }),
-        ),
-      ],
-    );
+          },
+          data: {
+            coachId: actor.id,
+            approvedByCoachId: null,
+            approvedAt: null,
+            rejectedAt: null,
+            rejectionReason: null,
+          },
+        }),
+      ),
+    ]);
 
     const planItems = linkedAreaFilters.length
       ? await this.prisma.planItem.findMany({
@@ -543,7 +543,9 @@ export class ProfessionalService {
     }
 
     if (planItem.planRelease.status !== 'PENDING_APPROVAL') {
-      throw new BadRequestException('Il rilascio allenamento non e in approvazione');
+      throw new BadRequestException(
+        'Il rilascio allenamento non e in approvazione',
+      );
     }
 
     const allowed = await this.abac.canAccessUserArea(
@@ -552,7 +554,9 @@ export class ProfessionalService {
       planItem.areaId,
     );
     if (!allowed) {
-      throw new ForbiddenException('Operazione non consentita per questa attivita allenamento');
+      throw new ForbiddenException(
+        'Operazione non consentita per questa attivita allenamento',
+      );
     }
 
     const updated = await this.prisma.planItem.update({
@@ -609,7 +613,9 @@ export class ProfessionalService {
     }
 
     if (planItem.planRelease.status !== 'PENDING_APPROVAL') {
-      throw new BadRequestException('Il rilascio allenamento non e in approvazione');
+      throw new BadRequestException(
+        'Il rilascio allenamento non e in approvazione',
+      );
     }
 
     const allowed = await this.abac.canAccessUserArea(
@@ -618,7 +624,9 @@ export class ProfessionalService {
       planItem.areaId,
     );
     if (!allowed) {
-      throw new ForbiddenException('Operazione non consentita per questa attivita allenamento');
+      throw new ForbiddenException(
+        'Operazione non consentita per questa attivita allenamento',
+      );
     }
 
     const updated = await this.prisma.planItem.update({
@@ -671,7 +679,9 @@ export class ProfessionalService {
       approval.questionSet.specializationId,
     );
     if (!allowed) {
-      throw new ForbiddenException('Operazione non consentita per questo allenamento');
+      throw new ForbiddenException(
+        'Operazione non consentita per questo allenamento',
+      );
     }
 
     const updated = await this.prisma.trainingQuestionSetCoachApproval.update({
@@ -726,7 +736,9 @@ export class ProfessionalService {
       approval.questionSet.specializationId,
     );
     if (!allowed) {
-      throw new ForbiddenException('Operazione non consentita per questo allenamento');
+      throw new ForbiddenException(
+        'Operazione non consentita per questo allenamento',
+      );
     }
 
     const updated = await this.prisma.trainingQuestionSetCoachApproval.update({
@@ -786,7 +798,9 @@ export class ProfessionalService {
       planItem.trainingPlanRelease.specializationId,
     );
     if (!allowed) {
-      throw new ForbiddenException('Operazione non consentita per questo allenamento');
+      throw new ForbiddenException(
+        'Operazione non consentita per questo allenamento',
+      );
     }
 
     const updated = await this.prisma.trainingPlanItem.update({
@@ -853,7 +867,9 @@ export class ProfessionalService {
       planItem.trainingPlanRelease.specializationId,
     );
     if (!allowed) {
-      throw new ForbiddenException('Operazione non consentita per questo allenamento');
+      throw new ForbiddenException(
+        'Operazione non consentita per questo allenamento',
+      );
     }
 
     const updated = await this.prisma.trainingPlanItem.update({
@@ -956,7 +972,9 @@ export class ProfessionalService {
     if (actor.role === UserRole.PROFESSIONAL) {
       const allowed = await this.abac.canAccessUser(actor.id, plan.userId);
       if (!allowed) {
-        throw new ForbiddenException('Operazione non consentita per questo utente');
+        throw new ForbiddenException(
+          'Operazione non consentita per questo utente',
+        );
       }
     }
 

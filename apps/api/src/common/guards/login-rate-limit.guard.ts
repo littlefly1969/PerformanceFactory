@@ -27,7 +27,11 @@ export class LoginRateLimitGuard implements CanActivate {
 
     const forwarded = request.headers?.['x-forwarded-for'];
     const forwardedIp = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-    const ip = forwardedIp?.split(',')[0]?.trim() || request.ip || request.raw?.ip || 'unknown';
+    const ip =
+      forwardedIp?.split(',')[0]?.trim() ||
+      request.ip ||
+      request.raw?.ip ||
+      'unknown';
     const email = request.body?.email?.toLowerCase()?.trim() || 'unknown';
     const key = `${ip}:${email}`;
     const now = Date.now();
@@ -41,7 +45,10 @@ export class LoginRateLimitGuard implements CanActivate {
     bucket.count += 1;
     buckets.set(key, bucket);
     if (bucket.count > MAX_ATTEMPTS) {
-      throw new HttpException('Troppi tentativi di accesso', HttpStatus.TOO_MANY_REQUESTS);
+      throw new HttpException(
+        'Troppi tentativi di accesso',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
     return true;
   }

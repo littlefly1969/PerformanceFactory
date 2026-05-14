@@ -65,6 +65,15 @@ const roleNav: Record<string, NavItem[]> = {
     { href: "/admin/cycles", label: "Operazioni" },
     { href: "/admin/ai-config", label: "Configurazione AI" },
     { href: "/admin/consents", label: "Privacy" },
+    { href: "/ai-tuner", label: "AI Tuning" },
+  ],
+  AI_TUNER: [
+    { href: "/ai-tuner", label: "Dashboard" },
+    { href: "/ai-tuner/audits", label: "Audit & Replay" },
+    { href: "/ai-tuner/replays", label: "Replay storici" },
+    { href: "/ai-tuner/golden-contexts", label: "Golden context" },
+    { href: "/ai-tuner/evaluations", label: "Valutazioni" },
+    { href: "/ai-tuner/cost", label: "Costi AI" },
   ],
 };
 
@@ -72,6 +81,7 @@ const roleHome: Record<string, string> = {
   USER: "/user",
   PROFESSIONAL: "/professional",
   ADMIN: "/admin/cycles",
+  AI_TUNER: "/ai-tuner",
 };
 
 const pathMatchesRole = (path: string, role?: string) => {
@@ -98,7 +108,16 @@ const pathMatchesRole = (path: string, role?: string) => {
       path === "/consents" ||
       path === "/admin/cycles" ||
       path.startsWith("/admin/ai-config") ||
-      path.startsWith("/admin/consents")
+      path.startsWith("/admin/consents") ||
+      path === "/ai-tuner" ||
+      path.startsWith("/ai-tuner/")
+    );
+  }
+  if (role === "AI_TUNER") {
+    return (
+      path === "/consents" ||
+      path === "/ai-tuner" ||
+      path.startsWith("/ai-tuner/")
     );
   }
   return true;
