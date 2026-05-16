@@ -23,7 +23,7 @@ type AuditRow = {
 
 export default function AuditsListPage() {
   const [areas, setAreas] = useState<Area[]>([]);
-  const [areaId, setAreaId] = useState<string>("");
+  const [areaId, setAreaId] = useState("");
   const [items, setItems] = useState<AuditRow[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -58,20 +58,20 @@ export default function AuditsListPage() {
 
   return (
     <ProductShell
-      eyebrow="AI TUNING"
-      title="Audit AI per replay"
-      description="Sfoglia le generazioni reali. Il riferimento all'atleta è pseudonimizzato."
+      eyebrow="TEST SU CASI"
+      title="Casi reali gia generati"
+      description="Sfoglia le risposte AI reali gia prodotte dal sistema. Il riferimento all'atleta e pseudonimizzato."
     >
       <div className="pf-stack" style={{ gap: 16 }}>
         <div className="pf-row" style={{ gap: 12, alignItems: "flex-end" }}>
           <label className="pf-field">
-            Area
+            Area performance
             <select
               className="pf-input"
               value={areaId}
-              onChange={(e) => {
+              onChange={(event) => {
                 setPage(1);
-                setAreaId(e.target.value);
+                setAreaId(event.target.value);
               }}
             >
               <option value="">Tutte</option>
@@ -83,15 +83,15 @@ export default function AuditsListPage() {
             </select>
           </label>
           <div className="pf-meta">
-            {total} audit totali · pagina {page}
+            {total} casi reali totali - pagina {page}
           </div>
         </div>
 
-        {loading && <p>Caricamento…</p>}
+        {loading && <p>Caricamento...</p>}
         {!loading && items.length === 0 && (
           <EmptyState
-            title="Nessun audit"
-            description="Non ci sono audit per i filtri scelti."
+            title="Nessun caso reale"
+            description="Non ci sono generazioni AI reali per i filtri scelti."
           />
         )}
 
@@ -102,7 +102,7 @@ export default function AuditsListPage() {
                 <tr>
                   <th>Atleta</th>
                   <th>Area</th>
-                  <th>Provider · Modello</th>
+                  <th>Provider / modello</th>
                   <th>Token</th>
                   <th>Data</th>
                   <th></th>
@@ -112,14 +112,14 @@ export default function AuditsListPage() {
                 {items.map((row) => (
                   <tr key={row.id}>
                     <td>{row.athleteLabel}</td>
-                    <td>{row.area?.name ?? "—"}</td>
+                    <td>{row.area?.name ?? "-"}</td>
                     <td>
-                      {row.provider} · {row.model}
+                      {row.provider} / {row.model}
                     </td>
                     <td>
                       {row.totalTokens != null
                         ? `${row.totalTokens} (in ${row.inputTokens ?? "?"} / out ${row.outputTokens ?? "?"})`
-                        : "—"}
+                        : "-"}
                     </td>
                     <td>{new Date(row.createdAt).toLocaleString("it-IT")}</td>
                     <td>
@@ -127,7 +127,7 @@ export default function AuditsListPage() {
                         className="pf-button-secondary"
                         href={`/ai-tuner/audits/${row.id}`}
                       >
-                        Apri
+                        Apri caso
                       </Link>
                     </td>
                   </tr>
@@ -142,7 +142,7 @@ export default function AuditsListPage() {
             type="button"
             className="pf-button-secondary"
             disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            onClick={() => setPage((current) => Math.max(1, current - 1))}
           >
             Precedente
           </button>
@@ -150,7 +150,7 @@ export default function AuditsListPage() {
             type="button"
             className="pf-button-secondary"
             disabled={items.length < 30}
-            onClick={() => setPage((p) => p + 1)}
+            onClick={() => setPage((current) => current + 1)}
           >
             Successivo
           </button>

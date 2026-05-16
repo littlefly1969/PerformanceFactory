@@ -73,8 +73,8 @@ const demoAccounts = [
     password: "password123",
   },
   {
-    group: "AI Tuner",
-    label: "AI Tuner",
+    group: "Gestione prompt",
+    label: "Gestione prompt",
     email: "tuner@example.com",
     password: "password123",
   },
@@ -94,7 +94,7 @@ const demoAccessAccounts = [
     )!,
   },
   {
-    label: "AI Tuner demo",
+    label: "Gestione prompt demo",
     account: demoAccounts.find(
       (account) => account.email === "tuner@example.com",
     )!,
@@ -223,10 +223,10 @@ export default function LoginPage() {
           : "/user"
         : user.role === "PROFESSIONAL"
           ? "/professional"
-          : user.role === "ADMIN"
-            ? "/admin/cycles"
+            : user.role === "ADMIN"
+              ? "/admin/cycles"
             : user.role === "AI_TUNER"
-              ? "/ai-tuner"
+              ? "/ai-tuner/prompts"
               : "/";
     window.location.href = destination;
   };

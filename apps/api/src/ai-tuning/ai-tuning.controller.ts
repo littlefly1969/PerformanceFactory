@@ -15,12 +15,17 @@ import { UserRole } from '@prisma/client';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { AdminService } from '../admin/admin.service';
+import { UpsertAiAreaGenerationConfigDto } from '../admin/dto/upsert-ai-area-generation-config.dto';
+import { UpsertGoalPromptConfigDto } from '../admin/dto/upsert-goal-prompt-config.dto';
+import { UpsertOnboardingTemplateDto } from '../admin/dto/upsert-onboarding-template.dto';
 import { AiTuningService } from './ai-tuning.service';
 import { RunReplayDto } from './dto/run-replay.dto';
 import { SaveReplayFeedbackDto } from './dto/save-replay-feedback.dto';
 import { UpsertGoldenContextDto } from './dto/upsert-golden-context.dto';
 import { CreateEvaluationRunDto } from './dto/create-evaluation-run.dto';
 import { RateEvaluationResultDto } from './dto/rate-evaluation-result.dto';
+import { TestPromptDto } from './dto/test-prompt.dto';
 
 type ActorRequest = { user?: { id: string; role: UserRole } };
 
@@ -30,7 +35,10 @@ type ActorRequest = { user?: { id: string; role: UserRole } };
 @Roles(UserRole.AI_TUNER, UserRole.ADMIN)
 @ApiCookieAuth()
 export class AiTuningController {
-  constructor(private readonly tuning: AiTuningService) {}
+  constructor(
+    private readonly tuning: AiTuningService,
+    private readonly promptAdmin: AdminService,
+  ) {}
 
   @Get('areas')
   @ApiOperation({ summary: 'Elenco aree per filtraggio' })
@@ -42,6 +50,13 @@ export class AiTuningController {
   @ApiOperation({ summary: 'Configurazioni AI per area' })
   getAreaConfigs() {
     return this.tuning.listAreaConfigs();
+  }
+
+  @Get('prompt-settings')
+  @ApiOperation({ summary: 'Configurazione prompt e onboarding' })
+  @Roles(UserRole.AI_TUNER)
+  getPromptSettings() {
+    return this.promptAdmin.getAiSettings();
   }
 
   @Get('audits')
@@ -68,6 +83,93 @@ export class AiTuningController {
   @ApiOperation({ summary: 'Esegui replay sincronizzato' })
   runReplay(@Req() req: ActorRequest, @Body() dto: RunReplayDto) {
     return this.tuning.runReplay(req.user?.id ?? '', dto);
+  }
+
+  @Post('prompt-test')
+  @ApiOperation({ summary: 'Testa un prompt libero con il provider AI' })
+  @Roles(UserRole.AI_TUNER)
+  testPrompt(@Body() dto: TestPromptDto) {
+    return this.tuning.testPrompt(dto);
+  }
+
+  @Post('goal-prompt')
+  @ApiOperation({ summary: 'Crea o aggiorna il prompt obiettivo atleta' })
+  @Roles(UserRole.AI_TUNER)
+  upsertGoalPrompt(
+    @Req() req: ActorRequest,
+    @Body() body: UpsertGoalPromptConfigDto,
+  ) {
+    return this.promptAdmin.upsertGoalPromptConfig(body, req.user?.id ?? '');
+  }
+
+  @Post('sports')
+  @ApiOperation({
+    summary: 'Crea o aggiorna sport, specializzazioni e prompt area',
+  })
+  @Roles(UserRole.AI_TUNER)
+  upsertSport(
+    @Req() req: ActorRequest,
+    @Body()
+    body: {
+      id?: string;
+      key?: string;
+      label?: string;
+      isActive?: boolean;
+      specializations?: Array<{
+        id?: string;
+        key?: string;
+        label?: string;
+        trainingPrompt?: string;
+        trainingPromptActive?: boolean;
+        isActive?: boolean;
+        prompts?: Array<{
+          id?: string;
+          areaId?: string;
+          basePrompt?: string;
+          isEnabledDriver?: boolean;
+          isActive?: boolean;
+        }>;
+      }>;
+    },
+  ) {
+    return this.promptAdmin.upsertSportCatalog(body, req.user?.id ?? '');
+  }
+
+  @Delete('sports/:sportId')
+  @ApiOperation({
+    summary: 'Cancella uno sport e le specializzazioni collegate',
+  })
+  @Roles(UserRole.AI_TUNER)
+  deleteSport(@Param('sportId') sportId: string) {
+    return this.promptAdmin.deleteSport(sportId);
+  }
+
+  @Post('ai-area-configs')
+  @ApiOperation({
+    summary: 'Crea o aggiorna una configurazione generazione AI per area',
+  })
+  @Roles(UserRole.AI_TUNER)
+  upsertAiAreaConfig(
+    @Req() req: ActorRequest,
+    @Body() body: UpsertAiAreaGenerationConfigDto,
+  ) {
+    return this.promptAdmin.upsertAiAreaGenerationConfig(
+      body,
+      req.user?.id ?? '',
+    );
+  }
+
+  @Post('onboarding-templates')
+  @ApiOperation({ summary: 'Crea o aggiorna un template domanda onboarding' })
+  @Roles(UserRole.AI_TUNER)
+  upsertOnboardingTemplate(
+    @Req() req: ActorRequest,
+    @Body() body: UpsertOnboardingTemplateDto,
+  ) {
+    return this.promptAdmin.upsertOnboardingTemplate(
+      body,
+      req.user?.id ?? '',
+    );
   }
 
   @Get('replays')

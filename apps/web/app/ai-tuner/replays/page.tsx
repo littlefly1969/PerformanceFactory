@@ -42,16 +42,16 @@ export default function ReplaysPage() {
 
   return (
     <ProductShell
-      eyebrow="AI TUNING"
-      title="Replay storici"
-      description="I tuoi replay precedenti e le valutazioni rubric assegnate."
+      eyebrow="MONITORAGGIO AI"
+      title="Storico test"
+      description="Rivedi i test e le rigenerazioni gia eseguite sui prompt."
     >
       <div className="pf-stack" style={{ gap: 16 }}>
-        <div className="pf-meta">{total} replay totali</div>
+        <div className="pf-meta">{total} test totali</div>
         {items.length === 0 && (
           <EmptyState
-            title="Nessun replay"
-            description="Apri un audit e lancia un replay per iniziare."
+            title="Nessun test"
+            description="Apri un caso reale e lancia un test per iniziare."
           />
         )}
         {items.length > 0 && (

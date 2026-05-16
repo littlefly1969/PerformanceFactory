@@ -72,7 +72,7 @@ export default function EvaluationDetailPage() {
 
   if (!run) {
     return (
-      <ProductShell eyebrow="AI TUNING" title="Run">
+      <ProductShell eyebrow="CONFRONTO VERSIONI" title="Confronto">
         <p>Caricamento…</p>
       </ProductShell>
     );
@@ -100,22 +100,22 @@ export default function EvaluationDetailPage() {
       },
     );
     if (res.ok) void load();
-    else alert("Errore salvataggio rubric");
+    else alert("Errore salvataggio criteri");
   };
 
   return (
     <ProductShell
-      eyebrow="AI TUNING"
-      title={`Run "${run.name}"`}
+      eyebrow="CONFRONTO VERSIONI"
+      title={`Confronto "${run.name}"`}
       description={`Status: ${run.status}${run.errorMessage ? ` · ${run.errorMessage}` : ""}`}
     >
       <div className="pf-stack" style={{ gap: 16 }}>
         <section className="pf-card">
-          <h3>Matrice golden × variante</h3>
+          <h3>Matrice casi x versione</h3>
           <table className="pf-table">
             <thead>
               <tr>
-                <th>Golden</th>
+                <th>Caso</th>
                 {variantLabels.map((v) => (
                   <th key={v}>{v}</th>
                 ))}
@@ -194,7 +194,7 @@ export default function EvaluationDetailPage() {
           return (
             <section className="pf-card">
               <h3>
-                {res.goldenContext.label} · variante {res.variantLabel}
+                {res.goldenContext.label} - versione {res.variantLabel}
               </h3>
               {(() => {
                 const root = (res.input ?? null) as
@@ -302,13 +302,15 @@ export default function EvaluationDetailPage() {
                     onChange={(e) => setKey("notes", e.target.value)}
                   />
                 </label>
-                <button
-                  type="button"
-                  className="pf-button"
-                  onClick={() => saveScore(res.id)}
-                >
-                  Salva valutazione
-                </button>
+                <div className="pf-form-actions">
+                  <button
+                    type="button"
+                    className="pf-button"
+                    onClick={() => saveScore(res.id)}
+                  >
+                    Salva valutazione
+                  </button>
+                </div>
               </div>
             </section>
           );

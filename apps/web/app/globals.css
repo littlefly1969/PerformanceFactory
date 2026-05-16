@@ -202,6 +202,39 @@ a {
   padding: 36px clamp(20px, 4vw, 56px) 72px;
 }
 
+.pf-back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  margin: 0 0 18px;
+  border: 1px solid var(--pf-border);
+  border-radius: 999px;
+  background: var(--pf-surface);
+  color: var(--pf-muted);
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.pf-back-button span:first-child {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.pf-back-button:hover {
+  border-color: var(--pf-accent);
+  background: #ecfdf5;
+  color: var(--pf-accent-strong);
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.12);
+}
+
 .pf-header {
   display: flex;
   justify-content: space-between;
@@ -764,6 +797,13 @@ a {
   color: #344054;
   font-size: 13px;
   font-weight: 700;
+}
+
+.pf-field-hint {
+  color: var(--pf-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .pf-input,
@@ -1819,11 +1859,23 @@ body {
 
 .pf-nav a:hover,
 .pf-nav a.active,
-.pf-nav-dropdown.active > summary,
 .pf-nav-dropdown summary:hover {
   border-color: transparent;
   background: var(--pf-accent);
   box-shadow: none;
+  color: #050515;
+}
+
+.pf-nav-dropdown.active > summary {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.pf-nav-dropdown.active > summary:hover,
+.pf-nav-dropdown[open] > summary:hover {
+  background: var(--pf-accent);
   color: #050515;
 }
 
@@ -1843,6 +1895,19 @@ body {
 .pf-header {
   align-items: center;
   margin-bottom: 28px;
+}
+
+.pf-ai-tuner-shell .pf-back-button {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.pf-ai-tuner-shell .pf-back-button:hover {
+  background: var(--pf-accent);
+  border-color: var(--pf-accent);
+  color: #050515;
+  box-shadow: 0 0 0 3px rgba(220, 255, 50, 0.18);
 }
 
 .pf-eyebrow {
@@ -1946,6 +2011,11 @@ body {
   padding: 12px 18px;
   text-transform: uppercase;
   letter-spacing: 0;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .pf-button {
@@ -1958,6 +2028,7 @@ body {
 .pf-button:hover {
   background: var(--pf-accent-strong);
   border-color: var(--pf-accent-strong);
+  color: #050515;
 }
 
 .pf-button-secondary {
@@ -1973,6 +2044,832 @@ body {
 .pf-button-danger {
   background: var(--pf-danger);
   color: #050515;
+}
+
+.pf-ai-tuner-shell .pf-actions,
+.pf-ai-tuner-shell .pf-row {
+  gap: 14px;
+}
+
+.pf-ai-tuner-shell .pf-actions {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.pf-ai-tuner-shell .pf-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 18px;
+  margin-top: 26px;
+}
+
+.pf-ai-tuner-shell .pf-inline-action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.pf-ai-tuner-shell .pf-inline-action-row .pf-button,
+.pf-ai-tuner-shell .pf-inline-action-row .pf-button-secondary,
+.pf-ai-tuner-shell .pf-inline-action-row .pf-button-danger {
+  align-self: end;
+  margin: 0;
+}
+
+.pf-ai-tuner-shell .pf-panel-header .pf-actions,
+.pf-ai-tuner-shell .pf-card .pf-actions,
+.pf-ai-tuner-shell .pf-panel > .pf-actions,
+.pf-ai-tuner-shell .pf-prompt-management .pf-actions {
+  margin-top: 18px;
+}
+
+.pf-ai-tuner-shell .pf-button,
+.pf-ai-tuner-shell .pf-button-secondary,
+.pf-ai-tuner-shell .pf-button-danger {
+  margin: 3px;
+}
+
+.pf-ai-tuner-shell .pf-form-actions .pf-button,
+.pf-ai-tuner-shell .pf-form-actions .pf-button-secondary,
+.pf-ai-tuner-shell .pf-form-actions .pf-button-danger {
+  margin: 0;
+}
+
+.pf-ai-tuner-shell .pf-table .pf-button,
+.pf-ai-tuner-shell .pf-table .pf-button-secondary,
+.pf-ai-tuner-shell .pf-table .pf-button-danger {
+  min-height: 38px;
+  margin: 4px 0 4px 8px;
+  padding: 8px 12px;
+}
+
+.pf-prompt-management .pf-button:hover,
+.pf-prompt-management .pf-button-secondary:hover,
+.pf-prompt-management .pf-button-danger:hover,
+.pf-prompt-management .pf-card:is(button, a):hover,
+.pf-prompt-management .pf-config-row:hover {
+  background: var(--pf-accent);
+  border-color: var(--pf-accent);
+  color: #000;
+  box-shadow: 0 0 0 3px rgba(220, 255, 50, 0.22);
+}
+
+.pf-prompt-management .pf-card:is(button, a):hover *,
+.pf-prompt-management .pf-config-row:hover * {
+  color: #000 !important;
+}
+
+.pf-prompt-management .pf-card:is(button, a):hover h3,
+.pf-prompt-management .pf-card:is(button, a):hover h4,
+.pf-prompt-management .pf-card:is(button, a):hover p,
+.pf-prompt-management .pf-card:is(button, a):hover span,
+.pf-prompt-management .pf-card:is(button, a):hover strong,
+.pf-prompt-management .pf-config-row:hover strong,
+.pf-prompt-management .pf-config-row:hover small {
+  color: #000 !important;
+}
+
+.pf-prompt-management button.pf-card:hover,
+.pf-prompt-management a.pf-card:hover,
+.pf-prompt-management button.pf-config-row:hover,
+.pf-prompt-management .pf-button:hover,
+.pf-prompt-management .pf-button-secondary:hover,
+.pf-prompt-management .pf-button-danger:hover {
+  border-color: var(--pf-accent) !important;
+}
+
+.pf-prompt-management .pf-card[style*="border-color"] {
+  background:
+    linear-gradient(180deg, rgba(220, 255, 50, 0.08), rgba(27, 27, 48, 0.94));
+}
+
+.pf-test-cases .pf-test-case-card {
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.pf-test-cases button.pf-test-case-card:hover,
+.pf-test-cases a.pf-test-case-card:hover {
+  background: var(--pf-accent);
+  border-color: var(--pf-accent) !important;
+  color: #050515;
+  box-shadow: 0 0 0 3px rgba(220, 255, 50, 0.22);
+}
+
+.pf-test-cases button.pf-test-case-card:hover h3,
+.pf-test-cases button.pf-test-case-card:hover p,
+.pf-test-cases button.pf-test-case-card:hover span,
+.pf-test-cases a.pf-test-case-card:hover h3,
+.pf-test-cases a.pf-test-case-card:hover p,
+.pf-test-cases a.pf-test-case-card:hover span {
+  color: #050515;
+}
+
+.pf-standard-cases-panel > .pf-panel-header {
+  align-items: flex-start;
+}
+
+.pf-standard-cases-create {
+  align-self: flex-start;
+  margin-top: -2px;
+}
+
+.pf-ai-tuner-shell .pf-standard-cases-panel .pf-standard-cases-create {
+  margin-top: -8px;
+}
+
+.pf-standard-cases-table-wrap {
+  overflow-x: auto;
+}
+
+.pf-standard-cases-table {
+  display: table;
+  width: 100%;
+  min-width: 760px;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.pf-standard-cases-table th,
+.pf-standard-cases-table td {
+  padding: 16px 14px;
+  text-align: left;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.pf-standard-cases-table th {
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.pf-standard-cases-table th:nth-child(1),
+.pf-standard-cases-table td:nth-child(1) {
+  width: 20%;
+}
+
+.pf-standard-cases-table th:nth-child(2),
+.pf-standard-cases-table td:nth-child(2) {
+  width: 16%;
+}
+
+.pf-standard-cases-table th:nth-child(3),
+.pf-standard-cases-table td:nth-child(3) {
+  width: 12%;
+}
+
+.pf-standard-cases-table th:nth-child(4),
+.pf-standard-cases-table td:nth-child(4) {
+  width: 34%;
+}
+
+.pf-standard-cases-table th:nth-child(5),
+.pf-standard-cases-table td:nth-child(5) {
+  width: 18%;
+  text-align: right;
+}
+
+.pf-standard-cases-table tbody td {
+  height: 96px;
+}
+
+.pf-standard-cases-table td:nth-child(5) {
+  text-align: center;
+}
+
+.pf-standard-cases-table .pf-button-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.pf-standard-cases-list {
+  display: grid;
+  gap: 16px;
+}
+
+.pf-standard-case-block {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(130px, auto);
+  gap: 24px;
+  align-items: start;
+  padding: 22px 24px;
+}
+
+.pf-standard-case-content {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.9fr) minmax(150px, 0.65fr) minmax(120px, 0.45fr) minmax(280px, 1.6fr);
+  gap: 20px;
+  align-items: start;
+  min-width: 0;
+}
+
+.pf-standard-case-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pf-standard-case-label {
+  display: block;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.pf-standard-case-field strong,
+.pf-standard-case-field p {
+  display: block;
+  margin: 0;
+  color: var(--pf-text);
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.pf-standard-case-description p {
+  max-width: 58ch;
+}
+
+.pf-test-history-table .pf-clickable-table-row {
+  cursor: pointer;
+}
+
+.pf-test-history-table .pf-clickable-table-row td {
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease;
+}
+
+.pf-test-history-table .pf-clickable-table-row td:first-child {
+  border-left: 2px solid transparent;
+  border-radius: 8px 0 0 8px;
+}
+
+.pf-test-history-table .pf-clickable-table-row td:last-child {
+  border-right: 2px solid transparent;
+  border-radius: 0 8px 8px 0;
+}
+
+.pf-test-history-table .pf-clickable-table-row:hover td,
+.pf-test-history-table .pf-clickable-table-row:focus-visible td {
+  background: transparent;
+  border-top-color: var(--pf-lime);
+  border-bottom-color: var(--pf-lime);
+  box-shadow: 0 0 22px rgba(220, 255, 50, 0.28);
+  color: var(--pf-text);
+}
+
+.pf-test-history-table .pf-clickable-table-row:hover td:first-child,
+.pf-test-history-table .pf-clickable-table-row:focus-visible td:first-child {
+  border-left-color: var(--pf-lime);
+  box-shadow:
+    -5px 0 16px rgba(220, 255, 50, 0.3),
+    0 0 22px rgba(220, 255, 50, 0.28);
+}
+
+.pf-test-history-table .pf-clickable-table-row:hover td:last-child,
+.pf-test-history-table .pf-clickable-table-row:focus-visible td:last-child {
+  border-right-color: var(--pf-lime);
+  box-shadow:
+    5px 0 16px rgba(220, 255, 50, 0.3),
+    0 0 22px rgba(220, 255, 50, 0.28);
+}
+
+.pf-test-history-table .pf-clickable-table-row:focus-visible {
+  outline: none;
+}
+
+.pf-standard-cases-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-content: flex-start;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.pf-ai-tuner-shell .pf-standard-cases-actions .pf-button-secondary {
+  margin: 0;
+}
+
+.pf-test-result-screen .pf-panel-header {
+  align-items: flex-start;
+}
+
+.pf-test-result-screen .pf-panel-header h2 {
+  font-size: 18px;
+}
+
+.pf-test-result-screen .pf-panel-header p {
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.pf-test-result-screen .pf-actions {
+  align-items: flex-start;
+  justify-content: flex-end;
+}
+
+.pf-test-result-layout {
+  display: grid;
+  grid-template-columns: minmax(310px, 0.36fr) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.pf-test-result-summary {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.pf-test-result-summary h2 {
+  font-size: 19px;
+}
+
+.pf-test-result-summary .pf-prompt-info-card {
+  gap: 14px;
+  padding: 16px;
+}
+
+.pf-test-result-summary .pf-prompt-info-card span {
+  font-size: 13px;
+}
+
+.pf-test-result-summary .pf-prompt-info-card strong {
+  font-size: 15px;
+}
+
+.pf-test-result-accordion {
+  display: grid;
+  gap: 16px;
+}
+
+.pf-test-result-disclosure {
+  display: grid;
+  gap: 14px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.pf-test-result-disclosure summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, auto) auto;
+  gap: 18px;
+  align-items: center;
+  cursor: pointer;
+  padding: 22px 24px;
+  color: var(--pf-text);
+  font-weight: 800;
+}
+
+.pf-test-result-disclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.pf-test-result-disclosure summary::after {
+  color: var(--pf-lime);
+  content: "+";
+  font-size: 28px;
+  line-height: 1;
+}
+
+.pf-test-result-disclosure[open] summary::after {
+  content: "-";
+}
+
+.pf-test-result-disclosure summary:hover {
+  color: var(--pf-lime);
+}
+
+.pf-test-result-disclosure summary span {
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.pf-test-result-disclosure summary small {
+  color: var(--pf-muted);
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.pf-test-result-disclosure .pf-readonly-code {
+  margin: 0 24px 24px;
+  padding: 20px;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.pf-ai-answer-output {
+  min-height: 420px;
+  max-height: 720px;
+}
+
+.pf-readonly-code {
+  width: 100%;
+  max-height: 420px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--pf-text);
+  padding: 16px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.pf-standard-case-summary {
+  display: grid;
+  gap: 8px;
+}
+
+a.pf-standard-case-summary {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+a.pf-standard-case-summary:hover,
+a.pf-standard-case-summary:focus-visible {
+  border-color: var(--pf-lime);
+  box-shadow: 0 0 0 3px rgba(220, 255, 50, 0.22);
+  outline: none;
+}
+
+.pf-test-history-panel {
+  margin-top: 4px;
+}
+
+.pf-test-history-table-wrap {
+  overflow-x: auto;
+}
+
+.pf-test-history-table {
+  display: table;
+  width: 100%;
+  min-width: 1180px;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.pf-test-history-table th,
+.pf-test-history-table td {
+  padding: 10px 16px;
+  text-align: left;
+  vertical-align: middle;
+  overflow-wrap: anywhere;
+}
+
+.pf-test-history-table th {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.pf-test-history-table td {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  line-height: 1.3;
+}
+
+.pf-test-history-table tbody tr:first-child td {
+  border-top: 0;
+}
+
+.pf-test-history-table th + th,
+.pf-test-history-table td + td {
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.pf-test-history-table th:nth-child(1),
+.pf-test-history-table td:nth-child(1) {
+  width: 16%;
+  white-space: nowrap;
+}
+
+.pf-test-history-table th:nth-child(2),
+.pf-test-history-table td:nth-child(2) {
+  width: 18%;
+}
+
+.pf-test-history-table th:nth-child(3),
+.pf-test-history-table td:nth-child(3) {
+  width: 14%;
+}
+
+.pf-test-history-table th:nth-child(4),
+.pf-test-history-table td:nth-child(4) {
+  width: 18%;
+}
+
+.pf-test-history-table th:nth-child(5),
+.pf-test-history-table td:nth-child(5) {
+  width: 18%;
+}
+
+.pf-test-history-table th:nth-child(6),
+.pf-test-history-table td:nth-child(6),
+.pf-test-history-table th:nth-child(7),
+.pf-test-history-table td:nth-child(7) {
+  width: 8%;
+}
+
+.pf-test-history-table th:nth-child(8),
+.pf-test-history-table td:nth-child(8) {
+  width: 12%;
+}
+
+.pf-history-remove-button {
+  min-width: 96px;
+  min-height: 30px;
+  padding: 6px 14px;
+  white-space: nowrap;
+}
+
+.pf-prompt-card-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pf-prompt-current-panel {
+  overflow: hidden;
+}
+
+.pf-prompt-current-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 18px;
+}
+
+.pf-prompt-current-actions {
+  justify-content: flex-end;
+  align-items: start;
+  margin-top: 0 !important;
+}
+
+.pf-prompt-current-content {
+  min-width: 0;
+}
+
+.pf-prompt-preview-card {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pf-prompt-preview-card:hover {
+  border-color: var(--pf-accent);
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--pf-text);
+  box-shadow: 0 0 0 3px rgba(220, 255, 50, 0.12);
+}
+
+.pf-prompt-preview-card:hover strong,
+.pf-prompt-preview-card:hover p {
+  color: inherit;
+}
+
+.pf-prompt-overview-card:hover .pf-prompt-overview-meta span,
+.pf-prompt-overview-card:hover .pf-prompt-overview-meta strong,
+.pf-created-prompt-card:hover .pf-prompt-overview-meta span,
+.pf-created-prompt-card:hover .pf-prompt-overview-meta strong {
+  color: #000 !important;
+}
+
+.pf-prompt-preview {
+  margin: 0;
+  width: 100%;
+  max-width: 100%;
+  max-height: 420px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.65;
+}
+
+.pf-prompt-overview-grid {
+  align-items: stretch;
+}
+
+.pf-prompt-overview-card {
+  display: grid;
+  gap: 14px;
+}
+
+.pf-prompt-overview-card h3,
+.pf-created-prompt-card h3 {
+  font-weight: 900;
+}
+
+.pf-prompt-overview-card p,
+.pf-created-prompt-card p {
+  font-weight: 600;
+}
+
+.pf-prompt-overview-meta span {
+  font-weight: 800;
+}
+
+.pf-prompt-overview-meta strong {
+  font-weight: 600;
+}
+
+.pf-created-prompts-grid {
+  align-items: stretch;
+}
+
+.pf-created-prompt-card {
+  position: relative;
+  display: grid;
+  gap: 14px;
+  min-height: 220px;
+  padding-top: 22px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pf-created-prompt-card.in-use {
+  border-color: var(--pf-accent) !important;
+  background:
+    linear-gradient(180deg, rgba(220, 255, 50, 0.18), rgba(27, 27, 48, 0.94));
+  box-shadow: 0 0 0 2px rgba(220, 255, 50, 0.16);
+}
+
+.pf-created-prompt-card.in-use:hover {
+  background: var(--pf-accent);
+  color: #050515;
+}
+
+.pf-created-prompt-card.in-use:hover h3,
+.pf-created-prompt-card.in-use:hover p,
+.pf-created-prompt-card.in-use:hover span,
+.pf-created-prompt-card.in-use:hover strong {
+  color: #050515;
+}
+
+.pf-created-prompt-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--pf-accent);
+  color: #050515;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.pf-created-prompt-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 16px;
+}
+
+.pf-created-prompt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.pf-ai-tuner-shell .pf-created-prompt-actions .pf-button,
+.pf-ai-tuner-shell .pf-created-prompt-actions .pf-button-secondary {
+  margin: 0;
+}
+
+.pf-prompt-overview-meta {
+  display: grid;
+  gap: 10px;
+  margin-top: 0;
+}
+
+.pf-prompt-overview-meta span {
+  display: grid;
+  gap: 3px;
+  color: var(--pf-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.pf-prompt-overview-meta strong {
+  color: var(--pf-text);
+  font-size: 13px;
+  line-height: 1.4;
+  font-weight: 600;
+  text-transform: none;
+}
+
+.pf-prompt-status-grid,
+.pf-prompt-info-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.045);
+  padding: 14px;
+}
+
+.pf-prompt-status-grid {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  align-items: end;
+}
+
+.pf-prompt-current-panel .pf-prompt-status-grid {
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.pf-prompt-info-card {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.pf-prompt-status-grid span,
+.pf-prompt-info-card span {
+  display: block;
+  color: var(--pf-muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.pf-prompt-status-grid strong,
+.pf-prompt-info-card strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--pf-text);
+  line-height: 1.45;
+}
+
+.pf-prompt-status-action .pf-button-secondary {
+  width: 100%;
+  margin: 6px 0 0;
+  justify-content: center;
+}
+
+.pf-save-draft-button {
+  box-shadow: none;
+}
+
+.pf-save-draft-button:hover {
+  background: var(--pf-accent);
+  border-color: var(--pf-accent);
+  color: #050515;
+  box-shadow: 0 0 0 3px rgba(220, 255, 50, 0.22);
+}
+
+.pf-confirm-modal {
+  width: min(560px, 100%);
+}
+
+.pf-prompt-textarea {
+  min-height: 320px;
+  padding: 16px;
+  font-size: 15px;
+  line-height: 1.65;
 }
 
 .pf-input,

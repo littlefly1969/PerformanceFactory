@@ -21,6 +21,9 @@ const destinationFor = (
   if (role === "ADMIN") {
     return "/admin/cycles";
   }
+  if (role === "AI_TUNER") {
+    return "/ai-tuner/prompts";
+  }
   return "/login";
 };
 

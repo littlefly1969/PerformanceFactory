@@ -53,7 +53,7 @@ export default function AuditDetailPage() {
 
   if (!audit) {
     return (
-      <ProductShell eyebrow="AI TUNING" title="Audit">
+      <ProductShell eyebrow="TEST SU CASI" title="Caso reale">
         <p>Caricamento…</p>
       </ProductShell>
     );
@@ -82,7 +82,7 @@ export default function AuditDetailPage() {
     });
     if (!res.ok) {
       const text = await res.text();
-      setError(text || "Replay non riuscito");
+      setError(text || "Test non riuscito");
       setRunning(false);
       return;
     }
@@ -102,16 +102,16 @@ export default function AuditDetailPage() {
     );
     if (res.ok) {
       setGoldenLabel("");
-      alert("Golden context creato");
+      alert("Caso test creato");
     } else {
-      alert("Errore creazione golden");
+      alert("Errore creazione caso test");
     }
   };
 
   return (
     <ProductShell
-      eyebrow="AI TUNING"
-      title={`Audit ${audit.athleteLabel}`}
+      eyebrow="TEST SU CASI"
+      title={`Caso reale ${audit.athleteLabel}`}
       description={`Area ${audit.area?.name ?? "—"} · ciclo v${audit.cycleVersion ?? "—"} · ${audit.provider} · ${audit.model}`}
     >
       <div className="pf-stack" style={{ gap: 18 }}>
@@ -131,7 +131,7 @@ export default function AuditDetailPage() {
               <section className="pf-card">
                 <h3>Prompt originale</h3>
                 <p className="pf-meta">
-                  Audit storico senza prompt strutturato in input.
+                  Caso storico senza prompt strutturato in input.
                 </p>
               </section>
             );
@@ -226,9 +226,9 @@ export default function AuditDetailPage() {
         </section>
 
         <section className="pf-card">
-          <h3>Esegui replay con prompt diversi</h3>
+          <h3>Esegui test con prompt diversi</h3>
           <p className="pf-meta">
-            Modifica i prompt qui sotto e lancia il replay. Lasciali invariati
+            Modifica i prompt qui sotto e lancia il test. Lasciali invariati
             per rifare la stessa chiamata.
           </p>
           <label className="pf-field">
@@ -250,26 +250,28 @@ export default function AuditDetailPage() {
             />
           </label>
           {error && <div className="pf-alert warning">{error}</div>}
-          <button
-            type="button"
-            className="pf-button"
-            disabled={running}
-            onClick={startReplay}
-          >
-            {running ? "In corso…" : "Lancia replay"}
-          </button>
+          <div className="pf-form-actions">
+            <button
+              type="button"
+              className="pf-button"
+              disabled={running}
+              onClick={startReplay}
+            >
+              {running ? "In corso..." : "Esegui test"}
+            </button>
+          </div>
         </section>
 
         <section className="pf-card">
-          <h3>Salva come Golden Context</h3>
+          <h3>Salva come caso test standard</h3>
           <p className="pf-meta">
-            Memorizza il contesto di questo audit per riusarlo nelle valutazioni
-            sistematiche.
+            Memorizza il contesto di questo caso reale per riusarlo nei test
+            standard.
           </p>
-          <div className="pf-row" style={{ gap: 12 }}>
+          <div className="pf-inline-action-row">
             <input
               className="pf-input"
-              placeholder="Etichetta del golden (es. Atleta-amatoriale-corsa)"
+              placeholder="Etichetta del caso test (es. Atleta-amatoriale-corsa)"
               value={goldenLabel}
               onChange={(e) => setGoldenLabel(e.target.value)}
             />

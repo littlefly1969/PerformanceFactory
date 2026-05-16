@@ -2,9 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE, clearAccessToken, secureFetch } from "@/app/lib/api";
 
 type NavItem = {
@@ -20,6 +20,10 @@ type ProductShellProps = {
   description?: string;
   nav?: NavItem[];
   actions?: ReactNode;
+  backAction?: {
+    label?: string;
+    onClick: () => void;
+  };
   stats?: Array<{
     label: string;
     value: ReactNode;
@@ -63,17 +67,20 @@ const roleNav: Record<string, NavItem[]> = {
   ],
   ADMIN: [
     { href: "/admin/cycles", label: "Operazioni" },
-    { href: "/admin/ai-config", label: "Configurazione AI" },
     { href: "/admin/consents", label: "Privacy" },
-    { href: "/ai-tuner", label: "AI Tuning" },
   ],
   AI_TUNER: [
-    { href: "/ai-tuner", label: "Dashboard" },
-    { href: "/ai-tuner/audits", label: "Audit & Replay" },
-    { href: "/ai-tuner/replays", label: "Replay storici" },
-    { href: "/ai-tuner/golden-contexts", label: "Golden context" },
-    { href: "/ai-tuner/evaluations", label: "Valutazioni" },
-    { href: "/ai-tuner/cost", label: "Costi AI" },
+    { href: "/ai-tuner/prompts", label: "Prompt" },
+    {
+      href: "/ai-tuner/test-cases",
+      label: "Test su casi",
+      children: [
+        { href: "/ai-tuner/test-cases?mode=standard", label: "Casi test standard" },
+        { href: "/ai-tuner/test-cases?mode=real", label: "Casi reali" },
+      ],
+    },
+    { href: "/ai-tuner/version-comparison", label: "Confronto versioni" },
+    { href: "/ai-tuner/monitoring", label: "Monitoraggio AI" },
   ],
 };
 
@@ -81,7 +88,7 @@ const roleHome: Record<string, string> = {
   USER: "/user",
   PROFESSIONAL: "/professional",
   ADMIN: "/admin/cycles",
-  AI_TUNER: "/ai-tuner",
+  AI_TUNER: "/ai-tuner/prompts",
 };
 
 const pathMatchesRole = (path: string, role?: string) => {
@@ -107,10 +114,7 @@ const pathMatchesRole = (path: string, role?: string) => {
     return (
       path === "/consents" ||
       path === "/admin/cycles" ||
-      path.startsWith("/admin/ai-config") ||
-      path.startsWith("/admin/consents") ||
-      path === "/ai-tuner" ||
-      path.startsWith("/ai-tuner/")
+      path.startsWith("/admin/consents")
     );
   }
   if (role === "AI_TUNER") {
@@ -123,10 +127,94 @@ const pathMatchesRole = (path: string, role?: string) => {
   return true;
 };
 
-const isNavActive = (path: string, href: string) =>
-  path === href ||
-  (href === "/user" && path.startsWith("/user/areas/")) ||
-  (href !== "/user" && href !== "/professional" && path.startsWith(`${href}/`));
+const isNavActive = (path: string, href: string) => {
+  if (href === "/ai-tuner/test-cases") {
+    return (
+      path === href ||
+      path.startsWith("/ai-tuner/test-cases/") ||
+      path.startsWith("/ai-tuner/audits") ||
+      path.startsWith("/ai-tuner/golden-contexts")
+    );
+  }
+  if (href === "/ai-tuner/version-comparison") {
+    return (
+      path === href ||
+      path.startsWith("/ai-tuner/version-comparison/") ||
+      path.startsWith("/ai-tuner/evaluations")
+    );
+  }
+  if (href === "/ai-tuner/monitoring") {
+    return (
+      path === href ||
+      path.startsWith("/ai-tuner/monitoring/") ||
+      path.startsWith("/ai-tuner/replays") ||
+      path.startsWith("/ai-tuner/cost")
+    );
+  }
+  return (
+    path === href ||
+    (href === "/user" && path.startsWith("/user/areas/")) ||
+    (href !== "/user" && href !== "/professional" && path.startsWith(`${href}/`))
+  );
+};
+
+const getLogicalBackHref = (path: string, search: string) => {
+  const params = new URLSearchParams(search);
+
+  if (path === "/ai-tuner/test-cases") {
+    if (params.get("caseId")) {
+      return "/ai-tuner/test-cases?mode=standard";
+    }
+    if (params.get("mode")) {
+      return "/ai-tuner/test-cases";
+    }
+    return null;
+  }
+  if (path === "/ai-tuner/golden-contexts") {
+    return "/ai-tuner/test-cases?mode=standard";
+  }
+  if (path.startsWith("/ai-tuner/audits/")) {
+    return "/ai-tuner/test-cases?mode=real";
+  }
+  if (path === "/ai-tuner/audits") {
+    return "/ai-tuner/test-cases?mode=real";
+  }
+  if (path.startsWith("/ai-tuner/replays/")) {
+    return "/ai-tuner/replays";
+  }
+  if (path === "/ai-tuner/replays" || path === "/ai-tuner/cost") {
+    return "/ai-tuner/monitoring";
+  }
+  if (path.startsWith("/ai-tuner/evaluations/")) {
+    return "/ai-tuner/evaluations";
+  }
+  if (path === "/ai-tuner/evaluations") {
+    return "/ai-tuner/version-comparison";
+  }
+
+  if (path.startsWith("/user/areas/") || path === "/user/performance") {
+    return "/user";
+  }
+  if (path === "/user/training" || path === "/user/plan/history") {
+    return "/user/plan";
+  }
+  if (path === "/user/questions/history") {
+    return "/user/questions";
+  }
+  if (path === "/user/plan" || path === "/user/questions") {
+    return search ? "/user" : null;
+  }
+
+  if (path === "/professional/approvals" || path.startsWith("/professional/users/")) {
+    return "/professional";
+  }
+
+  if (path === "/admin/consents") {
+    return "/admin/cycles";
+  }
+
+  return null;
+};
 
 export function ProductShell({
   eyebrow = "PerformanceFactory",
@@ -135,15 +223,22 @@ export function ProductShell({
   description,
   nav,
   actions,
+  backAction,
   stats,
   children,
 }: ProductShellProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [me, setMe] = useState<CurrentUser | null>(null);
   const [authChecked, setAuthChecked] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [openNavHref, setOpenNavHref] = useState<string | null>(null);
   const navRef = useRef<HTMLElement | null>(null);
+  const navCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const logicalBackHref = getLogicalBackHref(
+    pathname,
+    typeof window === "undefined" ? "" : window.location.search,
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -221,10 +316,41 @@ export function ProductShell({
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
     return () => {
+      if (navCloseTimeoutRef.current) {
+        clearTimeout(navCloseTimeoutRef.current);
+      }
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
+
+  const openNavMenu = (href: string) => {
+    if (navCloseTimeoutRef.current) {
+      clearTimeout(navCloseTimeoutRef.current);
+      navCloseTimeoutRef.current = null;
+    }
+    setOpenNavHref(href);
+  };
+
+  const scheduleNavMenuClose = () => {
+    if (navCloseTimeoutRef.current) {
+      clearTimeout(navCloseTimeoutRef.current);
+    }
+    navCloseTimeoutRef.current = setTimeout(() => {
+      setOpenNavHref(null);
+      navCloseTimeoutRef.current = null;
+    }, 220);
+  };
+
+  const goBack = useCallback(() => {
+    if (backAction) {
+      backAction.onClick();
+      return;
+    }
+    if (logicalBackHref) {
+      router.push(logicalBackHref);
+    }
+  }, [backAction, logicalBackHref, router]);
 
   const logout = async () => {
     setLoggingOut(true);
@@ -237,7 +363,7 @@ export function ProductShell({
   };
 
   return (
-    <main className="pf-shell">
+    <main className={`pf-shell ${me?.role === "AI_TUNER" ? "pf-ai-tuner-shell" : ""}`}>
       <header className="pf-topbar">
         <Link className="pf-brand pf-brand-with-logo" href="/" aria-label="Performance Factory">
           <Image
@@ -258,6 +384,9 @@ export function ProductShell({
                     key={item.href}
                     className={`pf-nav-dropdown ${isNavActive(pathname, item.href) ? "active" : ""}`}
                     open={openNavHref === item.href}
+                    onMouseEnter={() => openNavMenu(item.href)}
+                    onMouseLeave={scheduleNavMenuClose}
+                    onFocus={() => openNavMenu(item.href)}
                     onToggle={(event) => {
                       if (event.currentTarget.open) {
                         setOpenNavHref(item.href);
@@ -266,13 +395,25 @@ export function ProductShell({
                       }
                     }}
                   >
-                    <summary>{item.label}</summary>
+                    <summary
+                      onClick={(event) => {
+                        event.preventDefault();
+                        setOpenNavHref(null);
+                        router.push(item.href);
+                      }}
+                    >
+                      {item.label}
+                    </summary>
                     {openNavHref === item.href && (
-                      <div className="pf-nav-menu">
+                      <div
+                        className="pf-nav-menu"
+                        onMouseEnter={() => openNavMenu(item.href)}
+                        onMouseLeave={scheduleNavMenuClose}
+                      >
                       {item.children.map((child) => (
                         <Link
                           key={child.href}
-                          className={pathname === child.href ? "active" : ""}
+                          className=""
                           href={child.href}
                           onClick={() => setOpenNavHref(null)}
                         >
@@ -310,6 +451,17 @@ export function ProductShell({
       </header>
 
       <section className="pf-main">
+        {(logicalBackHref || backAction) && (
+          <button
+            type="button"
+            className="pf-back-button"
+            onClick={goBack}
+            aria-label="Torna indietro"
+          >
+            <span aria-hidden="true">&larr;</span>
+            <span>{backAction?.label ?? "Torna indietro"}</span>
+          </button>
+        )}
         <header className="pf-header">
           <div>
             <p className="pf-eyebrow">{eyebrow}</p>

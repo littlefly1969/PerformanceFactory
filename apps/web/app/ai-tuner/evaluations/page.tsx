@@ -84,7 +84,7 @@ export default function EvaluationsPage() {
 
   const submit = async () => {
     if (!name.trim() || selectedGoldens.length === 0 || variants.length === 0) {
-      alert("Nome, golden e almeno una variante sono obbligatori");
+      alert("Nome, casi test e almeno una versione sono obbligatori");
       return;
     }
     setSubmitting(true);
@@ -116,23 +116,23 @@ export default function EvaluationsPage() {
 
   return (
     <ProductShell
-      eyebrow="AI TUNING"
-      title="Valutazioni sistematiche"
-      description="Ogni golden context viene passato attraverso tutte le varianti di prompt scelte."
+      eyebrow="CONFRONTO VERSIONI"
+      title="Confronti versioni"
+      description="Confronta piu versioni di prompt su diversi casi per scegliere quella migliore."
       actions={
         <button
           type="button"
           className="pf-button"
           onClick={() => setCreating(!creating)}
         >
-          {creating ? "Annulla" : "Nuova valutazione"}
+          {creating ? "Annulla" : "Nuovo confronto"}
         </button>
       }
     >
       <div className="pf-stack" style={{ gap: 16 }}>
         {creating && (
           <section className="pf-card">
-            <h3>Nuova evaluation run</h3>
+            <h3>Nuovo confronto</h3>
             <label className="pf-field">
               Nome
               <input
@@ -142,10 +142,10 @@ export default function EvaluationsPage() {
               />
             </label>
             <div className="pf-field">
-              <strong>Golden context da usare</strong>
+              <strong>Casi test standard da usare</strong>
               {goldens.length === 0 && (
                 <p className="pf-meta">
-                  Crea prima qualche golden context.
+                  Crea prima qualche caso test standard.
                 </p>
               )}
               <div className="pf-stack" style={{ gap: 4 }}>
@@ -165,7 +165,7 @@ export default function EvaluationsPage() {
               </div>
             </div>
             <div className="pf-field">
-              <strong>Varianti di prompt</strong>
+              <strong>Versioni di prompt</strong>
               <p className="pf-meta">
                 Lascia vuoto un campo per usare quello corrente dell&apos;area
                 config.
@@ -224,6 +224,7 @@ export default function EvaluationsPage() {
                 </button>
               </div>
             </div>
+            <div className="pf-form-actions">
             <button
               type="button"
               className="pf-button"
@@ -232,6 +233,7 @@ export default function EvaluationsPage() {
             >
               {submitting ? "Avvio…" : "Lancia run"}
             </button>
+            </div>
           </section>
         )}
 
@@ -248,7 +250,7 @@ export default function EvaluationsPage() {
                 <tr>
                   <th>Nome</th>
                   <th>Status</th>
-                  <th>Golden</th>
+                  <th>Casi</th>
                   <th>Risultati</th>
                   <th>Creata</th>
                   <th></th>

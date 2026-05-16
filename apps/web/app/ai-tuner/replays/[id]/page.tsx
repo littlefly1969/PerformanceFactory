@@ -111,7 +111,7 @@ export default function ReplayDetailPage() {
 
   if (!data) {
     return (
-      <ProductShell eyebrow="AI TUNING" title="Replay">
+      <ProductShell eyebrow="MONITORAGGIO AI" title="Dettaglio test">
         <p>Caricamento…</p>
       </ProductShell>
     );
@@ -143,8 +143,8 @@ export default function ReplayDetailPage() {
 
   return (
     <ProductShell
-      eyebrow="AI TUNING"
-      title={`Replay ${data.sourceAudit.athleteLabel}`}
+      eyebrow="MONITORAGGIO AI"
+      title={`Test ${data.sourceAudit.athleteLabel}`}
       description={`Area ${data.sourceAudit.area?.name ?? "—"}`}
     >
       <div className="pf-stack" style={{ gap: 18 }}>
@@ -203,7 +203,7 @@ export default function ReplayDetailPage() {
                   )}
                 </div>
                 <div>
-                  <strong>REPLAY</strong>
+                  <strong>NUOVO TEST</strong>
                   {repl.hasPrompt ? (
                     <>
                       <details open>
@@ -217,14 +217,14 @@ export default function ReplayDetailPage() {
                     </>
                   ) : (
                     <p className="pf-meta">
-                      Replay vecchio: prompt non era ancora salvato.
+                      Test precedente: prompt non era ancora salvato.
                     </p>
                   )}
                 </div>
               </div>
               <details style={{ marginTop: 12 }}>
                 <summary>
-                  <strong>Solo gli override (delta)</strong>
+                  <strong>Solo modifiche applicate</strong>
                 </summary>
                 <div className="pf-stack" style={{ gap: 8, marginTop: 8 }}>
                   <div>
@@ -276,7 +276,7 @@ export default function ReplayDetailPage() {
             </pre>
           </section>
           <section className="pf-card">
-            <h3>Output REPLAY</h3>
+            <h3>Output NUOVO TEST</h3>
             <p className="pf-meta">
               {data.replay.provider} · {data.replay.model} · token{" "}
               {data.replay.totalTokens ?? "—"} · {data.replay.durationMs ?? "—"} ms
@@ -301,12 +301,12 @@ export default function ReplayDetailPage() {
         </div>
 
         <section className="pf-card">
-          <h3>Valutazione rubric</h3>
+          <h3>Valutazione risultato</h3>
           <p className="pf-meta">
             Quale dei due output è migliore? Vota le dimensioni che ti
             interessano.
           </p>
-          <div className="pf-row" style={{ gap: 12 }}>
+          <div className="pf-form-actions">
             {(["ORIGINAL", "REPLAY", "TIE"] as const).map((side) => (
               <button
                 key={side}
@@ -317,10 +317,10 @@ export default function ReplayDetailPage() {
                 onClick={() => setChosenSide(side)}
               >
                 {side === "ORIGINAL"
-                  ? "Originale 👈"
+                  ? "Originale"
                   : side === "REPLAY"
-                    ? "Replay 👉"
-                    : "Pari 🤝"}
+                    ? "Nuovo test"
+                    : "Pari"}
               </button>
             ))}
           </div>
@@ -370,7 +370,7 @@ export default function ReplayDetailPage() {
               />
             </label>
           </div>
-          <div className="pf-row" style={{ gap: 12, marginTop: 12 }}>
+          <div className="pf-form-actions">
             <button
               type="button"
               className="pf-button"

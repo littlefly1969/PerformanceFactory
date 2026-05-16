@@ -4,7 +4,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -20,6 +20,7 @@ import {
   PromptVariantDto,
 } from './dto/create-evaluation-run.dto';
 import { RateEvaluationResultDto } from './dto/rate-evaluation-result.dto';
+import { TestPromptDto } from './dto/test-prompt.dto';
 
 const AUDITS_PAGE_SIZE = 30;
 const REPLAYS_PAGE_SIZE = 30;
@@ -61,6 +62,7 @@ export class AiTuningService {
     const skip = (page - 1) * AUDITS_PAGE_SIZE;
     const where: Prisma.AiProposalAuditWhereInput = {
       status: 'SUCCESS',
+      user: { role: UserRole.USER },
     };
     if (params.areaId) {
       where.planRelease = { areaId: params.areaId };
@@ -162,6 +164,14 @@ export class AiTuningService {
           }
         : null,
     };
+  }
+
+  async testPrompt(dto: TestPromptDto) {
+    return this.proposalProvider.testPrompt({
+      prompt: dto.prompt,
+      context: dto.context,
+      provider: dto.provider,
+    });
   }
 
   async runReplay(actorId: string, dto: RunReplayDto) {

@@ -2,7 +2,6 @@ import {
   Body,
   BadRequestException,
   Controller,
-  Delete,
   Get,
   Param,
   Patch,
@@ -25,9 +24,6 @@ import { OrchestratorService } from '../ai-orchestrator/orchestrator.service';
 import { ConsentsService } from '../consents/consents.service';
 import { RunCycleDto } from './dto/run-cycle.dto';
 import { AdminService } from './admin.service';
-import { UpsertAiAreaGenerationConfigDto } from './dto/upsert-ai-area-generation-config.dto';
-import { UpsertOnboardingTemplateDto } from './dto/upsert-onboarding-template.dto';
-import { UpsertGoalPromptConfigDto } from './dto/upsert-goal-prompt-config.dto';
 
 @ApiTags('admin-cycles')
 @Controller('admin')
@@ -158,17 +154,6 @@ export class AdminController {
     return this.admin.resetUserOperationalData(userId);
   }
 
-  @Get('ai-settings')
-  @ApiOperation({
-    summary: 'Configurazione prompt AI e onboarding amministratore',
-  })
-  @ApiCookieAuth()
-  @UseGuards(AuthenticatedGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  aiSettings() {
-    return this.admin.getAiSettings();
-  }
-
   @Get('consent-documents')
   @ApiOperation({ summary: 'Documenti consenso correnti' })
   @ApiCookieAuth()
@@ -198,94 +183,6 @@ export class AdminController {
     },
   ) {
     return this.consents.upsertDocument(body, req.user?.id ?? '');
-  }
-
-  @Post('goal-prompt')
-  @ApiOperation({ summary: 'Crea o aggiorna il prompt AI obiettivo atleta' })
-  @ApiBody({ type: UpsertGoalPromptConfigDto })
-  @ApiCookieAuth()
-  @UseGuards(AuthenticatedGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  upsertGoalPrompt(
-    @Req() req: { user?: { id: string } },
-    @Body() body: UpsertGoalPromptConfigDto,
-  ) {
-    return this.admin.upsertGoalPromptConfig(body, req.user?.id ?? '');
-  }
-
-  @Post('sports')
-  @ApiOperation({
-    summary: 'Crea o aggiorna sport, specializzazioni e prompt area',
-  })
-  @ApiCookieAuth()
-  @UseGuards(AuthenticatedGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  upsertSport(
-    @Req() req: { user?: { id: string } },
-    @Body()
-    body: {
-      id?: string;
-      key?: string;
-      label?: string;
-      isActive?: boolean;
-      specializations?: Array<{
-        id?: string;
-        key?: string;
-        label?: string;
-        trainingPrompt?: string;
-        trainingPromptActive?: boolean;
-        isActive?: boolean;
-        prompts?: Array<{
-          id?: string;
-          areaId?: string;
-          basePrompt?: string;
-          isEnabledDriver?: boolean;
-          isActive?: boolean;
-        }>;
-      }>;
-    },
-  ) {
-    return this.admin.upsertSportCatalog(body, req.user?.id ?? '');
-  }
-
-  @Delete('sports/:sportId')
-  @ApiOperation({
-    summary: 'Cancella uno sport e le specializzazioni collegate',
-  })
-  @ApiParam({ name: 'sportId' })
-  @ApiCookieAuth()
-  @UseGuards(AuthenticatedGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  deleteSport(@Param('sportId') sportId: string) {
-    return this.admin.deleteSport(sportId);
-  }
-
-  @Post('ai-area-configs')
-  @ApiOperation({
-    summary: 'Crea o aggiorna una configurazione generazione AI per area',
-  })
-  @ApiBody({ type: UpsertAiAreaGenerationConfigDto })
-  @ApiCookieAuth()
-  @UseGuards(AuthenticatedGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  upsertAiAreaConfig(
-    @Req() req: { user?: { id: string } },
-    @Body() body: UpsertAiAreaGenerationConfigDto,
-  ) {
-    return this.admin.upsertAiAreaGenerationConfig(body, req.user?.id ?? '');
-  }
-
-  @Post('onboarding-templates')
-  @ApiOperation({ summary: 'Crea o aggiorna un template domanda onboarding' })
-  @ApiBody({ type: UpsertOnboardingTemplateDto })
-  @ApiCookieAuth()
-  @UseGuards(AuthenticatedGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  upsertOnboardingTemplate(
-    @Req() req: { user?: { id: string } },
-    @Body() body: UpsertOnboardingTemplateDto,
-  ) {
-    return this.admin.upsertOnboardingTemplate(body, req.user?.id ?? '');
   }
 
   @Post('maintenance/close-answered-questionnaires')

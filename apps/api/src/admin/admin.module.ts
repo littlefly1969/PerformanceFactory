@@ -8,5 +8,6 @@ import { ConsentsModule } from '../consents/consents.module';
   imports: [AiOrchestratorModule, ConsentsModule],
   controllers: [AdminController],
   providers: [AdminService],
+  exports: [AdminService],
 })
 export class AdminModule {}

@@ -44,7 +44,7 @@ export default function CostPage() {
 
   if (!summary) {
     return (
-      <ProductShell eyebrow="AI TUNING" title="Costi AI">
+      <ProductShell eyebrow="MONITORAGGIO AI" title="Consumi e costi">
         <p>Caricamento…</p>
       </ProductShell>
     );
@@ -52,9 +52,9 @@ export default function CostPage() {
 
   return (
     <ProductShell
-      eyebrow="AI TUNING"
-      title="Costi e consumo token"
-      description="Dati basati sugli audit AI con tokenUsage catturato (proposte) e sui replay AI Tuner."
+      eyebrow="MONITORAGGIO AI"
+      title="Consumi e costi"
+      description="Monitora token utilizzati, numero di chiamate AI, provider e costi generati."
     >
       <div className="pf-stack" style={{ gap: 18 }}>
         <section className="pf-card">
@@ -101,18 +101,18 @@ export default function CostPage() {
         </section>
 
         <section className="pf-card">
-          <h3>Replay AI Tuner</h3>
+          <h3>Test prompt</h3>
           {summary.replays.length === 0 ? (
             <EmptyState
-              title="Nessun replay"
-              description="Esegui qualche replay per popolare questo blocco."
+              title="Nessun test"
+              description="Esegui qualche test per popolare questo blocco."
             />
           ) : (
             <table className="pf-table">
               <thead>
                 <tr>
                   <th>Provider · Modello</th>
-                  <th>Replay</th>
+                  <th>Test</th>
                   <th>Input tok</th>
                   <th>Output tok</th>
                   <th>Totale tok</th>

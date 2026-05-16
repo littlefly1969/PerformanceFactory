@@ -1116,6 +1116,7 @@ export class AdminService {
 
     const [
       goalPromptConfig,
+      goalPromptConfigs,
       areaGenerationConfigs,
       sports,
       onboardingTemplates,
@@ -1132,6 +1133,18 @@ export class AdminService {
           updatedAt: true,
         },
         orderBy: [{ version: 'desc' }, { updatedAt: 'desc' }],
+      }),
+      this.prisma.aiGoalPromptConfig.findMany({
+        select: {
+          id: true,
+          name: true,
+          basePrompt: true,
+          version: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        orderBy: [{ isActive: 'desc' }, { updatedAt: 'desc' }],
       }),
       this.prisma.aiAreaGenerationConfig.findMany({
         select: {
@@ -1160,6 +1173,7 @@ export class AdminService {
               trainingPromptVersion: true,
               trainingPromptActive: true,
               isActive: true,
+              updatedAt: true,
               prompts: {
                 select: {
                   id: true,
@@ -1168,6 +1182,7 @@ export class AdminService {
                   isEnabledDriver: true,
                   version: true,
                   isActive: true,
+                  updatedAt: true,
                   area: { select: { id: true, name: true } },
                 },
                 orderBy: [{ area: { name: 'asc' } }],
@@ -1202,6 +1217,7 @@ export class AdminService {
       areas,
       sports,
       goalPromptConfig,
+      goalPromptConfigs,
       areaGenerationConfigs,
       onboardingTemplates,
       inputTypes: Object.values(OnboardingInputType),
