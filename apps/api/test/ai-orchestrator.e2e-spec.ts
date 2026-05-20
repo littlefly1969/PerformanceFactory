@@ -3,6 +3,7 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { OrchestratorService } from '../src/ai-orchestrator/orchestrator.service';
 import { UserRole } from '@prisma/client';
+import { createPrismaTestFake } from './utils/prisma-test-fake';
 
 type PlanReleaseRecord = {
   id: string;
@@ -18,7 +19,7 @@ type PlanReleaseRecord = {
 };
 
 const makePrismaMock = () => {
-  const users = [{ id: 'user-1', role: UserRole.USER }];
+  const users = [{ id: 'user-1', role: UserRole.USER, isActive: true }];
   const areas = [
     { id: 'area-1', name: 'Footwork' },
     { id: 'area-2', name: 'Mindset' },
@@ -57,7 +58,7 @@ const makePrismaMock = () => {
   const nextId = (prefix: string, list: Array<{ id: string }>) =>
     `${prefix}-${list.length + 1}`;
 
-  const prismaMock = {
+  const prismaMock = createPrismaTestFake({
     user: {
       findUnique: ({ where }: { where: { id: string } }) =>
         users.find((user) => user.id === where.id) ?? null,
@@ -106,6 +107,28 @@ const makePrismaMock = () => {
         );
         return entry ?? null;
       },
+    },
+    userSportSelection: {
+      findUnique: () => null,
+    },
+    sportSpecializationAreaPrompt: {
+      findMany: () => [],
+      findUnique: () => null,
+    },
+    aiAreaGenerationConfig: {
+      findUnique: () => null,
+    },
+    userOnboardingAssessment: {
+      findUnique: () => null,
+    },
+    currentState: {
+      findUnique: () => null,
+    },
+    userAreaPromptInstruction: {
+      findUnique: () => null,
+    },
+    consent: {
+      findFirst: () => ({ id: 'consent-1' }),
     },
     performanceProfileSnapshot: {
       findMany: () =>
@@ -404,6 +427,24 @@ const makePrismaMock = () => {
       },
       updateMany: () => ({ count: 1 }),
     },
+    aiCycleHistorySummary: {
+      findFirst: () => null,
+      create: ({
+        data,
+      }: {
+        data: {
+          userId: string;
+          scope: string;
+          areaId?: string | null;
+          summaryText: string;
+        };
+      }) => ({
+        id: nextId('history-summary', aiSummaries),
+        ...data,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    },
     aiProposalAudit: {
       create: ({
         data,
@@ -434,15 +475,14 @@ const makePrismaMock = () => {
         return entry;
       },
     },
-    $transaction: (fn: (tx: unknown) => Promise<unknown>) =>
-      fn(prismaMock as unknown as PrismaService),
-  } as unknown as PrismaService;
+  });
 
   return { prismaMock, planReleases, questionSets };
 };
 
 describe('AI Orchestrator (integration)', () => {
   let orchestrator: OrchestratorService;
+  const originalAiProvider = process.env.AI_PROVIDER;
   let planReleases: PlanReleaseRecord[];
   let questionSets: Array<{
     id: string;
@@ -451,8 +491,10 @@ describe('AI Orchestrator (integration)', () => {
     status: string;
     approvals: Array<{ status: string }>;
   }>;
+  let moduleFixture: TestingModule;
 
   beforeAll(async () => {
+    process.env.AI_PROVIDER = 'stub';
     const {
       prismaMock,
       planReleases: plans,
@@ -461,7 +503,7 @@ describe('AI Orchestrator (integration)', () => {
     planReleases = plans;
     questionSets = sets;
 
-    const moduleFixture: TestingModule = await Test.createTestingModule({
+    moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
     })
       .overrideProvider(PrismaService)
@@ -469,6 +511,15 @@ describe('AI Orchestrator (integration)', () => {
       .compile();
 
     orchestrator = moduleFixture.get(OrchestratorService);
+  });
+
+  afterAll(async () => {
+    await moduleFixture.close();
+    if (originalAiProvider === undefined) {
+      delete process.env.AI_PROVIDER;
+    } else {
+      process.env.AI_PROVIDER = originalAiProvider;
+    }
   });
 
   beforeEach(() => {
@@ -547,7 +598,7 @@ describe('AI Orchestrator (integration)', () => {
     );
     await expect(
       orchestrator.publishCycle(proposal.planReleaseId, 'admin-1'),
-    ).rejects.toThrow('Not all question areas are approved');
+    ).rejects.toThrow('Non tutte le aree del questionario sono approvate');
   });
 
   it('blocks proposal while the active cycle is not completed', async () => {
@@ -563,7 +614,7 @@ describe('AI Orchestrator (integration)', () => {
     await expect(
       orchestrator.runProposalBatch(['user-1'], 'admin-1', 'area-1', false),
     ).rejects.toThrow(
-      'Previous plan activity must be completed before generating a new cycle',
+      'L attivita dell allenamento precedente deve essere completata prima di generare un nuovo ciclo',
     );
     const stillActive = planReleases.find((plan) => plan.id === 'plan-active');
     expect(stillActive?.status).toBe('ACTIVE');

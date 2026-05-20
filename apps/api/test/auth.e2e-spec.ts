@@ -5,6 +5,11 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 import { AuthService } from '../src/auth/auth.service';
 import { AbacService } from '../src/common/policies/abac.service';
+import {
+  createCoachUserLinkDelegate,
+  createPrismaTestFake,
+  createProfessionalUserLinkDelegate,
+} from './utils/prisma-test-fake';
 
 const makePrismaMock = async () => {
   const passwordHash = await bcrypt.hash('password123', 10);
@@ -41,7 +46,7 @@ const makePrismaMock = async () => {
     },
   ];
 
-  return {
+  return createPrismaTestFake({
     user: {
       findUnique: ({ where }: { where: { id?: string; email?: string } }) => {
         if (where.id) {
@@ -53,32 +58,19 @@ const makePrismaMock = async () => {
         return null;
       },
     },
-    professionalUserLink: {
-      findFirst: ({
-        where,
-      }: {
-        where: { professionalId: string; userId: string; areaId?: string };
-      }) => {
-        return (
-          links.find(
-            (l) =>
-              l.professionalId === where.professionalId &&
-              l.userId === where.userId &&
-              (!where.areaId || l.areaId === where.areaId),
-          ) ?? null
-        );
-      },
-    },
-  } as unknown as PrismaService;
+    professionalUserLink: createProfessionalUserLinkDelegate(links),
+    coachUserLink: createCoachUserLinkDelegate(),
+  });
 };
 
 describe('Auth + ABAC (service tests)', () => {
   let authService: AuthService;
   let abacService: AbacService;
+  let moduleFixture: TestingModule;
 
   beforeAll(async () => {
     const prismaMock = await makePrismaMock();
-    const moduleFixture: TestingModule = await Test.createTestingModule({
+    moduleFixture = await Test.createTestingModule({
       imports: [AppModule],
     })
       .overrideProvider(PrismaService)
@@ -87,6 +79,10 @@ describe('Auth + ABAC (service tests)', () => {
 
     authService = moduleFixture.get(AuthService);
     abacService = moduleFixture.get(AbacService);
+  });
+
+  afterAll(async () => {
+    await moduleFixture.close();
   });
 
   it('validates user credentials', async () => {

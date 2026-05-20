@@ -12,6 +12,11 @@ import { UserRole } from '@prisma/client';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuthenticatedGuard } from '../src/common/guards/authenticated.guard';
+import {
+  createCoachUserLinkDelegate,
+  createPrismaTestFake,
+  createProfessionalUserLinkDelegate,
+} from './utils/prisma-test-fake';
 
 type InjectResponse = {
   statusCode: number;
@@ -128,7 +133,7 @@ const makePrismaMock = () => {
 
   const findGuidance = (id: string) => guidance.find((g) => g.id === id);
 
-  return {
+  return createPrismaTestFake({
     user: {
       findUnique: ({ where }: { where: { id?: string; email?: string } }) => {
         if (where.id) {
@@ -144,22 +149,8 @@ const makePrismaMock = () => {
       findUnique: ({ where }: { where: { id: string } }) =>
         areas.find((area) => area.id === where.id) ?? null,
     },
-    professionalUserLink: {
-      findFirst: ({
-        where,
-      }: {
-        where: { professionalId: string; userId: string; areaId?: string };
-      }) => {
-        return (
-          links.find(
-            (link) =>
-              link.professionalId === where.professionalId &&
-              link.userId === where.userId &&
-              (!where.areaId || link.areaId === where.areaId),
-          ) ?? null
-        );
-      },
-    },
+    professionalUserLink: createProfessionalUserLinkDelegate(links),
+    coachUserLink: createCoachUserLinkDelegate(),
     guidanceContent: {
       create: ({
         data,
@@ -268,7 +259,7 @@ const makePrismaMock = () => {
         return entry;
       },
     },
-  } as unknown as PrismaService;
+  });
 };
 
 describe('Guidance + Assignments (e2e)', () => {

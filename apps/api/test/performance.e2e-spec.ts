@@ -12,6 +12,11 @@ import { UserRole } from '@prisma/client';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuthenticatedGuard } from '../src/common/guards/authenticated.guard';
+import {
+  createCoachUserLinkDelegate,
+  createPrismaTestFake,
+  createProfessionalUserLinkDelegate,
+} from './utils/prisma-test-fake';
 
 type InjectResponse = {
   statusCode: number;
@@ -78,23 +83,9 @@ const makePrismaMock = () => {
     },
   ];
 
-  return {
-    professionalUserLink: {
-      findFirst: ({
-        where,
-      }: {
-        where: { professionalId: string; userId: string; areaId?: string };
-      }) => {
-        return (
-          links.find(
-            (link) =>
-              link.professionalId === where.professionalId &&
-              link.userId === where.userId &&
-              (!where.areaId || link.areaId === where.areaId),
-          ) ?? null
-        );
-      },
-    },
+  return createPrismaTestFake({
+    professionalUserLink: createProfessionalUserLinkDelegate(links),
+    coachUserLink: createCoachUserLinkDelegate(),
     professionalAreaCompetence: {
       findMany: ({ where }: { where: { professionalId: string } }) => {
         if (where.professionalId === 'pro-1') {
@@ -103,6 +94,9 @@ const makePrismaMock = () => {
         return [];
       },
     },
+    userSportSelection: {
+      findUnique: () => null,
+    },
     performanceProfileSnapshot: {
       findFirst: ({ where }: { where: { userId: string } }) =>
         snapshots.find((snapshot) => snapshot.userId === where.userId) ?? null,
@@ -110,7 +104,7 @@ const makePrismaMock = () => {
     dataAccessAudit: {
       create: jest.fn(),
     },
-  } as unknown as PrismaService;
+  });
 };
 
 describe('Performance (e2e)', () => {

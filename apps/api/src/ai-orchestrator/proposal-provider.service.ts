@@ -524,7 +524,9 @@ export class AiProposalProviderService {
         payload.promptFeedback?.blockReason ??
         payload.candidates?.[0]?.finishReason ??
         'risposta vuota';
-      throw new BadRequestException(`La risposta test Gemini e vuota: ${reason}`);
+      throw new BadRequestException(
+        `La risposta test Gemini e vuota: ${reason}`,
+      );
     }
     return {
       provider,

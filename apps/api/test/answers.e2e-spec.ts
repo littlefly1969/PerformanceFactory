@@ -12,6 +12,8 @@ import { UserRole } from '@prisma/client';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuthenticatedGuard } from '../src/common/guards/authenticated.guard';
+import { OrchestratorService } from '../src/ai-orchestrator/orchestrator.service';
+import { createPrismaTestFake } from './utils/prisma-test-fake';
 
 type InjectResponse = {
   statusCode: number;
@@ -115,7 +117,7 @@ const makePrismaMock = () => {
     scoreAwarded: number;
   }> = [];
 
-  const prismaMock = {
+  const prismaMock = createPrismaTestFake({
     questionSet: {
       findUnique: ({ where }: { where: { id: string } }) =>
         questionSets.find((set) => set.id === where.id) ?? null,
@@ -136,7 +138,7 @@ const makePrismaMock = () => {
         return { count: data.length };
       },
     },
-  } as unknown as PrismaService;
+  });
 
   return { prismaMock, answers };
 };
@@ -150,6 +152,10 @@ describe('Answers (e2e)', () => {
     answerOptionId: string;
     scoreAwarded: number;
   }>;
+  const orchestratorMock = {
+    createSnapshotFromQuestionSetInTransaction: () =>
+      Promise.resolve({ snapshotId: 'snapshot-1' }),
+  } as unknown as OrchestratorService;
 
   beforeAll(async () => {
     const mock = makePrismaMock();
@@ -160,6 +166,8 @@ describe('Answers (e2e)', () => {
     })
       .overrideProvider(PrismaService)
       .useValue(mock.prismaMock)
+      .overrideProvider(OrchestratorService)
+      .useValue(orchestratorMock)
       .overrideGuard(AuthenticatedGuard)
       .useClass(TestAuthGuard)
       .compile();

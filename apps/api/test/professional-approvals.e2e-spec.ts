@@ -13,6 +13,11 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuthenticatedGuard } from '../src/common/guards/authenticated.guard';
 import { OrchestratorService } from '../src/ai-orchestrator/orchestrator.service';
+import {
+  createCoachUserLinkDelegate,
+  createPrismaTestFake,
+  createProfessionalUserLinkDelegate,
+} from './utils/prisma-test-fake';
 
 type InjectResponse = {
   statusCode: number;
@@ -98,30 +103,13 @@ const makePrismaMock = () => {
       },
     },
   ];
+  const links = [
+    { professionalId: 'pro-1', userId: 'user-1', areaId: 'area-1' },
+  ];
 
-  return {
-    professionalUserLink: {
-      findMany: ({ where }: { where: { professionalId: string } }) => {
-        if (where.professionalId === 'pro-1') {
-          return [{ userId: 'user-1', areaId: 'area-1' }];
-        }
-        return [];
-      },
-      findFirst: ({
-        where,
-      }: {
-        where: { professionalId: string; userId: string; areaId?: string };
-      }) => {
-        if (
-          where.professionalId === 'pro-1' &&
-          where.userId === 'user-1' &&
-          (!where.areaId || where.areaId === 'area-1')
-        ) {
-          return { id: 'link-1' };
-        }
-        return null;
-      },
-    },
+  return createPrismaTestFake({
+    professionalUserLink: createProfessionalUserLinkDelegate(links),
+    coachUserLink: createCoachUserLinkDelegate(),
     professionalAreaCompetence: {
       findMany: ({ where }: { where: { professionalId: string } }) => {
         if (where.professionalId === 'pro-1') {
@@ -225,7 +213,14 @@ const makePrismaMock = () => {
         };
       },
     },
-  } as unknown as PrismaService;
+    trainingQuestionSetCoachApproval: {
+      updateMany: jest.fn(() => ({ count: 0 })),
+      findMany: () => [],
+    },
+    trainingPlanItem: {
+      findMany: () => [],
+    },
+  });
 };
 
 describe('Professional approvals workspace (e2e)', () => {

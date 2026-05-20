@@ -166,10 +166,7 @@ export class AiTuningController {
     @Req() req: ActorRequest,
     @Body() body: UpsertOnboardingTemplateDto,
   ) {
-    return this.promptAdmin.upsertOnboardingTemplate(
-      body,
-      req.user?.id ?? '',
-    );
+    return this.promptAdmin.upsertOnboardingTemplate(body, req.user?.id ?? '');
   }
 
   @Delete('onboarding-templates/:id')
