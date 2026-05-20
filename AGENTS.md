@@ -16,7 +16,7 @@ This is a TypeScript monorepo using pnpm and Turborepo.
 
 - Use `pnpm`, not `npm` or `yarn`.
 - Inspect the relevant `package.json` scripts before inventing commands.
-- Root scripts include `dev`, `build`, `lint`, `test`, `typecheck`, `db:up`, and `db:down`.
+- Root scripts include `dev`, `build`, `lint`, `lint:fix`, `test`, `typecheck`, `db:up`, and `db:down`.
 - Backend scripts include Prisma commands for validate, generate, migrate, and seed.
 
 ## Change Policy
@@ -37,14 +37,14 @@ This is a TypeScript monorepo using pnpm and Turborepo.
 
 ## Validation
 
-When feasible, validate changes with the narrowest relevant command first, then broader checks:
+When feasible, validate changes with the narrowest relevant command first, then broader checks. `pnpm lint` is a read-only check; use `pnpm lint:fix` only when automatic fixes are explicitly intended.
 
 - Lint
 - Typecheck
 - Tests
 - Build
 
-Backend tests use Jest, Supertest, ts-jest, and e2e tests. The frontend test command currently needs verification before relying on it as coverage.
+Backend tests use Jest, Supertest, ts-jest, and e2e tests. Frontend tests are not configured yet; the web test script reports that gap explicitly and should not be treated as frontend coverage.
 
 ## Definition of Done
 

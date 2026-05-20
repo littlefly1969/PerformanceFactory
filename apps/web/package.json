@@ -7,8 +7,9 @@
     "start": "next start -p ${PORT:-3000} -H 0.0.0.0",
     "build": "next build",
     "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"TODO\""
+    "test": "node -e \"console.log('Frontend tests are not configured yet')\""
   },
   "dependencies": {
     "next": "16.1.6",
