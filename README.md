@@ -2,6 +2,11 @@
 
 Monorepo PNPM/Turbo con API NestJS, Web Next.js, PostgreSQL/Prisma e Redis per le sessioni di produzione.
 
+## Prerequisiti
+
+- Node.js 22, allineato alle immagini Docker `node:22-bookworm-slim`. Con nvm: `nvm use`.
+- pnpm 10.28.2, dichiarato in `packageManager`.
+
 ## Database Dev
 
 Docker Compose è previsto per sviluppo locale:

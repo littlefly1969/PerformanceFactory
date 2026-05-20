@@ -15,6 +15,7 @@ This is a TypeScript monorepo using pnpm and Turborepo.
 ## Tooling
 
 - Use `pnpm`, not `npm` or `yarn`.
+- Use Node.js 22, matching `.nvmrc` and the Docker base images.
 - Inspect the relevant `package.json` scripts before inventing commands.
 - Root scripts include `dev`, `build`, `lint`, `lint:fix`, `test`, `typecheck`, `db:up`, and `db:down`.
 - Backend scripts include Prisma commands for validate, generate, migrate, and seed.
