@@ -172,6 +172,13 @@ export class AiTuningController {
     );
   }
 
+  @Delete('onboarding-templates/:id')
+  @ApiOperation({ summary: 'Elimina un template domanda onboarding' })
+  @Roles(UserRole.AI_TUNER)
+  deleteOnboardingTemplate(@Param('id') id: string) {
+    return this.promptAdmin.deleteOnboardingTemplate(id);
+  }
+
   @Get('replays')
   @ApiOperation({ summary: 'Lista replay utente corrente' })
   listReplays(@Req() req: ActorRequest, @Query('page') page?: string) {

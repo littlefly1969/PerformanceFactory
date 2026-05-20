@@ -70,12 +70,14 @@ const roleNav: Record<string, NavItem[]> = {
     { href: "/admin/consents", label: "Privacy" },
   ],
   AI_TUNER: [
+    { href: "/ai-tuner/anamnesi", label: "Anamnesi" },
     { href: "/ai-tuner/prompts", label: "Prompt" },
     {
       href: "/ai-tuner/test-cases",
       label: "Test su casi",
       children: [
-        { href: "/ai-tuner/test-cases?mode=standard", label: "Casi test standard" },
+        { href: "/ai-tuner/test-cases?mode=users", label: "Utenti" },
+        { href: "/ai-tuner/test-cases?mode=standard", label: "Storico test" },
         { href: "/ai-tuner/test-cases?mode=real", label: "Casi reali" },
       ],
     },

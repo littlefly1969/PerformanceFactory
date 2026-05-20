@@ -2275,6 +2275,336 @@ body {
   color: #050515;
 }
 
+.pf-onboarding-test-modal {
+  width: min(1680px, 92vw);
+  max-height: 94vh;
+  padding: 40px;
+  font-size: 18px;
+}
+
+.pf-onboarding-test-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.25fr) minmax(0, 1fr);
+  gap: 34px;
+  align-items: start;
+}
+
+.pf-onboarding-phase-list,
+.pf-onboarding-test-content,
+.pf-onboarding-question-list,
+.pf-onboarding-prompt-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.pf-onboarding-test-content {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+.pf-onboarding-test-modal .pf-panel {
+  padding: 36px;
+}
+
+.pf-onboarding-test-modal .pf-panel-header h2 {
+  font-size: 30px;
+}
+
+.pf-onboarding-test-modal .pf-panel-header p,
+.pf-onboarding-test-modal .pf-field,
+.pf-onboarding-test-modal .pf-muted {
+  font-size: 18px;
+}
+
+.pf-onboarding-test-modal > .pf-panel-header h2 {
+  font-size: 28px;
+}
+
+.pf-onboarding-test-modal > .pf-panel-header p {
+  font-size: 17px;
+}
+
+.pf-onboarding-phase-button,
+.pf-onboarding-prompt-card {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pf-onboarding-phase-button {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  color: rgba(255, 255, 255, 0.88);
+  min-height: 104px;
+  padding: 22px;
+}
+
+.pf-onboarding-phase-button span,
+.pf-onboarding-prompt-card span {
+  font-size: 22px;
+  font-weight: 850;
+}
+
+.pf-onboarding-phase-button small,
+.pf-onboarding-prompt-card small {
+  color: var(--pf-muted);
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.pf-onboarding-phase-button.active,
+.pf-onboarding-prompt-card.selected {
+  border-color: var(--pf-accent);
+  background: rgba(220, 255, 50, 0.1);
+}
+
+.pf-onboarding-sim-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.pf-onboarding-prompt-grid {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.pf-onboarding-prompt-card {
+  display: grid;
+  gap: 8px;
+}
+
+.pf-onboarding-prompt-card strong {
+  color: var(--pf-text);
+  line-height: 1.35;
+}
+
+.pf-readonly-field {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--pf-text);
+  padding: 10px 12px;
+  font-weight: 800;
+}
+
+.pf-onboarding-test-modal .pf-input,
+.pf-onboarding-test-modal .pf-select,
+.pf-onboarding-test-modal .pf-textarea {
+  min-height: 72px;
+  padding: 18px 20px;
+  font-size: 18px;
+}
+
+.pf-onboarding-test-modal .pf-button,
+.pf-onboarding-test-modal .pf-button-secondary,
+.pf-onboarding-test-modal .pf-button-danger {
+  min-height: 62px;
+  padding: 17px 24px;
+  font-size: 17px;
+}
+
+.pf-onboarding-test-modal .pf-prompt-info-card {
+  gap: 18px;
+  padding: 22px;
+}
+
+.pf-onboarding-test-modal .pf-prompt-info-card span {
+  font-size: 15px;
+}
+
+.pf-onboarding-test-modal .pf-prompt-info-card strong {
+  font-size: 18px;
+}
+
+.pf-test-users-layout {
+  display: block;
+  width: 100%;
+}
+
+.pf-test-users-panel > .pf-panel-header > div,
+.pf-test-users-layout > .pf-panel > .pf-panel-header > div {
+  max-width: 920px;
+}
+
+.pf-test-users-layout > .pf-panel {
+  width: 100%;
+}
+
+.pf-test-users-layout > .pf-panel .pf-muted {
+  max-width: 86ch;
+}
+
+.pf-test-users-list {
+  display: grid;
+  gap: 18px;
+  width: 100%;
+}
+
+.pf-test-users-list .pf-card {
+  width: 100%;
+}
+
+.pf-test-user-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, auto);
+  gap: 22px;
+  align-items: center;
+  min-height: 116px;
+  padding: 22px 24px;
+  text-align: left;
+}
+
+.pf-test-user-card h3 {
+  margin: 0 0 10px;
+  color: var(--pf-text);
+  font-size: 24px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.pf-test-user-card p {
+  margin: 0;
+  max-width: 84ch;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.pf-test-user-card small {
+  color: var(--pf-muted);
+  line-height: 1.35;
+}
+
+.pf-test-user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+@media (max-width: 1180px) {
+  .pf-onboarding-test-layout,
+  .pf-onboarding-test-content {
+    grid-template-columns: 1fr;
+  }
+
+  .pf-test-user-card {
+    grid-template-columns: 1fr;
+  }
+
+  .pf-test-user-actions {
+    justify-content: flex-start;
+  }
+}
+
+.pf-anamnesis-management {
+  display: grid;
+  gap: 18px;
+}
+
+.pf-anamnesis-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.48fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.pf-anamnesis-list {
+  display: grid;
+  gap: 14px;
+}
+
+.pf-anamnesis-question {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, auto);
+  gap: 16px;
+  align-items: start;
+}
+
+.pf-anamnesis-question.selected {
+  border-color: var(--pf-accent);
+}
+
+.pf-anamnesis-question-main {
+  display: grid;
+  gap: 12px;
+}
+
+.pf-anamnesis-question-top {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.pf-anamnesis-question-top h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.pf-anamnesis-order {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(220, 255, 50, 0.34);
+  border-radius: 8px;
+  color: var(--pf-accent);
+  font-weight: 800;
+}
+
+.pf-anamnesis-meta,
+.pf-anamnesis-actions,
+.pf-anamnesis-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.pf-anamnesis-actions {
+  justify-content: flex-end;
+}
+
+.pf-anamnesis-actions .pf-button-secondary,
+.pf-anamnesis-actions .pf-button-danger {
+  min-height: 36px;
+  padding: 8px 10px;
+}
+
+.pf-anamnesis-form-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 12px;
+}
+
+.pf-anamnesis-checks {
+  color: rgba(255, 255, 255, 0.82);
+  font-weight: 700;
+}
+
+.pf-anamnesis-checks input {
+  accent-color: var(--pf-accent);
+}
+
+@media (max-width: 1120px) {
+  .pf-anamnesis-layout,
+  .pf-anamnesis-question {
+    grid-template-columns: 1fr;
+  }
+
+  .pf-anamnesis-actions {
+    justify-content: flex-start;
+  }
+}
+
 .pf-standard-cases-panel > .pf-panel-header {
   align-items: flex-start;
 }
@@ -4394,5 +4724,133 @@ a.pf-standard-case-summary:focus-visible {
 
   .pf-auth-demo-card {
     gap: 12px;
+  }
+}
+
+.pf-modal.pf-onboarding-test-modal {
+  width: min(1780px, calc(100vw - 56px)) !important;
+  min-height: min(840px, calc(100vh - 56px));
+  max-height: calc(100vh - 56px) !important;
+  padding: 48px !important;
+  gap: 34px;
+  font-size: 19px;
+}
+
+.pf-modal.pf-onboarding-test-modal > .pf-panel-header h2 {
+  font-size: 32px;
+}
+
+.pf-modal.pf-onboarding-test-modal > .pf-panel-header p {
+  font-size: 18px;
+}
+
+.pf-modal.pf-onboarding-test-modal .pf-onboarding-test-layout {
+  grid-template-columns: minmax(360px, 0.28fr) minmax(0, 1fr);
+  gap: 38px;
+}
+
+.pf-modal.pf-onboarding-test-modal .pf-panel {
+  padding: 42px;
+}
+
+.pf-modal.pf-onboarding-test-modal .pf-panel-header h2 {
+  font-size: 32px;
+}
+
+.pf-modal.pf-onboarding-test-modal .pf-panel-header p,
+.pf-modal.pf-onboarding-test-modal .pf-field,
+.pf-modal.pf-onboarding-test-modal .pf-muted {
+  font-size: 19px;
+}
+
+.pf-modal.pf-onboarding-test-modal .pf-onboarding-phase-list,
+.pf-modal.pf-onboarding-test-modal .pf-onboarding-test-content,
+.pf-modal.pf-onboarding-test-modal .pf-onboarding-question-list,
+.pf-modal.pf-onboarding-test-modal .pf-stack {
+  gap: 18px;
+}
+
+.pf-modal.pf-onboarding-test-modal .pf-onboarding-phase-button {
+  min-height: 116px;
+  padding: 26px;
+}
+
+.pf-modal.pf-onboarding-test-modal .pf-onboarding-phase-button span {
+  font-size: 24px;
+}
+
+.pf-modal.pf-onboarding-test-modal .pf-onboarding-phase-button small {
+  font-size: 17px;
+}
+
+.pf-modal.pf-onboarding-test-modal .pf-input,
+.pf-modal.pf-onboarding-test-modal .pf-select,
+.pf-modal.pf-onboarding-test-modal .pf-textarea {
+  min-height: 78px;
+  padding: 20px 22px;
+  font-size: 19px;
+}
+
+.pf-modal.pf-onboarding-test-modal .pf-button,
+.pf-modal.pf-onboarding-test-modal .pf-button-secondary,
+.pf-modal.pf-onboarding-test-modal .pf-button-danger {
+  min-height: 68px;
+  padding: 20px 28px;
+  font-size: 18px;
+}
+
+.pf-modal.pf-onboarding-test-modal .pf-prompt-info-card {
+  gap: 24px;
+  padding: 28px;
+}
+
+.pf-modal.pf-onboarding-test-modal .pf-prompt-info-card span {
+  font-size: 16px;
+}
+
+.pf-modal.pf-onboarding-test-modal .pf-prompt-info-card strong {
+  font-size: 20px;
+}
+
+.pf-modal.pf-onboarding-test-modal .pf-simulation-question-card {
+  display: grid;
+  gap: 18px;
+}
+
+.pf-modal.pf-onboarding-test-modal .pf-simulation-question-card h3 {
+  margin: 0 0 8px;
+}
+
+.pf-modal.pf-onboarding-test-modal .pf-simulation-question-card .pf-option-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.pf-modal.pf-onboarding-test-modal .pf-simulation-question-card .pf-button,
+.pf-modal.pf-onboarding-test-modal .pf-simulation-question-card .pf-button-secondary {
+  min-height: 54px;
+  padding: 12px;
+}
+
+.pf-simulation-dialog-backdrop {
+  z-index: 90;
+}
+
+.pf-simulation-dialog-modal {
+  width: min(900px, calc(100vw - 48px));
+}
+
+.pf-simulation-ai-output .pf-form-actions {
+  justify-content: flex-end;
+}
+
+@media (max-width: 980px) {
+  .pf-modal.pf-onboarding-test-modal {
+    width: min(100%, calc(100vw - 24px)) !important;
+    min-height: auto;
+    padding: 22px !important;
+  }
+
+  .pf-modal.pf-onboarding-test-modal .pf-onboarding-test-layout {
+    grid-template-columns: 1fr;
   }
 }

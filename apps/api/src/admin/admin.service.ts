@@ -1711,6 +1711,18 @@ export class AdminService {
     });
   }
 
+  async deleteOnboardingTemplate(id: string) {
+    const existing = await this.prisma.onboardingQuestionTemplate.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw new NotFoundException('Template onboarding non trovato');
+    }
+    await this.prisma.onboardingQuestionTemplate.delete({ where: { id } });
+    return { id, deleted: true };
+  }
+
   async closeAnsweredQuestionnaires() {
     const questionSets = await this.prisma.questionSet.findMany({
       where: { status: 'PUBLISHED' },
