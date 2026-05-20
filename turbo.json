@@ -6,13 +6,20 @@
     },
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".next/**"]
+      "outputs": ["dist/**", ".next/**", "!.next/cache/**"],
+      "env": ["NEXT_PUBLIC_API_BASE_URL"]
     },
-    "lint": {},
+    "lint": {
+      "outputs": []
+    },
     "lint:fix": {
       "cache": false
     },
-    "test": {},
-    "typecheck": {}
+    "test": {
+      "outputs": []
+    },
+    "typecheck": {
+      "outputs": []
+    }
   }
 }
