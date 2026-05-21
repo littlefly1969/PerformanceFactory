@@ -130,10 +130,18 @@ pnpm lint:fix
 - API: test Jest unitari ed e2e reali; al momento passano.
 - Web: i test frontend non sono ancora configurati. Lo script `apps/web test` stampa `Frontend tests are not configured yet` e termina con successo per non rompere il gate root, ma non deve essere considerato copertura frontend.
 
+Test PostgreSQL-backed espliciti:
+
+```bash
+TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/performancefactory_test pnpm --filter api test:db
+```
+
+`test:db` non fa parte di `pnpm test`: richiede PostgreSQL avviato con `pnpm db:up` e rifiuta URL che non puntano a un database locale dedicato con `test` nel nome.
+Il database di test viene creato automaticamente se manca; le migrazioni non vengono applicate da questo smoke test iniziale.
+
 ## Caveat Locali
 
 - Usa Node.js 22. Eseguire i comandi con Node 24/26 genera warning sugli `engines` e puo produrre differenze rispetto a Docker/CI.
-- La suite API e2e completa puo ancora stampare un warning Jest sul graceful exit di un worker; `--detectOpenHandles` non ha identificato handle attivi nei target stabilizzati.
 - In sandbox ristrette, `pnpm build` puo fallire durante il build web perche Turbopack tenta un bind di porta. In un ambiente locale/CI non ristretto il build passa.
 - `pnpm lint` passa con warning noti; i warning non bloccano ancora il gate.
 

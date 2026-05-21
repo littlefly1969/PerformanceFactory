@@ -47,6 +47,8 @@ When feasible, validate changes with the narrowest relevant command first, then 
 
 Backend tests use Jest, Supertest, ts-jest, and e2e tests. Frontend tests are not configured yet; the web test script reports that gap explicitly and should not be treated as frontend coverage.
 
+PostgreSQL-backed integration tests are explicit and separate from the root test gate. Run them with `TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/performancefactory_test pnpm --filter api test:db` after `pnpm db:up`; the guard requires a local database name containing `test`.
+
 ## Definition of Done
 
 A change is done when:

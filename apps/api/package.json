@@ -20,6 +20,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand --openHandlesTimeout=5000",
+    "test:db": "jest --config ./test/jest-db.json --runInBand --openHandlesTimeout=5000",
     "prisma:generate": "prisma generate",
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:migrate:dev": "prisma migrate dev",
