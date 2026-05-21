@@ -125,6 +125,20 @@ pnpm build
 pnpm lint:fix
 ```
 
+## CI
+
+GitHub Actions esegue i gate deterministici su Node.js 22 e pnpm 10.28.2:
+
+- `pnpm install --frozen-lockfile`
+- `pnpm --filter api prisma:validate`
+- `pnpm --filter api prisma:generate`
+- `pnpm lint`
+- `pnpm typecheck`
+- `pnpm test`
+- `pnpm build`
+
+Un job separato avvia solo PostgreSQL 16 e lancia `pnpm --filter api test:db` con `TEST_DATABASE_URL` locale di test. Non usa staging e non richiede Redis.
+
 ## Testing
 
 - API: test Jest unitari ed e2e reali; al momento passano.
