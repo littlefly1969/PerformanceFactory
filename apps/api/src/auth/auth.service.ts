@@ -24,6 +24,18 @@ type SessionCarrier = {
   raw?: { session?: { userId?: string } };
 };
 
+type LogoutSession = {
+  destroy?: (cb: () => void) => void;
+  userId?: string;
+  passport?: { user?: string };
+};
+
+type LogoutCarrier = {
+  logout?: (cb: (err?: unknown) => void) => void;
+  session?: LogoutSession;
+  raw?: { session?: LogoutSession };
+};
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -339,20 +351,35 @@ export class AuthService {
   }
 
   async logout(req: unknown) {
-    const request = req as {
-      session?: { destroy?: (cb: () => void) => void; userId?: string };
-      raw?: {
-        session?: { destroy?: (cb: () => void) => void; userId?: string };
-      };
-    };
-    const session = request.session ?? request.raw?.session;
-    if (session?.destroy) {
-      await new Promise<void>((resolve) => {
-        session.destroy?.(() => resolve());
-      });
-    } else if (session) {
-      session.userId = undefined;
+    const request = req as LogoutCarrier;
+    await this.logoutPassport(request);
+
+    const sessions = [request.session, request.raw?.session].filter(
+      (session, index, all): session is LogoutSession =>
+        !!session && all.indexOf(session) === index,
+    );
+
+    for (const session of sessions) {
+      if (session.destroy) {
+        await new Promise<void>((resolve) => {
+          session.destroy?.(() => resolve());
+        });
+      } else {
+        session.userId = undefined;
+        if (session.passport) {
+          session.passport.user = undefined;
+        }
+      }
     }
     return { ok: true };
+  }
+
+  private async logoutPassport(request: LogoutCarrier) {
+    if (!request.logout) {
+      return;
+    }
+    await new Promise<void>((resolve) => {
+      request.logout?.(() => resolve());
+    });
   }
 }

@@ -93,6 +93,38 @@ describe('Auth + ABAC (service tests)', () => {
     expect(user.email).toBe('pro@example.com');
   });
 
+  it('rejects invalid credentials', async () => {
+    await expect(
+      authService.validateUser('pro@example.com', 'wrong-password'),
+    ).rejects.toThrow('Credenziali non valide');
+  });
+
+  it('destroys the session and logs out passport state', async () => {
+    const logout = jest.fn((cb: (err?: unknown) => void) => cb());
+    const destroy = jest.fn((cb: () => void) => cb());
+
+    await expect(
+      authService.logout({
+        logout,
+        session: { userId: 'pro-1', destroy },
+      }),
+    ).resolves.toEqual({ ok: true });
+
+    expect(logout).toHaveBeenCalledTimes(1);
+    expect(destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears fallback session identifiers when destroy is unavailable', async () => {
+    const session = { userId: 'pro-1', passport: { user: 'pro-1' } };
+
+    await expect(authService.logout({ session })).resolves.toEqual({
+      ok: true,
+    });
+
+    expect(session.userId).toBeUndefined();
+    expect(session.passport.user).toBeUndefined();
+  });
+
   it('ABAC allows only linked users', async () => {
     const allowed = await abacService.canAccessUser('pro-1', 'user-1');
     const denied = await abacService.canAccessUser('pro-1', 'user-2');
