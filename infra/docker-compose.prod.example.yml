@@ -12,7 +12,7 @@ x-restart-policy: &default-restart-policy
 services:
   api:
     <<: *default-restart-policy
-    image: ${API_IMAGE:-performancefactory-api:${IMAGE_TAG:?Set IMAGE_TAG or API_IMAGE}}
+    image: ${API_IMAGE:-performancefactory-api:${IMAGE_TAG:-local}}
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
@@ -66,7 +66,7 @@ services:
 
   web:
     <<: *default-restart-policy
-    image: ${WEB_IMAGE:-performancefactory-web:${IMAGE_TAG:?Set IMAGE_TAG or WEB_IMAGE}}
+    image: ${WEB_IMAGE:-performancefactory-web:${IMAGE_TAG:-local}}
     build:
       context: ..
       dockerfile: apps/web/Dockerfile

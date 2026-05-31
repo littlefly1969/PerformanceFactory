@@ -225,7 +225,9 @@ Validazione config:
 docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml config
 ```
 
-Deploy sicuro:
+Deploy sicuro. Se `IMAGE_TAG`, `API_IMAGE` e `WEB_IMAGE` non sono impostati,
+Compose usa immagini locali `performancefactory-api:local` e
+`performancefactory-web:local`.
 
 ```bash
 infra/scripts/deploy-prod.sh --env-file .env.production

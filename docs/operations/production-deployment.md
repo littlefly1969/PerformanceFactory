@@ -38,7 +38,6 @@ Never commit real secrets.
 Set these values before first deploy:
 
 ```text
-IMAGE_TAG
 API_IMAGE
 WEB_IMAGE
 WEB_ORIGIN
@@ -50,10 +49,11 @@ REDIS_URL
 SWAGGER_ENABLED=false
 ```
 
-`IMAGE_TAG` provides the default tag for `performancefactory-api` and
-`performancefactory-web`. `API_IMAGE` and `WEB_IMAGE` can override the full image
-name, including registry and tag. Do not use `latest` for production unless a
-separate release policy makes that intentional.
+`IMAGE_TAG` is optional and provides the default tag for `performancefactory-api`
+and `performancefactory-web`. If it is not set, Compose uses the local tag
+`local`, preserving simple server-side builds. `API_IMAGE` and `WEB_IMAGE` can
+override the full image name, including registry and tag. Do not use `latest`
+for production unless a separate release policy makes that intentional.
 
 ## First Deploy
 

@@ -175,7 +175,7 @@ per il file reale `.env.production`, senza committare segreti.
 
 Il compose di produzione e `infra/docker-compose.prod.example.yml` e usa:
 
-- immagini applicative con tag esplicito (`API_IMAGE`, `WEB_IMAGE`);
+- immagini applicative configurabili (`IMAGE_TAG`, `API_IMAGE`, `WEB_IMAGE`);
 - Redis self-hosted con volume persistente `redis-data`;
 - PostgreSQL esterno via `DATABASE_URL`;
 - healthcheck per API, web e Redis;
