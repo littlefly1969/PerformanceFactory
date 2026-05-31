@@ -204,6 +204,10 @@ type ResetTarget = {
   athlete: Athlete;
 };
 
+type DeleteTarget = {
+  athlete: Athlete;
+};
+
 const readError = async (response: Response) => {
   try {
     const data = (await response.json()) as {
@@ -286,6 +290,8 @@ export default function AdminCyclesPage() {
   const [coachAssignmentTarget, setCoachAssignmentTarget] =
     useState<CoachAssignmentTarget | null>(null);
   const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [exportConfirmOpen, setExportConfirmOpen] = useState(false);
   const [professionalFilter, setProfessionalFilter] = useState("");
   const [coachFilter, setCoachFilter] = useState("");
@@ -826,6 +832,29 @@ export default function AdminCyclesPage() {
     setBusyKey(null);
   };
 
+  const deleteAthleteCompletely = async () => {
+    if (!deleteTarget) {
+      return;
+    }
+    const athleteId = deleteTarget.athlete.id;
+    setBusyKey(`delete:${athleteId}`);
+    setMessage(null);
+    const response = await secureFetch(`${API_BASE}/admin/users/${athleteId}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (!response.ok) {
+      setMessage(`Eliminazione atleta non riuscita: ${await readError(response)}`);
+      setBusyKey(null);
+      return;
+    }
+    setMessage("Atleta eliminato definitivamente.");
+    setDeleteTarget(null);
+    setDeleteConfirmText("");
+    await loadDashboard();
+    setBusyKey(null);
+  };
+
   return (
     <ProductShell
       eyebrow="Ambiente amministratore"
@@ -1272,6 +1301,17 @@ export default function AdminCyclesPage() {
                   >
                     Cancella dati
                   </button>
+                  <button
+                    className="pf-button-danger"
+                    type="button"
+                    disabled={busyKey === `delete:${athlete.id}`}
+                    onClick={() => {
+                      setDeleteTarget({ athlete });
+                      setDeleteConfirmText("");
+                    }}
+                  >
+                    Elimina atleta
+                  </button>
                 </div>
                 <div className="pf-area-strip">
                   {athlete.areaStates.map((state) => (
@@ -1594,6 +1634,62 @@ export default function AdminCyclesPage() {
                 type="button"
                 disabled={busyKey === `reset:${resetTarget.athlete.id}`}
                 onClick={() => setResetTarget(null)}
+              >
+                Annulla
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div className="pf-modal-backdrop" role="dialog" aria-modal="true">
+          <section className="pf-modal">
+            <div className="pf-panel-header">
+              <div>
+                <p className="pf-eyebrow">Conferma amministratore</p>
+                <h2>Eliminare definitivamente l'atleta?</h2>
+                <p className="pf-muted">
+                  {displayUser(deleteTarget.athlete)}
+                </p>
+              </div>
+              <StatusBadge tone="danger">Azione irreversibile</StatusBadge>
+            </div>
+            <div className="pf-alert warning">
+              Verranno cancellati account, credenziali di login, identita
+              collegate, consensi, onboarding, obiettivo, sport, assegnazioni,
+              allenamenti, questionari, risposte, snapshot, storico, audit e
+              dati AI collegati all'atleta.
+            </div>
+            <label className="pf-field">
+              <span>Digita l'email dell'atleta per confermare</span>
+              <input
+                value={deleteConfirmText}
+                onChange={(event) => setDeleteConfirmText(event.target.value)}
+                placeholder={deleteTarget.athlete.email}
+                autoComplete="off"
+              />
+            </label>
+            <div className="pf-actions">
+              <button
+                className="pf-button-danger"
+                type="button"
+                disabled={
+                  busyKey === `delete:${deleteTarget.athlete.id}` ||
+                  deleteConfirmText !== deleteTarget.athlete.email
+                }
+                onClick={deleteAthleteCompletely}
+              >
+                Elimina definitivamente
+              </button>
+              <button
+                className="pf-button-secondary"
+                type="button"
+                disabled={busyKey === `delete:${deleteTarget.athlete.id}`}
+                onClick={() => {
+                  setDeleteTarget(null);
+                  setDeleteConfirmText("");
+                }}
               >
                 Annulla
               </button>

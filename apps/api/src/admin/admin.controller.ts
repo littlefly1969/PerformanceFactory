@@ -2,6 +2,7 @@ import {
   Body,
   BadRequestException,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -153,6 +154,16 @@ export class AdminController {
   @Roles(UserRole.ADMIN)
   resetUserData(@Param('userId') userId: string) {
     return this.admin.resetUserOperationalData(userId);
+  }
+
+  @Delete('users/:userId')
+  @ApiOperation({ summary: 'Elimina definitivamente un atleta' })
+  @ApiParam({ name: 'userId' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  deleteUser(@Param('userId') userId: string) {
+    return this.admin.deleteAthleteCompletely(userId);
   }
 
   @Get('consent-documents')

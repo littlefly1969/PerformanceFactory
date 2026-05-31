@@ -1273,6 +1273,50 @@ export class AdminService {
     });
   }
 
+  async deleteAthleteCompletely(userId: string) {
+    if (!userId) {
+      throw new BadRequestException('ID utente mancante');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+      },
+    });
+    if (!user || user.role !== UserRole.USER) {
+      throw new NotFoundException('Atleta non trovato');
+    }
+
+    const reset = await this.resetUserOperationalData(userId);
+
+    return this.prisma.$transaction(async (tx) => {
+      const deleted = {
+        ...reset.deleted,
+        authIdentities: (
+          await tx.authIdentity.deleteMany({ where: { userId } })
+        ).count,
+      };
+      await tx.user.delete({ where: { id: userId } });
+
+      return {
+        deleted: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+        },
+        deletedCounts: deleted,
+      };
+    });
+  }
+
   async getAiSettings() {
     const areas = await this.prisma.area.findMany({
       select: { id: true, name: true },
