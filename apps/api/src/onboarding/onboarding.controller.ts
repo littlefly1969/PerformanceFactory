@@ -8,6 +8,12 @@ import {
 import { UserRole } from '@prisma/client';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { OnboardingService } from './onboarding.service';
+import {
+  GoalTextDto,
+  OnboardingAnswersDto,
+  RefineGoalDto,
+  SportSelectionDto,
+} from './dto/onboarding.dto';
 
 @ApiTags('onboarding')
 @Controller('onboarding')
@@ -43,7 +49,7 @@ export class OnboardingController {
   })
   validateGoal(
     @Req() req: { user?: { id: string; role: UserRole } },
-    @Body() body: { goalText?: string },
+    @Body() body: GoalTextDto,
   ) {
     return this.onboarding.validateGoal(
       { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },
@@ -57,11 +63,7 @@ export class OnboardingController {
   })
   saveSportSelection(
     @Req() req: { user?: { id: string; role: UserRole } },
-    @Body()
-    body: {
-      sportId?: string;
-      specializationId?: string;
-    },
+    @Body() body: SportSelectionDto,
   ) {
     return this.onboarding.saveSportSelection(
       { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },
@@ -73,13 +75,7 @@ export class OnboardingController {
   @ApiOperation({ summary: 'Raffina obiettivo performance con chat AI' })
   refineGoal(
     @Req() req: { user?: { id: string; role: UserRole } },
-    @Body()
-    body: {
-      originalGoal?: string;
-      currentDraft?: string;
-      messages?: Array<{ role: 'user' | 'assistant'; content: string }>;
-      userReply?: string;
-    },
+    @Body() body: RefineGoalDto,
   ) {
     return this.onboarding.refineGoal(
       { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },
@@ -94,14 +90,7 @@ export class OnboardingController {
   })
   generateSpecialistQuestions(
     @Req() req: { user?: { id: string; role: UserRole } },
-    @Body()
-    body: {
-      goalText?: string;
-      answers?: Array<{
-        questionId: string;
-        value: string | number | boolean | null;
-      }>;
-    },
+    @Body() body: OnboardingAnswersDto,
   ) {
     return this.onboarding.generateSpecialistQuestions(
       { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },
@@ -116,14 +105,7 @@ export class OnboardingController {
   })
   validateFinalGoal(
     @Req() req: { user?: { id: string; role: UserRole } },
-    @Body()
-    body: {
-      goalText?: string;
-      answers?: Array<{
-        questionId: string;
-        value: string | number | boolean | null;
-      }>;
-    },
+    @Body() body: OnboardingAnswersDto,
   ) {
     return this.onboarding.validateFinalGoal(
       { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },
@@ -138,14 +120,7 @@ export class OnboardingController {
   })
   submit(
     @Req() req: { user?: { id: string; role: UserRole } },
-    @Body()
-    body: {
-      goalText?: string;
-      answers?: Array<{
-        questionId: string;
-        value: string | number | boolean | null;
-      }>;
-    },
+    @Body() body: OnboardingAnswersDto,
   ) {
     return this.onboarding.submit(
       { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },

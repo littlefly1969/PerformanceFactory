@@ -14,6 +14,7 @@ import { PrismaService } from '../src/prisma/prisma.service';
 import { AuthenticatedGuard } from '../src/common/guards/authenticated.guard';
 import { OrchestratorService } from '../src/ai-orchestrator/orchestrator.service';
 import { createPrismaTestFake } from './utils/prisma-test-fake';
+import { applyValidationPipe } from './utils/apply-validation-pipe';
 
 type InjectResponse = {
   statusCode: number;
@@ -176,6 +177,7 @@ describe('Answers (e2e)', () => {
       new FastifyAdapter(),
     );
     app.setGlobalPrefix('api');
+    applyValidationPipe(app);
     await app.init();
 
     const fastify = app.getHttpAdapter().getInstance() as unknown as {
@@ -267,6 +269,24 @@ describe('Answers (e2e)', () => {
           { questionId: 'q1', answerOptionId: 'o2' },
           { questionId: 'q1', answerOptionId: 'o1' },
         ],
+      }),
+    });
+
+    expect(response.statusCode).toBe(400);
+  });
+
+  it('rejects malformed answer payloads before service validation', async () => {
+    const response = await inject({
+      method: 'POST',
+      url: '/api/answers/batch',
+      headers: {
+        'content-type': 'application/json',
+        'x-test-user-id': 'user-1',
+        'x-test-role': UserRole.USER,
+      },
+      payload: JSON.stringify({
+        questionSetId: 'set-1',
+        answers: 'not-an-array',
       }),
     });
 

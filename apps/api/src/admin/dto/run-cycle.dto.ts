@@ -4,6 +4,7 @@ import {
   ArrayNotEmpty,
   IsArray,
   IsBoolean,
+  IsNotEmpty,
   IsOptional,
   IsString,
   MaxLength,
@@ -15,6 +16,7 @@ export class RunCycleDto {
   @ArrayNotEmpty()
   @ArrayMaxSize(200)
   @IsString({ each: true })
+  @IsNotEmpty({ each: true })
   @MaxLength(64, { each: true })
   userIds: string[];
 

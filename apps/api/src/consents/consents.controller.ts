@@ -14,6 +14,7 @@ import { ConsentsService } from './consents.service';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { ConsentAcceptanceDto } from './dto/consent-acceptance.dto';
 
 const AI_CONSENT_TYPE = 'AI_ASSISTANT';
 
@@ -54,16 +55,7 @@ export class ConsentsController {
       ip?: string;
       headers?: { 'user-agent'?: string };
     },
-    @Body()
-    body: {
-      privacyAccepted?: boolean;
-      aiAssistantAccepted?: boolean;
-      acceptedDocuments?: Array<{
-        type?: string;
-        version?: string;
-        documentHash?: string;
-      }>;
-    },
+    @Body() body: ConsentAcceptanceDto,
   ) {
     const userId = req.user?.id ?? '';
     if (!userId) {

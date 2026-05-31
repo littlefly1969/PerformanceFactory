@@ -18,6 +18,7 @@ import { LocalAuthGuard } from '../common/guards/local-auth.guard';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { LoginRateLimitGuard } from '../common/guards/login-rate-limit.guard';
 import { RegisterAthleteDto } from './dto/register-athlete.dto';
+import { ConsentAcceptanceDto } from '../consents/dto/consent-acceptance.dto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -165,16 +166,7 @@ export class AuthController {
       ip?: string;
       headers?: { 'user-agent'?: string };
     },
-    @Body()
-    body: {
-      privacyAccepted?: boolean;
-      aiAssistantAccepted?: boolean;
-      acceptedDocuments?: Array<{
-        type?: string;
-        version?: string;
-        documentHash?: string;
-      }>;
-    },
+    @Body() body: ConsentAcceptanceDto,
   ) {
     const result = await this.google().completeRegistration(
       req as Parameters<GoogleOidcService['completeRegistration']>[0],

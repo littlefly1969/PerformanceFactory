@@ -11,26 +11,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-
-export class AcceptedDocumentDto {
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  @MaxLength(64)
-  type?: string;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  @MaxLength(64)
-  version?: string;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  @MaxLength(128)
-  documentHash?: string;
-}
+import { AcceptedDocumentDto } from '../../consents/dto/consent-acceptance.dto';
 
 export class RegisterAthleteDto {
   @ApiProperty()

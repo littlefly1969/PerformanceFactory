@@ -18,6 +18,7 @@ import {
   createPrismaTestFake,
   createProfessionalUserLinkDelegate,
 } from './utils/prisma-test-fake';
+import { applyValidationPipe } from './utils/apply-validation-pipe';
 
 type InjectResponse = {
   statusCode: number;
@@ -254,6 +255,7 @@ describe('Professional approvals workspace (e2e)', () => {
       new FastifyAdapter(),
     );
     app.setGlobalPrefix('api');
+    applyValidationPipe(app);
     await app.init();
 
     const fastify = app.getHttpAdapter().getInstance() as unknown as {
@@ -343,6 +345,21 @@ describe('Professional approvals workspace (e2e)', () => {
         'content-type': 'application/json',
       },
       payload: JSON.stringify({ rejectionReason: '' }),
+    });
+
+    expect(reject.statusCode).toBe(400);
+  });
+
+  it('rejects malformed rejection payloads before service validation', async () => {
+    const reject = await inject({
+      method: 'POST',
+      url: '/api/professional/questionsets/qs-1/reject',
+      headers: {
+        'x-test-user-id': 'pro-1',
+        'x-test-role': UserRole.PROFESSIONAL,
+        'content-type': 'application/json',
+      },
+      payload: JSON.stringify({ rejectionReason: 42 }),
     });
 
     expect(reject.statusCode).toBe(400);

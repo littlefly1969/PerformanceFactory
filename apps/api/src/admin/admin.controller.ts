@@ -24,6 +24,7 @@ import { OrchestratorService } from '../ai-orchestrator/orchestrator.service';
 import { ConsentsService } from '../consents/consents.service';
 import { RunCycleDto } from './dto/run-cycle.dto';
 import { AdminService } from './admin.service';
+import { UpsertConsentDocumentDto } from '../consents/dto/upsert-consent-document.dto';
 
 @ApiTags('admin-cycles')
 @Controller('admin')
@@ -172,15 +173,7 @@ export class AdminController {
   @Roles(UserRole.ADMIN)
   upsertConsentDocument(
     @Req() req: { user?: { id: string } },
-    @Body()
-    body: {
-      type?: string;
-      version?: string;
-      title?: string;
-      summary?: string;
-      body?: string[];
-      publish?: boolean;
-    },
+    @Body() body: UpsertConsentDocumentDto,
   ) {
     return this.consents.upsertDocument(body, req.user?.id ?? '');
   }

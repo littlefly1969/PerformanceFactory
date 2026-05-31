@@ -13,6 +13,7 @@ import { AppModule } from '../src/app.module';
 import { OrchestratorService } from '../src/ai-orchestrator/orchestrator.service';
 import { AuthenticatedGuard } from '../src/common/guards/authenticated.guard';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { applyValidationPipe } from './utils/apply-validation-pipe';
 
 type InjectResponse = {
   statusCode: number;
@@ -85,6 +86,7 @@ describe('Admin cycle endpoints (e2e)', () => {
       new FastifyAdapter(),
     );
     app.setGlobalPrefix('api');
+    applyValidationPipe(app);
     await app.init();
 
     const fastify = app.getHttpAdapter().getInstance() as unknown as {
@@ -125,6 +127,21 @@ describe('Admin cycle endpoints (e2e)', () => {
     });
 
     expect(response.statusCode).toBe(403);
+  });
+
+  it('rejects malformed run payloads before orchestrator execution', async () => {
+    const response = await inject({
+      method: 'POST',
+      url: '/api/admin/orchestrator/run',
+      headers: {
+        'content-type': 'application/json',
+        'x-test-user-id': 'admin-1',
+        'x-test-role': UserRole.ADMIN,
+      },
+      payload: JSON.stringify({ userIds: [123] }),
+    });
+
+    expect(response.statusCode).toBe(400);
   });
 
   it('user cannot publish cycle', async () => {
