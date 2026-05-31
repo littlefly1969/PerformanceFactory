@@ -228,14 +228,18 @@ describe('Professional approvals workspace (e2e)', () => {
   let app: INestApplication;
   let inject: InjectFn;
 
+  const refreshCycleReadinessMock = jest.fn(() =>
+    Promise.resolve({
+      planReleaseId: 'plan-1',
+      cycleStatus: 'PUBLISHED',
+    }),
+  );
+  const rejectCycleProposalMock = jest.fn(() =>
+    Promise.resolve({ planReleaseId: 'plan-1', status: 'REJECTED' }),
+  );
   const orchestratorMock = {
-    refreshCycleReadiness: () =>
-      Promise.resolve({
-        planReleaseId: 'plan-1',
-        cycleStatus: 'WAITING_APPROVALS',
-      }),
-    rejectCycleProposal: () =>
-      Promise.resolve({ planReleaseId: 'plan-1', status: 'REJECTED' }),
+    refreshCycleReadiness: refreshCycleReadinessMock,
+    rejectCycleProposal: rejectCycleProposalMock,
   } as unknown as OrchestratorService;
 
   beforeAll(async () => {
@@ -333,6 +337,22 @@ describe('Professional approvals workspace (e2e)', () => {
       },
     });
     expect(approve.statusCode).toBe(403);
+  });
+
+  it('legacy plan item approval refreshes readiness with actor for direct publish', async () => {
+    refreshCycleReadinessMock.mockClear();
+
+    const approve = await inject({
+      method: 'POST',
+      url: '/api/plans/items/pi-1/approve',
+      headers: {
+        'x-test-user-id': 'pro-1',
+        'x-test-role': UserRole.PROFESSIONAL,
+      },
+    });
+
+    expect(approve.statusCode).toBe(201);
+    expect(refreshCycleReadinessMock).toHaveBeenCalledWith('plan-1', 'pro-1');
   });
 
   it('reject requires a reason', async () => {

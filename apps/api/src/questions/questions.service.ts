@@ -254,12 +254,7 @@ export class QuestionsService {
     });
   }
 
-  async approveArea(
-    actor: Actor,
-    questionSetId: string,
-    areaId: string,
-    notes?: string,
-  ) {
+  async approveArea(actor: Actor, questionSetId: string, areaId: string) {
     if (actor.role !== UserRole.PROFESSIONAL) {
       throw new ForbiddenException('Solo i professionisti possono approvare');
     }
@@ -312,10 +307,9 @@ export class QuestionsService {
       select: { planReleaseId: true },
     });
     if (questionSet?.planReleaseId) {
-      await this.orchestrator.rejectCycleProposal(
+      await this.orchestrator.refreshCycleReadiness(
         questionSet.planReleaseId,
         actor.id,
-        notes ?? 'Questionario rifiutato',
       );
     }
 

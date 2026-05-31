@@ -259,7 +259,10 @@ export class PlansService {
     });
 
     if (planItem.planReleaseId) {
-      await this.orchestrator.refreshCycleReadiness(planItem.planReleaseId);
+      await this.orchestrator.refreshCycleReadiness(
+        planItem.planReleaseId,
+        actor.id,
+      );
     }
 
     return updated;

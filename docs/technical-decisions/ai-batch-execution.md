@@ -115,7 +115,7 @@ Coprono:
 
 - generazione indipendente per area con `runAllAreas = true`;
 - generazione di una singola area senza toccare le altre;
-- pubblicazione dopo approval;
+- pubblicazione diretta dopo approval specialistica completa;
 - archiviazione piano attivo precedente;
 - blocco publish se mancano approval;
 - blocco nuova proposta se il ciclo attivo precedente non è completato;
@@ -440,7 +440,7 @@ Il DB job store deve restare fonte di verità. La coda deve essere meccanismo di
 - Non generare due pending per stesso utente/area.
 - Non indebolire controlli su utente attivo, ruolo, consenso AI e ciclo precedente.
 - Non pubblicare automaticamente una proposta generata dal job.
-- Continuare a richiedere approval professionale e publish secondo le regole attuali.
+- Continuare a richiedere approval professionale/coach; quando tutte le approval e gli item sono approvati, la readiness chiamata con l'attore specialista pubblica direttamente secondo la regola attuale.
 - Non esporre dettagli sensibili del provider negli errori UI.
 
 ## Domande aperte
@@ -454,7 +454,7 @@ Il DB job store deve restare fonte di verità. La coda deve essere meccanismo di
 - Gli audit dei fallimenti provider devono usare `AiProposalAudit` anche senza `planReleaseId`?
 - Serve una retention policy per job/item completati?
 - Quale ruolo oltre `ADMIN`, se presente, può vedere job e dettagli errore?
-- L'auto-publish da `refreshCycleReadiness` dopo approval professional è intenzionale o va separato prima di introdurre worker?
+- Nei job futuri, come propagare in modo idempotente l'auto-publish intenzionale dopo approval specialistica completa?
 
 ## Decisione proposta
 

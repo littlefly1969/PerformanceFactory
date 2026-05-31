@@ -8,9 +8,15 @@ import {
   Post,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
-import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCookieAuth,
+  ApiOperation,
+  ApiProduces,
+  ApiTags,
+} from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -28,6 +34,10 @@ import { RateEvaluationResultDto } from './dto/rate-evaluation-result.dto';
 import { TestPromptDto } from './dto/test-prompt.dto';
 
 type ActorRequest = { user?: { id: string; role: UserRole } };
+type DownloadReply = {
+  header?: (name: string, value: string) => unknown;
+  setHeader?: (name: string, value: string) => unknown;
+};
 
 @ApiTags('ai-tuning')
 @Controller('ai-tuning')
@@ -57,6 +67,30 @@ export class AiTuningController {
   @Roles(UserRole.AI_TUNER)
   getPromptSettings() {
     return this.promptAdmin.getAiSettings();
+  }
+
+  @Get('prompt-versions')
+  @ApiOperation({ summary: 'Storico immutabile versioni prompt' })
+  @Roles(UserRole.AI_TUNER)
+  listPromptVersions(
+    @Query('type') type?: string,
+    @Query('ownerId') ownerId?: string,
+  ) {
+    return this.tuning.listPromptVersions({ type, ownerId });
+  }
+
+  @Get('active-prompts/export')
+  @ApiOperation({ summary: 'Esporta prompt AI attivi in formato testo' })
+  @ApiProduces('text/plain')
+  @Roles(UserRole.AI_TUNER, UserRole.ADMIN)
+  async exportActivePrompts(@Res({ passthrough: true }) reply: DownloadReply) {
+    const exportFile = await this.tuning.exportActivePrompts();
+    const contentDisposition = `attachment; filename="${exportFile.filename}"`;
+    reply.header?.('Content-Type', 'text/plain; charset=utf-8');
+    reply.header?.('Content-Disposition', contentDisposition);
+    reply.setHeader?.('Content-Type', 'text/plain; charset=utf-8');
+    reply.setHeader?.('Content-Disposition', contentDisposition);
+    return exportFile.content;
   }
 
   @Get('audits')

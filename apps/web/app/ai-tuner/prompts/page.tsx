@@ -23,6 +23,7 @@ type AreaGenerationConfig = {
   initialContext: string;
   responseFormatPrompt: string;
   questionnaireLayoutJson: unknown;
+  version?: number;
   updatedAt?: string;
   area?: Area | null;
 };
@@ -317,6 +318,11 @@ const removeStoredDraft = (key: string) => {
 
 const makeHistoryDraftId = () => `previous-${Date.now()}`;
 
+const exportFilenameFromHeader = (header: string | null) => {
+  const match = header?.match(/filename="?([^"]+)"?/i);
+  return match?.[1] ?? "active-ai-prompts.txt";
+};
+
 export default function PromptManagementPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [mode, setMode] = useState<PromptMode>("goal");
@@ -360,6 +366,7 @@ export default function PromptManagementPage() {
   const [trainingDraftId, setTrainingDraftId] = useState<string | null>(null);
   const [activationTarget, setActivationTarget] =
     useState<ActivationTarget | null>(null);
+  const [exportConfirmOpen, setExportConfirmOpen] = useState(false);
 
   const [goalDraft, setGoalDraft] =
     useState<GoalPromptConfig>(emptyGoalPrompt);
@@ -833,7 +840,7 @@ export default function PromptManagementPage() {
           : areaConfigEditorSource === "draft" || areaConfigEditorSource === "new"
             ? undefined
             : selectedAreaConfig
-            ? 1
+            ? selectedAreaConfig.version ?? 1
             : undefined;
   const updatedAt =
     mode === "goal"
@@ -1297,6 +1304,40 @@ export default function PromptManagementPage() {
     }
   };
 
+  const confirmExportActivePrompts = async () => {
+    setBusyKey("export-active-prompts");
+    setMessage(null);
+    const response = await secureFetch(
+      `${API_BASE}/ai-tuning/active-prompts/export`,
+      {
+        method: "GET",
+        credentials: "include",
+      },
+    );
+    if (!response.ok) {
+      setMessage(`Export non riuscito: ${await readError(response)}`);
+      setBusyKey(null);
+      setExportConfirmOpen(false);
+      return;
+    }
+
+    const blob = await response.blob();
+    const filename = exportFilenameFromHeader(
+      response.headers.get("content-disposition"),
+    );
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    setBusyKey(null);
+    setExportConfirmOpen(false);
+    showSuccess("Export prompt AI attivi generato.");
+  };
+
   const saveSportPayload = async (payload: SportCatalogItem) => {
     const response = await secureFetch(`${API_BASE}/ai-tuning/sports`, {
       method: "POST",
@@ -1661,7 +1702,9 @@ export default function PromptManagementPage() {
         description:
           "Definisce la proposta operativa e il questionario prodotti per ogni area.",
         where: "Generazione consigli area",
-        version: selectedAreaConfig ? "v1" : "-",
+        version: selectedAreaConfig
+          ? `v${selectedAreaConfig.version ?? 1}`
+          : "-",
         updatedAt: formatDate(selectedAreaConfig?.updatedAt),
       };
     }
@@ -3934,9 +3977,19 @@ export default function PromptManagementPage() {
       title={pageHeader.title}
       description={pageHeader.description}
       actions={
-        <button className="pf-button-secondary" type="button" onClick={loadSettings}>
-          Aggiorna
-        </button>
+        <>
+          <button
+            className="pf-button-secondary"
+            type="button"
+            disabled={busyKey === "export-active-prompts"}
+            onClick={() => setExportConfirmOpen(true)}
+          >
+            Export prompt attivi
+          </button>
+          <button className="pf-button-secondary" type="button" onClick={loadSettings}>
+            Aggiorna
+          </button>
+        </>
       }
       backAction={promptBackAction}
     >
@@ -3986,6 +4039,42 @@ export default function PromptManagementPage() {
                   className="pf-button-secondary"
                   disabled={busyKey?.startsWith("activate-")}
                   onClick={() => setActivationTarget(null)}
+                >
+                  Annulla
+                </button>
+              </div>
+            </section>
+          </div>
+        )}
+        {exportConfirmOpen && (
+          <div className="pf-modal-backdrop" role="dialog" aria-modal="true">
+            <section className="pf-modal pf-confirm-modal">
+              <div className="pf-panel-header">
+                <div>
+                  <h2>Esportare prompt attivi?</h2>
+                  <p className="pf-muted">
+                    Il file contiene prompt AI e configurazioni correnti con
+                    valore sensibile/IP. Le versioni storiche, i log, i dati
+                    utente e i segreti non verranno esportati.
+                  </p>
+                </div>
+              </div>
+              <div className="pf-form-actions">
+                <button
+                  type="button"
+                  className="pf-button"
+                  disabled={busyKey === "export-active-prompts"}
+                  onClick={() => void confirmExportActivePrompts()}
+                >
+                  {busyKey === "export-active-prompts"
+                    ? "Export..."
+                    : "Conferma export"}
+                </button>
+                <button
+                  type="button"
+                  className="pf-button-secondary"
+                  disabled={busyKey === "export-active-prompts"}
+                  onClick={() => setExportConfirmOpen(false)}
                 >
                   Annulla
                 </button>

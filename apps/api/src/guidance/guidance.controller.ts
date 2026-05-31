@@ -24,11 +24,18 @@ import { Roles } from '../common/decorators/roles.decorator';
 
 @ApiTags('guidance')
 @Controller('guidance')
+/**
+ * @deprecated Legacy V1 guidance API backed by GuidanceContent/UserAssignment.
+ * Current V2+ flows use AI-generated plan releases, question sets and training plans.
+ */
 export class GuidanceController {
   constructor(private readonly guidance: GuidanceService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Crea contenuto guida' })
+  @ApiOperation({
+    summary: '[DEPRECATED] Crea contenuto guida legacy V1',
+    deprecated: true,
+  })
   @ApiBody({ type: CreateGuidanceDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
@@ -38,7 +45,10 @@ export class GuidanceController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Elenca contenuti guida' })
+  @ApiOperation({
+    summary: '[DEPRECATED] Elenca contenuti guida legacy V1',
+    deprecated: true,
+  })
   @ApiQuery({ name: 'areaId', required: false })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
@@ -47,7 +57,10 @@ export class GuidanceController {
   }
 
   @Post('assign')
-  @ApiOperation({ summary: 'Assegna guida a un utente' })
+  @ApiOperation({
+    summary: '[DEPRECATED] Assegna guida legacy V1 a un utente',
+    deprecated: true,
+  })
   @ApiBody({ type: AssignGuidanceDto })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)

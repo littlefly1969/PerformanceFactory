@@ -14,6 +14,8 @@ Il provider viene scelto da `AI_PROVIDER`:
 
 Ogni prompt strutturato genera anche un `promptHash`, calcolato come SHA-256 del JSON di audit costruito dal provider.
 
+I prompt amministrativi modificabili hanno anche uno storico immutabile in `AiPromptVersion`. Questo storico non sostituisce le costanti runtime del provider: conserva le modifiche ai record correnti usati da orchestrator, onboarding e AI tuner.
+
 ## Vista d'insieme
 
 | Tipologia prompt | Metodo pubblico | Versione | Chiamanti principali | Output atteso |
@@ -26,6 +28,17 @@ Ogni prompt strutturato genera anche un `promptHash`, calcolato come SHA-256 del
 | Test prompt libero | `testPrompt` | Nessuna costante dedicata | AI tuner prompt test | Testo libero generato dal provider. |
 
 Replay ed evaluation non hanno un prompt builder diverso: ricostruiscono un `CycleProposalInput` e poi riusano `generateCycleProposal`.
+
+## Versioni amministrative immutabili
+
+| Prompt modificabile | Record corrente letto dai flussi | Storico immutabile |
+| --- | --- | --- |
+| Validazione obiettivo | `AiGoalPromptConfig.basePrompt`, `version` | `AiPromptVersion` con `promptType = GOAL`. |
+| Proposta ciclo area | `AiAreaGenerationConfig.initialContext`, `responseFormatPrompt`, `questionnaireLayoutJson`, `version` | `AiPromptVersion` con `promptType = AREA_GENERATION`. |
+| Prompt area sport/specializzazione | `SportSpecializationAreaPrompt.basePrompt`, `version` | `AiPromptVersion` con `promptType = SPORT_AREA`. |
+| Allenamento specifico | `SportSpecialization.trainingPrompt`, `trainingPromptVersion` | `AiPromptVersion` con `promptType = TRAINING`. |
+
+Su ogni create/update il backend crea una nuova riga `AiPromptVersion` e aggiorna il puntatore attivo sul record corrente. Le versioni vecchie non vengono sovrascritte. La migration iniziale crea una versione 1 per i record gia presenti e collega i record alla versione attiva.
 
 ## Anatomia comune
 
@@ -54,6 +67,8 @@ Il JSON di audit viene salvato o restituito con una struttura `prompt` che inclu
 | `prompt.system` | Testo finale usato come system prompt. |
 | `prompt.user` | Oggetto task inviato come messaggio user. |
 | `prompt.responseJsonSchema` | Schema atteso, quando presente. |
+
+Quando disponibili, i blocchi `guidance` includono anche la versione amministrativa e l'identificativo della versione attiva usata come fonte del prompt corrente. Gli audit storici precedenti alla migration restano ricostruibili dal loro `inputJson`, ma non sono retro-collegati a una riga `AiPromptVersion`.
 
 Se `AI_DEBUG_PROMPT_LOG=true`, il servizio logga provider, modello e blocco `prompt` dell'input audit.
 
@@ -364,6 +379,22 @@ sequenceDiagram
   end
   Caller->>DB: Salva audit/output se previsto dal flusso
 ```
+
+## Export prompt attivi
+
+L'endpoint `GET /ai-tuning/active-prompts/export` genera on demand un file `text/plain` scaricabile dalla UI AI tuner. L'endpoint e read-only, richiede autenticazione e ruolo `ADMIN` o `AI_TUNER`, e non scrive file persistenti sul server.
+
+L'export include solo configurazioni correnti e attive:
+
+| Dominio | Fonte |
+| --- | --- |
+| Prompt obiettivo/onboarding | `AiGoalPromptConfig` attivi. |
+| Config generazione area | `AiAreaGenerationConfig` correnti. |
+| Prompt sport-specializzazione-area | `SportSpecializationAreaPrompt` attivi sotto sport/specializzazioni attivi. |
+| Prompt training | `SportSpecialization.trainingPrompt` quando attivo. |
+| Template onboarding | `OnboardingQuestionTemplate` attivi, come configurazione corrente di raccolta contesto. |
+
+Non esporta versioni storiche, audit, replay, evaluation, cost log, dati utente, sessioni, variabili ambiente, segreti o risposte raw provider. Se il puntatore `activePromptVersionId` o `activeTrainingPromptVersionId` manca, l'export usa il campo operativo corrente e segnala il warning nel file.
 
 ## Persistenza e tracciabilita
 

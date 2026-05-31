@@ -119,6 +119,174 @@ export class AdminService {
     private readonly orchestrator: OrchestratorService,
   ) {}
 
+  private goalPromptVersionContent(config: {
+    name: string;
+    basePrompt: string;
+    isActive: boolean;
+  }): Prisma.InputJsonObject {
+    return {
+      name: config.name,
+      basePrompt: config.basePrompt,
+      isActive: config.isActive,
+    };
+  }
+
+  private areaGenerationVersionContent(config: {
+    areaId: string;
+    initialContext: string;
+    responseFormatPrompt: string;
+    questionnaireLayoutJson: unknown;
+  }): Prisma.InputJsonObject {
+    return {
+      areaId: config.areaId,
+      initialContext: config.initialContext,
+      responseFormatPrompt: config.responseFormatPrompt,
+      questionnaireLayoutJson:
+        config.questionnaireLayoutJson as Prisma.InputJsonValue,
+    };
+  }
+
+  private sportAreaPromptVersionContent(prompt: {
+    specializationId: string;
+    areaId: string;
+    basePrompt: string;
+    isEnabledDriver: boolean;
+    isActive: boolean;
+  }): Prisma.InputJsonObject {
+    return {
+      specializationId: prompt.specializationId,
+      areaId: prompt.areaId,
+      basePrompt: prompt.basePrompt,
+      isEnabledDriver: prompt.isEnabledDriver,
+      isActive: prompt.isActive,
+    };
+  }
+
+  private trainingPromptVersionContent(specialization: {
+    id: string;
+    trainingPrompt: string | null;
+    trainingPromptActive: boolean;
+  }): Prisma.InputJsonObject {
+    return {
+      specializationId: specialization.id,
+      trainingPrompt: specialization.trainingPrompt,
+      trainingPromptActive: specialization.trainingPromptActive,
+    };
+  }
+
+  private async createGoalPromptVersion(
+    tx: Prisma.TransactionClient,
+    config: {
+      id: string;
+      name: string;
+      basePrompt: string;
+      version: number;
+      isActive: boolean;
+    },
+    actorId: string | null,
+  ) {
+    const version = await tx.aiPromptVersion.create({
+      data: {
+        promptType: 'GOAL',
+        version: config.version,
+        contentJson: this.goalPromptVersionContent(config),
+        goalPromptConfigId: config.id,
+        createdById: actorId,
+      },
+      select: { id: true },
+    });
+    return tx.aiGoalPromptConfig.update({
+      where: { id: config.id },
+      data: { activePromptVersionId: version.id },
+    });
+  }
+
+  private async createAreaGenerationPromptVersion(
+    tx: Prisma.TransactionClient,
+    config: {
+      id: string;
+      areaId: string;
+      initialContext: string;
+      responseFormatPrompt: string;
+      questionnaireLayoutJson: unknown;
+      version: number;
+    },
+    actorId: string | null,
+  ) {
+    const version = await tx.aiPromptVersion.create({
+      data: {
+        promptType: 'AREA_GENERATION',
+        version: config.version,
+        contentJson: this.areaGenerationVersionContent(config),
+        areaGenerationConfigId: config.id,
+        createdById: actorId,
+      },
+      select: { id: true },
+    });
+    return tx.aiAreaGenerationConfig.update({
+      where: { id: config.id },
+      data: { activePromptVersionId: version.id },
+    });
+  }
+
+  private async createSportAreaPromptVersion(
+    tx: Prisma.TransactionClient,
+    prompt: {
+      id: string;
+      specializationId: string;
+      areaId: string;
+      basePrompt: string;
+      version: number;
+      isEnabledDriver: boolean;
+      isActive: boolean;
+    },
+    actorId: string | null,
+  ) {
+    const version = await tx.aiPromptVersion.create({
+      data: {
+        promptType: 'SPORT_AREA',
+        version: prompt.version,
+        contentJson: this.sportAreaPromptVersionContent(prompt),
+        sportSpecializationAreaPromptId: prompt.id,
+        createdById: actorId,
+      },
+      select: { id: true },
+    });
+    return tx.sportSpecializationAreaPrompt.update({
+      where: { id: prompt.id },
+      data: { activePromptVersionId: version.id },
+    });
+  }
+
+  private async createTrainingPromptVersion(
+    tx: Prisma.TransactionClient,
+    specialization: {
+      id: string;
+      trainingPrompt: string | null;
+      trainingPromptVersion: number;
+      trainingPromptActive: boolean;
+    },
+    actorId: string | null,
+  ) {
+    if (!specialization.trainingPrompt) {
+      return specialization;
+    }
+    const version = await tx.aiPromptVersion.create({
+      data: {
+        promptType: 'TRAINING',
+        version: specialization.trainingPromptVersion,
+        contentJson: this.trainingPromptVersionContent(specialization),
+        sportSpecializationId: specialization.id,
+        createdById: actorId,
+      },
+      select: { id: true },
+    });
+    return tx.sportSpecialization.update({
+      where: { id: specialization.id },
+      data: { activeTrainingPromptVersionId: version.id },
+    });
+  }
+
   async getDashboard() {
     const [
       users,
@@ -1129,6 +1297,10 @@ export class AdminService {
           basePrompt: true,
           version: true,
           isActive: true,
+          activePromptVersionId: true,
+          activePromptVersion: {
+            select: { id: true, version: true, createdAt: true },
+          },
           createdAt: true,
           updatedAt: true,
         },
@@ -1141,6 +1313,10 @@ export class AdminService {
           basePrompt: true,
           version: true,
           isActive: true,
+          activePromptVersionId: true,
+          activePromptVersion: {
+            select: { id: true, version: true, createdAt: true },
+          },
           createdAt: true,
           updatedAt: true,
         },
@@ -1153,6 +1329,11 @@ export class AdminService {
           initialContext: true,
           responseFormatPrompt: true,
           questionnaireLayoutJson: true,
+          version: true,
+          activePromptVersionId: true,
+          activePromptVersion: {
+            select: { id: true, version: true, createdAt: true },
+          },
           updatedAt: true,
           area: { select: { id: true, name: true } },
         },
@@ -1172,6 +1353,10 @@ export class AdminService {
               trainingPrompt: true,
               trainingPromptVersion: true,
               trainingPromptActive: true,
+              activeTrainingPromptVersionId: true,
+              activeTrainingPromptVersion: {
+                select: { id: true, version: true, createdAt: true },
+              },
               isActive: true,
               updatedAt: true,
               prompts: {
@@ -1182,6 +1367,10 @@ export class AdminService {
                   isEnabledDriver: true,
                   version: true,
                   isActive: true,
+                  activePromptVersionId: true,
+                  activePromptVersion: {
+                    select: { id: true, version: true, createdAt: true },
+                  },
                   updatedAt: true,
                   area: { select: { id: true, name: true } },
                 },
@@ -1230,28 +1419,57 @@ export class AdminService {
       return;
     }
 
-    await this.prisma.aiAreaGenerationConfig.createMany({
-      data: areaIds.map((areaId) => ({
-        id: `area-generation-config-${areaId}`,
-        areaId,
-        initialContext: DEFAULT_INITIAL_CONTEXT,
-        responseFormatPrompt: DEFAULT_RESPONSE_FORMAT_PROMPT,
-        questionnaireLayoutJson: DEFAULT_QUESTIONNAIRE_LAYOUT_JSON,
-      })),
-      skipDuplicates: true,
+    await this.prisma.$transaction(async (tx) => {
+      for (const areaId of areaIds) {
+        const existing = await tx.aiAreaGenerationConfig.findUnique({
+          where: { areaId },
+          select: { id: true, activePromptVersionId: true },
+        });
+        if (existing) {
+          continue;
+        }
+        const config = await tx.aiAreaGenerationConfig.create({
+          data: {
+            id: `area-generation-config-${areaId}`,
+            areaId,
+            initialContext: DEFAULT_INITIAL_CONTEXT,
+            responseFormatPrompt: DEFAULT_RESPONSE_FORMAT_PROMPT,
+            questionnaireLayoutJson: DEFAULT_QUESTIONNAIRE_LAYOUT_JSON,
+          },
+        });
+        await this.createAreaGenerationPromptVersion(tx, config, null);
+      }
+
+      const missingHistory = await tx.aiAreaGenerationConfig.findMany({
+        where: {
+          areaId: { in: areaIds },
+          activePromptVersionId: null,
+        },
+      });
+      for (const config of missingHistory) {
+        await this.createAreaGenerationPromptVersion(tx, config, null);
+      }
     });
   }
 
   private async ensureGoalPromptConfig() {
-    await this.prisma.aiGoalPromptConfig.upsert({
-      where: { id: 'goal-prompt-default' },
-      update: {},
-      create: {
-        id: 'goal-prompt-default',
-        name: 'obiettivo',
-        basePrompt: DEFAULT_GOAL_PROMPT,
-        isActive: true,
-      },
+    await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.aiGoalPromptConfig.findUnique({
+        where: { id: 'goal-prompt-default' },
+      });
+      const config =
+        existing ??
+        (await tx.aiGoalPromptConfig.create({
+          data: {
+            id: 'goal-prompt-default',
+            name: 'obiettivo',
+            basePrompt: DEFAULT_GOAL_PROMPT,
+            isActive: true,
+          },
+        }));
+      if (!config.activePromptVersionId) {
+        await this.createGoalPromptVersion(tx, config, null);
+      }
     });
   }
 
@@ -1290,6 +1508,30 @@ export class AdminService {
         skipDuplicates: true,
       });
     }
+    await this.prisma.$transaction(async (tx) => {
+      const trainingPrompts = await tx.sportSpecialization.findMany({
+        where: {
+          trainingPrompt: { not: null },
+          activeTrainingPromptVersionId: null,
+        },
+        select: {
+          id: true,
+          trainingPrompt: true,
+          trainingPromptVersion: true,
+          trainingPromptActive: true,
+        },
+      });
+      for (const specialization of trainingPrompts) {
+        await this.createTrainingPromptVersion(tx, specialization, null);
+      }
+
+      const areaPrompts = await tx.sportSpecializationAreaPrompt.findMany({
+        where: { activePromptVersionId: null },
+      });
+      for (const prompt of areaPrompts) {
+        await this.createSportAreaPromptVersion(tx, prompt, null);
+      }
+    });
   }
 
   private defaultSportSpecializationAreaPrompt(
@@ -1342,12 +1584,22 @@ export class AdminService {
 
       return this.prisma.$transaction(async (tx) => {
         if (isActive) {
-          await tx.aiGoalPromptConfig.updateMany({
+          const activeConfigs = await tx.aiGoalPromptConfig.findMany({
             where: { isActive: true, id: { not: body.id } },
-            data: { isActive: false },
           });
+          for (const activeConfig of activeConfigs) {
+            const deactivated = await tx.aiGoalPromptConfig.update({
+              where: { id: activeConfig.id },
+              data: {
+                isActive: false,
+                version: { increment: 1 },
+                updatedById: actorId,
+              },
+            });
+            await this.createGoalPromptVersion(tx, deactivated, actorId);
+          }
         }
-        return tx.aiGoalPromptConfig.update({
+        const updated = await tx.aiGoalPromptConfig.update({
           where: { id: body.id },
           data: {
             name,
@@ -1357,17 +1609,28 @@ export class AdminService {
             updatedById: actorId,
           },
         });
+        return this.createGoalPromptVersion(tx, updated, actorId);
       });
     }
 
     return this.prisma.$transaction(async (tx) => {
       if (isActive) {
-        await tx.aiGoalPromptConfig.updateMany({
+        const activeConfigs = await tx.aiGoalPromptConfig.findMany({
           where: { isActive: true },
-          data: { isActive: false },
         });
+        for (const activeConfig of activeConfigs) {
+          const deactivated = await tx.aiGoalPromptConfig.update({
+            where: { id: activeConfig.id },
+            data: {
+              isActive: false,
+              version: { increment: 1 },
+              updatedById: actorId,
+            },
+          });
+          await this.createGoalPromptVersion(tx, deactivated, actorId);
+        }
       }
-      return tx.aiGoalPromptConfig.create({
+      const created = await tx.aiGoalPromptConfig.create({
         data: {
           name,
           basePrompt,
@@ -1376,6 +1639,7 @@ export class AdminService {
           updatedById: actorId,
         },
       });
+      return this.createGoalPromptVersion(tx, created, actorId);
     });
   }
 
@@ -1477,7 +1741,13 @@ export class AdminService {
                   specializationInput.trainingPromptActive ?? true,
                 isActive: specializationInput.isActive ?? true,
               },
-              select: { id: true, label: true },
+              select: {
+                id: true,
+                label: true,
+                trainingPrompt: true,
+                trainingPromptVersion: true,
+                trainingPromptActive: true,
+              },
             })
           : await tx.sportSpecialization.create({
               data: {
@@ -1493,8 +1763,17 @@ export class AdminService {
                   specializationInput.trainingPromptActive ?? true,
                 isActive: specializationInput.isActive ?? true,
               },
-              select: { id: true, label: true },
+              select: {
+                id: true,
+                label: true,
+                trainingPrompt: true,
+                trainingPromptVersion: true,
+                trainingPromptActive: true,
+              },
             });
+        if (!specializationInput.id || hasTrainingPrompt) {
+          await this.createTrainingPromptVersion(tx, specialization, actorId);
+        }
 
         const prompts = specializationInput.prompts ?? [];
         for (const prompt of prompts) {
@@ -1503,7 +1782,7 @@ export class AdminService {
           if (!areaId || !areaIds.has(areaId) || !basePrompt) {
             continue;
           }
-          await tx.sportSpecializationAreaPrompt.upsert({
+          const savedPrompt = await tx.sportSpecializationAreaPrompt.upsert({
             where: {
               specializationId_areaId: {
                 specializationId: specialization.id,
@@ -1527,10 +1806,11 @@ export class AdminService {
               updatedById: actorId,
             },
           });
+          await this.createSportAreaPromptVersion(tx, savedPrompt, actorId);
         }
 
         for (const area of areas) {
-          await tx.sportSpecializationAreaPrompt.upsert({
+          const savedPrompt = await tx.sportSpecializationAreaPrompt.upsert({
             where: {
               specializationId_areaId: {
                 specializationId: specialization.id,
@@ -1550,6 +1830,9 @@ export class AdminService {
               updatedById: actorId,
             },
           });
+          if (!savedPrompt.activePromptVersionId) {
+            await this.createSportAreaPromptVersion(tx, savedPrompt, actorId);
+          }
         }
       }
 
@@ -1625,24 +1908,28 @@ export class AdminService {
       }
     }
 
-    return this.prisma.aiAreaGenerationConfig.upsert({
-      where: { areaId },
-      update: {
-        initialContext,
-        responseFormatPrompt,
-        questionnaireLayoutJson:
-          body.questionnaireLayoutJson as Prisma.InputJsonValue,
-        updatedById: actorId,
-      },
-      create: {
-        areaId,
-        initialContext,
-        responseFormatPrompt,
-        questionnaireLayoutJson:
-          body.questionnaireLayoutJson as Prisma.InputJsonValue,
-        createdById: actorId,
-        updatedById: actorId,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const config = await tx.aiAreaGenerationConfig.upsert({
+        where: { areaId },
+        update: {
+          initialContext,
+          responseFormatPrompt,
+          questionnaireLayoutJson:
+            body.questionnaireLayoutJson as Prisma.InputJsonValue,
+          version: { increment: 1 },
+          updatedById: actorId,
+        },
+        create: {
+          areaId,
+          initialContext,
+          responseFormatPrompt,
+          questionnaireLayoutJson:
+            body.questionnaireLayoutJson as Prisma.InputJsonValue,
+          createdById: actorId,
+          updatedById: actorId,
+        },
+      });
+      return this.createAreaGenerationPromptVersion(tx, config, actorId);
     });
   }
 

@@ -15,6 +15,10 @@ type Actor = {
 };
 
 @Injectable()
+/**
+ * @deprecated Legacy V1 guidance service. Do not use for new product flows.
+ * Keep only for existing API/data compatibility until a removal migration is planned.
+ */
 export class GuidanceService {
   constructor(
     private readonly prisma: PrismaService,

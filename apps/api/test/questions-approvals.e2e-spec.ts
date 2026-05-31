@@ -63,12 +63,14 @@ const makePrismaMock = () => {
       userId: 'user-2',
       areaId: 'area-1',
       status: 'PENDING_APPROVAL',
+      planReleaseId: 'plan-1',
     },
     {
       id: 'set-published',
       userId: 'user-1',
       areaId: 'area-1',
       status: 'PUBLISHED',
+      planReleaseId: 'plan-published',
     },
   ];
 
@@ -79,6 +81,7 @@ const makePrismaMock = () => {
       areaId: 'area-1',
       professionalId: 'pro-1',
       status: 'PENDING',
+      questionSet: { status: 'PENDING_APPROVAL' },
     },
     {
       id: 'approval-2',
@@ -86,6 +89,7 @@ const makePrismaMock = () => {
       areaId: 'area-2',
       professionalId: 'pro-2',
       status: 'PENDING',
+      questionSet: { status: 'PENDING_APPROVAL' },
     },
   ];
 
@@ -169,16 +173,20 @@ const makePrismaMock = () => {
 describe('Question approvals + visibility (e2e)', () => {
   let app: INestApplication;
   let inject: InjectFn;
+  const refreshCycleReadinessMock = jest.fn(() =>
+    Promise.resolve({
+      planReleaseId: 'plan-1',
+      cycleStatus: 'PUBLISHED',
+    }),
+  );
+  const rejectCycleProposalMock = jest.fn(() =>
+    Promise.resolve({ planReleaseId: 'plan-1', status: 'REJECTED' }),
+  );
   const orchestratorMock = {
     createSnapshotFromQuestionSet: () =>
       Promise.resolve({ snapshotId: 'snap-1' }),
-    refreshCycleReadiness: () =>
-      Promise.resolve({
-        planReleaseId: 'plan-1',
-        cycleStatus: 'WAITING_APPROVALS',
-      }),
-    rejectCycleProposal: () =>
-      Promise.resolve({ planReleaseId: 'plan-1', status: 'REJECTED' }),
+    refreshCycleReadiness: refreshCycleReadinessMock,
+    rejectCycleProposal: rejectCycleProposalMock,
   } as unknown as OrchestratorService;
 
   beforeAll(async () => {
@@ -236,6 +244,23 @@ describe('Question approvals + visibility (e2e)', () => {
     });
 
     expect(response.statusCode).toBe(403);
+  });
+
+  it('professional approval refreshes readiness with actor for direct publish', async () => {
+    const response = await inject({
+      method: 'POST',
+      url: '/api/questions/set-pending/areas/area-1/approve',
+      headers: {
+        'content-type': 'application/json',
+        'x-test-user-id': 'pro-1',
+        'x-test-role': UserRole.PROFESSIONAL,
+      },
+      payload: JSON.stringify({ notes: 'ok' }),
+    });
+
+    expect(response.statusCode).toBe(201);
+    expect(refreshCycleReadinessMock).toHaveBeenCalledWith('plan-1', 'pro-1');
+    expect(rejectCycleProposalMock).not.toHaveBeenCalled();
   });
 
   it('close is allowed only for PUBLISHED question set', async () => {

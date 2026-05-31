@@ -104,13 +104,11 @@ export class QuestionsController {
     @Req() req: { user?: { id: string; role: UserRole } },
     @Param('setId') setId: string,
     @Param('areaId') areaId: string,
-    @Body() body: AreaApprovalDto,
   ) {
     return this.questions.approveArea(
       { id: req.user?.id ?? '', role: req.user?.role ?? UserRole.USER },
       setId,
       areaId,
-      body.notes,
     );
   }
 

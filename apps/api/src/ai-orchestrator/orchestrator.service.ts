@@ -915,6 +915,9 @@ export class OrchestratorService {
             answerOptions: DEFAULT_TRAINING_ANSWER_OPTIONS,
           },
         },
+        version: trainingPromptInstruction.trainingPromptVersion,
+        activePromptVersionId:
+          trainingPromptInstruction.activeTrainingPromptVersionId,
       },
       userAreaPromptInstruction: goal
         ? {
@@ -1064,6 +1067,9 @@ export class OrchestratorService {
                 input.areaGenerationConfig.responseFormatPrompt,
               questionnaireLayoutJson:
                 input.areaGenerationConfig.questionnaireLayoutJson,
+              version: input.areaGenerationConfig.version,
+              activePromptVersionId:
+                input.areaGenerationConfig.activePromptVersionId,
             }
           : null,
         userAreaPromptInstruction: input.userAreaPromptInstruction
@@ -1085,6 +1091,9 @@ export class OrchestratorService {
                     .label,
                 areaName: input.sportSpecializationPromptInstruction.area.name,
                 version: input.sportSpecializationPromptInstruction.version,
+                activePromptVersionId:
+                  input.sportSpecializationPromptInstruction
+                    .activePromptVersionId,
                 updatedAt:
                   input.sportSpecializationPromptInstruction.updatedAt.toISOString(),
                 basePrompt:
@@ -1096,6 +1105,8 @@ export class OrchestratorService {
               sportLabel: input.trainingPromptInstruction.sport.label,
               specializationLabel: input.trainingPromptInstruction.label,
               version: input.trainingPromptInstruction.trainingPromptVersion,
+              activePromptVersionId:
+                input.trainingPromptInstruction.activeTrainingPromptVersionId,
               updatedAt:
                 input.trainingPromptInstruction.updatedAt.toISOString(),
               basePrompt: input.trainingPromptInstruction.trainingPrompt,
@@ -1257,6 +1268,8 @@ export class OrchestratorService {
         initialContext: true,
         responseFormatPrompt: true,
         questionnaireLayoutJson: true,
+        version: true,
+        activePromptVersionId: true,
       },
     });
   }
@@ -1283,6 +1296,7 @@ export class OrchestratorService {
         select: {
           basePrompt: true,
           version: true,
+          activePromptVersionId: true,
           updatedAt: true,
           isActive: true,
           isEnabledDriver: true,
@@ -1316,6 +1330,7 @@ export class OrchestratorService {
           label: true,
           trainingPrompt: true,
           trainingPromptVersion: true,
+          activeTrainingPromptVersionId: true,
           trainingPromptActive: true,
           updatedAt: true,
           sport: { select: { label: true } },

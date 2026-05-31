@@ -95,6 +95,8 @@ export type AiCycleContext = {
       initialContext: string;
       responseFormatPrompt: string;
       questionnaireLayoutJson: unknown;
+      version?: number;
+      activePromptVersionId?: string | null;
     } | null;
     userAreaPromptInstruction: {
       promptVersion: string;
@@ -106,6 +108,7 @@ export type AiCycleContext = {
       specializationLabel: string;
       areaName: string;
       version: number;
+      activePromptVersionId?: string | null;
       updatedAt: string;
       basePrompt: string;
     } | null;
@@ -113,6 +116,7 @@ export type AiCycleContext = {
       sportLabel: string;
       specializationLabel: string;
       version: number;
+      activePromptVersionId?: string | null;
       updatedAt: string;
       basePrompt: string;
     } | null;

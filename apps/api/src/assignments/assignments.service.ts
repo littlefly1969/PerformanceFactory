@@ -7,6 +7,10 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
+/**
+ * @deprecated Legacy V1 assignment service. Do not use for new product flows.
+ * Keep only for existing API/data compatibility until a removal migration is planned.
+ */
 export class AssignmentsService {
   constructor(private readonly prisma: PrismaService) {}
 

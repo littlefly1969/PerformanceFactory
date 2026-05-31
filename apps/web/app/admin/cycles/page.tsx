@@ -264,6 +264,11 @@ const formatStatus = (status: string) =>
     WAITING_PROFESSIONAL_APPROVAL: "in attesa professionista",
   })[status] ?? status.replace(/_/g, " ").toLowerCase();
 
+const exportFilenameFromHeader = (header: string | null) => {
+  const match = header?.match(/filename="?([^"]+)"?/i);
+  return match?.[1] ?? "active-ai-prompts.txt";
+};
+
 export default function AdminCyclesPage() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
   const [loading, setLoading] = useState(false);
@@ -285,6 +290,7 @@ export default function AdminCyclesPage() {
   const [coachAssignmentTarget, setCoachAssignmentTarget] =
     useState<CoachAssignmentTarget | null>(null);
   const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
+  const [exportConfirmOpen, setExportConfirmOpen] = useState(false);
   const [professionalFilter, setProfessionalFilter] = useState("");
   const [coachFilter, setCoachFilter] = useState("");
 
@@ -760,6 +766,40 @@ export default function AdminCyclesPage() {
     setBusyKey(null);
   };
 
+  const confirmExportActivePrompts = async () => {
+    setBusyKey("export-active-prompts");
+    setMessage(null);
+    const response = await secureFetch(
+      `${API_BASE}/ai-tuning/active-prompts/export`,
+      {
+        method: "GET",
+        credentials: "include",
+      },
+    );
+    if (!response.ok) {
+      setMessage(`Export prompt AI non riuscito: ${await readError(response)}`);
+      setBusyKey(null);
+      setExportConfirmOpen(false);
+      return;
+    }
+
+    const blob = await response.blob();
+    const filename = exportFilenameFromHeader(
+      response.headers.get("content-disposition"),
+    );
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    setMessage("Export prompt AI attivi generato.");
+    setBusyKey(null);
+    setExportConfirmOpen(false);
+  };
+
   const setAthleteActive = async (athleteId: string, active: boolean) => {
     setBusyKey(`active:${athleteId}`);
     setMessage(null);
@@ -834,6 +874,14 @@ export default function AdminCyclesPage() {
       description="Assegna un professionista per area atleta, genera cicli AI quando gli atleti sono pronti, traccia le approvazioni e pubblica senza copiare ID."
       actions={
         <>
+          <button
+            className="pf-button-secondary"
+            type="button"
+            onClick={() => setExportConfirmOpen(true)}
+            disabled={busyKey === "export-active-prompts"}
+          >
+            Export prompt AI
+          </button>
           <button
             className="pf-button-secondary"
             type="button"
@@ -1595,6 +1643,43 @@ export default function AdminCyclesPage() {
                 type="button"
                 disabled={busyKey === `reset:${resetTarget.athlete.id}`}
                 onClick={() => setResetTarget(null)}
+              >
+                Annulla
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {exportConfirmOpen && (
+        <div className="pf-modal-backdrop" role="dialog" aria-modal="true">
+          <section className="pf-modal">
+            <div className="pf-panel-header">
+              <div>
+                <h2>Esportare prompt AI attivi?</h2>
+                <p className="pf-muted">
+                  Il file contiene prompt AI e configurazioni correnti con
+                  valore sensibile/IP. Non include versioni storiche, log, dati
+                  utente, sessioni o segreti.
+                </p>
+              </div>
+            </div>
+            <div className="pf-actions">
+              <button
+                className="pf-button"
+                type="button"
+                disabled={busyKey === "export-active-prompts"}
+                onClick={() => void confirmExportActivePrompts()}
+              >
+                {busyKey === "export-active-prompts"
+                  ? "Export..."
+                  : "Conferma export"}
+              </button>
+              <button
+                className="pf-button-secondary"
+                type="button"
+                disabled={busyKey === "export-active-prompts"}
+                onClick={() => setExportConfirmOpen(false)}
               >
                 Annulla
               </button>

@@ -107,6 +107,7 @@ model User {
   updatedGoalPromptConfigs    AiGoalPromptConfig[]         @relation("AiGoalPromptConfigUpdatedBy")
   createdSportSpecializationPrompts SportSpecializationAreaPrompt[] @relation("SportSpecializationPromptCreatedBy")
   updatedSportSpecializationPrompts SportSpecializationAreaPrompt[] @relation("SportSpecializationPromptUpdatedBy")
+  createdAiPromptVersions      AiPromptVersion[]            @relation("AiPromptVersionCreatedBy")
   createdAiPromptReplays      AiPromptReplay[]             @relation("AiPromptReplayCreatedBy")
   createdAiGoldenContexts     AiGoldenContext[]            @relation("AiGoldenContextCreatedBy")
   createdAiEvaluationRuns     AiEvaluationRun[]            @relation("AiEvaluationRunCreatedBy")
@@ -189,6 +190,7 @@ model AiGoalPromptConfig {
   basePrompt  String
   version     Int      @default(1)
   isActive    Boolean  @default(true)
+  activePromptVersionId String? @unique
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   createdById String?
@@ -196,6 +198,8 @@ model AiGoalPromptConfig {
 
   createdBy User? @relation("AiGoalPromptConfigCreatedBy", fields: [createdById], references: [id])
   updatedBy User? @relation("AiGoalPromptConfigUpdatedBy", fields: [updatedById], references: [id])
+  activePromptVersion AiPromptVersion? @relation("AiGoalPromptConfigActiveVersion", fields: [activePromptVersionId], references: [id])
+  promptVersions AiPromptVersion[] @relation("AiGoalPromptConfigVersions")
 
   @@index([isActive, version])
 }
@@ -254,6 +258,8 @@ model AiAreaGenerationConfig {
   initialContext          String
   responseFormatPrompt    String
   questionnaireLayoutJson Json
+  version                 Int      @default(1)
+  activePromptVersionId   String?  @unique
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
   createdById             String?
@@ -262,6 +268,8 @@ model AiAreaGenerationConfig {
   area      Area  @relation(fields: [areaId], references: [id], onDelete: Cascade)
   createdBy User? @relation("AiAreaGenerationConfigCreatedBy", fields: [createdById], references: [id])
   updatedBy User? @relation("AiAreaGenerationConfigUpdatedBy", fields: [updatedById], references: [id])
+  activePromptVersion AiPromptVersion? @relation("AiAreaGenerationConfigActiveVersion", fields: [activePromptVersionId], references: [id])
+  promptVersions AiPromptVersion[] @relation("AiAreaGenerationConfigVersions")
   replays   AiPromptReplay[]     @relation("AiPromptReplayAreaConfig")
   evalResults AiEvaluationResult[] @relation("AiEvaluationResultAreaConfig")
 }
@@ -286,12 +294,15 @@ model SportSpecialization {
   trainingPrompt        String?
   trainingPromptVersion Int      @default(1)
   trainingPromptActive  Boolean  @default(true)
+  activeTrainingPromptVersionId String? @unique
   isActive              Boolean  @default(true)
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
   sport      Sport                           @relation(fields: [sportId], references: [id], onDelete: Cascade)
   prompts    SportSpecializationAreaPrompt[]
+  activeTrainingPromptVersion AiPromptVersion? @relation("SportSpecializationActiveTrainingPromptVersion", fields: [activeTrainingPromptVersionId], references: [id])
+  trainingPromptVersions AiPromptVersion[] @relation("SportSpecializationTrainingPromptVersions")
   selections UserSportSelection[]
   coachCompetences CoachSpecializationCompetence[]
   coachLinks        CoachUserLink[]
@@ -310,6 +321,7 @@ model SportSpecializationAreaPrompt {
   isEnabledDriver  Boolean  @default(true)
   version          Int      @default(1)
   isActive         Boolean  @default(true)
+  activePromptVersionId String? @unique
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   createdById      String?
@@ -319,10 +331,42 @@ model SportSpecializationAreaPrompt {
   area           Area                @relation(fields: [areaId], references: [id], onDelete: Cascade)
   createdBy      User?               @relation("SportSpecializationPromptCreatedBy", fields: [createdById], references: [id])
   updatedBy      User?               @relation("SportSpecializationPromptUpdatedBy", fields: [updatedById], references: [id])
+  activePromptVersion AiPromptVersion? @relation("SportSpecializationAreaPromptActiveVersion", fields: [activePromptVersionId], references: [id])
+  promptVersions AiPromptVersion[] @relation("SportSpecializationAreaPromptVersions")
 
   @@unique([specializationId, areaId])
   @@index([specializationId, isActive])
   @@index([areaId])
+}
+
+model AiPromptVersion {
+  id                              String   @id @default(uuid())
+  promptType                      String
+  version                         Int
+  contentJson                     Json
+  createdAt                       DateTime @default(now())
+  createdById                     String?
+  goalPromptConfigId              String?
+  areaGenerationConfigId          String?
+  sportSpecializationAreaPromptId String?
+  sportSpecializationId           String?
+
+  createdBy User? @relation("AiPromptVersionCreatedBy", fields: [createdById], references: [id])
+  goalPromptConfig AiGoalPromptConfig? @relation("AiGoalPromptConfigVersions", fields: [goalPromptConfigId], references: [id], onDelete: Cascade)
+  activeForGoalPromptConfig AiGoalPromptConfig? @relation("AiGoalPromptConfigActiveVersion")
+  areaGenerationConfig AiAreaGenerationConfig? @relation("AiAreaGenerationConfigVersions", fields: [areaGenerationConfigId], references: [id], onDelete: Cascade)
+  activeForAreaGenerationConfig AiAreaGenerationConfig? @relation("AiAreaGenerationConfigActiveVersion")
+  sportSpecializationAreaPrompt SportSpecializationAreaPrompt? @relation("SportSpecializationAreaPromptVersions", fields: [sportSpecializationAreaPromptId], references: [id], onDelete: Cascade)
+  activeForSportSpecializationAreaPrompt SportSpecializationAreaPrompt? @relation("SportSpecializationAreaPromptActiveVersion")
+  sportSpecialization SportSpecialization? @relation("SportSpecializationTrainingPromptVersions", fields: [sportSpecializationId], references: [id], onDelete: Cascade)
+  activeForSportSpecializationTrainingPrompt SportSpecialization? @relation("SportSpecializationActiveTrainingPromptVersion")
+
+  @@unique([goalPromptConfigId, version])
+  @@unique([areaGenerationConfigId, version])
+  @@unique([sportSpecializationAreaPromptId, version])
+  @@unique([sportSpecializationId, version])
+  @@index([promptType, createdAt])
+  @@index([createdById, createdAt])
 }
 
 model UserAreaPromptInstruction {

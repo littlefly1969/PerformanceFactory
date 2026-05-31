@@ -126,15 +126,16 @@ Prompt effettivo:
 - Contesto iniziale per area da `AiAreaGenerationConfig.initialContext`.
 - Forma risposta da `AiAreaGenerationConfig.responseFormatPrompt`.
 - Layout JSON questionari da `AiAreaGenerationConfig.questionnaireLayoutJson`.
-- Prompt admin attivi da `AiPromptConfig`.
+- Prompt obiettivo attivo da `AiGoalPromptConfig`.
+- Versioni amministrative immutabili da `AiPromptVersion`.
 - Una sola configurazione `AiAreaGenerationConfig` per area; la migrazione crea lo stesso default iniziale per tutte le aree esistenti.
-- Il nome del prompt e' univoco.
-- Puo' esistere un solo prompt attivo per coppia area/livello; quando ne viene attivato uno nuovo, gli altri della stessa coppia vengono disattivati.
-- Modificare testo o stato attivo aggiorna il prompt selezionato.
-- Modificare nome, area o livello crea un nuovo prompt.
+- Il nome del prompt obiettivo e' univoco.
+- Le configurazioni area, sport/specializzazione e training mantengono un record corrente e uno storico immutabile.
+- Modificare testo o stato attivo aggiorna il record corrente e crea una nuova `AiPromptVersion`.
 - Selezione prompt per:
-  - globale o area specifica;
-  - livello atleta (`BASELINE`, `STABLE`, `ADVANCED`);
+  - area specifica tramite `AiAreaGenerationConfig`;
+  - obiettivo utente tramite `AiGoalPromptConfig`;
+  - sport/specializzazione tramite `SportSpecializationAreaPrompt`;
   - versione attiva.
 - Contesto atleta passato al modello, senza UUID o campi tecnici inutili:
   - anamnesi generale di onboarding;
@@ -201,7 +202,8 @@ Onboarding e prompt:
 
 - `UserOnboardingAssessment`
 - `OnboardingQuestionTemplate`
-- `AiPromptConfig`
+- `AiGoalPromptConfig`
+- `AiPromptVersion`
 - `AiAreaGenerationConfig`
 
 Performance e cicli:

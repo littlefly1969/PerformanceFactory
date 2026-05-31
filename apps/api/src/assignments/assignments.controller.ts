@@ -8,11 +8,18 @@ import { Roles } from '../common/decorators/roles.decorator';
 
 @ApiTags('assignments')
 @Controller('assignments')
+/**
+ * @deprecated Legacy V1 assignment API backed by UserAssignment.
+ * Current V2+ user work is exposed through published plans, questions and training.
+ */
 export class AssignmentsController {
   constructor(private readonly assignments: AssignmentsService) {}
 
   @Get('my')
-  @ApiOperation({ summary: 'Elenca assegnazioni utente correnti' })
+  @ApiOperation({
+    summary: '[DEPRECATED] Elenca assegnazioni legacy V1 utente',
+    deprecated: true,
+  })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.USER)
@@ -21,7 +28,10 @@ export class AssignmentsController {
   }
 
   @Post(':id/complete')
-  @ApiOperation({ summary: 'Completa una assegnazione' })
+  @ApiOperation({
+    summary: '[DEPRECATED] Completa una assegnazione legacy V1',
+    deprecated: true,
+  })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.USER)
