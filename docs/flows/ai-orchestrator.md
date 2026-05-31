@@ -120,6 +120,34 @@ Nota: il path di servizio `refreshCycleReadiness(planReleaseId, actorId)` può a
 | Valutazioni AI tuner | Le evaluation run sono avviate e poi processate in background con `setImmediate`; non è lo stesso runtime della generazione ciclo admin. |
 | Costi | `AiTuningService.getCostSummary` aggrega token/metadati da audit e replay. |
 
+## Fallback e configurazione AI
+
+Questa sezione inventaria i fallback AI rilevati prima dell'hardening della configurazione. I fallback sono classificati in tre gruppi:
+
+| Classe | Significato | Regola operativa |
+| --- | --- | --- |
+| Dev/test esplicito | Serve a far girare test e ambienti locali senza provider esterni. | Consentito solo se dichiarato o in ambienti non production. |
+| Compatibilita dati | Mantiene leggibili dati storici o incompleti. | Da preservare finche non esiste una migrazione o decisione prodotto diversa. |
+| Configurazione mancante | Nasconde assenza di prompt/config necessari alla generazione ordinaria. | Da documentare ora e rendere esplicito in fasi mirate con test dedicati. |
+
+| Punto | Trigger | Comportamento attuale | Visibilita | Uso env | Classificazione | Decisione |
+| --- | --- | --- | --- | --- | --- | --- |
+| `AI_PROVIDER` non impostato | `AiProposalProviderService.resolveProvider` e chiamanti configurati | In dev/test usa `stub`; in production deve fallire con errore esplicito. | Esplicito in production, fallback in dev/test. | `AI_PROVIDER`, `NODE_ENV` | Dev/test esplicito | Mantenere stub locale/test; non accettare provider implicito in production. |
+| Provider non supportato | `AI_PROVIDER` diverso da `stub`, `openai`, `gemini` | `BadRequestException`. | Esplicito. | `AI_PROVIDER` | Configurazione errata | Preservare. |
+| Chiavi provider mancanti | `openai` senza `OPENAI_API_KEY`, `gemini` senza `GEMINI_API_KEY` | `BadRequestException` prima della chiamata esterna. | Esplicito. | API key provider | Configurazione errata | Preservare. |
+| Modello provider non impostato | Provider esterno senza model env | Usa default codice: `gpt-5.4-mini` o `gemini-2.5-flash`. | Silente. | `AI_MODEL_PROPOSAL`, `GEMINI_MODEL_PROPOSAL` | Default operativo | Accettabile finche il default e documentato; valutare warning/setting obbligatorio in produzione. |
+| Scala performance assente | Nessuna `PerformanceScaleConfig` attiva | Usa `DEFAULT_SCALE`. | Silente. | Nessuno | Compatibilita/configurazione | Preservare per ora; irrigidire solo con decisione prodotto per bootstrap dati. |
+| Config area mancante | Nessun `AiAreaGenerationConfig` per area ordinaria | Il provider usa `SYSTEM_PROMPT`, response format tecnico e layout default. | Silente. | Nessuno | Configurazione mancante | Non cambiato in questa fase per evitare impatto sui test e sui dati seed; candidato a errore esplicito per generazione production. |
+| Layout questionario area mancante o incompleto | `questionnaireLayoutJson` nullo/non valido | Usa 3 domande e opzioni default. | Silente. | Nessuno | Configurazione mancante | Preservare ora; rendere testabile prima di irrigidire. |
+| Prompt obiettivo assente | Nessuna `AiGoalPromptConfig` attiva in onboarding | Usa prompt base interno. | Silente. | Nessuno | Configurazione mancante | Preservare temporaneamente per onboarding; candidato a errore esplicito dopo verifica seed/admin defaults. |
+| Prompt sport/specializzazione assente | Utente senza selezione sport o senza driver prompt attivo | `runAllAreas` considera tutte le aree; prompt sport non viene aggiunto. | Silente. | Nessuno | Compatibilita dati | Preservare: l'assenza di sport selection e ammessa dal flusso corrente. |
+| Training prompt assente | Generazione training senza prompt specializzazione attivo | `BadRequestException`. | Esplicito. | Nessuno | Configurazione richiesta | Preservare. |
+| Replay/evaluation senza config area | Audit/golden context valido ma config corrente assente | Usa override se presenti, altrimenti stringhe vuote/layout default. | Silente nel prompt; failure registrata se provider rifiuta output. | Provider configurato | Compatibilita AI tuner | Preservare per confronti storici; documentare nei risultati tuner. |
+| Normalizzazione output provider incompleta | Campi testuali mancanti ma struttura minima valida | Alcuni testi ricevono default tecnici; output senza item o numero domande errato viene rifiutato. | Parziale. | Nessuno | Compatibilita output provider | Preservare: non indebolisce i vincoli strutturali principali. |
+| Domande onboarding specialistiche incomplete | Provider non produce esattamente tre domande valide | Usa domande specialistiche fallback. | Silente. | Provider configurato | Compatibilita output provider | Preservare finche UX onboarding richiede continuita. |
+
+La decisione applicata in questa fase e minima: il provider `stub` resta disponibile per sviluppo e test, ma un ambiente `NODE_ENV=production` senza `AI_PROVIDER` non deve usare implicitamente lo stub. Gli altri fallback restano invariati e documentati per non introdurre cambiamenti di flusso non richiesti.
+
 ## Cambiamenti di stato database
 
 | Modello | Quando viene toccato | Campi rilevanti |

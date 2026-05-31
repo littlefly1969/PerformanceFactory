@@ -152,6 +152,30 @@ describe('AiProposalProviderService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  it('keeps the deterministic stub available when explicitly selected', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.AI_PROVIDER = 'stub';
+
+    const proposal =
+      await new AiProposalProviderService().generateCycleProposal(input);
+
+    expect(proposal.provider).toBe('stub');
+    expect(proposal.model).toBe('deterministic-stub');
+    expect(proposal.questions).toHaveLength(3);
+  });
+
+  it('rejects an implicit stub fallback in production', async () => {
+    process.env.NODE_ENV = 'production';
+    delete process.env.AI_PROVIDER;
+
+    await expect(
+      new AiProposalProviderService().generateCycleProposal(input),
+    ).rejects.toThrow('AI_PROVIDER e obbligatorio in produzione');
+    expect(() => AiProposalProviderService.requiresUserConsent()).toThrow(
+      'AI_PROVIDER e obbligatorio in produzione',
+    );
+  });
+
   it('marks Gemini as an external provider that requires user consent', () => {
     expect(AiProposalProviderService.requiresUserConsent('gemini')).toBe(true);
     expect(AiProposalProviderService.requiresUserConsent('stub')).toBe(false);

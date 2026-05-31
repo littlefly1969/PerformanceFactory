@@ -582,12 +582,28 @@ export class AiProposalProviderService {
     );
   }
 
-  static requiresUserConsent(provider = process.env.AI_PROVIDER ?? 'stub') {
-    return EXTERNAL_AI_PROVIDERS.includes(provider.toLowerCase() as AiProvider);
+  static requiresUserConsent(provider = process.env.AI_PROVIDER) {
+    return EXTERNAL_AI_PROVIDERS.includes(
+      this.resolveConfiguredProvider(provider),
+    );
   }
 
   private resolveProvider(): AiProvider {
-    const provider = (process.env.AI_PROVIDER ?? 'stub').toLowerCase();
+    return AiProposalProviderService.resolveConfiguredProvider();
+  }
+
+  private static resolveConfiguredProvider(
+    configuredProvider = process.env.AI_PROVIDER,
+  ): AiProvider {
+    const provider = configuredProvider?.trim().toLowerCase();
+    if (!provider) {
+      if (process.env.NODE_ENV === 'production') {
+        throw new BadRequestException(
+          'AI_PROVIDER e obbligatorio in produzione',
+        );
+      }
+      return 'stub';
+    }
     if (provider === 'stub' || provider === 'openai' || provider === 'gemini') {
       return provider;
     }
