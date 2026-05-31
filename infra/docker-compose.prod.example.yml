@@ -1,5 +1,18 @@
+name: ${COMPOSE_PROJECT_NAME:-performancefactory}
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: ${DOCKER_LOG_MAX_SIZE:-10m}
+    max-file: ${DOCKER_LOG_MAX_FILE:-5}
+
+x-restart-policy: &default-restart-policy
+  restart: unless-stopped
+
 services:
   api:
+    <<: *default-restart-policy
+    image: ${API_IMAGE:-performancefactory-api:${IMAGE_TAG:?Set IMAGE_TAG or API_IMAGE}}
     build:
       context: ..
       dockerfile: apps/api/Dockerfile
@@ -7,14 +20,15 @@ services:
       NODE_ENV: production
       API_HOST: 0.0.0.0
       API_PORT: 4000
-      WEB_ORIGIN: ${WEB_ORIGIN}
-      DATABASE_URL: ${DATABASE_URL}
-      SESSION_SECRET: ${SESSION_SECRET}
-      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:-}
+      WEB_ORIGIN: ${WEB_ORIGIN:?Set WEB_ORIGIN}
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET}
+      ACCESS_TOKEN_SECRET: ${ACCESS_TOKEN_SECRET:?Set ACCESS_TOKEN_SECRET}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
       SESSION_COOKIE_SAME_SITE: ${SESSION_COOKIE_SAME_SITE:-lax}
       SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-}
-      REDIS_URL: ${REDIS_URL}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
+      REDIS_SESSION_PREFIX: ${REDIS_SESSION_PREFIX:-pf:sess:}
       AI_PROVIDER: ${AI_PROVIDER:-stub}
       AI_MODEL_PROPOSAL: ${AI_MODEL_PROPOSAL:-gpt-5.4-mini}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
@@ -30,29 +44,78 @@ services:
       WEB_LOGIN_SUCCESS_URL: ${WEB_LOGIN_SUCCESS_URL:-}
       WEB_LOGIN_FAILURE_URL: ${WEB_LOGIN_FAILURE_URL:-}
     ports:
-      - "${API_HOST_PORT:-4000}:4000"
+      - "${API_HOST_BIND:-127.0.0.1}:${API_HOST_PORT:-4000}:4000"
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:4000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    stop_grace_period: 30s
+    logging: *default-logging
+    networks:
+      - backend
+      - public
 
   web:
+    <<: *default-restart-policy
+    image: ${WEB_IMAGE:-performancefactory-web:${IMAGE_TAG:?Set IMAGE_TAG or WEB_IMAGE}}
     build:
       context: ..
       dockerfile: apps/web/Dockerfile
       args:
-        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?Set NEXT_PUBLIC_API_BASE_URL}
     environment:
       NODE_ENV: production
       PORT: 3000
     ports:
-      - "${WEB_HOST_PORT:-3000}:3000"
+      - "${WEB_HOST_BIND:-127.0.0.1}:${WEB_HOST_PORT:-3000}:3000"
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))\"",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    stop_grace_period: 30s
+    logging: *default-logging
+    networks:
+      - public
 
   redis:
-    image: redis:7
+    <<: *default-restart-policy
+    image: ${REDIS_IMAGE:-redis:7.4-alpine}
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    stop_grace_period: 30s
+    logging: *default-logging
+    networks:
+      - backend
 
 volumes:
   redis-data:
+
+networks:
+  backend:
+    internal: true
+  public:

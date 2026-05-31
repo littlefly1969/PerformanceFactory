@@ -25,6 +25,15 @@ corepack enable
 pnpm --version
 ```
 
+Verifica rapida dell'ambiente:
+
+```bash
+pnpm run doctor
+```
+
+Il progetto richiede Node.js 22 e pnpm 10.28.2. Se usi zsh con nvm, la shell
+carica `.nvmrc` quando entri nella directory del progetto.
+
 ## Setup Locale
 
 Installa le dipendenze dalla root:
@@ -155,27 +164,41 @@ Il database di test viene creato automaticamente se manca; le migrazioni non ven
 
 ## Caveat Locali
 
-- Usa Node.js 22. Eseguire i comandi con Node 24/26 genera warning sugli `engines` e puo produrre differenze rispetto a Docker/CI.
+- Usa Node.js 22. Verifica con `pnpm run doctor` prima dei gate locali.
 - In sandbox ristrette, `pnpm build` puo fallire durante il build web perche Turbopack tenta un bind di porta. In un ambiente locale/CI non ristretto il build passa.
 - `pnpm lint` passa con warning noti; i warning non bloccano ancora il gate.
 
 ## Produzione
 
-La configurazione runtime e env-driven. Usa `.env.production.example` come base:
+La configurazione runtime e env-driven. Usa `infra/.env.prod.example` come base
+per il file reale `.env.production`, senza committare segreti.
 
-- API: `DATABASE_URL`, `SESSION_SECRET`, `ACCESS_TOKEN_SECRET`, `REDIS_URL`, `WEB_ORIGIN`, variabili AI e Google OIDC.
-- Web: `NEXT_PUBLIC_API_BASE_URL`.
+Il compose di produzione e `infra/docker-compose.prod.example.yml` e usa:
 
-Build, migrazioni e restart con compose di produzione:
+- immagini applicative con tag esplicito (`API_IMAGE`, `WEB_IMAGE`);
+- Redis self-hosted con volume persistente `redis-data`;
+- PostgreSQL esterno via `DATABASE_URL`;
+- healthcheck per API, web e Redis;
+- log Docker con rotazione `json-file`;
+- `restart: unless-stopped`;
+- `up -d --remove-orphans` nello script di deploy.
+
+Deploy:
 
 ```bash
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml build --no-cache api web
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml run --rm api \
-  ./node_modules/.bin/prisma migrate deploy
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml up -d
+infra/scripts/deploy-prod.sh --env-file .env.production
 ```
 
-La documentazione operativa estesa e in [`comandi.md`](./comandi.md).
+Cleanup sicuro, senza pruning dei volumi:
+
+```bash
+DRY_RUN=true infra/scripts/cleanup-docker.sh --env-file .env.production
+CONFIRM_DOCKER_CLEANUP=true infra/scripts/cleanup-docker.sh --env-file .env.production
+```
+
+La documentazione operativa estesa e in
+[`docs/operations/production-deployment.md`](./docs/operations/production-deployment.md).
+Il riepilogo dei comandi correnti e in [`comandi.md`](./comandi.md).
 
 ## Privacy, AI e Google Identity
 

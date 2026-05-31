@@ -12,6 +12,7 @@
     "lint:fix": "turbo run lint:fix",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
+    "doctor": "scripts/check-toolchain.sh",
     "db:up": "docker compose -f infra/docker-compose.dev.yml up -d",
     "db:down": "docker compose -f infra/docker-compose.dev.yml down",
     "db:check": "cd apps/api && pnpm prisma validate"

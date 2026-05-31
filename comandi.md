@@ -1,116 +1,127 @@
 # PerformanceFactory - Comandi Operativi
 
-Aggiornato al 6 maggio 2026.
+Aggiornato al 31 maggio 2026.
 
-## Stato Server Attuale
+Questo file contiene solo i comandi correnti. La documentazione completa dello
+stato di sviluppo e' in [`sviluppo.md`](./sviluppo.md); la runbook produzione e'
+in [`docs/operations/production-deployment.md`](./docs/operations/production-deployment.md).
 
-In questa sessione i server locali sono stati fermati su richiesta. Ultimo stato verificato prima dello stop:
+## Toolchain
 
-- Web Next.js dev: `http://127.0.0.1:3000`
-- API NestJS: `http://127.0.0.1:4000/api`
-- Health API verificato: `GET http://127.0.0.1:4000/api/health` restituisce `{"status":"ok"}`
-- Database configurato da `apps/api/.env`; nell'ambiente corrente punta a Neon.
-- Ultima migrazione creata: `20260505154000_consent_documents`
-- Seed aggiornato: utenti demo, 6 aree, competenze coach, template anamnesi, prompt AI iniziali e configurazioni AI per area.
+Il progetto usa Node.js 22 e pnpm 10.28.2.
 
-Account seed principali:
-
-```text
-admin@example.com / password123
-user@example.com / password123
-pro@example.com / password123
-```
-
-## Prerequisiti
-
-Il progetto e' un monorepo con:
-
-- API: NestJS, Prisma, PostgreSQL, sessioni cookie, bearer token breve.
-- Web: Next.js App Router.
-- Package manager dichiarato: `pnpm@10.28.2`.
-- In questa workspace `pnpm` non e' nel PATH, quindi i comandi locali usano i binari in `node_modules/.bin`.
-
-## Avvio Locale
-
-API:
+Verifica:
 
 ```bash
-cd apps/api
-./node_modules/.bin/nest start
+pnpm run doctor
 ```
 
-Web:
+Se fallisce, correggere prima l'ambiente. Non usare Node 24/26 come workaround.
+
+## Setup Locale
+
+Installa dipendenze:
 
 ```bash
-cd apps/web
-./node_modules/.bin/next dev -p 3000 -H 127.0.0.1
+pnpm install
 ```
 
-Health check:
+Prepara gli env locali:
 
 ```bash
-curl -sS http://127.0.0.1:4000/api/health
-curl -sS http://127.0.0.1:3000/login
+cp apps/api/.env.example apps/api/.env
+cp apps/web/.env.example apps/web/.env.local
 ```
 
-Se `pnpm` e' disponibile:
+Avvia PostgreSQL e Redis locali:
+
+```bash
+pnpm db:up
+```
+
+Ferma PostgreSQL e Redis locali:
+
+```bash
+pnpm db:down
+```
+
+Avvia API e web in sviluppo:
 
 ```bash
 pnpm dev
 ```
 
+Endpoint locali:
+
+- Web: `http://127.0.0.1:3000`
+- API: `http://127.0.0.1:4000/api`
+- Health API: `http://127.0.0.1:4000/api/health`
+- Swagger locale: `http://127.0.0.1:4000/docs`
+
 ## Database
 
-Avvio Postgres e Redis locali via Docker:
+Valida Prisma:
+
+```bash
+pnpm db:check
+```
+
+Genera client Prisma:
+
+```bash
+pnpm --filter api prisma:generate
+```
+
+Applica migrazioni:
+
+```bash
+pnpm --filter api prisma:migrate:deploy
+```
+
+Seed:
+
+```bash
+pnpm --filter api prisma:seed
+```
+
+Primo bootstrap locale tipico:
 
 ```bash
 pnpm db:up
-pnpm db:down
+pnpm --filter api prisma:migrate:deploy
+pnpm --filter api prisma:seed
+pnpm dev
 ```
 
-Con i binari locali, dalla root API:
+## Quality Gate
+
+Eseguire dalla root:
 
 ```bash
-cd apps/api
-./node_modules/.bin/prisma validate
-./node_modules/.bin/prisma generate --schema prisma/schema.prisma --generator client
-./node_modules/.bin/prisma migrate deploy
-./node_modules/.bin/ts-node prisma/seed.ts
-```
-
-Nota: `prisma generate` completo usa anche `prisma-erd-generator`; se il generatore ERD non e' nel PATH, usa:
-
-```bash
-cd apps/api
-PATH=../../node_modules/.bin:$PATH ./node_modules/.bin/prisma generate
-```
-
-## Verifica Qualita'
-
-API:
-
-```bash
-cd apps/api
-./node_modules/.bin/tsc -p tsconfig.json --noEmit
-./node_modules/.bin/nest build
-./node_modules/.bin/jest
-./node_modules/.bin/jest --config ./test/jest-e2e.json
-```
-
-Web:
-
-```bash
-cd apps/web
-./node_modules/.bin/tsc --noEmit
-./node_modules/.bin/next build
-```
-
-Root monorepo, se `pnpm` e' disponibile:
-
-```bash
+pnpm lint
 pnpm typecheck
-pnpm build
 pnpm test
+pnpm build
+```
+
+Test DB espliciti:
+
+```bash
+TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/performancefactory_test pnpm --filter api test:db
+```
+
+`test:db` richiede PostgreSQL locale e rifiuta URL che non puntano a un database
+locale dedicato con `test` nel nome.
+
+## Account Seed
+
+Account demo principali:
+
+```text
+admin@example.com / password123
+user@example.com / password123
+pro@example.com / password123
+tuner@example.com / password123
 ```
 
 ## Flussi Manuali Da Provare
@@ -119,76 +130,46 @@ Registrazione atleta:
 
 1. Apri `http://127.0.0.1:3000/login`.
 2. Usa "Nuovo utente".
-3. Compila nome, cognome, email, password.
-4. Leggi i documenti privacy e AI completi caricati dalla piattaforma.
-5. Accetta separatamente privacy e utilizzo dell'assistente AI.
-6. L'account nasce sospeso.
+3. Compila nome, cognome, email e password.
+4. Accetta privacy e assistente AI.
+5. Verifica che l'account nasca sospeso.
 
-Registrazione atleta con Google:
+Registrazione Google:
 
 1. Apri `http://127.0.0.1:3000/register`.
 2. Usa `Registrati con Google`.
-3. Google verifica identita' ed email.
-4. La piattaforma mostra `/register/google/consents`.
-5. Accetta privacy e AI; solo dopo viene creato l'account atleta sospeso.
+3. Completa `/register/google/consents`.
+4. Verifica che l'account nasca sospeso solo dopo i consensi.
 
 Abilitazione admin:
 
 1. Login admin.
-2. Vai in `Operations`.
-3. Apri "New athlete requests".
-4. Abilita l'atleta.
-5. Assegna un coach per area in "Athlete ownership".
+2. Apri `/admin/cycles`.
+3. Abilita l'atleta.
+4. Assegna coach per area.
 
-Anamnesi atleta:
+Onboarding atleta:
 
-1. L'atleta abilitato fa login.
-2. Se onboarding richiesto viene mandato su `/onboarding`.
-3. Risponde a domande generali e specifiche per area.
-4. Il sistema crea baseline, snapshot e `CurrentState`.
+1. Login atleta abilitato.
+2. Completa `/onboarding`.
+3. Verifica baseline, snapshot e `CurrentState`.
 
-Configurazione AI:
+Ciclo operativo:
 
-1. Login admin.
-2. Vai in `/admin/ai-config`.
-3. Modifica prompt globali o specifici per area/livello.
-4. Modifica, una volta per area, contesto iniziale AI, forma della risposta e layout JSON questionari.
-5. Modifica domande di anamnesi generali o per area.
-6. Le successive preview/generazioni AI includono anamnesi generale, anamnesi della sola area target, livello area, performance sintetica e storico utile della stessa area.
-7. Gli ID tecnici non vengono passati al modello; restano solo nelle relazioni/audit del database.
+1. Admin usa preview AI.
+2. Admin genera proposta.
+3. Coach approva piano e questionario.
+4. Admin pubblica.
+5. Atleta completa piano e questionario.
+6. Verifica chiusura ciclo e aggiornamento performance.
 
-Configurazione documenti privacy e AI:
+AI tuning:
 
-1. Login admin.
-2. Vai in `/admin/consents`.
-3. Usa i documenti attivi come base.
-4. Inserisci una nuova `version`, per esempio `privacy-v2-2026-05-06`.
-5. Pubblica la nuova versione.
-6. Il server calcola l'hash del documento e rende bloccante la nuova accettazione per gli utenti che non hanno ancora accettato quella versione/hash.
+1. Login `AI_TUNER` o admin.
+2. Apri `/ai-tuner`.
+3. Verifica prompt, audit, replay, evaluation e monitoraggio.
 
-Generazione ciclo:
-
-1. In `Operations`, verifica che l'atleta sia abilitato, abbia completato onboarding e abbia coach assegnato per l'area.
-2. Usa `Preview AI`.
-3. Genera la proposta.
-4. Il coach approva piano e questionario.
-5. L'admin pubblica il ciclo.
-
-Riparazione questionari gia' risposti ma rimasti aperti:
-
-1. Deploya il codice aggiornato sul server.
-2. Login admin.
-3. Apri `Operations`.
-4. Usa `Close submitted questionnaires`.
-5. Il backend chiude solo i questionari `PUBLISHED` che hanno gia' una risposta per ogni domanda, crea lo snapshot e aggiorna lo stato ciclo.
-
-Endpoint equivalente:
-
-```bash
-POST /api/admin/maintenance/close-answered-questionnaires
-```
-
-## Variabili Ambiente Rilevanti
+## Variabili Ambiente Locali
 
 API (`apps/api/.env`):
 
@@ -200,8 +181,8 @@ API_PORT=4000
 WEB_ORIGIN=http://127.0.0.1:3000
 SESSION_SECRET
 ACCESS_TOKEN_SECRET
-REDIS_URL
-AI_PROVIDER=stub|openai|gemini
+REDIS_URL=redis://localhost:6379
+AI_PROVIDER=stub
 AI_MODEL_PROPOSAL
 OPENAI_API_KEY
 GEMINI_MODEL_PROPOSAL
@@ -217,7 +198,7 @@ WEB_LOGIN_SUCCESS_URL
 WEB_LOGIN_FAILURE_URL
 ```
 
-Web (`apps/web/.env.example`):
+Web (`apps/web/.env.local`):
 
 ```text
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:4000/api
@@ -225,214 +206,82 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:4000/api
 
 ## Produzione Docker
 
-### Deploy con Git sul server
-
-Il metodo consigliato e' usare una working copy Git in `/opt/performancefactory`.
-Prima di fare pull verifica sempre lo stato:
-
-```bash
-cd /opt/performancefactory
-
-git status --short --branch
-git remote -v
-git branch
-```
-
-Aggiornamento codice dal branch di lavoro:
-
-```bash
-cd /opt/performancefactory
-
-git fetch origin
-git switch feature-goal-driven-ai-flow
-git pull --ff-only origin feature-goal-driven-ai-flow
-git log -1 --oneline
-```
-
-`--ff-only` evita merge automatici sul server. Se fallisce, fermati e verifica
-le modifiche locali con `git status` e `git diff`.
-
-### Deploy con rsync
-
-In alternativa, sincronizzazione codice verso il server:
-
-```bash
-rsync -az --delete \
-  --exclude node_modules \
-  --exclude 'apps/*/node_modules' \
-  --exclude 'apps/web/.next' \
-  --exclude 'apps/api/dist' \
-  --exclude '.env' \
-  --exclude '.env.production' \
-  ./ stefano@192.168.1.105:/opt/performancefactory/
-```
-
-Questo comando e' adatto al deploy del sorgente quando non si usa Git sul
-server: esclude dipendenze installate, output di build e file ambiente locali.
-Dopo la sincronizzazione, build, migrazioni e variabili ambiente vanno gestite
-sul server. Non e' perfettamente equivalente a `git pull`: `rsync --delete`
-cancella file non presenti nella sorgente locale, mentre Git aggiorna solo file
-tracciati.
-
-Rigenerazione completa dei container Docker sul server:
-
-Prima verifica che esista `/opt/performancefactory/.env.production`. Il file ambiente non viene copiato da `rsync` per scelta, quindi deve essere creato e mantenuto sul server.
-
-Esempio per il deploy dietro proxy:
-
-```bash
-cd /opt/performancefactory
-nano .env.production
-chmod 600 .env.production
-```
-
-Contenuto minimo:
+Usare la runbook:
 
 ```text
-WEB_ORIGIN=https://performancefactory.littlefly.it
-NEXT_PUBLIC_API_BASE_URL=https://performancefactory.littlefly.it/api
-DATABASE_URL=postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require
-SESSION_SECRET=metti-una-stringa-lunga-random
-ACCESS_TOKEN_SECRET=metti-una-seconda-stringa-lunga-random
-REDIS_URL=redis://redis:6379
-AI_PROVIDER=stub
-AI_MODEL_PROPOSAL=gpt-5.4-mini
-GEMINI_MODEL_PROPOSAL=gemini-2.5-flash
-GEMINI_API_KEY=
-OPENAI_API_KEY=
-SESSION_COOKIE_SECURE=true
-SESSION_COOKIE_SAME_SITE=lax
-SWAGGER_ENABLED=false
-API_HOST_PORT=4100
-WEB_HOST_PORT=3100
-GOOGLE_OIDC_CLIENT_ID=
-GOOGLE_OIDC_CLIENT_SECRET=
-GOOGLE_OIDC_REDIRECT_URI=https://performancefactory.littlefly.it/api/auth/google/callback
-GOOGLE_OIDC_HOSTED_DOMAIN=
-GOOGLE_OIDC_AUTO_LINK_VERIFIED_EMAIL=false
-WEB_LOGIN_SUCCESS_URL=https://performancefactory.littlefly.it/
-WEB_LOGIN_FAILURE_URL=https://performancefactory.littlefly.it/login
+docs/operations/production-deployment.md
 ```
 
-Controlla che Compose legga davvero le variabili:
+File production correnti:
+
+- `infra/docker-compose.prod.example.yml`
+- `infra/.env.prod.example`
+- `infra/scripts/deploy-prod.sh`
+- `infra/scripts/cleanup-docker.sh`
+
+Validazione config:
 
 ```bash
-cd /opt/performancefactory
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml config >/tmp/pf-compose.yml
-grep -E "DATABASE_URL|WEB_ORIGIN|NEXT_PUBLIC_API_BASE_URL|REDIS_URL|GOOGLE_OIDC|WEB_LOGIN" /tmp/pf-compose.yml
+docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml config
 ```
 
-Se vedi valori vuoti, fermati e correggi `.env.production`.
+Deploy sicuro:
 
 ```bash
-cd /opt/performancefactory
+infra/scripts/deploy-prod.sh --env-file .env.production
+```
 
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml down
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml build --no-cache api web
+Deploy con immagini da registry:
+
+```bash
+DEPLOY_MODE=pull infra/scripts/deploy-prod.sh --env-file .env.production
+```
+
+Migrazioni production, solo come step esplicito e dopo backup/review:
+
+```bash
 docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml run --rm api \
   ./node_modules/.bin/prisma migrate deploy
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml up -d
+```
+
+Stato servizi:
+
+```bash
 docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml ps
 ```
 
-Se il server avvisa che `buildx` non e' installato, installa il plugin Docker Buildx e rilancia:
+Log:
 
 ```bash
-sudo apt update
-sudo apt install -y docker-buildx-plugin
-docker buildx version
+docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml logs --tail=200 api
+docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml logs --tail=200 web
+docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml logs --tail=200 redis
 ```
 
-Porte configurabili:
-
-```text
-API_HOST_PORT=4000
-WEB_HOST_PORT=3000
-```
-
-Per deploy dietro proxy Apache/Nginx, imposta:
-
-```text
-WEB_ORIGIN=https://dominio-pubblico
-NEXT_PUBLIC_API_BASE_URL=https://dominio-pubblico/api
-SESSION_COOKIE_SECURE=true
-SESSION_COOKIE_SAME_SITE=lax
-SWAGGER_ENABLED=false
-```
-
-Aggiornamento base dati dopo il deploy:
+Cleanup sicuro in dry-run:
 
 ```bash
-cd /opt/performancefactory
-
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml run --rm api \
-  ./node_modules/.bin/prisma migrate deploy
-
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml run --rm api \
-  ./node_modules/.bin/prisma generate --schema prisma/schema.prisma --generator client
+DRY_RUN=true infra/scripts/cleanup-docker.sh --env-file .env.production
 ```
 
-Nota prompt AI: la migrazione `20260429123000_ai_prompt_uniqueness` normalizza eventuali duplicati preesistenti, poi applica i vincoli per impedire nomi prompt duplicati e piu' prompt attivi sulla stessa coppia area/livello. La migrazione `20260429142000_area_generation_config` aggiunge una configurazione unica per area con contesto iniziale, forma risposta e layout JSON questionari.
-Nota consensi: la migrazione `20260505154000_consent_documents` aggiunge i
-documenti consenso versionati e lo snapshot del testo accettato. Dopo questa
-migrazione la pagina admin `/admin/consents` puo' pubblicare nuove versioni
-privacy/AI; ogni nuova versione/hash richiede nuova accettazione bloccante.
-
-Seed solo quando serve:
+Cleanup confermato:
 
 ```bash
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml run --rm api \
-  ./node_modules/.bin/ts-node prisma/seed.ts
+CONFIRM_DOCKER_CLEANUP=true infra/scripts/cleanup-docker.sh --env-file .env.production
 ```
 
-Il seed non e' uno step obbligatorio a ogni deploy. Eseguilo solo in questi casi:
-
-- primo bootstrap di un database vuoto;
-- dati seed mancanti o corrotti;
-- release che introduce nuovi dati iniziali, come template anamnesi o prompt base.
-
-Il seed usa `upsert` per i dati principali, quindi e' pensato per essere idempotente, ma in produzione va comunque lanciato consapevolmente. Se l'immagine production non include `ts-node`, esegui il seed prima di ricostruire l'immagine oppure usa una shell del container costruita con le dipendenze dev.
-
-Sequenza consigliata completa:
+Non eseguire routine distruttive sui volumi:
 
 ```bash
-cd /opt/performancefactory
-
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml down
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml build --no-cache api web
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml run --rm api \
-  ./node_modules/.bin/prisma migrate deploy
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml up -d
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml ps
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml logs --tail=120 api
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml logs --tail=120 web
+docker volume prune
+docker compose down --volumes
 ```
 
-Health check post deploy:
+## Note Operative
 
-```bash
-curl -sS http://127.0.0.1:${API_HOST_PORT:-4000}/api/health
-curl -I http://127.0.0.1:${WEB_HOST_PORT:-3000}/login
-```
-
-Verifica Google OIDC post deploy:
-
-```bash
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml exec api printenv | grep -E "GOOGLE_OIDC|WEB_LOGIN"
-
-curl -sS -D - -o /dev/null "https://performancefactory.littlefly.it/api/auth/google/register"
-```
-
-Il redirect deve contenere `prompt=select_account` e `set-cookie: pf.sid=...`.
-Il flusso corretto di registrazione Google termina su
-`/register/google/consents`.
-
-Restart rapido senza rebuild, utile solo dopo cambio `.env.production` gia'
-supportato dall'immagine corrente:
-
-```bash
-cd /opt/performancefactory
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml up -d --force-recreate api web
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml logs --tail=120 api
-docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml logs --tail=120 web
-```
+- Il deploy non esegue automaticamente migrazioni.
+- Il cleanup non cancella volumi.
+- Redis production usa il volume persistente `redis-data`.
+- PostgreSQL production e' esterno via `DATABASE_URL`.
+- `SWAGGER_ENABLED=false` in produzione salvo decisione esplicita diversa.
+- `AI_DEBUG_PROMPT_LOG=false` in produzione.
