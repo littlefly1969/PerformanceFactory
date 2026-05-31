@@ -124,6 +124,12 @@ describe('AI prompt active export endpoint (e2e)', () => {
     expect(String(response.headers['content-disposition'])).toContain(
       'active-ai-prompts-20260531-123456.txt',
     );
+    expect(String(response.headers['content-disposition'])).toContain(
+      "filename*=UTF-8''active-ai-prompts-20260531-123456.txt",
+    );
+    expect(String(response.headers['content-length'])).toBe(
+      Buffer.byteLength(response.body, 'utf8').toString(),
+    );
     expect(response.body).toContain('Prompt attivo');
     expect(exportActivePrompts).toHaveBeenCalledTimes(1);
   });

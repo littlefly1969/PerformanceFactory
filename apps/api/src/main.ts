@@ -119,6 +119,7 @@ async function bootstrap() {
     origin: getCsvEnv('WEB_ORIGIN', 'http://127.0.0.1:3000'),
     credentials: true,
     methods: ['GET', 'HEAD', 'POST', 'PATCH', 'PUT', 'DELETE', 'OPTIONS'],
+    exposedHeaders: ['Content-Disposition', 'Content-Length', 'Content-Type'],
   });
 
   app.use(cookieParser());

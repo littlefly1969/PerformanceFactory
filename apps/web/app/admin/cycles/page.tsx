@@ -7,6 +7,7 @@ import {
   StatusBadge,
 } from "@/app/components/product-shell";
 import { API_BASE, secureFetch } from "@/app/lib/api";
+import { downloadResponseBody } from "@/app/lib/download";
 
 type Area = { id: string; name: string };
 type Sport = {
@@ -263,11 +264,6 @@ const formatStatus = (status: string) =>
     READY_TO_PUBLISH: "pronto da pubblicare",
     WAITING_PROFESSIONAL_APPROVAL: "in attesa professionista",
   })[status] ?? status.replace(/_/g, " ").toLowerCase();
-
-const exportFilenameFromHeader = (header: string | null) => {
-  const match = header?.match(/filename="?([^"]+)"?/i);
-  return match?.[1] ?? "active-ai-prompts.txt";
-};
 
 export default function AdminCyclesPage() {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
@@ -783,18 +779,7 @@ export default function AdminCyclesPage() {
       return;
     }
 
-    const blob = await response.blob();
-    const filename = exportFilenameFromHeader(
-      response.headers.get("content-disposition"),
-    );
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+    await downloadResponseBody(response, "active-ai-prompts.txt");
     setMessage("Export prompt AI attivi generato.");
     setBusyKey(null);
     setExportConfirmOpen(false);

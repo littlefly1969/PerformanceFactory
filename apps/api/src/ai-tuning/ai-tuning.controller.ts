@@ -85,11 +85,21 @@ export class AiTuningController {
   @Roles(UserRole.AI_TUNER, UserRole.ADMIN)
   async exportActivePrompts(@Res({ passthrough: true }) reply: DownloadReply) {
     const exportFile = await this.tuning.exportActivePrompts();
-    const contentDisposition = `attachment; filename="${exportFile.filename}"`;
+    const encodedFilename = encodeURIComponent(exportFile.filename);
+    const contentDisposition = [
+      `attachment; filename="${exportFile.filename}"`,
+      `filename*=UTF-8''${encodedFilename}`,
+    ].join('; ');
+    const contentLength = Buffer.byteLength(
+      exportFile.content,
+      'utf8',
+    ).toString();
     reply.header?.('Content-Type', 'text/plain; charset=utf-8');
     reply.header?.('Content-Disposition', contentDisposition);
+    reply.header?.('Content-Length', contentLength);
     reply.setHeader?.('Content-Type', 'text/plain; charset=utf-8');
     reply.setHeader?.('Content-Disposition', contentDisposition);
+    reply.setHeader?.('Content-Length', contentLength);
     return exportFile.content;
   }
 

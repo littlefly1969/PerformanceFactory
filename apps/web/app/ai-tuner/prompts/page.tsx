@@ -6,6 +6,7 @@ import {
   ProductShell,
 } from "@/app/components/product-shell";
 import { API_BASE, secureFetch } from "@/app/lib/api";
+import { downloadResponseBody } from "@/app/lib/download";
 
 type PromptMode = "goal" | "sport-area" | "area-config" | "training";
 type Area = { id: string; name: string };
@@ -317,11 +318,6 @@ const removeStoredDraft = (key: string) => {
 };
 
 const makeHistoryDraftId = () => `previous-${Date.now()}`;
-
-const exportFilenameFromHeader = (header: string | null) => {
-  const match = header?.match(/filename="?([^"]+)"?/i);
-  return match?.[1] ?? "active-ai-prompts.txt";
-};
 
 export default function PromptManagementPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
@@ -1321,18 +1317,7 @@ export default function PromptManagementPage() {
       return;
     }
 
-    const blob = await response.blob();
-    const filename = exportFilenameFromHeader(
-      response.headers.get("content-disposition"),
-    );
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+    await downloadResponseBody(response, "active-ai-prompts.txt");
     setBusyKey(null);
     setExportConfirmOpen(false);
     showSuccess("Export prompt AI attivi generato.");
