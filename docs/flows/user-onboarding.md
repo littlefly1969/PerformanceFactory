@@ -4,7 +4,7 @@
 
 L'onboarding serve a portare un account con ruolo `USER` da registrato ad utilizzabile nell'area utente. Il flusso raccoglie consensi, scelta sport/specializzazione, anamnesi generale, obiettivo prestazionale e domande specialistiche generate per area.
 
-Il backend considera l'onboarding completato quando viene salvata una `UserOnboardingAssessment` con stato `COMPLETED` e quando esiste un obiettivo prestazionale associato all'utente. Alcune parti del codice richiedono anche che l'obiettivo sia congelato con `UserPerformanceGoal.frozenAt`; questa differenza è documentata nelle ambiguità.
+Il backend considera l'onboarding completato solo quando viene salvata una `UserOnboardingAssessment` con stato `COMPLETED`, esiste un obiettivo prestazionale associato all'utente e l'obiettivo è congelato con `UserPerformanceGoal.frozenAt`.
 
 ## File principali
 
@@ -76,14 +76,14 @@ Il frontend salva anche un draft in `sessionStorage` con chiave `performance:onb
 | `/consents/required` | `POST` | Autenticato | Documenti correnti e flag privacy/AI | `ConsentsService.acceptRequired` | `Consent` | Salva consensi in transazione. |
 | `/onboarding/questionnaire` | `GET` | Autenticato `USER` | `assertAthlete` | `OnboardingService.getQuestionnaire` | Assessment, obiettivo, sport, template, domande utente | Combina domande generali e specialistiche già generate. |
 | `/onboarding/status` | `GET` | Autenticato `USER` | `assertAthlete` | `getStatus` | Assessment, obiettivo, sport selection | Restituisce stato richiesto/completato. |
-| `/onboarding/sport-selection` | `POST` | Autenticato `USER` | Body inline con `sportId`, `specializationId`; verifica attivi | `saveSportSelection` | `Sport`, `SportSpecialization`, `UserSportSelection` | Upsert scelta sport. |
+| `/onboarding/sport-selection` | `POST` | Autenticato `USER` | DTO con `sportId`, `specializationId`; verifica attivi | `saveSportSelection` | `Sport`, `SportSpecialization`, `UserSportSelection` | Upsert scelta sport. |
 | `/onboarding/goal/validate` | `POST` | Autenticato `USER` | Obiettivo >= 10 caratteri, sport context | `validateGoal` | `UserPerformanceGoal`, prompt config | Salva validazione non congelata. |
 | `/onboarding/goal/refine` | `POST` | Autenticato `USER` | Obiettivo >= 10, risposta utente >= 2 | `refineGoal` | `UserPerformanceGoal` | Invoca provider AI e aggiorna draft obiettivo. |
 | `/onboarding/specialist-questions/generate` | `POST` | Autenticato `USER` | Obiettivo >= 10, risposte generali normalizzabili, sport context | `generateSpecialistQuestions` | `UserPerformanceGoal`, `UserOnboardingQuestion`, aree sport | Cancella e ricrea domande specialistiche in transazione. |
 | `/onboarding/goal/final-validate` | `POST` | Autenticato `USER` | Tutte le risposte richieste e almeno un punteggio area | `validateFinalGoal` | `UserPerformanceGoal`, `UserAreaPromptInstruction` | Congela obiettivo e salva istruzioni area in transazione. |
 | `/onboarding/submit` | `POST` | Autenticato `USER` | Obiettivo già congelato, risposte complete | `submit` | `UserOnboardingAssessment`, `PerformanceProfileSnapshot`, `PerformanceProfileSnapshotArea`, `CurrentState` | Completa onboarding e crea stato prestazionale iniziale in transazione. |
 
-Gli endpoint onboarding usano tipi inline nel controller, non DTO class-based dedicati. Le regole effettive sono quindi in gran parte dentro `OnboardingService`.
+Gli endpoint onboarding usano DTO class-based per validare forma e tipi del payload. Le regole business e dipendenti dal database restano dentro `OnboardingService`.
 
 ## Cambiamenti di stato database
 
@@ -158,7 +158,7 @@ sequenceDiagram
 | Non registrato | Nessun account utente | Visitatore anonimo | Registrazione locale o Google | Nessuno |
 | Registrato inattivo | Account creato ma non abilitato | `registerAthlete` o Google complete | Attivazione admin | `User.role = USER`, `User.isActive = false`, `UserOnboardingAssessment.status = PENDING` |
 | Attivo con consensi mancanti | Sessione possibile solo se utente attivo, ma documenti richiesti non allineati | Nuovi documenti o consensi mancanti | `POST /consents/required` | `Consent`, `ConsentDocument` |
-| Onboarding richiesto | Consensi ok, assessment non completo o obiettivo mancante | Login o `/auth/me` | Wizard completato | `UserOnboardingAssessment.status`, `UserPerformanceGoal` |
+| Onboarding richiesto | Consensi ok, assessment non completo, obiettivo mancante o obiettivo non congelato | Login o `/auth/me` | Wizard completato | `UserOnboardingAssessment.status`, `UserPerformanceGoal.frozenAt` |
 | Sport selezionato | Contesto sportivo disponibile | `POST /onboarding/sport-selection` | Generazione/validazione obiettivo | `UserSportSelection` |
 | Obiettivo in bozza | Obiettivo validato/rifinito ma non congelato | `/goal/validate` o `/goal/refine` | Validazione finale | `UserPerformanceGoal.validationStatus`, `frozenAt = null` |
 | Obiettivo congelato | Obiettivo finale accettato | `POST /onboarding/goal/final-validate` | Submit finale | `UserPerformanceGoal.frozenAt` |
@@ -178,8 +178,8 @@ sequenceDiagram
 
 | Tema | Dettaglio |
 | --- | --- |
-| DTO onboarding | `OnboardingController` usa body inline invece di DTO class-validator; la validazione è principalmente nel service. |
-| Stato onboarding | `OnboardingService.getStatus` considera richiesto l'onboarding se manca `goal.frozenAt`; `AuthService.isOnboardingRequired` controlla assessment completato e presenza del goal, ma non `frozenAt`. |
+| DTO onboarding | I DTO controllano forma e tipi; le regole dipendenti da template, sport, AI e stato DB restano nel service. |
+| Stato onboarding | `OnboardingService.getStatus` e `AuthService.isOnboardingRequired` usano la stessa definizione: assessment `COMPLETED` e `UserPerformanceGoal.frozenAt` valorizzato. |
 | Endpoint `/goal/validate` | Esiste lato API, ma il wizard corrente usa soprattutto controllo locale, `/goal/refine`, `/goal/final-validate` e `/submit`. |
 | Attivazione admin | La registrazione comunica che serve attivazione admin; il dettaglio operativo di collegamento a professional/aree non fa parte del wizard onboarding. |
 | Provider AI | La generazione domande e la validazione obiettivo dipendono dal provider configurato; in test può essere usato uno stub deterministico. |

@@ -276,10 +276,10 @@ export class AuthService {
       }),
       this.prisma.userPerformanceGoal.findUnique({
         where: { userId },
-        select: { id: true },
+        select: { frozenAt: true },
       }),
     ]);
-    return onboarding?.status !== 'COMPLETED' || !goal;
+    return onboarding?.status !== 'COMPLETED' || !goal?.frozenAt;
   }
 
   async login(
