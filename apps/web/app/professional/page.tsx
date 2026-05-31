@@ -244,26 +244,12 @@ export default function ProfessionalDashboardPage() {
               <div className="pf-actions">
                 <Link className="pf-button" href="/professional/approvals">Rivedi approvazioni</Link>
                 {selectedUserId && (
-                  <>
-                    <Link
-                      className="pf-button-secondary"
-                      href={`/professional/users/${selectedUserId}/performance`}
-                    >
-                      Profilo completo
-                    </Link>
-                    <Link
-                      className="pf-button-secondary"
-                      href={`/professional/users/${selectedUserId}/performance?view=plans`}
-                    >
-                      Lavori storici
-                    </Link>
-                    <Link
-                      className="pf-button-secondary"
-                      href={`/professional/users/${selectedUserId}/performance?view=questions`}
-                    >
-                      Questionari storici
-                    </Link>
-                  </>
+                  <Link
+                    className="pf-button-secondary"
+                    href={`/professional/users/${selectedUserId}/performance`}
+                  >
+                    Profilo atleta
+                  </Link>
                 )}
               </div>
             </div>

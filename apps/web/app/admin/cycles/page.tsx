@@ -315,14 +315,6 @@ export default function AdminCyclesPage() {
     () => athletes.filter((athlete) => athlete.trainingState.generationReady),
     [athletes],
   );
-  const trainingCandidates = useMemo(
-    () =>
-      athletes.filter(
-        (athlete) =>
-          athlete.isActive && athlete.onboarding.status === "COMPLETED",
-      ),
-    [athletes],
-  );
   const waitingApproval =
     dashboard?.pendingCycles.filter(
       (cycle) => cycle.cycleStatus !== "READY_TO_PUBLISH",
@@ -1034,11 +1026,11 @@ export default function AdminCyclesPage() {
             </p>
           </div>
           <StatusBadge tone={readyTraining.length ? "success" : "neutral"}>
-            {readyTraining.length}/{trainingCandidates.length} pronti
+            {readyTraining.length} pronti
           </StatusBadge>
         </div>
         <div className="pf-table">
-          {trainingCandidates.map((athlete) => (
+          {readyTraining.map((athlete) => (
             <article key={`training:${athlete.id}`} className="pf-work-row">
               <div>
                 <strong>{displayUser(athlete)}</strong>
@@ -1051,11 +1043,6 @@ export default function AdminCyclesPage() {
                     {athlete.trainingState.linkedCoach?.email ?? "non assegnato"}
                   </p>
                 )}
-                {athlete.trainingState.pendingTraining && (
-                  <p className="pf-muted">
-                    In approvazione v{athlete.trainingState.pendingTraining.version}
-                  </p>
-                )}
                 {athlete.trainingState.activeTraining && (
                   <p className="pf-muted">
                     Ultimo allenamento v{athlete.trainingState.activeTraining.version} -{" "}
@@ -1063,28 +1050,11 @@ export default function AdminCyclesPage() {
                   </p>
                 )}
               </div>
-              {athlete.trainingState.sportSelection &&
-                !athlete.trainingState.linkedCoach && (
-                  <button
-                    className="pf-button-secondary"
-                    type="button"
-                    onClick={() =>
-                      openCoachAssignmentModal(
-                        athlete,
-                        athlete.trainingState.sportSelection!.specializationId,
-                        `${athlete.trainingState.sportSelection!.sport.label} - ${athlete.trainingState.sportSelection!.specialization.label}`,
-                      )
-                    }
-                  >
-                    Assegna allenatore
-                  </button>
-                )}
               <button
                 className="pf-button"
                 type="button"
                 disabled={
-                  busyKey === `training-preview:${athlete.id}` ||
-                  !athlete.trainingState.generationReady
+                  busyKey === `training-preview:${athlete.id}`
                 }
                 onClick={() => openTrainingPreview(athlete)}
               >
@@ -1092,10 +1062,10 @@ export default function AdminCyclesPage() {
               </button>
             </article>
           ))}
-          {!loading && trainingCandidates.length === 0 && (
+          {!loading && readyTraining.length === 0 && (
             <EmptyState
-              title="Nessun allenamento generabile"
-              description="Gli atleti con onboarding completato appariranno qui."
+              title="Niente da generare"
+              description="Al momento nessun atleta ha sport, onboarding e allenatore pronti per un nuovo allenamento."
             />
           )}
         </div>
@@ -1326,6 +1296,30 @@ export default function AdminCyclesPage() {
                       <span>{state.area.name}</span>
                     </button>
                   ))}
+                  {athlete.trainingState.sportSelection && (
+                    <button
+                      className={`pf-area-pill ${
+                        athlete.trainingState.generationReady ? "ready" : ""
+                      } ${athlete.trainingState.linkedCoach ? "assigned" : ""}`}
+                      type="button"
+                      onClick={() =>
+                        openCoachAssignmentModal(
+                          athlete,
+                          athlete.trainingState.sportSelection!.specializationId,
+                          `${athlete.trainingState.sportSelection!.sport.label} - ${athlete.trainingState.sportSelection!.specialization.label}`,
+                        )
+                      }
+                    >
+                      <span>
+                        Allenamento:{" "}
+                        {athlete.trainingState.sportSelection.sport.label} -{" "}
+                        {
+                          athlete.trainingState.sportSelection.specialization
+                            .label
+                        }
+                      </span>
+                    </button>
+                  )}
                 </div>
               </article>
             );

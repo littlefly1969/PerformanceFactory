@@ -54,6 +54,18 @@ export class AbacService {
     return !!link;
   }
 
+  async canCoachAccessUser(coachId: string, userId: string): Promise<boolean> {
+    if (!coachId || !userId) {
+      return false;
+    }
+
+    const link = await this.prisma.coachUserLink.findFirst({
+      where: { coachId, userId },
+      select: { id: true },
+    });
+    return !!link;
+  }
+
   async canCoachAccessUserSpecialization(
     coachId: string,
     userId: string,

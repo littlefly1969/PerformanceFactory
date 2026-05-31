@@ -53,7 +53,7 @@ export class PlansService {
     }
 
     if (actor.role === UserRole.PROFESSIONAL && targetUserId !== actor.id) {
-      const allowed = await this.abac.canAccessUserArea(
+      const allowed = await this.canReadUserAreaHistory(
         actor.id,
         targetUserId,
         areaId,
@@ -114,7 +114,7 @@ export class PlansService {
     }
 
     if (actor.role === UserRole.PROFESSIONAL && targetUserId !== actor.id) {
-      const allowed = await this.abac.canAccessUserArea(
+      const allowed = await this.canReadUserAreaHistory(
         actor.id,
         targetUserId,
         areaId,
@@ -166,6 +166,18 @@ export class PlansService {
     });
 
     return new Set(competences.map((item) => item.areaId));
+  }
+
+  private async canReadUserAreaHistory(
+    professionalId: string,
+    userId: string,
+    areaId: string,
+  ) {
+    const [areaAccess, coachAccess] = await Promise.all([
+      this.abac.canAccessUserArea(professionalId, userId, areaId),
+      this.abac.canCoachAccessUser(professionalId, userId),
+    ]);
+    return areaAccess || coachAccess;
   }
 
   async getPendingApprovalsForProfessional(actor: Actor) {

@@ -206,3 +206,7 @@ Il riepilogo dei comandi correnti e in [`comandi.md`](./comandi.md).
 - La registrazione Google verifica prima l'identita, poi richiede accettazione privacy/AI su `/register/google/consents`; l'utente viene creato solo dopo i consensi.
 - I documenti privacy e AI sono versionati in database, con hash server-side e gestione admin in `/admin/consents`.
 - Se un documento attivo cambia versione/hash, l'utente viene bloccato su `/consents` fino a nuova accettazione.
+
+## Flussi Funzionali
+
+- Profilo performance professionista/allenatore: [`docs/flows/professional-athlete-profile.md`](./docs/flows/professional-athlete-profile.md).

@@ -64,6 +64,9 @@ const makePrismaMock = () => {
   const links = [
     { professionalId: 'pro-1', userId: 'user-1', areaId: 'area-1' },
   ];
+  const coachLinks = [
+    { coachId: 'coach-1', userId: 'user-1', specializationId: 'spec-1' },
+  ];
 
   const snapshots = [
     {
@@ -79,13 +82,19 @@ const makePrismaMock = () => {
           potentialP: 80,
           area: { id: 'area-1', name: 'Footwork' },
         },
+        {
+          areaId: 'area-2',
+          realR: 90,
+          potentialP: 95,
+          area: { id: 'area-2', name: 'Endurance' },
+        },
       ],
     },
   ];
 
   return createPrismaTestFake({
     professionalUserLink: createProfessionalUserLinkDelegate(links),
-    coachUserLink: createCoachUserLinkDelegate(),
+    coachUserLink: createCoachUserLinkDelegate(coachLinks),
     professionalAreaCompetence: {
       findMany: ({ where }: { where: { professionalId: string } }) => {
         if (where.professionalId === 'pro-1') {
@@ -95,11 +104,30 @@ const makePrismaMock = () => {
       },
     },
     userSportSelection: {
-      findUnique: () => null,
+      findUnique: ({ where }: { where: { userId: string } }) =>
+        where.userId === 'user-1' ? { specializationId: 'spec-1' } : null,
+    },
+    sportSpecializationAreaPrompt: {
+      findMany: ({
+        where,
+      }: {
+        where: {
+          specializationId: string;
+          isActive: boolean;
+          isEnabledDriver: boolean;
+        };
+      }) =>
+        where.specializationId === 'spec-1' &&
+        where.isActive &&
+        where.isEnabledDriver
+          ? [{ areaId: 'area-1' }]
+          : [],
     },
     performanceProfileSnapshot: {
       findFirst: ({ where }: { where: { userId: string } }) =>
         snapshots.find((snapshot) => snapshot.userId === where.userId) ?? null,
+      findMany: ({ where }: { where: { userId: string } }) =>
+        snapshots.filter((snapshot) => snapshot.userId === where.userId),
     },
     dataAccessAudit: {
       create: jest.fn(),
@@ -161,5 +189,25 @@ describe('Performance (e2e)', () => {
 
     expect(denied.statusCode).toBe(403);
     expect(JSON.stringify(allowed.json())).not.toContain('password');
+  });
+
+  it('shows the full performance profile to the assigned coach', async () => {
+    const response = await inject({
+      method: 'GET',
+      url: '/api/performance/profile/current?userId=user-1',
+      headers: {
+        'x-test-user-id': 'coach-1',
+        'x-test-role': UserRole.PROFESSIONAL,
+      },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      rankingGlobal: 75,
+      areas: [
+        { areaId: 'area-1', area: { name: 'Footwork' } },
+        { areaId: 'area-2', area: { name: 'Endurance' } },
+      ],
+    });
   });
 });

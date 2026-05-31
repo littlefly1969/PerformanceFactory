@@ -47,12 +47,8 @@ export class PerformanceService {
   async getCurrentProfile(actor: Actor, userId?: string) {
     const targetUserId = await this.resolveTargetUser(actor, userId);
     await this.auditAccess(actor, targetUserId, 'performance.profile.current');
-    const allowedAreaIds =
-      actor.role === UserRole.PROFESSIONAL && targetUserId !== actor.id
-        ? await this.getAllowedAreaIds(actor.id)
-        : null;
-    const enabledDriverAreaIds =
-      await this.getEnabledDriverAreaIds(targetUserId);
+    const { allowedAreaIds, enabledDriverAreaIds } =
+      await this.getProfileAreaFilters(actor, targetUserId);
 
     const snapshot = await this.prisma.performanceProfileSnapshot.findFirst({
       where: { userId: targetUserId },
@@ -88,12 +84,8 @@ export class PerformanceService {
   async getProfileHistory(actor: Actor, userId?: string) {
     const targetUserId = await this.resolveTargetUser(actor, userId);
     await this.auditAccess(actor, targetUserId, 'performance.profile.history');
-    const allowedAreaIds =
-      actor.role === UserRole.PROFESSIONAL && targetUserId !== actor.id
-        ? await this.getAllowedAreaIds(actor.id)
-        : null;
-    const enabledDriverAreaIds =
-      await this.getEnabledDriverAreaIds(targetUserId);
+    const { allowedAreaIds, enabledDriverAreaIds } =
+      await this.getProfileAreaFilters(actor, targetUserId);
 
     const snapshots = await this.prisma.performanceProfileSnapshot.findMany({
       where: { userId: targetUserId },
@@ -127,6 +119,28 @@ export class PerformanceService {
     });
 
     return new Set(competences.map((item) => item.areaId));
+  }
+
+  private async getProfileAreaFilters(actor: Actor, targetUserId: string) {
+    if (actor.role === UserRole.PROFESSIONAL && targetUserId !== actor.id) {
+      const canCoachAccessUser = await this.abac.canCoachAccessUser(
+        actor.id,
+        targetUserId,
+      );
+      if (canCoachAccessUser) {
+        return { allowedAreaIds: null, enabledDriverAreaIds: null };
+      }
+
+      return {
+        allowedAreaIds: await this.getAllowedAreaIds(actor.id),
+        enabledDriverAreaIds: await this.getEnabledDriverAreaIds(targetUserId),
+      };
+    }
+
+    return {
+      allowedAreaIds: null,
+      enabledDriverAreaIds: await this.getEnabledDriverAreaIds(targetUserId),
+    };
   }
 
   private async getEnabledDriverAreaIds(userId: string) {

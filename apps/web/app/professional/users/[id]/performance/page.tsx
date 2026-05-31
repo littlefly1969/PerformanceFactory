@@ -40,10 +40,12 @@ type Piano = {
   version: number;
   status: string;
   createdAt: string;
+  sourceSnapshotId?: string | null;
   items: PlanItem[];
 };
 type QuestionSet = {
   id: string;
+  planReleaseId?: string | null;
   status: string;
   createdAt: string;
   areaId?: string;
@@ -111,6 +113,59 @@ export default function ProfessionalUserPerformancePage() {
     [history],
   );
 
+  const areaNameById = useMemo(() => {
+    const entries = new Map<string, string>();
+    for (const snapshot of history) {
+      for (const area of snapshot.areas) {
+        entries.set(area.areaId, area.area?.name ?? "Area");
+      }
+    }
+    for (const area of current?.areas ?? []) {
+      entries.set(area.areaId, area.area?.name ?? "Area");
+    }
+    return entries;
+  }, [current, history]);
+
+  const historicalCycles = useMemo(() => {
+    const questionsByPlan = new Map<string, QuestionSet[]>();
+    const standaloneQuestions: QuestionSet[] = [];
+
+    for (const questionSet of questionHistory) {
+      if (questionSet.planReleaseId) {
+        const entries = questionsByPlan.get(questionSet.planReleaseId) ?? [];
+        entries.push(questionSet);
+        questionsByPlan.set(questionSet.planReleaseId, entries);
+      } else {
+        standaloneQuestions.push(questionSet);
+      }
+    }
+
+    const planCycles = planHistory.map((plan) => ({
+      id: plan.id,
+      areaId: plan.areaId,
+      areaName: areaNameById.get(plan.areaId) ?? "Area",
+      createdAt: plan.createdAt,
+      plan,
+      questionSets: questionsByPlan.get(plan.id) ?? [],
+    }));
+
+    const questionOnlyCycles = standaloneQuestions.map((questionSet) => ({
+      id: questionSet.id,
+      areaId: questionSet.areaId ?? "",
+      areaName: questionSet.areaId
+        ? (areaNameById.get(questionSet.areaId) ?? "Area")
+        : "Area",
+      createdAt: questionSet.createdAt,
+      plan: null,
+      questionSets: [questionSet],
+    }));
+
+    return [...planCycles, ...questionOnlyCycles].sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+  }, [areaNameById, planHistory, questionHistory]);
+
   const loadProfilo = async () => {
     if (!userId) {
       return;
@@ -176,7 +231,7 @@ export default function ProfessionalUserPerformancePage() {
     <ProductShell
       eyebrow="Ambiente professionista"
       title="Profilo performance atleta"
-      description="Storico performance in sola lettura per un atleta collegato, filtrato sulle aree assegnate."
+      description="Storico performance in sola lettura per un atleta collegato."
       actions={
         <div className="pf-header-actions">
           <Link className="pf-button-secondary" href="/professional">
@@ -217,7 +272,7 @@ export default function ProfessionalUserPerformancePage() {
             <div>
               <h2>Snapshot corrente</h2>
               <p className="pf-muted">
-                I valori R/P sono visibili solo per le aree assegnate a te.
+                I valori R/P mostrano il perimetro visibile per il tuo incarico.
               </p>
             </div>
             {current && (
@@ -258,9 +313,9 @@ export default function ProfessionalUserPerformancePage() {
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
-            <h2>Storico snapshot</h2>
+            <h2>Progressione performance</h2>
             <p className="pf-muted">
-              Ranking storico e motivo della generazione.
+              Timeline sintetica degli snapshot generati alla chiusura dei cicli.
             </p>
           </div>
         </div>
@@ -289,88 +344,92 @@ export default function ProfessionalUserPerformancePage() {
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
-            <h2>Storico lavori</h2>
+            <h2>Storico cicli</h2>
             <p className="pf-muted">
-              Esercizi attivi, completati e chiusi visibili per le aree assegnate.
+              Lavori assegnati e questionari collegati, raccolti per ciclo.
             </p>
           </div>
         </div>
         <div className="pf-stack">
-          {planHistory.map((plan) => (
-            <article key={plan.id} className="pf-card">
+          {historicalCycles.map((cycle) => (
+            <article key={cycle.id} className="pf-card">
               <div className="pf-card-top">
                 <div>
-                  <h3>Versione {plan.version}</h3>
-                  <p className="pf-muted">{formatDate(plan.createdAt)}</p>
+                  <h3>{cycle.areaName}</h3>
+                  <p className="pf-muted">
+                    {formatDate(cycle.createdAt)}
+                    {cycle.plan ? ` - versione ${cycle.plan.version}` : ""}
+                  </p>
                 </div>
-                <StatusBadge tone={plan.status === "ACTIVE" ? "accent" : "neutral"}>
-                  {cleanStato(plan.status)}
+                <StatusBadge
+                  tone={cycle.plan?.status === "ACTIVE" ? "accent" : "neutral"}
+                >
+                  {cycle.plan ? cleanStato(cycle.plan.status) : "questionario"}
                 </StatusBadge>
               </div>
-              <div className="pf-stack">
-                {plan.items.map((item) => (
-                  <div key={item.id} className="pf-work-row">
-                    <span>
-                      <strong>{item.title}</strong>
-                      <small>
-                        {cleanStato(item.status)}
-                        {item.completedAt ? ` - completato ${formatDate(item.completedAt)}` : ""}
-                        {item.completionRating ? ` - voto ${item.completionRating}` : ""}
-                      </small>
-                    </span>
-                    <p className="pf-muted">{item.body}</p>
-                  </div>
-                ))}
-              </div>
-            </article>
-          ))}
-          {!loading && planHistory.length === 0 && (
-            <EmptyState title="Nessuno storico allenamenti" description="Lo storico degli allenamenti pubblicati apparira qui." />
-          )}
-        </div>
-      </section>
 
-      <section className="pf-panel">
-        <div className="pf-panel-header">
-          <div>
-            <h2>Storico questionari</h2>
-            <p className="pf-muted">
-              Domande e risposte storiche visibili per le aree assegnate.
-            </p>
-          </div>
-        </div>
-        <div className="pf-stack">
-          {questionHistory.map((set) => (
-            <article key={set.id} className="pf-card">
-              <div className="pf-card-top">
-                <div>
-                  <h3>{formatDate(set.createdAt)}</h3>
-                  <p className="pf-muted">{set.questions.length} domande</p>
-                </div>
-                <StatusBadge tone={set.status === "CLOSED" ? "success" : "warning"}>
-                  {cleanStato(set.status)}
-                </StatusBadge>
-              </div>
               <div className="pf-stack">
-                {set.questions.map((question) => {
-                  const answer = question.answers?.[0];
-                  const answerLabel = question.options.find(
-                    (option) => option.id === answer?.answerOptionId,
-                  )?.label;
-                  return (
-                    <div key={question.id} className="pf-work-row">
-                      <span>
-                        <strong>{question.orderIndex}. {question.text}</strong>
-                        <small>{answerLabel ?? "Nessuna risposta registrata"}</small>
-                      </span>
+                {cycle.plan && (
+                  <section className="pf-panel-section">
+                    <div className="pf-section-title">Lavori</div>
+                    <div className="pf-stack">
+                      {cycle.plan.items.map((item) => (
+                        <div key={item.id} className="pf-work-row">
+                          <span>
+                            <strong>{item.title}</strong>
+                            <small>
+                              {cleanStato(item.status)}
+                              {item.completedAt
+                                ? ` - completato ${formatDate(item.completedAt)}`
+                                : ""}
+                              {item.completionRating
+                                ? ` - voto ${item.completionRating}`
+                                : ""}
+                            </small>
+                          </span>
+                          <p className="pf-muted">{item.body}</p>
+                        </div>
+                      ))}
                     </div>
-                  );
-                })}
+                  </section>
+                )}
+
+                <section className="pf-panel-section">
+                  <div className="pf-section-title">Questionario</div>
+                  <div className="pf-stack">
+                    {cycle.questionSets.flatMap((set) =>
+                      set.questions.map((question) => {
+                        const answer = question.answers?.[0];
+                        const answerLabel = question.options.find(
+                          (option) => option.id === answer?.answerOptionId,
+                        )?.label;
+                        return (
+                          <div key={question.id} className="pf-work-row">
+                            <span>
+                              <strong>
+                                {question.orderIndex}. {question.text}
+                              </strong>
+                              <small>
+                                {answerLabel ?? "Nessuna risposta registrata"}
+                              </small>
+                            </span>
+                          </div>
+                        );
+                      }),
+                    )}
+                    {!cycle.questionSets.length && (
+                      <p className="pf-muted">Nessun questionario collegato.</p>
+                    )}
+                  </div>
+                </section>
               </div>
             </article>
           ))}
-          {!loading && questionHistory.length === 0 && (
-            <EmptyState title="Nessuno storico questionari" description="Lo storico dei questionari apparira qui." />
+          {!loading && historicalCycles.length === 0 && (
+            <EmptyState
+              title="Nessuno storico cicli"
+              description="I cicli pubblicati appariranno qui con lavori e questionari collegati."
+            />
           )}
         </div>
       </section>
