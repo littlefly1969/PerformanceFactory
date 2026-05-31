@@ -736,32 +736,6 @@ export default function AdminCyclesPage() {
     setBusyKey(null);
   };
 
-  const closeRisposteQuestionari = async () => {
-    setBusyKey("maintenance:close-questionnaires");
-    setMessage(null);
-    const response = await secureFetch(
-      `${API_BASE}/admin/maintenance/close-answered-questionnaires`,
-      {
-        method: "POST",
-        credentials: "include",
-      },
-    );
-    if (!response.ok) {
-      setMessage(`Manutenzione non riuscita: ${await readError(response)}`);
-      setBusyKey(null);
-      return;
-    }
-    const result = (await response.json()) as {
-      scanned: number;
-      closedCount: number;
-    };
-    setMessage(
-      `Manutenzione completata: ${result.closedCount}/${result.scanned} questionari pubblicati chiusi.`,
-    );
-    await loadDashboard();
-    setBusyKey(null);
-  };
-
   const confirmExportActivePrompts = async () => {
     setBusyKey("export-active-prompts");
     setMessage(null);
@@ -866,14 +840,6 @@ export default function AdminCyclesPage() {
             disabled={busyKey === "export-active-prompts"}
           >
             Export prompt AI
-          </button>
-          <button
-            className="pf-button-secondary"
-            type="button"
-            onClick={closeRisposteQuestionari}
-            disabled={busyKey === "maintenance:close-questionnaires"}
-          >
-            Chiudi questionari inviati
           </button>
           <button
             className="pf-button-secondary"

@@ -178,17 +178,6 @@ export class AdminController {
     return this.consents.upsertDocument(body, req.user?.id ?? '');
   }
 
-  @Post('maintenance/close-answered-questionnaires')
-  @ApiOperation({
-    summary: 'Chiudi i questionari pubblicati che hanno gia tutte le risposte',
-  })
-  @ApiCookieAuth()
-  @UseGuards(AuthenticatedGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  closeAnsweredQuestionnaires() {
-    return this.admin.closeAnsweredQuestionnaires();
-  }
-
   @Post('cycles/:cycleId/publish')
   @ApiOperation({ summary: 'Pubblica un ciclo (solo amministratore)' })
   @ApiParam({ name: 'cycleId' })
