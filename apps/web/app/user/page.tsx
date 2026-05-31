@@ -221,11 +221,11 @@ export default function AthleteDashboardPage() {
           </div>
           <div className="pf-stack">
             <Link className="pf-metric-row pf-action-metric" href="/user/plan">
-              <span>Allenamenti da fare</span>
+              <span>Attivita da fare</span>
               <strong>{activeItems.length}</strong>
             </Link>
             <Link className="pf-metric-row pf-action-metric" href="/user/questions">
-              <span>Questionari aperti</span>
+              <span>Check-in aperti</span>
               <strong>{openQuestionSets.length}</strong>
             </Link>
             <Link className="pf-metric-row pf-action-metric" href="/user/performance">
@@ -240,7 +240,7 @@ export default function AthleteDashboardPage() {
         <div className="pf-panel-header">
           <div>
             <h2>Focus per area</h2>
-            <p className="pf-muted">Stato corrente per area con accesso diretto a lavoro e check-in.</p>
+            <p className="pf-muted">Stato corrente per area con accesso diretto a lavori e check-in.</p>
           </div>
         </div>
         <div className="pf-grid">
@@ -257,8 +257,8 @@ export default function AthleteDashboardPage() {
                   <div className="pf-area-focus-status">
                   <StatusBadge tone={active.length ? "accent" : "neutral"}>
                     {active.length
-                      ? `${active.length} ${active.length === 1 ? "allenamento" : "allenamenti"} da fare`
-                      : "Nessun allenamento da fare"}
+                      ? `${active.length} ${active.length === 1 ? "attivita" : "attivita"} da fare`
+                      : "Nessuna attivita da fare"}
                   </StatusBadge>
                   </div>
                 </div>
@@ -274,7 +274,7 @@ export default function AthleteDashboardPage() {
                 </div>
                 <div className="pf-area-question-status">
                   <Link href={`/user/questions?areaId=${encodeURIComponent(row.area.id)}`}>
-                    Questionario
+                    Check-in
                   </Link>
                   <StatusBadge tone={row.questionSet ? "warning" : "neutral"}>
                     {row.questionSet ? `${row.questionSet.questions.length} domande` : "Non disponibile"}
@@ -282,10 +282,10 @@ export default function AthleteDashboardPage() {
                 </div>
                 <div className="pf-actions pf-area-card-actions">
                   <Link className="pf-button-secondary" href={`/user/plan?areaId=${encodeURIComponent(row.area.id)}`}>
-                    Allenamenti
+                    Apri lavori
                   </Link>
                   <Link className="pf-button-secondary" href={`/user/questions?areaId=${encodeURIComponent(row.area.id)}`}>
-                    Questionari
+                    Check-in
                   </Link>
                   <Link className="pf-button-secondary" href={`/user/areas/${encodeURIComponent(row.area.id)}`}>
                     Dettaglio area

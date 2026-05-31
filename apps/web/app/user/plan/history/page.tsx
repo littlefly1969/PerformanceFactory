@@ -50,7 +50,7 @@ export default function UserPlanHistoryPage() {
 
     if (!response.ok) {
       if (response.status === 401) {
-        setAuthHint("Accedi per vedere lo storico allenamenti.");
+        setAuthHint("Accedi per vedere lo storico lavori.");
       }
       setLoading(false);
       return;
@@ -109,8 +109,8 @@ export default function UserPlanHistoryPage() {
   return (
     <ProductShell
       eyebrow="Ambiente atleta"
-      title="Storico allenamenti"
-      description="Scegli un'area per rivedere gli allenamenti precedenti."
+      title="Storico lavori per area"
+      description="Scegli un'area per rivedere i lavori precedenti."
       actions={
         <button
           className="pf-button-secondary"
@@ -152,7 +152,7 @@ export default function UserPlanHistoryPage() {
         <div className="pf-panel-header">
           <div>
             <h2>Storico</h2>
-            <p className="pf-muted">Allenamenti completati o chiusi dell'area selezionata.</p>
+            <p className="pf-muted">Lavori completati o chiusi dell'area selezionata.</p>
           </div>
         </div>
 
@@ -192,13 +192,13 @@ export default function UserPlanHistoryPage() {
           {!loading && areaId && history.length === 0 && (
             <EmptyState
               title="Nessuno storico"
-              description="Lo storico apparira dopo la pubblicazione degli allenamenti."
+              description="Lo storico apparira dopo la pubblicazione dei lavori per area."
             />
           )}
           {loading && (
             <EmptyState
               title="Caricamento storico"
-              description="Sto caricando gli allenamenti precedenti dell'area selezionata."
+              description="Sto caricando i lavori precedenti dell'area selezionata."
             />
           )}
         </div>

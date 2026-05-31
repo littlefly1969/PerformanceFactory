@@ -45,19 +45,18 @@ const roleNav: Record<string, NavItem[]> = {
     { href: "/user", label: "La tua performance" },
     {
       href: "/user/plan",
-      label: "Allenamenti",
+      label: "Attivita",
       children: [
-        { href: "/user/training", label: "Allenamento specifico" },
-        { href: "/user/plan", label: "Allenamenti attivi" },
-        { href: "/user/plan/history", label: "Storico allenamenti" },
+        { href: "/user/plan", label: "Attivita aperte" },
+        { href: "/user/plan/history", label: "Storico lavori per area" },
       ],
     },
     {
       href: "/user/questions",
-      label: "Questionari",
+      label: "Check-in",
       children: [
-        { href: "/user/questions", label: "Questionari aperti" },
-        { href: "/user/questions/history", label: "Storico questionari" },
+        { href: "/user/questions", label: "Check-in aperti" },
+        { href: "/user/questions/history", label: "Storico check-in" },
       ],
     },
   ],

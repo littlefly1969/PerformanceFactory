@@ -62,7 +62,7 @@ export default function UserQuestionsHistoryPage() {
 
     if (!response.ok) {
       if (response.status === 401) {
-        setAuthHint("Accedi per vedere lo storico questionari.");
+        setAuthHint("Accedi per vedere lo storico check-in.");
       }
       setLoading(false);
       return;
@@ -121,8 +121,8 @@ export default function UserQuestionsHistoryPage() {
   return (
     <ProductShell
       eyebrow="Ambiente atleta"
-      title="Storico questionari"
-      description="Scegli un'area per rivedere i questionari precedenti."
+      title="Storico check-in"
+      description="Scegli un'area per rivedere i check-in precedenti."
       actions={
         <button
           className="pf-button-secondary"
@@ -164,7 +164,7 @@ export default function UserQuestionsHistoryPage() {
         <div className="pf-panel-header">
           <div>
             <h2>Storico</h2>
-            <p className="pf-muted">Questionari completati dell'area selezionata.</p>
+            <p className="pf-muted">Check-in completati dell'area selezionata.</p>
           </div>
         </div>
 
@@ -198,13 +198,13 @@ export default function UserQuestionsHistoryPage() {
           {!loading && areaId && history.length === 0 && (
             <EmptyState
               title="Nessuno storico"
-              description="Lo storico apparira dopo la pubblicazione dei questionari."
+              description="Lo storico apparira dopo la pubblicazione dei check-in."
             />
           )}
           {loading && (
             <EmptyState
               title="Caricamento storico"
-              description="Sto caricando i questionari precedenti dell'area selezionata."
+              description="Sto caricando i check-in precedenti dell'area selezionata."
             />
           )}
         </div>

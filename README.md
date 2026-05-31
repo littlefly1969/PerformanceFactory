@@ -209,4 +209,5 @@ Il riepilogo dei comandi correnti e in [`comandi.md`](./comandi.md).
 
 ## Flussi Funzionali
 
+- Esperienza atleta attivita/check-in: [`docs/flows/athlete-activity-experience.md`](./docs/flows/athlete-activity-experience.md).
 - Profilo performance professionista/allenatore: [`docs/flows/professional-athlete-profile.md`](./docs/flows/professional-athlete-profile.md).

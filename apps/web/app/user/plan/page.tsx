@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  EmptyState,
   ProductShell,
   StatusBadge,
 } from "@/app/components/product-shell";
@@ -31,6 +32,40 @@ type Piano = {
   items: PlanItem[];
 };
 
+type TrainingOutput = {
+  summaryText?: string;
+  planItems?: Array<{
+    type?: string;
+    title?: string;
+    body?: string;
+  }>;
+};
+
+type TrainingPlan = {
+  id: string;
+  version: number;
+  status: string;
+  summaryText: string;
+  outputJson: TrainingOutput;
+  provider: string;
+  model: string;
+  createdAt: string;
+  specialization?: {
+    label: string;
+    sport: { label: string };
+  };
+  items?: Array<{
+    id: string;
+    type: string;
+    title: string;
+    body: string;
+    status: string;
+    completedAt?: string | null;
+    completionNotes?: string | null;
+    completionRating?: number | null;
+  }>;
+};
+
 type Area = { id: string; name: string };
 
 const cleanStato = (status: string) =>
@@ -42,10 +77,28 @@ const cleanStato = (status: string) =>
     PUBLISHED: "pubblicato",
   })[status] ?? status.replace(/_/g, " ").toLowerCase();
 
+const formatDate = (value?: string | null) => {
+  if (!value) {
+    return "-";
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime())
+    ? "-"
+    : parsed.toLocaleDateString("it-IT", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+};
+
 export default function UserPianoPage() {
   const [plan, setPiano] = useState<Piano | null>(null);
+  const [training, setTraining] = useState<TrainingPlan | null>(null);
+  const [trainingHistory, setTrainingHistory] = useState<TrainingPlan[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  const [trainingMessage, setTrainingMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [trainingLoading, setTrainingLoading] = useState(false);
   const [authHint, setAuthHint] = useState<string | null>(null);
   const [notesById, setNotesById] = useState<Record<string, string>>({});
   const [ratingById, setRatingById] = useState<Record<string, string>>({});
@@ -56,10 +109,55 @@ export default function UserPianoPage() {
   );
   const planRequestIdRef = useRef(0);
 
-  const activeItems = useMemo(
+  const activeAreaItems = useMemo(
     () => plan?.items.filter((item) => item.status === "ACTIVE") ?? [],
     [plan],
   );
+  const trainingItems = useMemo(
+    () =>
+      training?.items?.length
+        ? training.items
+        : (training?.outputJson?.planItems ?? []),
+    [training],
+  );
+  const activeTrainingItems = useMemo(
+    () =>
+      training?.items?.filter((item) => item.status === "ACTIVE") ?? [],
+    [training],
+  );
+  const completedTrainingItems = useMemo(
+    () =>
+      training?.items?.filter((item) => item.status === "COMPLETED") ?? [],
+    [training],
+  );
+  const totalOpenActivities = activeAreaItems.length + activeTrainingItems.length;
+
+  const loadTraining = async () => {
+    setTrainingLoading(true);
+    setTrainingMessage(null);
+    const [currentResponse, historyResponse] = await Promise.all([
+      secureFetch(`${API_BASE}/user/training/current`, {
+        credentials: "include",
+      }),
+      secureFetch(`${API_BASE}/user/training/history`, {
+        credentials: "include",
+      }),
+    ]);
+
+    if (currentResponse.ok) {
+      setTraining((await currentResponse.json()) as TrainingPlan);
+    } else {
+      setTraining(null);
+      if (currentResponse.status !== 404) {
+        setTrainingMessage("Impossibile caricare il percorso sportivo.");
+      }
+    }
+
+    if (historyResponse.ok) {
+      setTrainingHistory((await historyResponse.json()) as TrainingPlan[]);
+    }
+    setTrainingLoading(false);
+  };
 
   const loadAree = async () => {
     const response = await secureFetch(`${API_BASE}/areas`, {
@@ -116,7 +214,7 @@ export default function UserPianoPage() {
         return;
       }
       setPiano(null);
-      setMessage("Seleziona un'area per caricare l'allenamento corrente.");
+      setMessage("Seleziona un'area per caricare i lavori correnti.");
       setLoading(false);
       return;
     }
@@ -133,9 +231,9 @@ export default function UserPianoPage() {
     if (!response.ok) {
       setPiano(null);
       if (response.status === 401) {
-        setAuthHint("Accedi per vedere il tuo allenamento.");
+        setAuthHint("Accedi per vedere i tuoi lavori.");
       } else if (response.status >= 500) {
-        setMessage("Impossibile caricare l'allenamento corrente.");
+        setMessage("Impossibile caricare i lavori correnti.");
       }
       setLoading(false);
       return;
@@ -149,10 +247,14 @@ export default function UserPianoPage() {
     setLoading(false);
   };
 
+  const loadAll = async () => {
+    await Promise.all([loadTraining(), loadAree()]);
+  };
+
   useEffect(() => {
     void (async () => {
       if (!(await redirectIfOnboardingRequired())) {
-        await loadAree();
+        await loadAll();
       }
     })();
   }, []);
@@ -173,8 +275,7 @@ export default function UserPianoPage() {
     }
   }, [areaId, plansByArea]);
 
-  const completePlanItem = async (itemId: string) => {
-    setMessage(null);
+  const buildCompletionPayload = (itemId: string) => {
     const completionNotes = notesById[itemId]?.trim();
     const ratingRaw = ratingById[itemId]?.trim();
     const payload: { completionNotes?: string; completionRating?: number } = {};
@@ -189,13 +290,19 @@ export default function UserPianoPage() {
       }
     }
 
+    return payload;
+  };
+
+  const completePlanItem = async (itemId: string) => {
+    setMessage(null);
+
     const response = await secureFetch(
       `${API_BASE}/user/plan-items/${itemId}/complete`,
       {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(buildCompletionPayload(itemId)),
       },
     );
 
@@ -209,36 +316,217 @@ export default function UserPianoPage() {
     }
 
     await loadAree();
-    await loadPiano();
+    await loadPiano(areaId);
+  };
+
+  const completeTrainingItem = async (itemId: string) => {
+    setTrainingMessage(null);
+
+    const response = await secureFetch(
+      `${API_BASE}/user/training-plan-items/${itemId}/complete`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(buildCompletionPayload(itemId)),
+      },
+    );
+
+    if (!response.ok) {
+      setTrainingMessage(
+        response.status === 409
+          ? "Questo esercizio e gia stato completato."
+          : "Completamento esercizio non riuscito.",
+      );
+      return;
+    }
+
+    setTrainingMessage("Esercizio completato.");
+    await loadTraining();
   };
 
   return (
     <ProductShell
       eyebrow="Ambiente atleta"
-      title="Allenamenti da fare"
-      description="Il lavoro e organizzato per area. Le aree con allenamenti da fare sono evidenziate per prime: aprine una e completa l'allenamento assegnato."
+      title="Attivita"
+      description="Percorso sportivo e lavori per area sono nello stesso spazio, ma restano distinti per obiettivo e responsabilita."
       actions={
         <button
           className="pf-button-secondary"
           type="button"
-          onClick={() => loadAree()}
+          onClick={() => loadAll()}
         >
-          Aggiorna aree
+          Aggiorna
         </button>
       }
       stats={[
         {
-          label: "Allenamenti da fare",
-          value: loading ? "..." : activeItems.length,
+          label: "Attivita aperte",
+          value: loading || trainingLoading ? "..." : totalOpenActivities,
           tone: "accent",
+        },
+        {
+          label: "Percorso sportivo",
+          value: training ? cleanStato(training.status) : "-",
+          tone: training ? "success" : "neutral",
+        },
+        {
+          label: "Lavori area",
+          value: loading ? "..." : activeAreaItems.length,
+          tone: "warning",
         },
       ]}
     >
+      <section className="pf-panel pf-focus-panel">
+        <div className="pf-panel-header">
+          <div>
+            <h2>Percorso sportivo</h2>
+            <p className="pf-muted">
+              Lavoro complessivo generato per sport e specializzazione.
+            </p>
+          </div>
+          {training && (
+            <StatusBadge tone="success">{cleanStato(training.status)}</StatusBadge>
+          )}
+        </div>
+
+        {trainingMessage && <div className="pf-alert">{trainingMessage}</div>}
+
+        {!trainingLoading && !training && (
+          <EmptyState
+            title="Nessun percorso sportivo"
+            description="Quando viene pubblicato, lo vedrai qui separato dai lavori per area."
+          />
+        )}
+
+        {training && (
+          <div className="pf-stack">
+            <div>
+              <p className="pf-muted">
+                Generato il {formatDate(training.createdAt)}
+                {training.specialization
+                  ? ` - ${training.specialization.sport.label} / ${training.specialization.label}`
+                  : ""}
+              </p>
+              <p>{training.summaryText}</p>
+            </div>
+
+            {trainingItems.map((item, index) => {
+              const itemId =
+                "id" in item && typeof item.id === "string" ? item.id : null;
+              const itemStatus =
+                "status" in item && typeof item.status === "string"
+                  ? item.status
+                  : "";
+              const actionable = Boolean(itemId) && itemStatus === "ACTIVE";
+              const completed = itemStatus === "COMPLETED";
+              const completedAt =
+                "completedAt" in item &&
+                (typeof item.completedAt === "string" ||
+                  item.completedAt === null)
+                  ? item.completedAt
+                  : null;
+              const completionRating =
+                "completionRating" in item &&
+                typeof item.completionRating === "number"
+                  ? item.completionRating
+                  : null;
+
+              return (
+                <article
+                  key={`${item.title ?? "item"}:${index}`}
+                  className="pf-card pf-active-plan-card"
+                >
+                  <div className="pf-card-top pf-active-plan-header">
+                    <div>
+                      <p className="pf-eyebrow">
+                        {"type" in item ? item.type : "Percorso sportivo"}
+                      </p>
+                      <h3>{item.title ?? `Blocco ${index + 1}`}</h3>
+                    </div>
+                    {itemStatus && (
+                      <StatusBadge tone={completed ? "success" : "accent"}>
+                        {cleanStato(itemStatus)}
+                      </StatusBadge>
+                    )}
+                  </div>
+                  <p className="pf-active-plan-body">{item.body}</p>
+                  {completed && (
+                    <p className="pf-muted">
+                      Completato {formatDate(completedAt)}
+                      {completionRating ? ` - voto ${completionRating}/10` : ""}
+                    </p>
+                  )}
+                  {actionable && itemId && (
+                    <>
+                      <div className="pf-grid pf-active-plan-form">
+                        <label className="pf-field">
+                          Note di completamento
+                          <textarea
+                            className="pf-textarea"
+                            rows={3}
+                            value={notesById[itemId] ?? ""}
+                            onChange={(event) =>
+                              setNotesById((prev) => ({
+                                ...prev,
+                                [itemId]: event.target.value,
+                              }))
+                            }
+                            placeholder="Cosa hai completato?"
+                          />
+                        </label>
+                        <label className="pf-field">
+                          Voto
+                          <input
+                            className="pf-input"
+                            type="number"
+                            min={1}
+                            max={10}
+                            value={ratingById[itemId] ?? ""}
+                            onChange={(event) =>
+                              setRatingById((prev) => ({
+                                ...prev,
+                                [itemId]: event.target.value,
+                              }))
+                            }
+                            placeholder="1-10"
+                          />
+                        </label>
+                      </div>
+                      <div className="pf-active-plan-actions">
+                        <button
+                          className="pf-button"
+                          type="button"
+                          onClick={() => completeTrainingItem(itemId)}
+                        >
+                          Segna come completato
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </article>
+              );
+            })}
+
+            <div className="pf-metric-row">
+              <span>Completati</span>
+              <strong>{completedTrainingItems.length}</strong>
+            </div>
+            <div className="pf-metric-row">
+              <span>Storico percorso</span>
+              <strong>{trainingHistory.length}</strong>
+            </div>
+          </div>
+        )}
+      </section>
+
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
-            <h2>Aree</h2>
-            <p className="pf-muted">Apri l'area che contiene lavoro da completare.</p>
+            <h2>Lavori per area</h2>
+            <p className="pf-muted">
+              Attivita operative collegate alle aree performance.
+            </p>
           </div>
         </div>
         <div className="pf-area-grid">
@@ -271,9 +559,9 @@ export default function UserPianoPage() {
                   <strong>{area.name}</strong>
                   <small>
                     {active
-                      ? `${active} ${active === 1 ? "allenamento" : "allenamenti"} da fare`
+                      ? `${active} ${active === 1 ? "lavoro" : "lavori"} da fare`
                       : completed
-                        ? `${completed} completate`
+                        ? `${completed} completati`
                         : "Da assegnare"}
                   </small>
                 </span>
@@ -286,7 +574,7 @@ export default function UserPianoPage() {
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
-            <h2>Lavoro di oggi</h2>
+            <h2>Lavori aperti</h2>
             <p className="pf-muted">
               Completa le attivita solo quando sono state davvero eseguite.
             </p>
@@ -296,7 +584,7 @@ export default function UserPianoPage() {
             type="button"
             onClick={() => loadPiano()}
           >
-            Aggiorna
+            Aggiorna lavori
           </button>
         </div>
 
@@ -304,7 +592,7 @@ export default function UserPianoPage() {
         {message && <div className="pf-alert">{message}</div>}
 
         <div className="pf-stack">
-          {activeItems.map((item) => (
+          {activeAreaItems.map((item) => (
             <article key={item.id} className="pf-card pf-active-plan-card">
               <div className="pf-card-top pf-active-plan-header">
                 <div>
@@ -364,14 +652,13 @@ export default function UserPianoPage() {
             </article>
           ))}
 
-          {!loading && activeItems.length === 0 && (
+          {!loading && activeAreaItems.length === 0 && (
             <p className="pf-plain-empty">
               {areaId ? "Nessun lavoro da fare." : "Seleziona un'area."}
             </p>
           )}
         </div>
       </section>
-
     </ProductShell>
   );
 }

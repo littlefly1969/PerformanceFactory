@@ -127,7 +127,7 @@ export default function UserPerformancePage() {
           !loading && (
             <EmptyState
               title="Profilo non ancora disponibile"
-              description="Completa e chiudi un questionario pubblicato per generare il primo snapshot performance."
+              description="Completa e chiudi un check-in pubblicato per generare il primo snapshot performance."
             />
           )
         )}

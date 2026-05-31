@@ -138,7 +138,7 @@ export default function UserAreaDetailPage() {
     <ProductShell
       eyebrow="Ambiente atleta"
       title={areaName}
-      description="Dettaglio della tua performance per questa area, con valori reali, potenziali, allenamenti e questionari disponibili."
+      description="Dettaglio della tua performance per questa area, con valori reali, potenziali, lavori e check-in disponibili."
       actions={
         <div className="pf-header-actions">
           <Link className="pf-button-secondary" href="/user">
@@ -190,7 +190,7 @@ export default function UserAreaDetailPage() {
           <article className="pf-card">
             <h3>Potenziale</h3>
             <p className="pf-muted">
-              Stima del livello verso cui orientare allenamenti e questionari di questa area.
+              Stima del livello verso cui orientare lavori e check-in di questa area.
             </p>
             <strong className="pf-score-value">{formatScore(selectedArea?.potentialP)}</strong>
           </article>
@@ -200,11 +200,11 @@ export default function UserAreaDetailPage() {
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
-            <h2>Allenamenti disponibili</h2>
-            <p className="pf-muted">Allenamenti da fare collegati solo a questa area.</p>
+            <h2>Lavori disponibili</h2>
+            <p className="pf-muted">Attivita da fare collegate solo a questa area.</p>
           </div>
           <Link className="pf-button-secondary" href={`/user/plan?areaId=${encodeURIComponent(areaId)}`}>
-            Apri allenamenti
+            Apri lavori
           </Link>
         </div>
         <div className="pf-stack">
@@ -219,8 +219,8 @@ export default function UserAreaDetailPage() {
           ))}
           {!loading && activeItems.length === 0 && (
             <EmptyState
-              title="Nessun allenamento da fare"
-              description="Non ci sono allenamenti attivi pubblicati per questa area."
+              title="Nessun lavoro da fare"
+              description="Non ci sono lavori attivi pubblicati per questa area."
             />
           )}
         </div>
@@ -229,11 +229,11 @@ export default function UserAreaDetailPage() {
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
-            <h2>Questionari disponibili</h2>
-            <p className="pf-muted">Questionari aperti collegati solo a questa area.</p>
+            <h2>Check-in disponibili</h2>
+            <p className="pf-muted">Check-in aperti collegati solo a questa area.</p>
           </div>
           <Link className="pf-button-secondary" href={`/user/questions?areaId=${encodeURIComponent(areaId)}`}>
-            Apri questionari
+            Apri check-in
           </Link>
         </div>
         {questionSet ? (
@@ -258,8 +258,8 @@ export default function UserAreaDetailPage() {
         ) : (
           !loading && (
             <EmptyState
-              title="Nessun questionario disponibile"
-              description="Non ci sono questionari aperti pubblicati per questa area."
+              title="Nessun check-in disponibile"
+              description="Non ci sono check-in aperti pubblicati per questa area."
             />
           )
         )}

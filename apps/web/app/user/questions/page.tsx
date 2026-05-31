@@ -33,6 +33,25 @@ type QuestionSet = {
   areaId?: string;
   questions: Question[];
 };
+type TrainingQuestion = {
+  id: string;
+  text: string;
+  orderIndex: number;
+  options: Array<{ id: string; label: string; score: number }>;
+};
+type TrainingPlan = {
+  id: string;
+  status: string;
+  specialization?: {
+    label: string;
+    sport: { label: string };
+  };
+  questionSets?: Array<{
+    id: string;
+    status: string;
+    questions: TrainingQuestion[];
+  }>;
+};
 type Snapshot = {
   id: string;
   rankingGlobal: number;
@@ -47,6 +66,11 @@ export default function UserQuestionsPage() {
   const [loading, setLoading] = useState(false);
   const [authHint, setAuthHint] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [training, setTraining] = useState<TrainingPlan | null>(null);
+  const [trainingSelected, setTrainingSelected] = useState<Record<string, string>>(
+    {},
+  );
+  const [trainingSubmitted, setTrainingSubmitted] = useState(false);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [areas, setAree] = useState<Area[]>([]);
   const [areaId, setAreaId] = useState("");
@@ -56,6 +80,23 @@ export default function UserQuestionsPage() {
   const questionRequestIdRef = useRef(0);
 
   const totalQuestions = questionSet?.questions.length ?? 0;
+  const trainingQuestionSet =
+    training?.questionSets?.find((set) => set.status !== "CLOSED") ?? null;
+  const totalOpenQuestions =
+    totalQuestions + (trainingQuestionSet?.questions.length ?? 0);
+
+  const loadTrainingCheckIn = async () => {
+    setTrainingSelected({});
+    setTrainingSubmitted(false);
+    const response = await secureFetch(`${API_BASE}/user/training/current`, {
+      credentials: "include",
+    });
+    if (response.ok) {
+      setTraining((await response.json()) as TrainingPlan);
+      return;
+    }
+    setTraining(null);
+  };
 
   const loadAree = async () => {
     const response = await secureFetch(`${API_BASE}/areas`, {
@@ -113,7 +154,7 @@ export default function UserQuestionsPage() {
         return;
       }
       setQuestionSet(null);
-      setMessage("Seleziona un'area per caricare il questionario.");
+      setMessage("Seleziona un'area per caricare il check-in.");
       setLoading(false);
       return;
     }
@@ -130,9 +171,9 @@ export default function UserQuestionsPage() {
     if (!response.ok) {
       setQuestionSet(null);
       if (response.status === 401) {
-        setAuthHint("Accedi per rispondere al questionario.");
+        setAuthHint("Accedi per rispondere al check-in.");
       } else if (response.status >= 500) {
-        setMessage("Impossibile caricare il questionario.");
+        setMessage("Impossibile caricare il check-in.");
       }
       setLoading(false);
       return;
@@ -149,7 +190,7 @@ export default function UserQuestionsPage() {
   useEffect(() => {
     void (async () => {
       if (!(await redirectIfOnboardingRequired())) {
-        await loadAree();
+        await Promise.all([loadAree(), loadTrainingCheckIn()]);
       }
     })();
   }, []);
@@ -213,39 +254,147 @@ export default function UserQuestionsPage() {
     setQuestionSet((current) =>
       current ? { ...current, status: "CLOSED" } : current,
     );
-    setMessage("Risposte inviate. Questionario chiuso e profilo aggiornato.");
+    setMessage("Risposte inviate. Check-in chiuso e profilo aggiornato.");
     await loadAree();
+  };
+
+  const submitTrainingAnswers = async () => {
+    if (!trainingQuestionSet) {
+      return;
+    }
+    setMessage(null);
+
+    const answers = trainingQuestionSet.questions.map((question) => ({
+      questionId: question.id,
+      answerOptionId: trainingSelected[question.id],
+    }));
+
+    if (answers.some((answer) => !answer.answerOptionId)) {
+      setMessage("Rispondi a tutte le domande del check-in sportivo prima dell'invio.");
+      return;
+    }
+
+    const response = await secureFetch(`${API_BASE}/answers/training/batch`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ questionSetId: trainingQuestionSet.id, answers }),
+    });
+
+    if (!response.ok) {
+      setMessage("Le risposte del check-in sportivo non possono essere inviate. Potrebbero esistere gia.");
+      return;
+    }
+
+    setTrainingSubmitted(true);
+    setMessage("Check-in sportivo inviato.");
+    await loadTrainingCheckIn();
   };
 
   return (
     <ProductShell
       eyebrow="Ambiente atleta"
-      title="Questionari da compilare"
-      description="I questionari sono organizzati per area. Le aree con domande da rispondere sono evidenziate per prime."
+      title="Check-in"
+      description="Le misurazioni sono separate dalle attivita: rispondi qui ai check-in sportivi e per area."
       actions={
         <button
           className="pf-button-secondary"
           type="button"
-          onClick={() => loadAree()}
+          onClick={() => Promise.all([loadAree(), loadTrainingCheckIn()])}
         >
-          Aggiorna aree
+          Aggiorna
         </button>
       }
       stats={[
         {
-          label: "Domande da rispondere",
-          value: loading ? "..." : totalQuestions,
+          label: "Domande aperte",
+          value: loading ? "..." : totalOpenQuestions,
           tone: "accent",
         },
       ]}
     >
+      <section className="pf-panel pf-focus-panel">
+        <div className="pf-panel-header">
+          <div>
+            <h2>Check-in percorso sportivo</h2>
+            <p className="pf-muted">
+              Check-in del percorso complessivo legato a sport e specializzazione.
+            </p>
+          </div>
+          {trainingQuestionSet && (
+            <StatusBadge tone="warning">
+              {trainingQuestionSet.questions.length} domande
+            </StatusBadge>
+          )}
+        </div>
+
+        <div className="pf-stack">
+          {trainingQuestionSet?.questions.map((question) => (
+            <article key={question.id} className="pf-card">
+              <div className="pf-card-top">
+                <div>
+                  <h3>
+                    {question.orderIndex}. {question.text}
+                  </h3>
+                  <p className="pf-muted">
+                    {training?.specialization
+                      ? `${training.specialization.sport.label} / ${training.specialization.label}`
+                      : "Percorso sportivo"}
+                  </p>
+                </div>
+                {trainingSelected[question.id] && (
+                  <StatusBadge tone="success">Risposta</StatusBadge>
+                )}
+              </div>
+              <div className="pf-grid">
+                {question.options.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={
+                      trainingSelected[question.id] === option.id
+                        ? "pf-button"
+                        : "pf-button-secondary"
+                    }
+                    onClick={() =>
+                      setTrainingSelected((prev) => ({
+                        ...prev,
+                        [question.id]: option.id,
+                      }))
+                    }
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </article>
+          ))}
+
+          {!trainingQuestionSet && (
+            <p className="pf-plain-empty">Nessun check-in sportivo aperto.</p>
+          )}
+        </div>
+
+        {trainingQuestionSet && (
+          <div className="pf-actions" style={{ marginTop: 18 }}>
+            <button
+              className="pf-button"
+              type="button"
+              onClick={submitTrainingAnswers}
+              disabled={trainingSubmitted}
+            >
+              {trainingSubmitted ? "Check-in inviato" : "Invia check-in sportivo"}
+            </button>
+          </div>
+        )}
+      </section>
+
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
             <h2>Aree</h2>
             <p className="pf-muted">
-              Le aree evidenziate hanno un questionario pubblicato in attesa
-              di risposta.
+              Le aree evidenziate hanno un check-in pubblicato in attesa di risposta.
             </p>
           </div>
         </div>
@@ -287,7 +436,7 @@ export default function UserQuestionsPage() {
       <section className="pf-panel">
         <div className="pf-panel-header">
           <div>
-            <h2>Questionario corrente</h2>
+            <h2>Check-in area</h2>
             <p className="pf-muted">
               Scegli l'opzione che descrive meglio la tua esecuzione attuale.
             </p>
@@ -344,7 +493,7 @@ export default function UserQuestionsPage() {
 
           {!loading && !questionSet && (
             <p className="pf-plain-empty">
-              {areaId ? "Nessun questionario da compilare." : "Seleziona un'area."}
+              {areaId ? "Nessun check-in area aperto." : "Seleziona un'area."}
             </p>
           )}
         </div>
@@ -357,7 +506,7 @@ export default function UserQuestionsPage() {
               onClick={handleSubmit}
               disabled={submitted}
             >
-              {submitted ? "Inviato e chiuso" : "Invia e chiudi"}
+              {submitted ? "Check-in inviato" : "Invia check-in area"}
             </button>
             {snapshot && (
               <StatusBadge tone="success">
