@@ -117,6 +117,13 @@ Endpoint locali predefiniti:
 - API: `http://127.0.0.1:4000/api`
 - Swagger: `http://127.0.0.1:4000/docs`
 
+Documentazione tecnica:
+
+- [architettura backend](docs/backend/architecture.md);
+- [API e OpenAPI](docs/api/README.md);
+- [autenticazione e autorizzazione](docs/api/authentication.md);
+- [errori e validazione](docs/api/errors.md).
+
 ## Quality Gate
 
 I comandi root sono quelli da usare per validazione locale e CI:

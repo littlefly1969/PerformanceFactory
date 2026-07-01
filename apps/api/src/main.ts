@@ -6,12 +6,12 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import middie from '@fastify/middie';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import passport from 'passport';
 import { randomBytes } from 'crypto';
+import { setupOpenApi } from './common/openapi/openapi';
 
 function warnIfAiPromptLogEnabled(isProduction: boolean) {
   if (process.env.AI_DEBUG_PROMPT_LOG !== 'true') {
@@ -195,17 +195,11 @@ async function bootstrap() {
     }),
   );
 
-  if (process.env.SWAGGER_ENABLED !== 'false') {
-    const config = new DocumentBuilder()
-      .setTitle('PerformanceFactory API')
-      .setVersion('0.1')
-      .build();
-
-    const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('docs', app, document);
-  }
-
   app.setGlobalPrefix('api');
+
+  if (process.env.SWAGGER_ENABLED !== 'false') {
+    setupOpenApi(app);
+  }
 
   await app.listen(
     Number(process.env.API_PORT ?? 4000),

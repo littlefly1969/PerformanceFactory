@@ -1,5 +1,10 @@
 import { Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCookieAuth,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { AssignmentsService } from './assignments.service';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
@@ -32,6 +37,7 @@ export class AssignmentsController {
     summary: '[DEPRECATED] Completa una assegnazione legacy V1',
     deprecated: true,
   })
+  @ApiParam({ name: 'id', description: 'Identificativo assegnazione legacy.' })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.USER)

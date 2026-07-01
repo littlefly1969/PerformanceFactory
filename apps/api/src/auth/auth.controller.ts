@@ -10,7 +10,16 @@ import {
   UseGuards,
   Logger,
 } from '@nestjs/common';
-import { ApiBody, ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBody,
+  ApiCookieAuth,
+  ApiFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { GoogleOidcService } from './google-oidc.service';
@@ -19,6 +28,7 @@ import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { LoginRateLimitGuard } from '../common/guards/login-rate-limit.guard';
 import { RegisterAthleteDto } from './dto/register-athlete.dto';
 import { ConsentAcceptanceDto } from '../consents/dto/consent-acceptance.dto';
+import { AccessTokenResponseDto } from '../common/openapi/openapi.models';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -31,7 +41,22 @@ export class AuthController {
   ) {}
 
   @Post('login')
-  @ApiOperation({ summary: 'Accesso con cookie sessione' })
+  @ApiOperation({
+    summary: 'Accedi e crea una sessione',
+    description:
+      'Valida le credenziali locali, imposta il cookie HTTP-only e restituisce il profilo utente con un token bearer breve.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['email', 'password'],
+      properties: {
+        email: { type: 'string', format: 'email', example: 'user@example.com' },
+        password: { type: 'string', format: 'password', minLength: 8 },
+      },
+    },
+  })
+  @ApiUnauthorizedResponse({ description: 'Credenziali non valide.' })
   @UseGuards(LoginRateLimitGuard, LocalAuthGuard)
   async login(
     @Req()
@@ -64,6 +89,12 @@ export class AuthController {
 
   @Get('google/login')
   @ApiOperation({ summary: 'Avvia login con Google OIDC' })
+  @ApiQuery({
+    name: 'returnTo',
+    required: false,
+    description: 'Percorso web relativo a cui tornare dopo il login.',
+  })
+  @ApiFoundResponse({ description: 'Redirect verso Google Identity.' })
   @Redirect()
   async googleLogin(@Req() req: unknown, @Query('returnTo') returnTo?: string) {
     const google = this.google();
@@ -79,6 +110,12 @@ export class AuthController {
 
   @Get('google/register')
   @ApiOperation({ summary: 'Avvia registrazione atleta con Google OIDC' })
+  @ApiQuery({
+    name: 'returnTo',
+    required: false,
+    description: 'Percorso web relativo a cui tornare dopo la registrazione.',
+  })
+  @ApiFoundResponse({ description: 'Redirect verso Google Identity.' })
   @Redirect()
   async googleRegister(
     @Req() req: unknown,
@@ -97,6 +134,18 @@ export class AuthController {
 
   @Get('google/callback')
   @ApiOperation({ summary: 'Callback Google OIDC server-side' })
+  @ApiQuery({ name: 'code', required: false, description: 'Codice OIDC.' })
+  @ApiQuery({
+    name: 'state',
+    required: false,
+    description: 'Stato OIDC anti-CSRF.',
+  })
+  @ApiQuery({
+    name: 'error',
+    required: false,
+    description: 'Errore restituito dal provider.',
+  })
+  @ApiFoundResponse({ description: 'Redirect al frontend configurato.' })
   async googleCallback(
     @Req() req: unknown,
     @Res()
@@ -255,6 +304,7 @@ export class AuthController {
     summary: 'Emetti token bearer breve da sessione sicura attiva',
   })
   @ApiCookieAuth()
+  @ApiOkResponse({ type: AccessTokenResponseDto })
   @UseGuards(AuthenticatedGuard)
   token(@Req() req: { user?: unknown }) {
     return this.authService.issueAccessToken(req.user);

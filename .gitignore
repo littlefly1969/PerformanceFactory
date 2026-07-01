@@ -6,6 +6,8 @@ apps/web/.next/
 .env
 .env.*
 !.env.production.example
+!apps/api/.env.example
+!infra/.env.prod.example
 *.log
 cookies.txt
 apps/api/cookies.txt

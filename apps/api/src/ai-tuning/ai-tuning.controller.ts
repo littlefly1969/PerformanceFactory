@@ -12,9 +12,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import {
+  ApiBody,
   ApiCookieAuth,
   ApiOperation,
+  ApiParam,
   ApiProduces,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
@@ -71,6 +74,16 @@ export class AiTuningController {
 
   @Get('prompt-versions')
   @ApiOperation({ summary: 'Storico immutabile versioni prompt' })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    description: 'Tipo configurazione prompt.',
+  })
+  @ApiQuery({
+    name: 'ownerId',
+    required: false,
+    description: 'Identificativo del proprietario.',
+  })
   @Roles(UserRole.AI_TUNER)
   listPromptVersions(
     @Query('type') type?: string,
@@ -105,6 +118,13 @@ export class AiTuningController {
 
   @Get('audits')
   @ApiOperation({ summary: 'Lista audit AI pseudonimizzati' })
+  @ApiQuery({ name: 'areaId', required: false })
+  @ApiQuery({
+    name: 'provider',
+    required: false,
+    enum: ['stub', 'openai', 'gemini'],
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   getAudits(
     @Query('areaId') areaId?: string,
     @Query('provider') provider?: string,
@@ -119,6 +139,7 @@ export class AiTuningController {
 
   @Get('audits/:id')
   @ApiOperation({ summary: 'Dettaglio audit AI' })
+  @ApiParam({ name: 'id', description: 'Identificativo audit.' })
   getAuditDetail(@Param('id') id: string) {
     return this.tuning.getAuditDetail(id);
   }
@@ -149,6 +170,44 @@ export class AiTuningController {
   @Post('sports')
   @ApiOperation({
     summary: 'Crea o aggiorna sport, specializzazioni e prompt area',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        key: { type: 'string' },
+        label: { type: 'string' },
+        isActive: { type: 'boolean' },
+        specializations: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              key: { type: 'string' },
+              label: { type: 'string' },
+              trainingPrompt: { type: 'string' },
+              trainingPromptActive: { type: 'boolean' },
+              isActive: { type: 'boolean' },
+              prompts: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    areaId: { type: 'string' },
+                    basePrompt: { type: 'string' },
+                    isEnabledDriver: { type: 'boolean' },
+                    isActive: { type: 'boolean' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   })
   @Roles(UserRole.AI_TUNER)
   upsertSport(
@@ -183,6 +242,7 @@ export class AiTuningController {
   @ApiOperation({
     summary: 'Cancella uno sport e le specializzazioni collegate',
   })
+  @ApiParam({ name: 'sportId', description: 'Identificativo sport.' })
   @Roles(UserRole.AI_TUNER)
   deleteSport(@Param('sportId') sportId: string) {
     return this.promptAdmin.deleteSport(sportId);
@@ -215,6 +275,7 @@ export class AiTuningController {
 
   @Delete('onboarding-templates/:id')
   @ApiOperation({ summary: 'Elimina un template domanda onboarding' })
+  @ApiParam({ name: 'id', description: 'Identificativo template.' })
   @Roles(UserRole.AI_TUNER)
   deleteOnboardingTemplate(@Param('id') id: string) {
     return this.promptAdmin.deleteOnboardingTemplate(id);
@@ -222,6 +283,7 @@ export class AiTuningController {
 
   @Get('replays')
   @ApiOperation({ summary: 'Lista replay utente corrente' })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
   listReplays(@Req() req: ActorRequest, @Query('page') page?: string) {
     return this.tuning.listReplays(
       req.user?.id ?? '',
@@ -231,12 +293,14 @@ export class AiTuningController {
 
   @Get('replays/:id')
   @ApiOperation({ summary: 'Dettaglio replay' })
+  @ApiParam({ name: 'id', description: 'Identificativo replay.' })
   getReplay(@Req() req: ActorRequest, @Param('id') id: string) {
     return this.tuning.getReplay(req.user?.id ?? '', id);
   }
 
   @Post('replays/:id/feedback')
   @ApiOperation({ summary: 'Salva valutazione rubric su un replay' })
+  @ApiParam({ name: 'id', description: 'Identificativo replay.' })
   saveFeedback(
     @Req() req: ActorRequest,
     @Param('id') id: string,
@@ -247,6 +311,7 @@ export class AiTuningController {
 
   @Get('golden-contexts')
   @ApiOperation({ summary: 'Lista golden context' })
+  @ApiQuery({ name: 'areaId', required: false })
   listGoldens(@Query('areaId') areaId?: string) {
     return this.tuning.listGoldenContexts(areaId);
   }
@@ -259,18 +324,28 @@ export class AiTuningController {
 
   @Patch('golden-contexts/:id')
   @ApiOperation({ summary: 'Modifica golden context' })
+  @ApiParam({ name: 'id', description: 'Identificativo golden context.' })
   updateGolden(@Param('id') id: string, @Body() dto: UpsertGoldenContextDto) {
     return this.tuning.updateGoldenContext(id, dto);
   }
 
   @Delete('golden-contexts/:id')
   @ApiOperation({ summary: 'Elimina golden context' })
+  @ApiParam({ name: 'id', description: 'Identificativo golden context.' })
   deleteGolden(@Param('id') id: string) {
     return this.tuning.deleteGoldenContext(id);
   }
 
   @Post('golden-contexts/from-audit/:auditId')
   @ApiOperation({ summary: 'Crea golden a partire da audit reale' })
+  @ApiParam({ name: 'auditId', description: 'Identificativo audit sorgente.' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['label'],
+      properties: { label: { type: 'string', maxLength: 120 } },
+    },
+  })
   createFromAudit(
     @Req() req: ActorRequest,
     @Param('auditId') auditId: string,
@@ -291,6 +366,7 @@ export class AiTuningController {
 
   @Get('evaluations/:id')
   @ApiOperation({ summary: 'Dettaglio evaluation run con risultati' })
+  @ApiParam({ name: 'id', description: 'Identificativo evaluation run.' })
   getEvalRun(@Param('id') id: string) {
     return this.tuning.getEvaluationRun(id);
   }
@@ -303,6 +379,8 @@ export class AiTuningController {
 
   @Post('evaluations/:runId/results/:resultId/rate')
   @ApiOperation({ summary: 'Salva rubric su singolo risultato evaluation' })
+  @ApiParam({ name: 'runId', description: 'Identificativo evaluation run.' })
+  @ApiParam({ name: 'resultId', description: 'Identificativo risultato.' })
   rateEvalResult(
     @Req() req: ActorRequest,
     @Param('resultId') resultId: string,
@@ -313,6 +391,13 @@ export class AiTuningController {
 
   @Get('cost')
   @ApiOperation({ summary: 'Sintesi costi token AI' })
+  @ApiQuery({
+    name: 'from',
+    required: false,
+    type: String,
+    format: 'date-time',
+  })
+  @ApiQuery({ name: 'to', required: false, type: String, format: 'date-time' })
   getCost(@Query('from') from?: string, @Query('to') to?: string) {
     return this.tuning.getCostSummary({
       from: from ? new Date(from) : undefined,

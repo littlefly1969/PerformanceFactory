@@ -30,12 +30,12 @@ export class AcceptedDocumentDto {
 }
 
 export class ConsentAcceptanceDto {
-  @ApiProperty()
+  @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
   privacyAccepted?: boolean;
 
-  @ApiProperty()
+  @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
   aiAssistantAccepted?: boolean;
