@@ -8,142 +8,43 @@ import {
 import { API_BASE, secureFetch } from "@/app/lib/api";
 import { downloadResponseBody } from "@/app/lib/download";
 
-type PromptMode = "goal" | "sport-area" | "area-config" | "training";
-type Area = { id: string; name: string };
-type GoalPromptConfig = {
-  id?: string;
-  name: string;
-  basePrompt: string;
-  version?: number;
-  isActive: boolean;
-  updatedAt?: string;
-};
-type AreaGenerationConfig = {
-  id?: string;
-  areaId: string;
-  initialContext: string;
-  responseFormatPrompt: string;
-  questionnaireLayoutJson: unknown;
-  version?: number;
-  updatedAt?: string;
-  area?: Area | null;
-};
-type SportPrompt = {
-  id?: string;
-  areaId: string;
-  basePrompt: string;
-  isEnabledDriver: boolean;
-  version?: number;
-  isActive: boolean;
-  updatedAt?: string;
-  area?: Area | null;
-};
-type SportSpecialization = {
-  id?: string;
-  key: string;
-  label: string;
-  trainingPrompt?: string | null;
-  trainingPromptVersion?: number;
-  trainingPromptActive: boolean;
-  isActive: boolean;
-  updatedAt?: string;
-  prompts: SportPrompt[];
-};
-type SportCatalogItem = {
-  id?: string;
-  key: string;
-  label: string;
-  isActive: boolean;
-  specializations: SportSpecialization[];
-};
-type StoredSportAreaDraft = {
-  id: string;
-  name: string;
-  basePrompt: string;
-  updatedAt: string;
-};
-type StoredAreaConfigDraft = {
-  id: string;
-  name: string;
-  initialContext: string;
-  responseFormatPrompt: string;
-  questionnaireLayoutJson: unknown;
-  updatedAt: string;
-};
-type StoredTrainingDraft = {
-  id: string;
-  name: string;
-  trainingPrompt: string;
-  updatedAt: string;
-};
-type Settings = {
-  areas: Area[];
-  sports: SportCatalogItem[];
-  goalPromptConfig?: GoalPromptConfig | null;
-  goalPromptConfigs?: GoalPromptConfig[];
-  areaGenerationConfigs: AreaGenerationConfig[];
-};
-type ActivationTarget =
-  | { kind: "goal"; prompt: GoalPromptConfig }
-  | { kind: "sport-area" }
-  | { kind: "area-config" }
-  | { kind: "training" };
-
-const promptModes: Array<{
-  id: PromptMode;
-  title: string;
-  body: string;
-}> = [
-  {
-    id: "goal",
-    title: "Validazione obiettivo",
-    body: "Controlla se l'obiettivo dell'atleta e chiaro, realistico, sicuro e coerente con il suo profilo.",
-  },
-  {
-    id: "sport-area",
-    title: "Configurazione aree performance",
-    body: "Adatta ogni area della performance allo sport, alla specializzazione e allo scenario selezionato.",
-  },
-  {
-    id: "area-config",
-    title: "Generazione proposta area",
-    body: "Definisce come l'AI genera consigli personalizzati per una singola area della performance.",
-  },
-  {
-    id: "training",
-    title: "Allenamento specifico",
-    body: "Trasforma obiettivo e dati dell'atleta in attivita pratiche, progressive e misurabili.",
-  },
-];
-
-const areaDisplayName = (name?: string | null) => {
-  const normalized = (name ?? "").trim().toLowerCase();
-  const labels: Record<string, string> = {
-    "allenamento mentale": "Mental training",
-    "mental": "Mental training",
-    "equipaggiamento": "Attrezzatura",
-    "fisioterapia": "Fisioterapia e movimento",
-    "tecnica": "Tecnico-tattica",
-    "tecnico tattica": "Tecnico-tattica",
-    "tecnico-tattica": "Tecnico-tattica",
-    "preparazione atletica": "Preparazione atletica",
-    "nutrizione": "Nutrizione",
-    "attrezzatura": "Attrezzatura",
-    "mental training": "Mental training",
-  };
-  return labels[normalized] ?? name ?? "Area";
-};
-
-const defaultSportAreaPromptText = (
-  sportLabel: string,
-  specializationLabel: string,
-  areaName: string,
-) =>
-  [
-    `Adatta l area ${areaName} allo scenario sportivo ${sportLabel} - ${specializationLabel}.`,
-    "Usa questa scelta come vincolo prioritario quando interpreti obiettivo, anamnesi e domande specialistiche.",
-    "Mantieni il lavoro specifico, pratico, misurabile, progressivo e revisionabile da un professionista.",
-  ].join(" ");
+import {
+  allFilterValue,
+  areaDisplayName,
+  defaultSportAreaPromptText,
+  emptyGoalPrompt,
+  promptModes,
+  stringifyJson,
+  type ActivationTarget,
+  type Area,
+  type GoalPromptConfig,
+  type PromptMode,
+  type PromptSettings,
+  type SportCatalogItem,
+  type SportPrompt,
+  type SportSpecialization,
+  type StoredAreaConfigDraft,
+  type StoredSportAreaDraft,
+  type StoredTrainingDraft,
+} from "./prompt-model";
+import {
+  areaConfigDraftsKey,
+  makeHistoryDraftId,
+  readStoredAreaConfigDrafts,
+  readStoredDraft,
+  readStoredSportAreaDrafts,
+  readStoredTrainingDrafts,
+  removeStoredDraft,
+  sportAreaDraftKey,
+  sportAreaDraftsKey,
+  trainingDraftKey,
+  trainingDraftsKey,
+  writeStoredAreaConfigDrafts,
+  writeStoredDraft,
+  writeStoredSportAreaDrafts,
+  writeStoredTrainingDrafts,
+} from "./prompt-draft-storage";
+import { PromptOverviewGrid } from "./prompt-overview-grid";
 
 const formatDate = (value?: string) =>
   value
@@ -154,12 +55,6 @@ const formatDate = (value?: string) =>
       }).format(new Date(value))
     : "-";
 
-const emptyGoalPrompt: GoalPromptConfig = {
-  name: "obiettivo",
-  basePrompt: "",
-  isActive: true,
-};
-
 const readError = async (response: Response) => {
   try {
     const data = (await response.json()) as { message?: string; error?: string };
@@ -169,158 +64,8 @@ const readError = async (response: Response) => {
   }
 };
 
-const stringifyJson = (value: unknown) =>
-  value === null || value === undefined ? "{}" : JSON.stringify(value, null, 2);
-
-const promptDraftStoragePrefix = "pf-ai-tuner-prompt-draft-v1";
-const allFilterValue = "__all__";
-
-const storageAvailable = () => typeof window !== "undefined";
-
-const sportAreaDraftKey = (
-  sportId: string,
-  specializationId: string,
-  areaId: string,
-) =>
-  `${promptDraftStoragePrefix}:sport-area:${sportId}:${specializationId}:${areaId}`;
-
-const sportAreaDraftsKey = (
-  sportId: string,
-  specializationId: string,
-  areaId: string,
-) =>
-  `${promptDraftStoragePrefix}:sport-area-drafts:${sportId}:${specializationId}:${areaId}`;
-
-const trainingDraftKey = (sportId: string, specializationId: string) =>
-  `${promptDraftStoragePrefix}:training:${sportId}:${specializationId}`;
-
-const trainingDraftsKey = (sportId: string, specializationId: string) =>
-  `${promptDraftStoragePrefix}:training-drafts:${sportId}:${specializationId}`;
-
-const areaConfigDraftsKey = (
-  areaId: string,
-  sportId?: string | null,
-  specializationId?: string | null,
-) =>
-  sportId && specializationId
-    ? `${promptDraftStoragePrefix}:area-config-drafts:${areaId}:${sportId}:${specializationId}`
-    : `${promptDraftStoragePrefix}:area-config-drafts:${areaId}`;
-
-const readStoredDraft = (key: string) => {
-  if (!storageAvailable()) return null;
-  return window.localStorage.getItem(key);
-};
-
-const writeStoredDraft = (key: string, value: string) => {
-  if (!storageAvailable()) return;
-  window.localStorage.setItem(key, value);
-};
-
-const readStoredSportAreaDrafts = (key: string) => {
-  if (!storageAvailable()) return [];
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(key) ?? "[]") as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (item): item is StoredSportAreaDraft =>
-        typeof item === "object" &&
-        item !== null &&
-        "id" in item &&
-        "name" in item &&
-        "basePrompt" in item &&
-        "updatedAt" in item &&
-        typeof item.id === "string" &&
-        typeof item.name === "string" &&
-        typeof item.basePrompt === "string" &&
-        typeof item.updatedAt === "string",
-    );
-  } catch {
-    return [];
-  }
-};
-
-const writeStoredSportAreaDrafts = (
-  key: string,
-  drafts: StoredSportAreaDraft[],
-) => {
-  if (!storageAvailable()) return;
-  window.localStorage.setItem(key, JSON.stringify(drafts));
-};
-
-const readStoredAreaConfigDrafts = (key: string) => {
-  if (!storageAvailable()) return [];
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(key) ?? "[]") as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (item): item is StoredAreaConfigDraft =>
-        typeof item === "object" &&
-        item !== null &&
-        "id" in item &&
-        "name" in item &&
-        "initialContext" in item &&
-        "responseFormatPrompt" in item &&
-        "questionnaireLayoutJson" in item &&
-        "updatedAt" in item &&
-        typeof item.id === "string" &&
-        typeof item.name === "string" &&
-        typeof item.initialContext === "string" &&
-        typeof item.responseFormatPrompt === "string" &&
-        typeof item.updatedAt === "string",
-    );
-  } catch {
-    return [];
-  }
-};
-
-const writeStoredAreaConfigDrafts = (
-  key: string,
-  drafts: StoredAreaConfigDraft[],
-) => {
-  if (!storageAvailable()) return;
-  window.localStorage.setItem(key, JSON.stringify(drafts));
-};
-
-const readStoredTrainingDrafts = (key: string) => {
-  if (!storageAvailable()) return [];
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(key) ?? "[]") as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (item): item is StoredTrainingDraft =>
-        typeof item === "object" &&
-        item !== null &&
-        "id" in item &&
-        "name" in item &&
-        "trainingPrompt" in item &&
-        "updatedAt" in item &&
-        typeof item.id === "string" &&
-        typeof item.name === "string" &&
-        typeof item.trainingPrompt === "string" &&
-        typeof item.updatedAt === "string",
-    );
-  } catch {
-    return [];
-  }
-};
-
-const writeStoredTrainingDrafts = (
-  key: string,
-  drafts: StoredTrainingDraft[],
-) => {
-  if (!storageAvailable()) return;
-  window.localStorage.setItem(key, JSON.stringify(drafts));
-};
-
-const removeStoredDraft = (key: string) => {
-  if (!storageAvailable()) return;
-  window.localStorage.removeItem(key);
-};
-
-const makeHistoryDraftId = () => `previous-${Date.now()}`;
-
 export default function PromptManagementPage() {
-  const [settings, setSettings] = useState<Settings | null>(null);
+  const [settings, setSettings] = useState<PromptSettings | null>(null);
   const [mode, setMode] = useState<PromptMode>("goal");
   const [message, setMessage] = useState<string | null>(null);
   const [successPopup, setSuccessPopup] = useState<string | null>(null);
@@ -378,12 +123,18 @@ export default function PromptManagementPage() {
   const [areaResponseFormat, setAreaResponseFormat] = useState("");
   const [areaLayoutText, setAreaLayoutText] = useState("{}");
 
-  const areas = settings?.areas ?? [];
-  const sports = settings?.sports ?? [];
-  const areaConfigs = settings?.areaGenerationConfigs ?? [];
-  const goalPromptConfigs =
-    settings?.goalPromptConfigs ??
-    (settings?.goalPromptConfig ? [settings.goalPromptConfig] : []);
+  const areas = useMemo(() => settings?.areas ?? [], [settings]);
+  const sports = useMemo(() => settings?.sports ?? [], [settings]);
+  const areaConfigs = useMemo(
+    () => settings?.areaGenerationConfigs ?? [],
+    [settings],
+  );
+  const goalPromptConfigs = useMemo(
+    () =>
+      settings?.goalPromptConfigs ??
+      (settings?.goalPromptConfig ? [settings.goalPromptConfig] : []),
+    [settings],
+  );
 
   const selectedSport = useMemo(
     () => sports.find((sport) => sport.id === selectedSportId) ?? null,
@@ -480,7 +231,7 @@ export default function PromptManagementPage() {
       return;
     }
 
-    const data = (await response.json()) as Settings;
+    const data = (await response.json()) as PromptSettings;
     setSettings(data);
     setGoalDraft(data.goalPromptConfig ?? emptyGoalPrompt);
 
@@ -1706,50 +1457,10 @@ export default function PromptManagementPage() {
   };
 
   const renderPromptOverview = () => (
-    <section className="pf-panel pf-prompt-current-panel">
-      <div className="pf-panel-header pf-prompt-current-header">
-        <div>
-          <h2>Prompt in uso</h2>
-          <p className="pf-muted">
-            Vedi solo i prompt attualmente usati dal sistema. Aprine uno per i
-            dettagli completi e le opzioni di modifica.
-          </p>
-        </div>
-      </div>
-
-      <div className="pf-grid pf-prompt-overview-grid">
-        {promptModes.map((item) => {
-          const overview = getPromptOverview(item.id);
-          return (
-            <button
-              key={item.id}
-              type="button"
-              className="pf-card pf-prompt-preview-card pf-prompt-overview-card"
-              onClick={() => openPromptMode(item.id)}
-            >
-              <div className="pf-prompt-card-title">
-                <h3>{overview.title}</h3>
-              </div>
-              <p>{overview.description}</p>
-              <div className="pf-prompt-overview-meta">
-                <span>
-                  Dove viene usato
-                  <strong>{overview.where}</strong>
-                </span>
-                <span>
-                  Versione
-                  <strong>{overview.version}</strong>
-                </span>
-                <span>
-                  Ultima modifica
-                  <strong>{overview.updatedAt}</strong>
-                </span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </section>
+    <PromptOverviewGrid
+      getOverview={getPromptOverview}
+      onOpen={openPromptMode}
+    />
   );
 
   const renderSportContextPicker = (params: {

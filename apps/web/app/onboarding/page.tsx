@@ -153,7 +153,6 @@ export default function OnboardingPage() {
   const [messageTone, setMessageTone] = useState<MessageTone>("warning");
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [validatingGoal, setValidatingGoal] = useState(false);
   const [generatingSpecialistQuestions, setGeneratingSpecialistQuestions] =
     useState(false);
   const [goalModalOpen, setGoalModalOpen] = useState(false);
@@ -1023,7 +1022,6 @@ export default function OnboardingPage() {
                     className="pf-button-secondary"
                     type="button"
                     disabled={
-                      validatingGoal ||
                       goalText.trim().length < 10 ||
                       !sportSelectionValid
                     }

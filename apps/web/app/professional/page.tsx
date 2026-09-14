@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   EmptyState,
   ProductShell,
@@ -103,7 +103,7 @@ export default function ProfessionalDashboardPage() {
     [inbox],
   );
 
-  const loadDashboard = async (preferredUserId?: string) => {
+  const loadDashboard = useCallback(async (preferredUserId?: string) => {
     setLoading(true);
     setMessage(null);
 
@@ -130,7 +130,7 @@ export default function ProfessionalDashboardPage() {
 
     const loadedUsers = (await usersRes.json()) as LinkedUser[];
     const nextSelected =
-      preferredUserId || selectedUserId || loadedUsers[0]?.id || "";
+      preferredUserId || loadedUsers[0]?.id || "";
     setUsers(loadedUsers);
     setSelectedUserId(nextSelected);
     setInbox(
@@ -152,11 +152,11 @@ export default function ProfessionalDashboardPage() {
     }
 
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     void loadDashboard();
-  }, []);
+  }, [loadDashboard]);
 
   const changeSelected = (userId: string) => {
     setSelectedUserId(userId);
@@ -176,7 +176,7 @@ export default function ProfessionalDashboardPage() {
           <button
             className="pf-button-secondary"
             type="button"
-            onClick={() => loadDashboard()}
+            onClick={() => loadDashboard(selectedUserId)}
           >
             Aggiorna
           </button>

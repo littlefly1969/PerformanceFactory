@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   EmptyState,
   ProductShell,
@@ -166,7 +166,7 @@ export default function ProfessionalUserPerformancePage() {
     );
   }, [areaNameById, planHistory, questionHistory]);
 
-  const loadProfilo = async () => {
+  const loadProfilo = useCallback(async () => {
     if (!userId) {
       return;
     }
@@ -221,11 +221,11 @@ export default function ProfessionalUserPerformancePage() {
     setPianoHistory(areaHistories.flatMap((entry) => entry.plans));
     setQuestionHistory(areaHistories.flatMap((entry) => entry.questions));
     setLoading(false);
-  };
+  }, [userId]);
 
   useEffect(() => {
     void loadProfilo();
-  }, [userId]);
+  }, [loadProfilo]);
 
   return (
     <ProductShell

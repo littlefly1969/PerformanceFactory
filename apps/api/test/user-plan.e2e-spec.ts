@@ -25,6 +25,11 @@ type InjectFn = (options: {
   payload?: string;
 }) => Promise<InjectResponse>;
 
+type FastifyTestInstance = {
+  ready: () => Promise<void>;
+  inject: InjectFn;
+};
+
 class TestAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<{
@@ -218,12 +223,9 @@ describe('User plan (e2e)', () => {
     );
     app.setGlobalPrefix('api');
     await app.init();
-    await app.getHttpAdapter().getInstance().ready();
-
-    inject = app
-      .getHttpAdapter()
-      .getInstance()
-      .inject.bind(app.getHttpAdapter().getInstance());
+    const fastify = app.getHttpAdapter().getInstance() as FastifyTestInstance;
+    await fastify.ready();
+    inject = (options) => fastify.inject(options);
   });
 
   afterAll(async () => {

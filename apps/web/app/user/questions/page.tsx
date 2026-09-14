@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ProductShell,
   StatusBadge,
@@ -78,6 +78,11 @@ export default function UserQuestionsPage() {
     Record<string, QuestionSet | null>
   >({});
   const questionRequestIdRef = useRef(0);
+  const areaIdRef = useRef(areaId);
+
+  useEffect(() => {
+    areaIdRef.current = areaId;
+  }, [areaId]);
 
   const totalQuestions = questionSet?.questions.length ?? 0;
   const trainingQuestionSet =
@@ -85,7 +90,7 @@ export default function UserQuestionsPage() {
   const totalOpenQuestions =
     totalQuestions + (trainingQuestionSet?.questions.length ?? 0);
 
-  const loadTrainingCheckIn = async () => {
+  const loadTrainingCheckIn = useCallback(async () => {
     setTrainingSelected({});
     setTrainingSubmitted(false);
     const response = await secureFetch(`${API_BASE}/user/training/current`, {
@@ -96,9 +101,9 @@ export default function UserQuestionsPage() {
       return;
     }
     setTraining(null);
-  };
+  }, []);
 
-  const loadAree = async () => {
+  const loadAree = useCallback(async () => {
     const response = await secureFetch(`${API_BASE}/areas`, {
       credentials: "include",
     });
@@ -127,7 +132,7 @@ export default function UserQuestionsPage() {
           ? ""
           : new URLSearchParams(window.location.search).get("areaId");
       const nextAreaId =
-        areaId ||
+        areaIdRef.current ||
         (requestedAreaId && loadedAree.some((area) => area.id === requestedAreaId)
           ? requestedAreaId
           : "") ||
@@ -137,9 +142,11 @@ export default function UserQuestionsPage() {
       setAreaId(nextAreaId);
       setQuestionSet(nextQuestionSets[nextAreaId] ?? null);
     }
-  };
+  }, []);
 
-  const loadQuestionSet = async (selectedAreaId = areaId) => {
+  const loadQuestionSet = useCallback(async (
+    selectedAreaId = areaIdRef.current,
+  ) => {
     const requestId = questionRequestIdRef.current + 1;
     questionRequestIdRef.current = requestId;
     setLoading(true);
@@ -185,7 +192,7 @@ export default function UserQuestionsPage() {
     }
     setQuestionSet(nextQuestionSet);
     setLoading(false);
-  };
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -193,7 +200,7 @@ export default function UserQuestionsPage() {
         await Promise.all([loadAree(), loadTrainingCheckIn()]);
       }
     })();
-  }, []);
+  }, [loadAree, loadTrainingCheckIn]);
 
   useEffect(() => {
     if (areaId) {
@@ -210,7 +217,7 @@ export default function UserQuestionsPage() {
       }
       void loadQuestionSet(areaId);
     }
-  }, [areaId, questionSetsByArea]);
+  }, [areaId, loadQuestionSet, questionSetsByArea]);
 
   const handleSubmit = async () => {
     if (!questionSet) {

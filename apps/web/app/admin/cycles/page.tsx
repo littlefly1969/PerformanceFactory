@@ -236,23 +236,6 @@ const formatDate = (value?: string | null) => {
       });
 };
 
-const badgeTone = (value: string) => {
-  if (
-    value.includes("READY") ||
-    value.includes("COMPLETED") ||
-    value.includes("ACTIVE")
-  ) {
-    return "success" as const;
-  }
-  if (value.includes("WAITING") || value.includes("PENDING")) {
-    return "warning" as const;
-  }
-  if (value.includes("REJECTED") || value.includes("MISSING")) {
-    return "danger" as const;
-  }
-  return "neutral" as const;
-};
-
 const displayUser = (user: UserRef) => {
   const fullName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
   return fullName ? `${fullName} - ${user.email}` : user.email;
@@ -296,10 +279,13 @@ export default function AdminCyclesPage() {
   const [professionalFilter, setProfessionalFilter] = useState("");
   const [coachFilter, setCoachFilter] = useState("");
 
-  const athletes =
-    dashboard?.athletes.filter(
-      (athlete) => athlete.onboarding.status !== "REJECTED",
-    ) ?? [];
+  const athletes = useMemo(
+    () =>
+      dashboard?.athletes.filter(
+        (athlete) => athlete.onboarding.status !== "REJECTED",
+      ) ?? [],
+    [dashboard],
+  );
   const professionals = dashboard?.professionals ?? [];
   const areas = dashboard?.areas ?? [];
   const readyToGenerate = useMemo(
@@ -1553,13 +1539,19 @@ export default function AdminCyclesPage() {
                 onChange={(event) => setCoachFilter(event.target.value)}
                 placeholder="Cerca per nome o email"
                 role="combobox"
+                aria-controls="coach-assignment-options"
                 aria-expanded="true"
+                aria-autocomplete="list"
                 autoFocus
                 autoComplete="off"
               />
             </label>
 
-            <div className="pf-combobox-menu">
+            <div
+              className="pf-combobox-menu"
+              id="coach-assignment-options"
+              role="listbox"
+            >
               {filteredCoachAssignmentProfessionals.map((professional) => (
                 <button
                   key={professional.id}
@@ -1570,6 +1562,11 @@ export default function AdminCyclesPage() {
                       : ""
                   }`}
                   type="button"
+                  role="option"
+                  aria-selected={
+                    coachAssignmentTarget.athlete.trainingState.linkedCoach
+                      ?.id === professional.id
+                  }
                   disabled={
                     busyKey ===
                     `coach-link:${coachAssignmentTarget.athlete.id}:${coachAssignmentTarget.specializationId}`
