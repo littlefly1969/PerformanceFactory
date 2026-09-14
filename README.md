@@ -82,6 +82,7 @@ Comandi Prisma disponibili nel package API:
 ```bash
 pnpm --filter api prisma:validate
 pnpm --filter api prisma:generate
+pnpm --filter api prisma:erd
 pnpm --filter api prisma:migrate:dev
 pnpm --filter api prisma:migrate:deploy
 pnpm --filter api prisma:seed
@@ -158,7 +159,13 @@ Un job separato avvia solo PostgreSQL 16 e lancia `pnpm --filter api test:db` co
 ## Testing
 
 - API: test Jest unitari ed e2e reali; al momento passano.
-- Web: i test frontend non sono ancora configurati. Lo script `apps/web test` stampa `Frontend tests are not configured yet` e termina con successo per non rompere il gate root, ma non deve essere considerato copertura frontend.
+- Web: test Node.js sulle funzioni di dominio estratte dai componenti. La copertura
+  iniziale protegge chiavi, parsing e validazione delle bozze prompt; i test di
+  interazione React restano da aggiungere.
+
+`prisma:generate` genera soltanto Prisma Client, così non richiede un browser nei
+runner CI. Il diagramma `prisma/erd.svg` si aggiorna esplicitamente con
+`pnpm --filter api prisma:erd`.
 
 Test PostgreSQL-backed espliciti:
 

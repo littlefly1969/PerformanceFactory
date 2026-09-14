@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
-    "test": "node -e \"console.log('Frontend tests are not configured yet')\""
+    "test": "node --test --experimental-strip-types 'app/**/*.test.ts'"
   },
   "dependencies": {
     "next": "16.1.6",
