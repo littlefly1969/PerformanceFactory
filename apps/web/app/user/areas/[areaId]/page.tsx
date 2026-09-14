@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   EmptyState,
   ProductShell,
@@ -92,7 +92,7 @@ export default function UserAreaDetailPage() {
     [plan],
   );
 
-  const loadArea = async () => {
+  const loadArea = useCallback(async () => {
     setLoading(true);
     setMessage(null);
 
@@ -122,11 +122,11 @@ export default function UserAreaDetailPage() {
       setMessage("Impossibile caricare i dati dell'area.");
     }
     setLoading(false);
-  };
+  }, [areaId]);
 
   useEffect(() => {
     void loadArea();
-  }, [areaId]);
+  }, [loadArea]);
 
   const areaName = selectedArea?.area?.name ?? "Area";
   const scoreGap =

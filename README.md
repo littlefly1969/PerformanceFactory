@@ -159,9 +159,9 @@ Un job separato avvia solo PostgreSQL 16 e lancia `pnpm --filter api test:db` co
 ## Testing
 
 - API: test Jest unitari ed e2e reali; al momento passano.
-- Web: test Node.js sulle funzioni di dominio estratte dai componenti. La copertura
-  iniziale protegge chiavi, parsing e validazione delle bozze prompt; i test di
-  interazione React restano da aggiungere.
+- Web: test Vitest sulle funzioni di dominio e test d'interazione React con
+  Testing Library. La copertura iniziale protegge chiavi, parsing e validazione
+  delle bozze prompt, oltre alla selezione delle categorie nell'interfaccia.
 
 `prisma:generate` genera soltanto Prisma Client, così non richiede un browser nei
 runner CI. Il diagramma `prisma/erd.svg` si aggiorna esplicitamente con

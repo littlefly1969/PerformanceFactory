@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   EmptyState,
   ProductShell,
@@ -108,6 +108,11 @@ export default function UserPianoPage() {
     {},
   );
   const planRequestIdRef = useRef(0);
+  const areaIdRef = useRef(areaId);
+
+  useEffect(() => {
+    areaIdRef.current = areaId;
+  }, [areaId]);
 
   const activeAreaItems = useMemo(
     () => plan?.items.filter((item) => item.status === "ACTIVE") ?? [],
@@ -132,7 +137,7 @@ export default function UserPianoPage() {
   );
   const totalOpenActivities = activeAreaItems.length + activeTrainingItems.length;
 
-  const loadTraining = async () => {
+  const loadTraining = useCallback(async () => {
     setTrainingLoading(true);
     setTrainingMessage(null);
     const [currentResponse, historyResponse] = await Promise.all([
@@ -157,9 +162,9 @@ export default function UserPianoPage() {
       setTrainingHistory((await historyResponse.json()) as TrainingPlan[]);
     }
     setTrainingLoading(false);
-  };
+  }, []);
 
-  const loadAree = async () => {
+  const loadAree = useCallback(async () => {
     const response = await secureFetch(`${API_BASE}/areas`, {
       credentials: "include",
     });
@@ -188,7 +193,7 @@ export default function UserPianoPage() {
           ? ""
           : new URLSearchParams(window.location.search).get("areaId");
       const nextAreaId =
-        areaId ||
+        areaIdRef.current ||
         (requestedAreaId && loadedAree.some((area) => area.id === requestedAreaId)
           ? requestedAreaId
           : "") ||
@@ -198,9 +203,11 @@ export default function UserPianoPage() {
       setAreaId(nextAreaId);
       setPiano(nextPianos[nextAreaId] ?? null);
     }
-  };
+  }, []);
 
-  const loadPiano = async (selectedAreaId = areaId) => {
+  const loadPiano = useCallback(async (
+    selectedAreaId = areaIdRef.current,
+  ) => {
     const requestId = planRequestIdRef.current + 1;
     planRequestIdRef.current = requestId;
     setLoading(true);
@@ -245,11 +252,11 @@ export default function UserPianoPage() {
     }
     setPiano(nextPlan);
     setLoading(false);
-  };
+  }, []);
 
-  const loadAll = async () => {
+  const loadAll = useCallback(async () => {
     await Promise.all([loadTraining(), loadAree()]);
-  };
+  }, [loadAree, loadTraining]);
 
   useEffect(() => {
     void (async () => {
@@ -257,7 +264,7 @@ export default function UserPianoPage() {
         await loadAll();
       }
     })();
-  }, []);
+  }, [loadAll]);
 
   useEffect(() => {
     if (areaId) {
@@ -273,7 +280,7 @@ export default function UserPianoPage() {
       }
       void loadPiano(areaId);
     }
-  }, [areaId, plansByArea]);
+  }, [areaId, loadPiano, plansByArea]);
 
   const buildCompletionPayload = (itemId: string) => {
     const completionNotes = notesById[itemId]?.trim();

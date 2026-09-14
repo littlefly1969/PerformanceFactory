@@ -90,15 +90,16 @@ describe('AiProposalProviderService', () => {
 
     const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue({
       ok: true,
-      json: async () => ({
-        candidates: [
-          {
-            content: {
-              parts: [{ text: responseText }],
+      json: () =>
+        Promise.resolve({
+          candidates: [
+            {
+              content: {
+                parts: [{ text: responseText }],
+              },
             },
-          },
-        ],
-      }),
+          ],
+        }),
     } as unknown as Response);
 
     const proposal =
@@ -135,12 +136,20 @@ describe('AiProposalProviderService', () => {
     });
     expect(proposal.questions).toHaveLength(3);
     expect(proposal.audit.outputJson.provider).toBe('gemini');
-    expect(proposal.audit.inputJson.prompt).toMatchObject({
-      system: expect.stringContaining('assistente senior di sport performance'),
-      responseJsonSchema: {
-        required: ['summaryText', 'planItems', 'questions'],
-      },
-    });
+    const auditInput = proposal.audit.inputJson as {
+      prompt: {
+        system: string;
+        responseJsonSchema: { required: string[] };
+      };
+    };
+    expect(auditInput.prompt.system).toContain(
+      'assistente senior di sport performance',
+    );
+    expect(auditInput.prompt.responseJsonSchema.required).toEqual([
+      'summaryText',
+      'planItems',
+      'questions',
+    ]);
   });
 
   it('requires a Gemini API key when Gemini is selected', async () => {

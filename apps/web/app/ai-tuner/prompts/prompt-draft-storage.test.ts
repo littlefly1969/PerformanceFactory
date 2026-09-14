@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { it } from "vitest";
 import {
   areaConfigDraftsKey,
   makeHistoryDraftId,
@@ -8,14 +8,14 @@ import {
   parseStoredTrainingDrafts,
   sportAreaDraftsKey,
   trainingDraftsKey,
-} from "./prompt-draft-storage.ts";
+} from "./prompt-draft-storage";
 import {
   areaDisplayName,
   defaultSportAreaPromptText,
   stringifyJson,
-} from "./prompt-model.ts";
+} from "./prompt-model";
 
-test("builds stable and isolated draft keys", () => {
+it("builds stable and isolated draft keys", () => {
   assert.equal(
     sportAreaDraftsKey("running", "trail", "mental"),
     "pf-ai-tuner-prompt-draft-v1:sport-area-drafts:running:trail:mental",
@@ -34,13 +34,13 @@ test("builds stable and isolated draft keys", () => {
   );
 });
 
-test("returns an empty collection for malformed stored data", () => {
+it("returns an empty collection for malformed stored data", () => {
   assert.deepEqual(parseStoredSportAreaDrafts("not-json"), []);
   assert.deepEqual(parseStoredAreaConfigDrafts("{}"), []);
   assert.deepEqual(parseStoredTrainingDrafts(null), []);
 });
 
-test("keeps valid drafts and rejects incomplete records", () => {
+it("keeps valid drafts and rejects incomplete records", () => {
   const valid = {
     id: "draft-1",
     name: "Versione controllata",
@@ -54,17 +54,17 @@ test("keeps valid drafts and rejects incomplete records", () => {
   assert.deepEqual(parsed, [valid]);
 });
 
-test("creates deterministic history identifiers when time is supplied", () => {
+it("creates deterministic history identifiers when time is supplied", () => {
   assert.equal(makeHistoryDraftId(1234), "previous-1234");
 });
 
-test("normalizes legacy area labels for presentation", () => {
+it("normalizes legacy area labels for presentation", () => {
   assert.equal(areaDisplayName("allenamento mentale"), "Mental training");
   assert.equal(areaDisplayName("TECNICA"), "Tecnico-tattica");
   assert.equal(areaDisplayName("Nuova area"), "Nuova area");
 });
 
-test("builds default prompts and formats empty JSON values", () => {
+it("builds default prompts and formats empty JSON values", () => {
   assert.match(
     defaultSportAreaPromptText("Running", "Trail", "Mental training"),
     /Running - Trail/,

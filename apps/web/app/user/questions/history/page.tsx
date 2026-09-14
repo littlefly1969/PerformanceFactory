@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   EmptyState,
   ProductShell,
@@ -49,7 +49,7 @@ export default function UserQuestionsHistoryPage() {
   const [loading, setLoading] = useState(false);
   const [authHint, setAuthHint] = useState<string | null>(null);
 
-  const loadHistory = async (selectedAreaId: string) => {
+  const loadHistory = useCallback(async (selectedAreaId: string) => {
     setAreaId(selectedAreaId);
     setLoading(true);
     setAuthHint(null);
@@ -70,9 +70,9 @@ export default function UserQuestionsHistoryPage() {
 
     setHistory((await response.json()) as QuestionSet[]);
     setLoading(false);
-  };
+  }, []);
 
-  const loadAree = async () => {
+  const loadAree = useCallback(async () => {
     const response = await secureFetch(`${API_BASE}/areas`, {
       credentials: "include",
     });
@@ -108,7 +108,7 @@ export default function UserQuestionsHistoryPage() {
     if (firstAreaId) {
       await loadHistory(firstAreaId);
     }
-  };
+  }, [loadHistory]);
 
   useEffect(() => {
     void (async () => {
@@ -116,7 +116,7 @@ export default function UserQuestionsHistoryPage() {
         await loadAree();
       }
     })();
-  }, []);
+  }, [loadAree]);
 
   return (
     <ProductShell
