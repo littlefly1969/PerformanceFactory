@@ -447,3 +447,35 @@
     transition: none !important;
   }
 }
+
+/* Match the PF4 thin line and lime marker on both browser engines. */
+.pf4-number input[type="range"] {
+  appearance: none;
+  height: 24px;
+  background: transparent;
+  cursor: pointer;
+}
+.pf4-number input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px;
+  background: #ededea;
+}
+.pf4-number input[type="range"]::-moz-range-track {
+  height: 3px;
+  background: #ededea;
+}
+.pf4-number input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  margin-top: -6px;
+  border: 2px solid #0b0b0c;
+  border-radius: 50%;
+  background: #c8f02e;
+}
+.pf4-number input[type="range"]::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border: 2px solid #0b0b0c;
+  border-radius: 50%;
+  background: #c8f02e;
+}
