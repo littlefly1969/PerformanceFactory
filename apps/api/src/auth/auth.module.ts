@@ -1,3 +1,4 @@
+import { DiscoveryModule } from '../discovery/discovery.module';
 import { Module } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
@@ -8,7 +9,11 @@ import { SessionSerializer } from './session.serializer';
 import { ConsentsModule } from '../consents/consents.module';
 
 @Module({
-  imports: [PassportModule.register({ session: false }), ConsentsModule],
+  imports: [
+    DiscoveryModule,
+    PassportModule.register({ session: false }),
+    ConsentsModule,
+  ],
   controllers: [AuthController],
   providers: [AuthService, GoogleOidcService, LocalStrategy, SessionSerializer],
 })

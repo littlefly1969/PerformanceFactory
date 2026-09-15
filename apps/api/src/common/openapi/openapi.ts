@@ -158,7 +158,8 @@ export function enrichOpenApiDocument(document: OpenAPIObject) {
 
       if (
         path.endsWith('/auth/login') ||
-        path.endsWith('/auth/register-athlete')
+        path.endsWith('/auth/register-athlete') ||
+        path.endsWith('/public/athlete-discovery')
       ) {
         operation.responses['429'] ??= {
           $ref: '#/components/responses/TooManyRequests',

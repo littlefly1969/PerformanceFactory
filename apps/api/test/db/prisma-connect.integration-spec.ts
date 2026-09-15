@@ -1,12 +1,9 @@
+import { ensureTestDatabaseExists } from '../utils/ensure-test-database';
 import { PrismaClient } from '@prisma/client';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
-import {
-  getMaintenanceDatabaseUrl,
-  getRequiredTestDatabaseUrl,
-  getTestDatabaseName,
-} from '../utils/db-test-guard';
+import { getRequiredTestDatabaseUrl } from '../utils/db-test-guard';
 
 describe('Prisma real database integration', () => {
   let prisma: PrismaClient | undefined;
@@ -114,32 +111,3 @@ describe('Prisma real database integration', () => {
     ).rejects.toMatchObject({ code: 'P2003' });
   });
 });
-
-async function ensureTestDatabaseExists(databaseUrl: string) {
-  const databaseName = getTestDatabaseName(databaseUrl);
-  const admin = new PrismaClient({
-    datasources: {
-      db: { url: getMaintenanceDatabaseUrl(databaseUrl) },
-    },
-  });
-
-  try {
-    const rows = await admin.$queryRaw<Array<{ exists: boolean }>>`
-      SELECT EXISTS(
-        SELECT 1 FROM pg_database WHERE datname = ${databaseName}
-      ) AS "exists"
-    `;
-
-    if (!rows[0]?.exists) {
-      await admin.$executeRawUnsafe(
-        `CREATE DATABASE ${quotePostgresIdentifier(databaseName)}`,
-      );
-    }
-  } finally {
-    await admin.$disconnect();
-  }
-}
-
-function quotePostgresIdentifier(identifier: string) {
-  return `"${identifier.replaceAll('"', '""')}"`;
-}

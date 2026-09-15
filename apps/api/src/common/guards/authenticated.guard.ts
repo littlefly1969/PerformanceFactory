@@ -21,6 +21,7 @@ const safeUserSelect = {
 
 const consentExemptPaths = [
   '/api/auth/me',
+  '/api/auth/journey',
   '/api/auth/token',
   '/api/auth/logout',
   '/api/consents/required',

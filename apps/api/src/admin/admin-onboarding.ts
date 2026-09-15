@@ -1,3 +1,4 @@
+import { assertDiscoveryMetadata } from '../discovery/discovery-metadata';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { OnboardingQuestionScope, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -25,6 +26,10 @@ export async function upsertOnboardingTemplate(
     if (!area) {
       throw new BadRequestException('Area non valida');
     }
+  }
+
+  if (body.scope === OnboardingQuestionScope.DISCOVERY) {
+    assertDiscoveryMetadata(body.optionsJson, body.required ?? true);
   }
 
   const data = {

@@ -36,6 +36,7 @@ enum CycleStatus {
 }
 
 enum OnboardingQuestionScope {
+  DISCOVERY
   GENERAL
   AREA
 }
@@ -48,6 +49,7 @@ enum OnboardingInputType {
 }
 
 model User {
+  discovery AthleteDiscovery?
   id        String   @id @default(uuid())
   email     String   @unique
   password  String
@@ -1115,4 +1117,14 @@ model AiEvaluationResult {
 
   @@index([runId])
   @@index([goldenContextId])
+}
+
+model AthleteDiscovery {
+  userId String @id
+  version BigInt
+  draft Json
+  configuration Json
+  phase String @default("CONSENTS")
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

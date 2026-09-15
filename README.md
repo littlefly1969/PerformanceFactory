@@ -270,3 +270,7 @@ Il riepilogo dei comandi correnti e in [`comandi.md`](./comandi.md).
 
 - Esperienza atleta attivita/check-in: [`docs/flows/athlete-activity-experience.md`](./docs/flows/athlete-activity-experience.md).
 - Profilo performance professionista/allenatore: [`docs/flows/professional-athlete-profile.md`](./docs/flows/professional-athlete-profile.md).
+
+## PF4 Discovery
+
+La Slice 1 è disponibile su `/start`: [configurazione, migrazioni e verifiche](docs/pf4-slice-1.md).

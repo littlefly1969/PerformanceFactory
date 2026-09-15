@@ -1,3 +1,8 @@
+import { AthleteRegistrationService } from '../discovery/athlete-registration.service';
+import {
+  registrationSession,
+  RegistrationRequest,
+} from '../discovery/registration-session';
 import {
   Body,
   Controller,
@@ -38,6 +43,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly googleOidc?: GoogleOidcService,
+    private readonly athleteRegistration?: AthleteRegistrationService,
   ) {}
 
   @Post('login')
@@ -70,21 +76,22 @@ export class AuthController {
 
   @Post('register-athlete')
   @ApiOperation({
-    summary: 'Registra un nuovo atleta in attesa di attivazione amministratore',
+    summary: 'Registra atleta con discovery e sessione immediata',
   })
   @ApiBody({ type: RegisterAthleteDto })
   @UseGuards(ThrottlerGuard)
   @Throttle({ 'register-athlete': { limit: 3, ttl: 15 * 60 * 1000 } })
-  registerAthlete(
+  async registerAthlete(
     @Body() body: RegisterAthleteDto,
     @Req()
-    req: { ip?: string; headers?: { 'user-agent'?: string } },
+    req: RegistrationRequest & {
+      ip?: string;
+      headers?: { 'user-agent'?: string };
+    },
   ) {
-    return this.authService.registerAthlete({
-      ...body,
-      ipAddress: req.ip,
-      userAgent: req.headers?.['user-agent'],
-    });
+    const result = await this.athleteRegistration!.register(body);
+    await registrationSession(req, result.user.id);
+    return result;
   }
 
   @Get('google/login')
@@ -269,6 +276,16 @@ export class AuthController {
   @UseGuards(AuthenticatedGuard)
   async logout(@Req() req: { logout: (cb: (err?: unknown) => void) => void }) {
     return this.authService.logout(req);
+  }
+
+  @Get('journey')
+  @ApiOperation({
+    summary: 'Prossimo passaggio del percorso atleta deciso dal backend',
+  })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard)
+  journey(@Req() req: { user: { id: string } }) {
+    return this.athleteRegistration!.journey(req.user.id);
   }
 
   @Get('me')

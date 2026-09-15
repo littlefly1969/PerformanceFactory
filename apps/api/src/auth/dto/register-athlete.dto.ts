@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  IsObject,
   IsBoolean,
   IsEmail,
   IsNotEmpty,
@@ -14,6 +15,10 @@ import {
 import { AcceptedDocumentDto } from '../../consents/dto/consent-acceptance.dto';
 
 export class RegisterAthleteDto {
+  @ApiProperty({ type: Object })
+  @IsObject()
+  discovery: Record<string, unknown>;
+
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
@@ -37,13 +42,15 @@ export class RegisterAthleteDto {
   @MaxLength(200)
   password: string;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsBoolean()
-  privacyAccepted: boolean;
+  privacyAccepted?: boolean;
 
-  @ApiProperty()
+  @ApiProperty({ required: false })
+  @IsOptional()
   @IsBoolean()
-  aiAssistantAccepted: boolean;
+  aiAssistantAccepted?: boolean;
 
   @ApiProperty({ required: false, type: [AcceptedDocumentDto] })
   @IsOptional()
