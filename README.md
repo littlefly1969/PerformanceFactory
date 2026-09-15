@@ -164,8 +164,7 @@ pnpm lint:fix
 
 ## CI
 
-[GitHub Actions](.github/workflows/ci.yml) parte su **ogni pull request**, sui push
-in `main`, sulla merge queue e manualmente. Tutti i job usano Node.js da `.nvmrc`
+[GitHub Actions](.github/workflows/ci.yml) parte su **ogni pull request**, su ogni push, sulla merge queue e manualmente. Tutti i job usano Node.js da `.nvmrc`
 e pnpm da `packageManager`, con installazione `--frozen-lockfile`.
 
 - **Lint and types**: validazione Prisma, lint e TypeScript per API e web.
