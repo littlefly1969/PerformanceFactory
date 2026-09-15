@@ -3,106 +3,119 @@ name: CI
 on:
   pull_request:
   push:
-    branches:
-      - main
+    branches: [main]
+  merge_group:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 env:
-  NODE_VERSION: '22'
-  PNPM_VERSION: '10.28.2'
-  DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/performancefactory_ci
-  SHADOW_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/performancefactory_ci_shadow
+  DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/performancefactory_ci_test
   NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:4000/api
   AI_PROVIDER: stub
-  SWAGGER_ENABLED: 'false'
+  SWAGGER_ENABLED: "false"
+  PUPPETEER_SKIP_DOWNLOAD: "true"
+  NEXT_TELEMETRY_DISABLED: "1"
 
 jobs:
   quality:
-    name: Quality Gates
+    name: Lint and types
     runs-on: ubuntu-latest
-
+    timeout-minutes: 15
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: pnpm --filter api prisma:validate
+      - run: pnpm test:infra
+      - run: pnpm lint
+      - run: pnpm typecheck
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Validate Prisma schema
-        run: pnpm --filter api prisma:validate
-
-      - name: Generate Prisma client
-        run: pnpm --filter api prisma:generate
-
-      - name: Lint
-        run: pnpm lint
-
-      - name: Typecheck
-        run: pnpm typecheck
-
-      - name: Test
-        run: pnpm test
-
-      - name: Build
-        run: pnpm build
-
-  postgres-smoke:
-    name: PostgreSQL Smoke Test
+  tests:
+    name: Tests (${{ matrix.workspace }})
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        workspace: [api, web]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: pnpm --filter ${{ matrix.workspace }} test:cov
+      - name: API end-to-end tests
+        if: matrix.workspace == 'api'
+        run: pnpm --filter api test:e2e
+      - name: Coverage reports
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage-${{ matrix.workspace }}
+          path: apps/${{ matrix.workspace }}/coverage
+          if-no-files-found: error
+          retention-days: 14
 
-    services:
-      postgres:
-        image: postgres:16
+  postgres:
+    name: PostgreSQL Docker integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test migrations and persistence in dedicated containers
+        run: infra/scripts/test-docker.sh
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup
+      - run: pnpm build
+
+  containers:
+    name: Docker full stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Build and start PostgreSQL, Redis, migrations, API and web
+        run: |
+          unset DATABASE_URL
+          infra/scripts/deploy-local.sh
+      - name: Verify runtime and HTTP endpoints
+        run: |
+          expected_version="v$(cat .nvmrc)"
+          for service in api web; do
+            actual_version="$(docker compose --env-file .env.docker -f infra/docker-compose.prod.example.yml exec -T "$service" node -p process.version)"
+            test "$actual_version" = "$expected_version"
+          done
+          curl --fail --silent --show-error http://127.0.0.1:4000/api/health
+          curl --fail --silent --show-error --output /dev/null http://127.0.0.1:3000/login
+      - name: Container logs
+        if: always()
+        run: |
+          unset DATABASE_URL
+          docker compose --env-file .env.docker -f infra/docker-compose.prod.example.yml logs --no-color --tail=100
+      - name: Stop containers
+        if: always()
+        run: |
+          unset DATABASE_URL
+          docker compose --env-file .env.docker -f infra/docker-compose.prod.example.yml down --remove-orphans
+
+  required:
+    name: CI required
+    if: always()
+    needs: [quality, tests, postgres, build, containers]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require all checks to pass
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: performancefactory_ci
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres -d performancefactory_ci"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    env:
-      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/performancefactory_ci_test
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Generate Prisma client
-        run: pnpm --filter api prisma:generate
-
-      - name: Run PostgreSQL smoke test
-        run: pnpm --filter api test:db
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTS" | jq -e 'all(.[]; .result == "success")'

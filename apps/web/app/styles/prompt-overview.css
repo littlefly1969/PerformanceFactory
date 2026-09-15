@@ -1,0 +1,410 @@
+.pf-auth-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 12px;
+  background: rgba(2, 2, 25, 0.48);
+}
+
+.pf-auth-tabs button {
+  min-height: 43px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  font-weight: 900;
+  text-transform: uppercase;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.pf-auth-tabs button.active {
+  background: var(--pf-accent);
+  color: #050515;
+  box-shadow: 0 10px 24px rgba(220, 255, 50, 0.18);
+}
+
+.pf-auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pf-auth-divider::before,
+.pf-auth-divider::after {
+  content: "";
+  height: 1px;
+  flex: 1;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.pf-auth-card .pf-field {
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.pf-auth-card .pf-input {
+  min-height: 50px;
+  border-color: rgba(255, 255, 255, 0.13);
+  background: rgba(255, 255, 255, 0.065);
+  color: #ffffff;
+}
+
+.pf-auth-card .pf-input:hover {
+  border-color: rgba(255, 255, 255, 0.23);
+}
+
+.pf-auth-card .pf-input:focus {
+  border-color: var(--pf-accent);
+  box-shadow:
+    0 0 0 3px rgba(220, 255, 50, 0.18),
+    inset 0 0 0 1px rgba(220, 255, 50, 0.15);
+}
+
+.pf-auth-card .pf-button {
+  width: 100%;
+  min-height: 50px;
+  border-radius: 10px;
+  font-weight: 900;
+  text-transform: none;
+}
+
+.pf-google-button {
+  width: fit-content;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  gap: 8px;
+  border: 1px solid #747775;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #1f1f1f;
+  cursor: pointer;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+  padding: 7px 12px;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.pf-google-button:hover {
+  background: #f8fafd;
+  border-color: #5f6368;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.3);
+}
+
+.pf-google-button:focus-visible {
+  outline: 2px solid var(--pf-accent);
+  outline-offset: 3px;
+}
+
+.pf-google-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.pf-auth-register-form {
+  gap: 12px;
+}
+
+.pf-auth-register-form .pf-input {
+  min-height: 44px;
+}
+
+.pf-auth-register-form .pf-button {
+  min-height: 46px;
+}
+
+.pf-login-options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.pf-remember {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pf-remember input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--pf-accent);
+}
+
+.pf-auth-text-link {
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.pf-auth-legal {
+  margin: -4px 0 0;
+  color: rgba(255, 255, 255, 0.54);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.pf-auth-tabs button:focus-visible,
+.pf-auth-socials button:focus-visible,
+.pf-auth-text-link:focus-visible,
+.pf-auth-demo-card button:focus-visible,
+.pf-remember input:focus-visible {
+  outline: 2px solid var(--pf-accent);
+  outline-offset: 3px;
+}
+
+.pf-auth-demo-card {
+  display: grid;
+  gap: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: none;
+  padding: 16px;
+}
+
+.pf-auth-demo-card .pf-eyebrow {
+  margin: 0 0 3px;
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 11px;
+}
+
+.pf-auth-demo-card p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.pf-demo-groups {
+  display: grid;
+  gap: 12px;
+}
+
+.pf-demo-group {
+  display: grid;
+  gap: 7px;
+}
+
+.pf-demo-group > span {
+  color: rgba(255, 255, 255, 0.44);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.pf-demo-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pf-demo-actions.coach {
+  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+}
+
+.pf-auth-demo-card .pf-button-secondary {
+  width: 100%;
+  min-height: 36px;
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.72);
+  box-shadow: none;
+  padding: 8px 9px;
+  font-size: 12px;
+  line-height: 1.2;
+  text-transform: none;
+}
+
+.pf-auth-demo-card .pf-button-secondary:hover {
+  border-color: rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+@media (max-width: 980px) {
+  .pf-prompt-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pf-standard-case-block {
+    grid-template-columns: 1fr;
+  }
+
+  .pf-standard-case-content {
+    grid-template-columns: 1fr;
+  }
+
+  .pf-standard-cases-actions {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .pf-created-prompt-card {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "title"
+      "description"
+      "meta"
+      "actions";
+    padding-right: 22px;
+  }
+
+  .pf-created-prompt-card .pf-prompt-card-title,
+  .pf-created-prompt-card > p {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .pf-prompt-overview-meta {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .pf-prompt-overview-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pf-button:not(:disabled):hover,
+.pf-button-secondary:not(:disabled):hover,
+.pf-button-danger:not(:disabled):hover,
+.pf-save-draft-button:not(:disabled):hover {
+  border-color: var(--pf-accent);
+  box-shadow:
+    0 0 0 2px rgba(220, 255, 50, 0.82),
+    0 0 18px rgba(220, 255, 50, 0.32);
+}
+
+.pf-button:not(:disabled):hover {
+  background: var(--pf-accent);
+  color: #050515;
+}
+
+.pf-button-secondary:not(:disabled):hover,
+.pf-save-draft-button:not(:disabled):hover {
+  background: rgba(2, 2, 25, 0.36);
+  color: var(--pf-accent);
+}
+
+.pf-button-danger:not(:disabled):hover {
+  background: var(--pf-danger);
+  color: #050515;
+}
+
+.pf-auth-socials button:not(:disabled):hover,
+.pf-auth-tabs button:not(:disabled):hover,
+.pf-google-button:not(:disabled):hover,
+.pf-lang-toggle button:not(:disabled):hover,
+.pf-combobox-option:not(:disabled):hover,
+.pf-area-pill:not(:disabled):hover {
+  border-color: var(--pf-accent);
+  box-shadow:
+    0 0 0 2px rgba(220, 255, 50, 0.82),
+    0 0 18px rgba(220, 255, 50, 0.32);
+  transform: none;
+}
+
+.pf-auth-socials button:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.pf-auth-tabs button:not(:disabled):hover {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.pf-auth-tabs button.active:not(:disabled):hover,
+.pf-lang-toggle button.active:not(:disabled):hover {
+  background: var(--pf-accent);
+  color: #050515;
+}
+
+.pf-google-button:not(:disabled):hover {
+  background: #ffffff;
+}
+
+.pf-combobox-option:not(:disabled):hover,
+.pf-area-pill:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--pf-text);
+}
+
+.pf-combobox-option.selected:not(:disabled):hover,
+.pf-area-pill.ready:not(:disabled):hover,
+.pf-area-pill.pending:not(:disabled):hover,
+.pf-area-pill.assigned:not(:disabled):hover {
+  background: var(--pf-accent);
+  color: #050515;
+}
+
+.pf-prompt-management .pf-card:is(button, a):hover,
+.pf-prompt-management .pf-config-row:hover,
+.pf-prompt-preview-card:hover,
+.pf-created-prompt-card:hover,
+.pf-test-cases button.pf-test-case-card:hover,
+.pf-test-cases a.pf-test-case-card:hover {
+  border-color: var(--pf-accent) !important;
+  background: linear-gradient(
+    180deg,
+    rgba(58, 58, 83, 0.72),
+    rgba(27, 27, 48, 0.94)
+  ) !important;
+  color: var(--pf-text) !important;
+  box-shadow:
+    0 0 0 2px rgba(220, 255, 50, 0.82),
+    0 0 18px rgba(220, 255, 50, 0.32) !important;
+}
+
+.pf-prompt-management .pf-card:is(button, a):hover h3,
+.pf-prompt-management .pf-card:is(button, a):hover h4,
+.pf-prompt-management .pf-card:is(button, a):hover p,
+.pf-prompt-management .pf-card:is(button, a):hover span,
+.pf-prompt-management .pf-card:is(button, a):hover strong,
+.pf-prompt-management .pf-config-row:hover p,
+.pf-prompt-management .pf-config-row:hover span,
+.pf-prompt-management .pf-config-row:hover strong,
+.pf-test-cases button.pf-test-case-card:hover h3,
+.pf-test-cases button.pf-test-case-card:hover p,
+.pf-test-cases button.pf-test-case-card:hover span,
+.pf-test-cases a.pf-test-case-card:hover h3,
+.pf-test-cases a.pf-test-case-card:hover p,
+.pf-test-cases a.pf-test-case-card:hover span,
+.pf-prompt-preview-card:hover strong,
+.pf-prompt-preview-card:hover p,
+.pf-prompt-overview-card:hover .pf-prompt-overview-meta span,
+.pf-prompt-overview-card:hover .pf-prompt-overview-meta strong,
+.pf-created-prompt-card:hover h3,
+.pf-created-prompt-card:hover p,
+.pf-created-prompt-card:hover span,
+.pf-created-prompt-card:hover strong,
+.pf-created-prompt-card:hover .pf-prompt-overview-meta span,
+.pf-created-prompt-card:hover .pf-prompt-overview-meta strong {
+  color: var(--pf-text) !important;
+}

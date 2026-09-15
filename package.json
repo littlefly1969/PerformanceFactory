@@ -3,19 +3,25 @@
   "private": true,
   "packageManager": "pnpm@10.28.2",
   "engines": {
-    "node": ">=22 <23"
+    "node": ">=26.8.2 <27"
   },
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "lint": "turbo run lint",
+    "lint": "pnpm check:size && turbo run lint",
     "lint:fix": "turbo run lint:fix",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "doctor": "scripts/check-toolchain.sh",
     "db:up": "docker compose -f infra/docker-compose.dev.yml up -d",
     "db:down": "docker compose -f infra/docker-compose.dev.yml down",
-    "db:check": "cd apps/api && pnpm prisma validate"
+    "db:check": "cd apps/api && pnpm prisma validate",
+    "check:size": "node scripts/check-source-size.mjs",
+    "docker:up": "infra/scripts/deploy-local.sh",
+    "docker:stop": "docker compose --env-file .env.docker -f infra/docker-compose.prod.example.yml stop",
+    "docker:ps": "docker compose --env-file .env.docker -f infra/docker-compose.prod.example.yml ps",
+    "test:docker": "infra/scripts/test-docker.sh",
+    "test:infra": "node --test infra/test/*.test.mjs"
   },
   "devDependencies": {
     "prisma-erd-generator": "^2.4.2",

@@ -17,7 +17,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "jest && jest --config ./test/jest-e2e.json --runInBand --openHandlesTimeout=5000",
     "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
+    "test:cov": "jest --coverage --runInBand",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand --openHandlesTimeout=5000",
     "test:db": "jest --config ./test/jest-db.json --runInBand --openHandlesTimeout=5000",
@@ -69,7 +69,7 @@
     "@types/express": "^5.0.0",
     "@types/express-session": "^1.18.2",
     "@types/jest": "^30.0.0",
-    "@types/node": "^22.10.7",
+    "@types/node": "^26.5.1",
     "@types/passport": "^1.0.17",
     "@types/passport-local": "^1.0.38",
     "@types/supertest": "^6.0.2",
@@ -105,6 +105,26 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "coverageReporters": [
+      "text-summary",
+      "html",
+      "lcov",
+      "json-summary"
+    ],
+    "coverageThreshold": {
+      "./src/ai-orchestrator/performance-scoring.ts": {
+        "lines": 80,
+        "functions": 80,
+        "branches": 80,
+        "statements": 80
+      },
+      "./src/onboarding/onboarding-answers.ts": {
+        "lines": 85,
+        "functions": 85,
+        "branches": 80,
+        "statements": 85
+      }
+    }
   }
 }

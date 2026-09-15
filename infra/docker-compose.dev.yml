@@ -1,14 +1,35 @@
+name: ${DEV_COMPOSE_PROJECT_NAME:-performancefactory-dev}
+
 services:
   postgres:
-    image: postgres:16
+    image: postgres:16-bookworm
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: performancefactory
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${DEV_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d performancefactory"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
 
   redis:
-    image: redis:7
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:${DEV_REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-dev-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  postgres-dev-data:
+  redis-dev-data:

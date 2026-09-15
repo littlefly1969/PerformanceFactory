@@ -18,8 +18,8 @@ NODE_VERSION="$(node --version)"
 PNPM_VERSION="$(pnpm --version)"
 
 case "$NODE_VERSION" in
-  v22.*) ;;
-  *) fail "Node.js must be v22.x for this repo, got $NODE_VERSION" ;;
+  v26.8.2) ;;
+  *) fail "Node.js must be v26.8.2 for this repo, got $NODE_VERSION" ;;
 esac
 
 if [ "$PNPM_VERSION" != "10.28.2" ]; then

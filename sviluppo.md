@@ -9,7 +9,7 @@ sviluppare senza cambiare toolchain a ogni sessione.
 
 Usare sempre:
 
-- Node.js 22, come indicato da `.nvmrc` e `package.json`.
+- Node.js 26.8.2, come indicato da `.nvmrc` e `package.json`.
 - pnpm 10.28.2, come indicato da `packageManager`.
 - Docker con Docker Compose plugin.
 

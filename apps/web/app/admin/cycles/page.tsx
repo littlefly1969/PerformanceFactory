@@ -1,838 +1,56 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import {
   EmptyState,
   ProductShell,
   StatusBadge,
 } from "@/app/components/product-shell";
-import { API_BASE, secureFetch } from "@/app/lib/api";
-import { downloadResponseBody } from "@/app/lib/download";
-
-type Area = { id: string; name: string };
-type Sport = {
-  id: string;
-  label: string;
-  specializations: Array<{ id: string; label: string }>;
-};
-type SportSpecializationRef = {
-  id: string;
-  label: string;
-  sport: { id?: string; label: string };
-};
-type UserRef = {
-  id: string;
-  email: string;
-  firstName?: string | null;
-  lastName?: string | null;
-};
-type Professional = UserRef & {
-  professionalAreaCompetences: Array<{ areaId: string; area: Area }>;
-  professionalLinks: Array<{
-    userId: string;
-    user: UserRef;
-    createdAt: string;
-  }>;
-  coachSpecializationCompetences: Array<{
-    specializationId: string;
-    specialization: SportSpecializationRef;
-  }>;
-  coachUserLinks: Array<{
-    userId: string;
-    specializationId: string;
-    user: UserRef;
-    specialization: SportSpecializationRef;
-    createdAt: string;
-  }>;
-};
-type Cycle = {
-  id: string;
-  userId: string;
-  areaId: string;
-  version: number;
-  status?: string;
-  cycleStatus: string;
-  createdAt: string;
-  user: UserRef;
-  area: Area;
-  items?: Array<{ id: string; status: string }>;
-  questionSets?: Array<{
-    id: string;
-    status: string;
-    approvals: Array<{ id: string; status: string; professional: UserRef }>;
-  }>;
-};
-type AreaState = {
-  area: Area;
-  snapshot?: { realR: number; potentialP: number } | null;
-  pendingCycle?: Cycle | null;
-  activeCycle?: Cycle | null;
-  currentQuestionSet?: { id: string; status: string } | null;
-  linkedProfessional?: UserRef | null;
-  generationReady: boolean;
-  generationBlocked: boolean;
-  reason: string;
-};
-type Athlete = {
-  id: string;
-  email: string;
-  firstName?: string | null;
-  lastName?: string | null;
-  isActive: boolean;
-  createdAt: string;
-  onboarding: { status: string; completedAt?: string | null };
-  linkedProfessionals: Array<{
-    area: Area;
-    professional: UserRef;
-    createdAt: string;
-  }>;
-  latestSnapshot?: { rankingGlobal: number; createdAt: string } | null;
-  trainingState: {
-    sportSelection?: {
-      specializationId: string;
-      sport: { id: string; label: string };
-      specialization: { id: string; label: string };
-    } | null;
-    linkedCoach?: UserRef | null;
-    pendingTraining?: {
-      id: string;
-      version: number;
-      status: string;
-      cycleStatus: string;
-      createdAt: string;
-      specialization: SportSpecializationRef;
-    } | null;
-    activeTraining?: {
-      id: string;
-      version: number;
-      status: string;
-      cycleStatus?: string;
-      createdAt: string;
-      publishedAt?: string | null;
-      summaryText: string;
-      specialization?: SportSpecializationRef;
-    } | null;
-    generationReady: boolean;
-    reason: string;
-  };
-  areaStates: AreaState[];
-};
-type Dashboard = {
-  areas: Area[];
-  athletes: Athlete[];
-  professionals: Professional[];
-  sports: Sport[];
-  pendingCycles: Cycle[];
-  readyCycles: Cycle[];
-  pendingTrainingPlans: Array<{
-    id: string;
-    version: number;
-    cycleStatus: string;
-    createdAt: string;
-    user: UserRef;
-    specialization: SportSpecializationRef;
-    items: Array<{ id: string; status: string }>;
-    questionSets: Array<{
-      id: string;
-      status: string;
-      approvals: Array<{ id: string; status: string; coach: UserRef }>;
-    }>;
-  }>;
-  readyTrainingPlans: Array<{
-    id: string;
-    version: number;
-    cycleStatus: string;
-    createdAt: string;
-    user: UserRef;
-    specialization: SportSpecializationRef;
-  }>;
-  pendingQuestionApprovals: Array<{
-    id: string;
-    professional: UserRef;
-    currentProfessional?: UserRef | null;
-    routingMismatch?: boolean;
-    area: Area;
-    questionSet: { id: string; user: UserRef; planReleaseId: string };
-  }>;
-  pendingPlanItems: Array<{
-    id: string;
-    area: Area;
-    planReleaseId: string;
-    user: UserRef;
-    professional?: UserRef | null;
-  }>;
-};
-
-type AiPreview = {
-  provider: string;
-  model: string;
-  promptVersion: string;
-  promptHash: string;
-  inputJson: {
-    prompt?: {
-      system?: string;
-      user?: {
-        task?: string;
-        constraints?: unknown;
-        context?: unknown;
-      };
-      responseJsonSchema?: unknown;
-    };
-    [key: string]: unknown;
-  };
-};
-
-type PreviewTarget = {
-  athlete: UserRef;
-  area: Area;
-};
-type TrainingPreviewTarget = {
-  athlete: Athlete;
-};
-
-type AssignmentTarget = {
-  athlete: Athlete;
-  state: AreaState;
-};
-type CoachAssignmentTarget = {
-  athlete: Athlete;
-  specializationId: string;
-  label: string;
-};
-
-type ResetTarget = {
-  athlete: Athlete;
-};
-
-type DeleteTarget = {
-  athlete: Athlete;
-};
-
-const readError = async (response: Response) => {
-  try {
-    const data = (await response.json()) as {
-      message?: string | string[];
-      error?: string;
-    };
-    return Array.isArray(data.message)
-      ? data.message.join(", ")
-      : (data.message ?? data.error ?? `HTTP ${response.status}`);
-  } catch {
-    return `HTTP ${response.status}`;
-  }
-};
-
-const formatDate = (value?: string | null) => {
-  if (!value) {
-    return "-";
-  }
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime())
-    ? "-"
-    : parsed.toLocaleDateString("it-IT", {
-        month: "short",
-        day: "2-digit",
-        year: "numeric",
-      });
-};
-
-const displayUser = (user: UserRef) => {
-  const fullName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
-  return fullName ? `${fullName} - ${user.email}` : user.email;
-};
-
-const formatStatus = (status: string) =>
-  ({
-    ACTIVE: "attivo",
-    COMPLETED: "completato",
-    CLOSED: "chiuso",
-    PENDING: "in attesa",
-    PUBLISHED: "pubblicato",
-    READY_TO_PUBLISH: "pronto da pubblicare",
-    WAITING_PROFESSIONAL_APPROVAL: "in attesa professionista",
-  })[status] ?? status.replace(/_/g, " ").toLowerCase();
-
+import { displayUser, formatDate, formatStatus } from "./admin-cycles-model";
+import { AthleteAssignments } from "./athlete-assignments";
+import { CoachAssignmentDialog } from "./coach-assignment-dialog";
+import { CyclesReadyToPublish } from "./cycles-ready-to-publish";
+import { ProfessionalAssignmentDialog } from "./professional-assignment-dialog";
+import { ProfessionalCompetences } from "./professional-competences";
+import { useAdminCycles } from "./use-admin-cycles";
 export default function AdminCyclesPage() {
-  const [dashboard, setDashboard] = useState<Dashboard | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [busyKey, setBusyKey] = useState<string | null>(null);
-  const [competencesByProfessional, setCompetencesByProfessional] = useState<
-    Record<string, Record<string, boolean>>
-  >({});
-  const [coachCompetencesByProfessional, setCoachCompetencesByProfessional] =
-    useState<Record<string, Record<string, boolean>>>({});
-  const [aiPreview, setAiPreview] = useState<AiPreview | null>(null);
-  const [previewTarget, setPreviewTarget] = useState<PreviewTarget | null>(
-    null,
-  );
-  const [trainingPreviewTarget, setTrainingPreviewTarget] =
-    useState<TrainingPreviewTarget | null>(null);
-  const [assignmentTarget, setAssignmentTarget] =
-    useState<AssignmentTarget | null>(null);
-  const [coachAssignmentTarget, setCoachAssignmentTarget] =
-    useState<CoachAssignmentTarget | null>(null);
-  const [resetTarget, setResetTarget] = useState<ResetTarget | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
-  const [deleteConfirmText, setDeleteConfirmText] = useState("");
-  const [exportConfirmOpen, setExportConfirmOpen] = useState(false);
-  const [professionalFilter, setProfessionalFilter] = useState("");
-  const [coachFilter, setCoachFilter] = useState("");
-
-  const athletes = useMemo(
-    () =>
-      dashboard?.athletes.filter(
-        (athlete) => athlete.onboarding.status !== "REJECTED",
-      ) ?? [],
-    [dashboard],
-  );
-  const professionals = dashboard?.professionals ?? [];
-  const areas = dashboard?.areas ?? [];
-  const readyToGenerate = useMemo(
-    () =>
-      athletes.flatMap((athlete) =>
-        athlete.areaStates
-          .filter((state) => state.generationReady && !state.generationBlocked)
-          .map((state) => ({ athlete, state })),
-      ),
-    [athletes],
-  );
-  const readyTraining = useMemo(
-    () => athletes.filter((athlete) => athlete.trainingState.generationReady),
-    [athletes],
-  );
-  const waitingApproval =
-    dashboard?.pendingCycles.filter(
-      (cycle) => cycle.cycleStatus !== "READY_TO_PUBLISH",
-    ) ?? [];
-  const readyCycles = dashboard?.readyCycles ?? [];
-  const readyTrainingPlans = dashboard?.readyTrainingPlans ?? [];
-  const pendingActivation = athletes.filter(
-    (athlete) => !athlete.isActive && athlete.onboarding.status !== "REJECTED",
-  );
-  const professionalCanHandleArea = (professionalId: string, areaId: string) =>
-    Boolean(
-      professionals
-        .find((professional) => professional.id === professionalId)
-        ?.professionalAreaCompetences.some(
-          (competence) => competence.areaId === areaId,
-        ),
-    );
-  const enabledProfessionalsForArea = (areaId: string) =>
-    areaId
-      ? professionals.filter((professional) =>
-          professional.professionalAreaCompetences.some(
-            (competence) => competence.areaId === areaId,
-          ),
-        )
-      : [];
-  const coachCanHandleSpecialization = (
-    coachId: string,
-    specializationId: string,
-  ) =>
-    Boolean(
-      professionals
-        .find((professional) => professional.id === coachId)
-        ?.coachSpecializationCompetences.some(
-          (competence) => competence.specializationId === specializationId,
-        ),
-    );
-
-  const previewAthlete = previewTarget?.athlete ?? trainingPreviewTarget?.athlete;
-  const previewLabel = previewTarget
-    ? previewTarget.area.name
-    : "Allenamento specifico";
-  const previewIsTraining = Boolean(trainingPreviewTarget);
-  const enabledCoachesForSpecialization = (specializationId: string) =>
-    specializationId
-      ? professionals.filter((professional) =>
-          professional.coachSpecializationCompetences.some(
-            (competence) => competence.specializationId === specializationId,
-          ),
-        )
-      : [];
-  const filteredAssignmentProfessionals = assignmentTarget
-    ? enabledProfessionalsForArea(assignmentTarget.state.area.id).filter(
-        (professional) =>
-          displayUser(professional)
-            .toLowerCase()
-            .includes(professionalFilter.trim().toLowerCase()),
-      )
-    : [];
-  const filteredCoachAssignmentProfessionals = coachAssignmentTarget
-    ? enabledCoachesForSpecialization(
-        coachAssignmentTarget.specializationId,
-      ).filter((professional) =>
-        displayUser(professional)
-          .toLowerCase()
-          .includes(coachFilter.trim().toLowerCase()),
-      )
-    : [];
-
-  const loadDashboard = async () => {
-    setLoading(true);
-    setMessage(null);
-    const response = await secureFetch(`${API_BASE}/admin/dashboard`, {
-      credentials: "include",
-    });
-    if (!response.ok) {
-      setMessage(
-        response.status === 403
-          ? "Accesso amministratore richiesto."
-          : `Caricamento cruscotto non riuscito: ${await readError(response)}`,
-      );
-      setLoading(false);
-      return;
-    }
-
-    const data = (await response.json()) as Dashboard;
-    setDashboard(data);
-    setCompetencesByProfessional(
-      Object.fromEntries(
-        data.professionals.map((professional) => [
-          professional.id,
-          Object.fromEntries(
-            professional.professionalAreaCompetences.map((competence) => [
-              competence.areaId,
-              true,
-            ]),
-          ),
-        ]),
-      ),
-    );
-    setCoachCompetencesByProfessional(
-      Object.fromEntries(
-        data.professionals.map((professional) => [
-          professional.id,
-          Object.fromEntries(
-            professional.coachSpecializationCompetences.map((competence) => [
-              competence.specializationId,
-              true,
-            ]),
-          ),
-        ]),
-      ),
-    );
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    void loadDashboard();
-  }, []);
-
-  const openAssignmentModal = (athlete: Athlete, state: AreaState) => {
-    setAssignmentTarget({ athlete, state });
-    setProfessionalFilter("");
-  };
-
-  const closeAssignmentModal = () => {
-    setAssignmentTarget(null);
-    setProfessionalFilter("");
-  };
-
-  const openCoachAssignmentModal = (
-    athlete: Athlete,
-    specializationId: string,
-    label: string,
-  ) => {
-    setCoachAssignmentTarget({ athlete, specializationId, label });
-    setCoachFilter("");
-  };
-
-  const closeCoachAssignmentModal = () => {
-    setCoachAssignmentTarget(null);
-    setCoachFilter("");
-  };
-
-  const assignProfessional = async (
-    athleteId: string,
-    areaId: string,
-    professionalId: string,
-  ) => {
-    if (!areaId) {
-      setMessage("Seleziona un'area prima di assegnare un professionista.");
-      return;
-    }
-    if (!professionalId) {
-      setMessage("Seleziona un professionista prima dell'assegnazione.");
-      return;
-    }
-    if (!professionalCanHandleArea(professionalId, areaId)) {
-      setMessage("Il professionista selezionato non e abilitato per questa area.");
-      return;
-    }
-    setBusyKey(`link:${athleteId}:${areaId}`);
-    setMessage(null);
-    const response = await secureFetch(`${API_BASE}/inspect/links`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: athleteId, professionalId, areaId }),
-    });
-    if (!response.ok) {
-      setMessage(`Assegnazione non riuscita: ${await readError(response)}`);
-      setBusyKey(null);
-      return;
-    }
-    setMessage(
-      "Atleta assegnato a un professionista abilitato. I collegamenti precedenti sono stati sostituiti.",
-    );
-    closeAssignmentModal();
-    await loadDashboard();
-    setBusyKey(null);
-  };
-
-  const saveCompetences = async (professionalId: string) => {
-    const selected = Object.entries(
-      competencesByProfessional[professionalId] ?? {},
-    )
-      .filter(([, checked]) => checked)
-      .map(([areaId]) => areaId);
-    if (!selected.length) {
-      setMessage("Seleziona almeno una competenza per area.");
-      return;
-    }
-    setBusyKey(`competences:${professionalId}`);
-    setMessage(null);
-    const response = await secureFetch(`${API_BASE}/inspect/competences`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ professionalId, areaIds: selected }),
-    });
-    if (!response.ok) {
-      setMessage(`Aggiornamento competenze non riuscito: ${await readError(response)}`);
-      setBusyKey(null);
-      return;
-    }
-    setMessage(
-      "Competenze salvate. Il professionista vede gli atleti collegati e le approvazioni coerenti.",
-    );
-    await loadDashboard();
-    setBusyKey(null);
-  };
-
-  const assignCoach = async (
-    athleteId: string,
-    specializationId: string,
-    coachId: string,
-  ) => {
-    if (!coachId) {
-      setMessage("Seleziona un allenatore prima dell'assegnazione.");
-      return;
-    }
-    if (!coachCanHandleSpecialization(coachId, specializationId)) {
-      setMessage(
-        "L'allenatore selezionato non e abilitato per questa specializzazione.",
-      );
-      return;
-    }
-    setBusyKey(`coach-link:${athleteId}:${specializationId}`);
-    setMessage(null);
-    const response = await secureFetch(`${API_BASE}/inspect/coach-links`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: athleteId, coachId, specializationId }),
-    });
-    if (!response.ok) {
-      setMessage(`Assegnazione allenatore non riuscita: ${await readError(response)}`);
-      setBusyKey(null);
-      return;
-    }
-    setMessage("Allenatore assegnato alla sport-specializzazione dell'atleta.");
-    closeCoachAssignmentModal();
-    await loadDashboard();
-    setBusyKey(null);
-  };
-
-  const saveCoachCompetences = async (coachId: string) => {
-    const selected = Object.entries(
-      coachCompetencesByProfessional[coachId] ?? {},
-    )
-      .filter(([, checked]) => checked)
-      .map(([specializationId]) => specializationId);
-    if (!selected.length) {
-      setMessage("Seleziona almeno una specializzazione per l'allenatore.");
-      return;
-    }
-    setBusyKey(`coach-competences:${coachId}`);
-    setMessage(null);
-    const response = await secureFetch(`${API_BASE}/inspect/coach-competences`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ coachId, specializationIds: selected }),
-    });
-    if (!response.ok) {
-      setMessage(`Aggiornamento competenze allenatore non riuscito: ${await readError(response)}`);
-      setBusyKey(null);
-      return;
-    }
-    setMessage("Competenze allenatore salvate.");
-    await loadDashboard();
-    setBusyKey(null);
-  };
-
-  const openAiPreview = async (athlete: UserRef, area: Area) => {
-    setBusyKey(`preview:${athlete.id}:${area.id}`);
-    setMessage(null);
-    const response = await secureFetch(
-      `${API_BASE}/admin/orchestrator/preview`,
-      {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userIds: [athlete.id],
-          areaId: area.id,
-          runAllAreas: false,
-        }),
-      },
-    );
-    if (!response.ok) {
-      setMessage(`Anteprima AI non riuscita: ${await readError(response)}`);
-      setBusyKey(null);
-      return;
-    }
-    setAiPreview((await response.json()) as AiPreview);
-    setPreviewTarget({ athlete, area });
-    setTrainingPreviewTarget(null);
-    setBusyKey(null);
-  };
-
-  const openTrainingPreview = async (athlete: Athlete) => {
-    setBusyKey(`training-preview:${athlete.id}`);
-    setMessage(null);
-    const response = await secureFetch(
-      `${API_BASE}/admin/orchestrator/training/preview`,
-      {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userIds: [athlete.id],
-          runAllAreas: false,
-        }),
-      },
-    );
-    if (!response.ok) {
-      setMessage(`Anteprima allenamento non riuscita: ${await readError(response)}`);
-      setBusyKey(null);
-      return;
-    }
-    setAiPreview((await response.json()) as AiPreview);
-    setPreviewTarget(null);
-    setTrainingPreviewTarget({ athlete });
-    setBusyKey(null);
-  };
-
-  const closeAiPreview = () => {
-    setAiPreview(null);
-    setPreviewTarget(null);
-    setTrainingPreviewTarget(null);
-  };
-
-  const generateCycle = async (athleteId: string, areaId: string) => {
-    setBusyKey(`generate:${athleteId}:${areaId}`);
-    setMessage(null);
-    const response = await secureFetch(`${API_BASE}/admin/orchestrator/run`, {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        userIds: [athleteId],
-        areaId,
-        runAllAreas: false,
-      }),
-    });
-    if (!response.ok) {
-      setMessage(`Generazione AI non riuscita: ${await readError(response)}`);
-      setBusyKey(null);
-      return;
-    }
-    setMessage("Proposta AI generata e inviata all'approvazione del professionista.");
-    closeAiPreview();
-    await loadDashboard();
-    setBusyKey(null);
-  };
-
-  const generateTraining = async (athleteId: string) => {
-    setBusyKey(`training:${athleteId}`);
-    setMessage(null);
-    const response = await secureFetch(
-      `${API_BASE}/admin/orchestrator/training/run`,
-      {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userIds: [athleteId], runAllAreas: false }),
-      },
-    );
-    if (!response.ok) {
-      setMessage(`Generazione allenamento non riuscita: ${await readError(response)}`);
-      setBusyKey(null);
-      return;
-    }
-    setMessage("Allenamento specifico generato e inviato all'approvazione dell'allenatore.");
-    closeAiPreview();
-    await loadDashboard();
-    setBusyKey(null);
-  };
-
-  const publishCycle = async (cycleId: string) => {
-    setBusyKey(`publish:${cycleId}`);
-    setMessage(null);
-    const response = await secureFetch(
-      `${API_BASE}/admin/cycles/${cycleId}/publish`,
-      {
-        method: "POST",
-        credentials: "include",
-      },
-    );
-    if (!response.ok) {
-      setMessage(`Pubblicazione non riuscita: ${await readError(response)}`);
-      setBusyKey(null);
-      return;
-    }
-    setMessage("Ciclo pubblicato. L'atleta ora vede allenamento e questionario.");
-    await loadDashboard();
-    setBusyKey(null);
-  };
-
-  const publishTrainingPlan = async (trainingPlanId: string) => {
-    setBusyKey(`training-publish:${trainingPlanId}`);
-    setMessage(null);
-    const response = await secureFetch(
-      `${API_BASE}/admin/training-plans/${trainingPlanId}/publish`,
-      {
-        method: "POST",
-        credentials: "include",
-      },
-    );
-    if (!response.ok) {
-      setMessage(`Pubblicazione allenamento non riuscita: ${await readError(response)}`);
-      setBusyKey(null);
-      return;
-    }
-    setMessage("Allenamento pubblicato. L'atleta ora vede esercizi e questionario.");
-    await loadDashboard();
-    setBusyKey(null);
-  };
-
-  const confirmExportActivePrompts = async () => {
-    setBusyKey("export-active-prompts");
-    setMessage(null);
-    const response = await secureFetch(
-      `${API_BASE}/ai-tuning/active-prompts/export`,
-      {
-        method: "GET",
-        credentials: "include",
-      },
-    );
-    if (!response.ok) {
-      setMessage(`Export prompt AI non riuscito: ${await readError(response)}`);
-      setBusyKey(null);
-      setExportConfirmOpen(false);
-      return;
-    }
-
-    await downloadResponseBody(response, "active-ai-prompts.txt");
-    setMessage("Export prompt AI attivi generato.");
-    setBusyKey(null);
-    setExportConfirmOpen(false);
-  };
-
-  const setAthleteActive = async (athleteId: string, active: boolean) => {
-    setBusyKey(`active:${athleteId}`);
-    setMessage(null);
-    const response = await secureFetch(
-      `${API_BASE}/admin/users/${athleteId}/${active ? "activate" : "deactivate"}`,
-      {
-        method: "PATCH",
-        credentials: "include",
-      },
-    );
-    if (!response.ok) {
-      setMessage(`Aggiornamento atleta non riuscito: ${await readError(response)}`);
-      setBusyKey(null);
-      return;
-    }
-    setMessage(active ? "Atleta abilitato." : "Atleta disabilitato.");
-    await loadDashboard();
-    setBusyKey(null);
-  };
-
-  const rejectAthleteApplication = async (athleteId: string) => {
-    setBusyKey(`reject:${athleteId}`);
-    setMessage(null);
-    const response = await secureFetch(
-      `${API_BASE}/admin/users/${athleteId}/reject`,
-      {
-        method: "PATCH",
-        credentials: "include",
-      },
-    );
-    if (!response.ok) {
-      setMessage(`Rifiuto candidatura non riuscito: ${await readError(response)}`);
-      setBusyKey(null);
-      return;
-    }
-    setMessage("Candidatura atleta rifiutata. L'utente potra riproporne una nuova.");
-    await loadDashboard();
-    setBusyKey(null);
-  };
-
-  const resetAthleteData = async () => {
-    if (!resetTarget) {
-      return;
-    }
-    const athleteId = resetTarget.athlete.id;
-    setBusyKey(`reset:${athleteId}`);
-    setMessage(null);
-    const response = await secureFetch(
-      `${API_BASE}/admin/users/${athleteId}/reset-data`,
-      {
-        method: "POST",
-        credentials: "include",
-      },
-    );
-    if (!response.ok) {
-      setMessage(`Reset dati atleta non riuscito: ${await readError(response)}`);
-      setBusyKey(null);
-      return;
-    }
-    setMessage(
-      "Dati atleta cancellati. Resta solo l'account: consensi e onboarding dovranno ripartire.",
-    );
-    setResetTarget(null);
-    await loadDashboard();
-    setBusyKey(null);
-  };
-
-  const deleteAthleteCompletely = async () => {
-    if (!deleteTarget) {
-      return;
-    }
-    const athleteId = deleteTarget.athlete.id;
-    setBusyKey(`delete:${athleteId}`);
-    setMessage(null);
-    const response = await secureFetch(`${API_BASE}/admin/users/${athleteId}`, {
-      method: "DELETE",
-      credentials: "include",
-    });
-    if (!response.ok) {
-      setMessage(`Eliminazione atleta non riuscita: ${await readError(response)}`);
-      setBusyKey(null);
-      return;
-    }
-    setMessage("Atleta eliminato definitivamente.");
-    setDeleteTarget(null);
-    setDeleteConfirmText("");
-    await loadDashboard();
-    setBusyKey(null);
-  };
-
+  const model = useAdminCycles();
+  const {
+    loading,
+    message,
+    busyKey,
+    aiPreview,
+    previewTarget,
+    assignmentTarget,
+    coachAssignmentTarget,
+    resetTarget,
+    setResetTarget,
+    deleteTarget,
+    setDeleteTarget,
+    deleteConfirmText,
+    setDeleteConfirmText,
+    exportConfirmOpen,
+    setExportConfirmOpen,
+    readyToGenerate,
+    readyTraining,
+    waitingApproval,
+    readyCycles,
+    pendingActivation,
+    professionalCanHandleArea,
+    previewAthlete,
+    previewLabel,
+    previewIsTraining,
+    loadDashboard,
+    openAiPreview,
+    openTrainingPreview,
+    closeAiPreview,
+    generateCycle,
+    generateTraining,
+    confirmExportActivePrompts,
+    setAthleteActive,
+    rejectAthleteApplication,
+    resetAthleteData,
+    deleteAthleteCompletely,
+  } = model;
   return (
     <ProductShell
       eyebrow="Ambiente amministratore"
@@ -971,8 +189,8 @@ export default function AdminCyclesPage() {
                   </p>
                   {!linkedProfessionalCanApprove && (
                     <p className="pf-muted">
-                      Assegna un professionista abilitato per {state.area.name} prima
-                      di generare.
+                      Assegna un professionista abilitato per {state.area.name}{" "}
+                      prima di generare.
                     </p>
                   )}
                 </div>
@@ -1008,7 +226,8 @@ export default function AdminCyclesPage() {
           <div>
             <h2>Allenamento autonomo</h2>
             <p className="pf-muted">
-              Genera l'allenamento specifico dello sport-specializzazione usando i driver abilitati come contesto.
+              Genera l'allenamento specifico dello sport-specializzazione usando
+              i driver abilitati come contesto.
             </p>
           </div>
           <StatusBadge tone={readyTraining.length ? "success" : "neutral"}>
@@ -1024,14 +243,16 @@ export default function AdminCyclesPage() {
                 {athlete.trainingState.sportSelection && (
                   <p className="pf-muted">
                     {athlete.trainingState.sportSelection.sport.label} -{" "}
-                    {athlete.trainingState.sportSelection.specialization.label} -{" "}
-                    allenatore:{" "}
-                    {athlete.trainingState.linkedCoach?.email ?? "non assegnato"}
+                    {athlete.trainingState.sportSelection.specialization.label}{" "}
+                    - allenatore:{" "}
+                    {athlete.trainingState.linkedCoach?.email ??
+                      "non assegnato"}
                   </p>
                 )}
                 {athlete.trainingState.activeTraining && (
                   <p className="pf-muted">
-                    Ultimo allenamento v{athlete.trainingState.activeTraining.version} -{" "}
+                    Ultimo allenamento v
+                    {athlete.trainingState.activeTraining.version} -{" "}
                     {formatDate(athlete.trainingState.activeTraining.createdAt)}
                   </p>
                 )}
@@ -1039,9 +260,7 @@ export default function AdminCyclesPage() {
               <button
                 className="pf-button"
                 type="button"
-                disabled={
-                  busyKey === `training-preview:${athlete.id}`
-                }
+                disabled={busyKey === `training-preview:${athlete.id}`}
                 onClick={() => openTrainingPreview(athlete)}
               >
                 Anteprima AI
@@ -1057,540 +276,15 @@ export default function AdminCyclesPage() {
         </div>
       </section>
 
-      <section className="pf-dashboard-grid">
-        <article className="pf-panel">
-          <div className="pf-panel-header">
-            <div>
-              <h2>Pronti da pubblicare</h2>
-              <p className="pf-muted">
-                I controlli dei professionisti sono completati. La pubblicazione
-                dell'amministratore attiva il ciclo.
-              </p>
-            </div>
-          </div>
-          <div className="pf-stack">
-            {readyCycles.map((cycle) => (
-              <div key={cycle.id} className="pf-card">
-                <div className="pf-card-top">
-                  <div>
-                    <h3>{cycle.area.name}</h3>
-                    <p className="pf-muted">
-                      {displayUser(cycle.user)} - v{cycle.version} -{" "}
-                      {formatDate(cycle.createdAt)}
-                    </p>
-                  </div>
-                  <StatusBadge tone="success">Pronto</StatusBadge>
-                </div>
-                <div className="pf-actions">
-                  <button
-                    className="pf-button"
-                    type="button"
-                    disabled={busyKey === `publish:${cycle.id}`}
-                    onClick={() => publishCycle(cycle.id)}
-                  >
-                    Pubblica
-                  </button>
-                </div>
-              </div>
-            ))}
-            {readyTrainingPlans.map((training) => (
-              <div key={training.id} className="pf-card">
-                <div className="pf-card-top">
-                  <div>
-                    <h3>
-                      {training.specialization.sport.label} -{" "}
-                      {training.specialization.label}
-                    </h3>
-                    <p className="pf-muted">
-                      {displayUser(training.user)} - v{training.version} -{" "}
-                      {formatDate(training.createdAt)}
-                    </p>
-                  </div>
-                  <StatusBadge tone="success">Allenamento pronto</StatusBadge>
-                </div>
-                <div className="pf-actions">
-                  <button
-                    className="pf-button"
-                    type="button"
-                    disabled={busyKey === `training-publish:${training.id}`}
-                    onClick={() => publishTrainingPlan(training.id)}
-                  >
-                    Pubblica allenamento
-                  </button>
-                </div>
-              </div>
-            ))}
-            {!loading && readyCycles.length === 0 && readyTrainingPlans.length === 0 && (
-              <EmptyState
-                title="Nessun ciclo pronto"
-                description="I cicli approvati appariranno qui per la pubblicazione diretta."
-              />
-            )}
-          </div>
-        </article>
+      <CyclesReadyToPublish model={model} />
 
-        <article className="pf-panel">
-          <div className="pf-panel-header">
-            <div>
-              <h2>Carico approvazioni</h2>
-              <p className="pf-muted">
-                Chi deve agire prima che l'amministratore possa pubblicare.
-              </p>
-            </div>
-          </div>
-          <div className="pf-stack">
-            {(dashboard?.pendingQuestionApprovals ?? []).map((approval) => (
-              <div key={approval.id} className="pf-metric-row">
-                <span>
-                  {approval.currentProfessional?.email ??
-                    approval.professional.email}
-                  <br />
-                  <small>
-                      {displayUser(approval.questionSet.user)} - {approval.area.name}
-                  {approval.routingMismatch ? " - riassegnato" : ""}
-                  </small>
-                </span>
-                <StatusBadge tone="warning">Questionario</StatusBadge>
-              </div>
-            ))}
-            {(dashboard?.pendingPlanItems ?? []).map((item) => (
-              <div key={item.id} className="pf-metric-row">
-                <span>
-                  {item.professional?.email ?? "Professionista non assegnato"}
-                  <br />
-                  <small>
-                    {displayUser(item.user)} - {item.area.name}
-                  </small>
-                </span>
-                <StatusBadge tone="warning">Attivita allenamento</StatusBadge>
-              </div>
-            ))}
-            {(dashboard?.pendingTrainingPlans ?? []).map((training) => {
-              const approval = training.questionSets[0]?.approvals[0];
-              return (
-                <div key={training.id} className="pf-metric-row">
-                  <span>
-                    {approval?.coach.email ?? "Allenatore non assegnato"}
-                    <br />
-                    <small>
-                      {displayUser(training.user)} -{" "}
-                      {training.specialization.sport.label} /{" "}
-                      {training.specialization.label}
-                    </small>
-                  </span>
-                  <StatusBadge tone="warning">Allenamento</StatusBadge>
-                </div>
-              );
-            })}
-            {!loading &&
-              !(
-                dashboard?.pendingQuestionApprovals.length ||
-                dashboard?.pendingPlanItems.length ||
-                dashboard?.pendingTrainingPlans.length
-              ) && (
-                <EmptyState
-                  title="Nessuna approvazione pendente"
-                  description="I professionisti non hanno revisioni aperte."
-                />
-              )}
-          </div>
-        </article>
-      </section>
+      <AthleteAssignments model={model} />
 
-      <section className="pf-panel">
-        <div className="pf-panel-header">
-          <div>
-            <h2>Assegnazione atleti</h2>
-            <p className="pf-muted">
-              Assegna un professionista per atleta e area. Riassegnando un'area
-              viene sostituito solo il responsabile di quell'area.
-            </p>
-          </div>
-        </div>
-        <div className="pf-grid pf-ownership-grid">
-          {athletes.map((athlete) => {
-            const assignedCount = athlete.areaStates.filter(
-              (state) => state.linkedProfessional,
-            ).length;
+      <ProfessionalCompetences model={model} />
 
-            return (
-              <article key={athlete.id} className="pf-card pf-ownership-card">
-                <div className="pf-card-top pf-ownership-header">
-                  <div>
-                    <h3>{displayUser(athlete)}</h3>
-                    <p className="pf-muted pf-athlete-meta">
-                      {athlete.isActive ? "Abilitato" : "In attesa attivazione"} -
-                      onboarding {formatStatus(athlete.onboarding.status)} -
-                      ranking {athlete.latestSnapshot?.rankingGlobal ?? "-"}
-                    </p>
-                  </div>
-                  <StatusBadge
-                    tone={
-                      !athlete.isActive
-                        ? "danger"
-                        : assignedCount
-                          ? "success"
-                          : "warning"
-                    }
-                  >
-                    {!athlete.isActive
-                      ? "in attesa"
-                      : `${assignedCount}/${athlete.areaStates.length} assegnati`}
-                  </StatusBadge>
-                </div>
-                <div className="pf-ownership-actions">
-                  <button
-                    className="pf-button-secondary"
-                    type="button"
-                    disabled={busyKey === `active:${athlete.id}`}
-                    onClick={() =>
-                      setAthleteActive(athlete.id, !athlete.isActive)
-                    }
-                  >
-                    {athlete.isActive ? "Disabilita atleta" : "Abilita atleta"}
-                  </button>
-                  <button
-                    className="pf-button-danger"
-                    type="button"
-                    disabled={busyKey === `reset:${athlete.id}`}
-                    onClick={() => setResetTarget({ athlete })}
-                  >
-                    Cancella dati
-                  </button>
-                  <button
-                    className="pf-button-danger"
-                    type="button"
-                    disabled={busyKey === `delete:${athlete.id}`}
-                    onClick={() => {
-                      setDeleteTarget({ athlete });
-                      setDeleteConfirmText("");
-                    }}
-                  >
-                    Elimina atleta
-                  </button>
-                </div>
-                <div className="pf-area-strip">
-                  {athlete.areaStates.map((state) => (
-                    <button
-                      key={state.area.id}
-                      className={`pf-area-pill ${state.pendingCycle ? "pending" : state.generationReady ? "ready" : ""} ${
-                        state.linkedProfessional ? "assigned" : ""
-                      }`}
-                      type="button"
-                      onClick={() => openAssignmentModal(athlete, state)}
-                    >
-                      <span>{state.area.name}</span>
-                    </button>
-                  ))}
-                  {athlete.trainingState.sportSelection && (
-                    <button
-                      className={`pf-area-pill ${
-                        athlete.trainingState.generationReady ? "ready" : ""
-                      } ${athlete.trainingState.linkedCoach ? "assigned" : ""}`}
-                      type="button"
-                      onClick={() =>
-                        openCoachAssignmentModal(
-                          athlete,
-                          athlete.trainingState.sportSelection!.specializationId,
-                          `${athlete.trainingState.sportSelection!.sport.label} - ${athlete.trainingState.sportSelection!.specialization.label}`,
-                        )
-                      }
-                    >
-                      <span>
-                        Allenamento:{" "}
-                        {athlete.trainingState.sportSelection.sport.label} -{" "}
-                        {
-                          athlete.trainingState.sportSelection.specialization
-                            .label
-                        }
-                      </span>
-                    </button>
-                  )}
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
+      {assignmentTarget && <ProfessionalAssignmentDialog model={model} />}
 
-      <section className="pf-panel">
-        <div className="pf-panel-header">
-          <div>
-            <h2>Competenze professionisti</h2>
-            <p className="pf-muted">
-              L'instradamento delle approvazioni usa le competenze per area.
-              Mantienilo esplicito e visibile.
-            </p>
-          </div>
-        </div>
-        <div className="pf-grid">
-          {professionals.map((professional) => (
-            <article key={professional.id} className="pf-card">
-              <div className="pf-card-top">
-                <div>
-                  <h3>{professional.email}</h3>
-                  <p className="pf-muted">
-                    {professional.professionalLinks.length} atleti collegati
-                  </p>
-                </div>
-              </div>
-              <div className="pf-checkbox-grid">
-                {areas.map((area) => (
-                  <label key={area.id} className="pf-checkbox">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(
-                        competencesByProfessional[professional.id]?.[area.id],
-                      )}
-                      onChange={(event) =>
-                        setCompetencesByProfessional((prev) => ({
-                          ...prev,
-                          [professional.id]: {
-                            ...(prev[professional.id] ?? {}),
-                            [area.id]: event.target.checked,
-                          },
-                        }))
-                      }
-                    />
-                    <span>{area.name}</span>
-                  </label>
-                ))}
-              </div>
-              <button
-                className="pf-button-secondary"
-                type="button"
-                disabled={busyKey === `competences:${professional.id}`}
-                onClick={() => saveCompetences(professional.id)}
-              >
-                Salva aree
-              </button>
-              <div className="pf-divider" />
-              <p className="pf-muted">Competenze allenatore</p>
-              <div className="pf-checkbox-grid">
-                {(dashboard?.sports ?? []).flatMap((sport) =>
-                  sport.specializations.map((specialization) => (
-                    <label key={specialization.id} className="pf-checkbox">
-                      <input
-                        type="checkbox"
-                        checked={Boolean(
-                          coachCompetencesByProfessional[professional.id]?.[
-                            specialization.id
-                          ],
-                        )}
-                        onChange={(event) =>
-                          setCoachCompetencesByProfessional((prev) => ({
-                            ...prev,
-                            [professional.id]: {
-                              ...(prev[professional.id] ?? {}),
-                              [specialization.id]: event.target.checked,
-                            },
-                          }))
-                        }
-                      />
-                      <span>
-                        {sport.label} - {specialization.label}
-                      </span>
-                    </label>
-                  )),
-                )}
-              </div>
-              <button
-                className="pf-button-secondary"
-                type="button"
-                disabled={busyKey === `coach-competences:${professional.id}`}
-                onClick={() => saveCoachCompetences(professional.id)}
-              >
-                Salva allenatore
-              </button>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      {assignmentTarget && (
-        <div className="pf-modal-backdrop" role="dialog" aria-modal="true">
-          <section className="pf-modal pf-assignment-modal">
-            <div className="pf-panel-header">
-              <div>
-                <p className="pf-eyebrow">Assegnazione area</p>
-                <h2>Seleziona professionista</h2>
-              </div>
-              <button
-                className="pf-button-secondary"
-                type="button"
-                onClick={closeAssignmentModal}
-              >
-                Chiudi
-              </button>
-            </div>
-
-            <div className="pf-assignment-summary">
-              <div>
-                <span>Utente</span>
-                <strong>{displayUser(assignmentTarget.athlete)}</strong>
-              </div>
-              <div>
-                <span>Zona driver</span>
-                <strong>{assignmentTarget.state.area.name}</strong>
-              </div>
-              <div>
-                <span>Attualmente assegnato</span>
-                <strong>
-                  {assignmentTarget.state.linkedProfessional?.email ??
-                    "Nessun professionista"}
-                </strong>
-              </div>
-            </div>
-
-            <label className="pf-field pf-combobox-field">
-              Professionista
-              <input
-                className="pf-input"
-                value={professionalFilter}
-                onChange={(event) => setProfessionalFilter(event.target.value)}
-                placeholder="Cerca per nome o email"
-                role="combobox"
-                aria-expanded="true"
-                aria-controls="professional-assignment-options"
-                autoFocus
-                autoComplete="off"
-              />
-            </label>
-
-            <div
-              className="pf-combobox-menu"
-              id="professional-assignment-options"
-            >
-              {filteredAssignmentProfessionals.map((professional) => (
-                <button
-                  key={professional.id}
-                  className={`pf-combobox-option ${
-                    assignmentTarget.state.linkedProfessional?.id ===
-                    professional.id
-                      ? "selected"
-                      : ""
-                  }`}
-                  type="button"
-                  disabled={
-                    busyKey ===
-                    `link:${assignmentTarget.athlete.id}:${assignmentTarget.state.area.id}`
-                  }
-                  onClick={() =>
-                    assignProfessional(
-                      assignmentTarget.athlete.id,
-                      assignmentTarget.state.area.id,
-                      professional.id,
-                    )
-                  }
-                >
-                  {displayUser(professional)}
-                </button>
-              ))}
-              {!filteredAssignmentProfessionals.length && (
-                <div className="pf-alert warning">
-                  Nessun professionista abilitato trovato per questa area.
-                </div>
-              )}
-            </div>
-          </section>
-        </div>
-      )}
-
-      {coachAssignmentTarget && (
-        <div className="pf-modal-backdrop" role="dialog" aria-modal="true">
-          <section className="pf-modal pf-assignment-modal">
-            <div className="pf-panel-header">
-              <div>
-                <p className="pf-eyebrow">Assegnazione allenatore</p>
-                <h2>Seleziona allenatore</h2>
-              </div>
-              <button
-                className="pf-button-secondary"
-                type="button"
-                onClick={closeCoachAssignmentModal}
-              >
-                Chiudi
-              </button>
-            </div>
-
-            <div className="pf-assignment-summary">
-              <div>
-                <span>Utente</span>
-                <strong>{displayUser(coachAssignmentTarget.athlete)}</strong>
-              </div>
-              <div>
-                <span>Sport-specializzazione</span>
-                <strong>{coachAssignmentTarget.label}</strong>
-              </div>
-              <div>
-                <span>Attualmente assegnato</span>
-                <strong>
-                  {coachAssignmentTarget.athlete.trainingState.linkedCoach?.email ??
-                    "Nessun allenatore"}
-                </strong>
-              </div>
-            </div>
-
-            <label className="pf-field pf-combobox-field">
-              Allenatore
-              <input
-                className="pf-input"
-                value={coachFilter}
-                onChange={(event) => setCoachFilter(event.target.value)}
-                placeholder="Cerca per nome o email"
-                role="combobox"
-                aria-controls="coach-assignment-options"
-                aria-expanded="true"
-                aria-autocomplete="list"
-                autoFocus
-                autoComplete="off"
-              />
-            </label>
-
-            <div
-              className="pf-combobox-menu"
-              id="coach-assignment-options"
-              role="listbox"
-            >
-              {filteredCoachAssignmentProfessionals.map((professional) => (
-                <button
-                  key={professional.id}
-                  className={`pf-combobox-option ${
-                    coachAssignmentTarget.athlete.trainingState.linkedCoach?.id ===
-                    professional.id
-                      ? "selected"
-                      : ""
-                  }`}
-                  type="button"
-                  role="option"
-                  aria-selected={
-                    coachAssignmentTarget.athlete.trainingState.linkedCoach
-                      ?.id === professional.id
-                  }
-                  disabled={
-                    busyKey ===
-                    `coach-link:${coachAssignmentTarget.athlete.id}:${coachAssignmentTarget.specializationId}`
-                  }
-                  onClick={() =>
-                    assignCoach(
-                      coachAssignmentTarget.athlete.id,
-                      coachAssignmentTarget.specializationId,
-                      professional.id,
-                    )
-                  }
-                >
-                  {displayUser(professional)}
-                </button>
-              ))}
-              {!filteredCoachAssignmentProfessionals.length && (
-                <div className="pf-alert warning">
-                  Nessun allenatore abilitato trovato per questa specializzazione.
-                </div>
-              )}
-            </div>
-          </section>
-        </div>
-      )}
+      {coachAssignmentTarget && <CoachAssignmentDialog model={model} />}
 
       {resetTarget && (
         <div className="pf-modal-backdrop" role="dialog" aria-modal="true">
@@ -1599,17 +293,15 @@ export default function AdminCyclesPage() {
               <div>
                 <p className="pf-eyebrow">Conferma amministratore</p>
                 <h2>Cancellare tutti i dati atleta?</h2>
-                <p className="pf-muted">
-                  {displayUser(resetTarget.athlete)}
-                </p>
+                <p className="pf-muted">{displayUser(resetTarget.athlete)}</p>
               </div>
               <StatusBadge tone="danger">Azione irreversibile</StatusBadge>
             </div>
             <div className="pf-alert warning">
               Verranno cancellati consensi privacy/AI, onboarding, obiettivo,
-              sport, assegnazioni, allenamenti, questionari, risposte,
-              snapshot, storico, audit e dati AI collegati all'atleta.
-              Resteranno solo account, password e identita login.
+              sport, assegnazioni, allenamenti, questionari, risposte, snapshot,
+              storico, audit e dati AI collegati all'atleta. Resteranno solo
+              account, password e identita login.
             </div>
             <div className="pf-actions">
               <button
@@ -1640,9 +332,7 @@ export default function AdminCyclesPage() {
               <div>
                 <p className="pf-eyebrow">Conferma amministratore</p>
                 <h2>Eliminare definitivamente l'atleta?</h2>
-                <p className="pf-muted">
-                  {displayUser(deleteTarget.athlete)}
-                </p>
+                <p className="pf-muted">{displayUser(deleteTarget.athlete)}</p>
               </div>
               <StatusBadge tone="danger">Azione irreversibile</StatusBadge>
             </div>
@@ -1734,8 +424,8 @@ export default function AdminCyclesPage() {
                 <p className="pf-eyebrow">Anteprima AI</p>
                 <h2>Contesto inviato all'AI</h2>
                 <p className="pf-muted">
-                  {previewAthlete.email} - {previewLabel} -{" "}
-                  {aiPreview.provider}/{aiPreview.model}
+                  {previewAthlete.email} - {previewLabel} - {aiPreview.provider}
+                  /{aiPreview.model}
                 </p>
               </div>
               <StatusBadge tone="accent">{aiPreview.promptVersion}</StatusBadge>
@@ -1783,7 +473,10 @@ export default function AdminCyclesPage() {
                 }
                 onClick={() =>
                   previewTarget
-                    ? generateCycle(previewTarget.athlete.id, previewTarget.area.id)
+                    ? generateCycle(
+                        previewTarget.athlete.id,
+                        previewTarget.area.id,
+                      )
                     : generateTraining(previewAthlete.id)
                 }
               >

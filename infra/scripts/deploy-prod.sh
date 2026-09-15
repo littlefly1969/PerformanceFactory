@@ -9,8 +9,8 @@ Environment:
   DEPLOY_MODE=build|pull   Default: build
 
 The script validates the production Compose config, builds or pulls images,
-starts services with --remove-orphans, and prints service status. It does not
-run database migrations, docker prune, or docker volume prune.
+starts PostgreSQL/Redis, applies migrations, and waits for healthy API/web.
+It does not prune images or volumes.
 USAGE
 }
 
@@ -74,24 +74,26 @@ case "$DEPLOY_MODE" in
     ;;
 esac
 
-COMPOSE="docker compose --env-file $ENV_FILE -f $COMPOSE_FILE"
+compose() {
+  docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
+}
 
 echo "Validating Compose configuration..."
-$COMPOSE config >/dev/null
+compose config >/dev/null
 
 if [ "$DEPLOY_MODE" = "pull" ]; then
   echo "Pulling configured images..."
-  $COMPOSE pull
+  compose pull
 else
   echo "Building application images..."
-  $COMPOSE build api web
+  compose build api web
 fi
 
 echo "Starting services and removing orphan containers for this Compose project..."
-$COMPOSE up -d --remove-orphans
+compose up -d --remove-orphans --wait --wait-timeout "${DEPLOY_WAIT_TIMEOUT:-180}"
 
 echo "Service status:"
-$COMPOSE ps
+compose ps
 
 echo "Recent service logs:"
-$COMPOSE logs --tail=80 api web redis
+compose logs --tail=80 api web redis migrate

@@ -1,0 +1,446 @@
+.pf-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.pf-two-col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pf-card {
+  padding: 18px;
+}
+
+.pf-active-plan-card {
+  display: grid;
+  gap: 18px;
+}
+
+.pf-active-plan-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.pf-active-plan-area {
+  margin: 0 0 10px;
+  color: var(--pf-accent);
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.25;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.pf-active-plan-card h3 {
+  color: var(--pf-text);
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.pf-active-plan-body {
+  margin: 2px 0 0;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.pf-active-plan-form {
+  align-items: start;
+  gap: 20px;
+}
+
+.pf-active-plan-form .pf-textarea {
+  min-height: 100px;
+}
+
+.pf-active-plan-actions {
+  display: flex;
+  justify-content: flex-start;
+  padding-top: 2px;
+}
+
+.pf-area-focus-card {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  min-height: 360px;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.pf-area-focus-card.attention {
+  border-color: rgba(220, 255, 50, 0.86);
+  background:
+    linear-gradient(90deg, rgba(220, 255, 50, 0.14), transparent 42%),
+    linear-gradient(180deg, rgba(68, 72, 84, 0.96), rgba(18, 19, 37, 0.98));
+  box-shadow:
+    0 0 0 2px rgba(220, 255, 50, 0.32),
+    0 18px 42px rgba(220, 255, 50, 0.1);
+}
+
+.pf-area-focus-card.attention::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 6px;
+  background: var(--pf-accent);
+  content: "";
+}
+
+.pf-area-focus-header {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.pf-area-focus-status {
+  min-width: 0;
+}
+
+.pf-area-focus-status .pf-badge {
+  justify-self: start;
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+  line-height: 1.2;
+}
+
+.pf-area-focus-card h3 {
+  margin: 0;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.pf-area-score-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.pf-area-score-item {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.045);
+  padding: 10px 12px;
+}
+
+.pf-area-score-item small {
+  color: var(--pf-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.pf-area-score-item strong {
+  color: var(--pf-text);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.pf-area-card-body {
+  min-height: 24px;
+  overflow: hidden;
+}
+
+.pf-area-card-body:empty {
+  min-height: 0;
+  margin-top: 0;
+}
+
+.pf-area-question-status {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.pf-area-question-status .pf-badge {
+  justify-self: start;
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}
+
+.pf-area-card-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 14px;
+  width: 100%;
+  margin-top: 14px;
+}
+
+.pf-area-card-actions .pf-button-secondary {
+  width: 100%;
+}
+
+.pf-history-content {
+  margin-top: 18px;
+}
+
+.pf-plain-empty {
+  margin: 0;
+  color: var(--pf-muted);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.pf-consent-documents {
+  display: grid;
+  gap: 12px;
+}
+
+.pf-consent-document {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.055);
+  overflow: hidden;
+}
+
+.pf-consent-document summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.pf-consent-document > div {
+  display: grid;
+  gap: 10px;
+  max-height: 260px;
+  overflow: auto;
+  padding: 0 14px 14px;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.55;
+}
+
+.pf-consent-document p,
+.pf-consent-text p {
+  margin: 0;
+}
+
+.pf-consent-text {
+  display: grid;
+  gap: 10px;
+  color: var(--pf-muted);
+  line-height: 1.55;
+}
+
+.pf-config-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 0;
+  border: 1px solid var(--pf-border);
+  border-radius: 8px;
+  background: var(--pf-surface-soft);
+  color: var(--pf-text);
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pf-config-row span,
+.pf-config-row small {
+  display: block;
+}
+
+.pf-config-row small {
+  margin-top: 4px;
+  color: var(--pf-muted);
+  line-height: 1.4;
+}
+
+.pf-card-top,
+.pf-row,
+.pf-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.pf-card-top {
+  align-items: flex-start;
+}
+
+.pf-actions {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.pf-submit-row {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 42px;
+  padding-top: 28px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.pf-submit-row > .pf-button {
+  min-width: 300px;
+}
+
+.pf-next-step-card {
+  width: 100%;
+}
+
+.pf-button,
+.pf-button-secondary,
+.pf-button-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 8px;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.pf-button {
+  color: white;
+  background: var(--pf-accent);
+}
+
+.pf-button:hover {
+  background: var(--pf-accent-strong);
+}
+
+.pf-button-secondary {
+  color: #344054;
+  background: white;
+  border-color: var(--pf-border);
+}
+
+.pf-button-danger {
+  color: white;
+  background: var(--pf-danger);
+}
+
+.pf-button:disabled,
+.pf-button-secondary:disabled,
+.pf-button-danger:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.pf-field {
+  display: grid;
+  gap: 7px;
+  color: #344054;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pf-field-hint {
+  color: var(--pf-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.pf-input,
+.pf-select,
+.pf-textarea {
+  width: 100%;
+  border: 1px solid var(--pf-border);
+  border-radius: 8px;
+  background: white;
+  color: var(--pf-text);
+  padding: 10px 12px;
+  outline: none;
+}
+
+.pf-input:focus,
+.pf-select:focus,
+.pf-textarea:focus {
+  border-color: var(--pf-accent);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+}
+
+.pf-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: #344054;
+  background: #eef2f7;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: capitalize;
+}
+
+.pf-badge.accent {
+  color: var(--pf-accent-strong);
+  background: #ccfbf1;
+}
+
+.pf-badge.success {
+  color: var(--pf-success);
+  background: #dcfce7;
+}
+
+.pf-badge.warning {
+  color: var(--pf-warning);
+  background: #fef3c7;
+}
+
+.pf-badge.danger {
+  color: var(--pf-danger);
+  background: #fee2e2;
+}
+
+.pf-alert {
+  margin-bottom: 14px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #991b1b;
+  background: #fff1f2;
+  font-weight: 600;
+}
+
+.pf-alert.warning {
+  border-color: #fde68a;
+  color: #92400e;
+  background: #fffbeb;
+}
+
+.pf-alert.success {
+  border-color: #bbf7d0;
+  color: var(--pf-success);
+  background: #f0fdf4;
+}
+
+.pf-empty {
+  padding: 24px;
+  color: var(--pf-muted);
+  box-shadow: none;
+}
+
+.pf-empty strong {
+  color: var(--pf-text);
+}
+
+.pf-login-page {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(420px, 0.9fr);
+  background: var(--pf-bg);
+}

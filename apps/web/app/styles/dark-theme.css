@@ -1,0 +1,471 @@
+/* PerformanceFactory dark identity refresh */
+:root {
+  --pf-bg: #020219;
+  --pf-surface: #101027;
+  --pf-surface-soft: #19192f;
+  --pf-surface-strong: #2f2f45;
+  --pf-text: #f8f8ff;
+  --pf-muted: #c3c2d1;
+  --pf-border: rgba(255, 255, 255, 0.13);
+  --pf-accent: #dcff32;
+  --pf-accent-strong: #efff6b;
+  --pf-success: #dcff32;
+  --pf-warning: #ffcf5a;
+  --pf-danger: #ff6b7a;
+  --pf-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
+  --background: var(--pf-bg);
+  --foreground: var(--pf-text);
+}
+
+html,
+body {
+  background: var(--pf-bg);
+  color: var(--pf-text);
+}
+
+body {
+  background:
+    radial-gradient(
+      circle at 18% 12%,
+      rgba(220, 255, 50, 0.08),
+      transparent 26rem
+    ),
+    radial-gradient(
+      circle at 82% 0%,
+      rgba(88, 86, 126, 0.32),
+      transparent 30rem
+    ),
+    var(--pf-bg);
+}
+
+.pf-shell {
+  background:
+    linear-gradient(180deg, rgba(8, 8, 38, 0.96), rgba(2, 2, 25, 1) 420px),
+    var(--pf-bg);
+}
+
+.pf-topbar {
+  border-bottom-color: rgba(255, 255, 255, 0.09);
+  background: rgba(2, 2, 25, 0.82);
+  backdrop-filter: blur(18px);
+}
+
+.pf-main {
+  max-width: 1500px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.pf-brand {
+  min-width: fit-content;
+}
+
+.pf-brand-with-logo {
+  justify-content: flex-start;
+}
+
+.pf-brand-logo {
+  display: block;
+  width: clamp(220px, 19vw, 310px);
+  height: auto;
+  object-fit: contain;
+}
+
+.pf-brand-mark {
+  position: relative;
+  width: 52px;
+  height: 38px;
+  border-radius: 0;
+  background: transparent url("/brand/performance-factory-logo.jpg") left
+    center / auto 100% no-repeat;
+  color: transparent;
+  overflow: hidden;
+}
+
+.pf-brand-mark::before {
+  content: none;
+}
+
+.pf-brand-mark::after {
+  content: none;
+}
+
+.pf-brand strong {
+  color: #ffffff;
+  font-size: 18px;
+  line-height: 1.02;
+}
+
+.pf-brand small {
+  color: var(--pf-accent);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.pf-nav {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 4px;
+}
+
+.pf-nav a,
+.pf-nav-dropdown summary {
+  color: rgba(255, 255, 255, 0.72);
+  border-radius: 999px;
+  padding: 9px 14px;
+}
+
+.pf-nav a:hover,
+.pf-nav a.active,
+.pf-nav-dropdown summary:hover {
+  border-color: transparent;
+  background: var(--pf-accent);
+  box-shadow: none;
+  color: #050515;
+}
+
+.pf-nav-dropdown.active > summary {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.pf-nav-dropdown.active > summary:hover,
+.pf-nav-dropdown[open] > summary:hover {
+  background: var(--pf-accent);
+  color: #050515;
+}
+
+.pf-nav-menu {
+  border-color: var(--pf-border);
+  background: linear-gradient(
+    180deg,
+    rgba(58, 58, 83, 0.98),
+    rgba(22, 22, 43, 0.98)
+  );
+}
+
+.pf-nav-menu a {
+  border-radius: 6px;
+}
+
+.pf-userbar {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.pf-header {
+  align-items: center;
+  margin-bottom: 28px;
+}
+
+.pf-ai-tuner-shell .pf-back-button {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.pf-ai-tuner-shell .pf-back-button:hover {
+  background: var(--pf-accent);
+  border-color: var(--pf-accent);
+  color: #050515;
+  box-shadow: 0 0 0 3px rgba(220, 255, 50, 0.18);
+}
+
+.pf-eyebrow {
+  color: var(--pf-accent);
+  letter-spacing: 0;
+}
+
+.pf-header h1 {
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.pf-subtitle,
+.pf-muted,
+.pf-brand small {
+  color: var(--pf-muted);
+}
+
+.pf-stat,
+.pf-panel,
+.pf-card,
+.pf-empty,
+.pf-config-row,
+.pf-metric-row,
+.pf-score-card,
+.pf-review-section,
+.pf-question-preview,
+.pf-roster-card,
+.pf-area-card,
+.pf-work-row,
+.pf-modal {
+  border-color: var(--pf-border);
+  background: linear-gradient(
+    180deg,
+    rgba(58, 58, 83, 0.72),
+    rgba(27, 27, 48, 0.94)
+  );
+  box-shadow: var(--pf-shadow);
+}
+
+.pf-area-focus-card.attention {
+  border-color: rgba(220, 255, 50, 0.9);
+  background:
+    linear-gradient(90deg, rgba(220, 255, 50, 0.18), transparent 44%),
+    linear-gradient(180deg, rgba(72, 76, 88, 0.98), rgba(18, 19, 37, 0.98));
+  box-shadow:
+    0 0 0 2px rgba(220, 255, 50, 0.46),
+    0 22px 48px rgba(220, 255, 50, 0.14);
+}
+
+.pf-area-focus-card.attention::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 7px;
+  background: var(--pf-accent);
+  content: "";
+}
+
+.pf-area-selector-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  cursor: default;
+}
+
+.pf-area-selector-main {
+  display: block;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+}
+
+.pf-area-selector-main span,
+.pf-area-selector-main small {
+  display: block;
+}
+
+.pf-area-selector-main small {
+  margin-top: 5px;
+  color: var(--pf-muted);
+  line-height: 1.35;
+}
+
+.pf-area-toggle-button {
+  position: relative;
+  min-width: 96px;
+  min-height: 34px;
+  border: 1px solid rgba(220, 255, 50, 0.34);
+  border-radius: 10px;
+  background: rgba(2, 2, 25, 0.42);
+  color: rgba(220, 255, 50, 0.5);
+  cursor: pointer;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+  opacity: 0.62;
+  padding: 8px 12px;
+  text-transform: uppercase;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    opacity 160ms ease;
+  white-space: nowrap;
+}
+
+.pf-area-toggle-group {
+  display: grid;
+  gap: 8px;
+  justify-items: stretch;
+}
+
+.pf-area-toggle-button.active {
+  border-color: var(--pf-accent);
+  background:
+    linear-gradient(180deg, rgba(220, 255, 50, 0.22), rgba(220, 255, 50, 0.12)),
+    rgba(2, 2, 25, 0.5);
+  color: #ffffff;
+  cursor: pointer;
+  opacity: 1;
+  padding-left: 20px;
+  box-shadow:
+    inset 0 0 0 1px rgba(220, 255, 50, 0.46),
+    0 0 14px rgba(220, 255, 50, 0.18);
+}
+
+.pf-area-toggle-button.active::before {
+  position: absolute;
+  top: 50%;
+  left: 8px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--pf-accent);
+  box-shadow: 0 0 8px rgba(220, 255, 50, 0.55);
+  content: "";
+  transform: translateY(-50%);
+}
+
+.pf-area-toggle-button:not(:disabled):hover {
+  box-shadow: none;
+}
+
+.pf-area-toggle-button.active:not(:disabled):hover {
+  box-shadow:
+    inset 0 0 0 1px rgba(220, 255, 50, 0.46),
+    0 0 14px rgba(220, 255, 50, 0.18);
+}
+
+.pf-area-toggle-button:disabled {
+  cursor: default;
+}
+
+.pf-panel {
+  border-radius: 18px;
+  padding: 24px;
+}
+
+.pf-card,
+.pf-empty,
+.pf-config-row,
+.pf-metric-row,
+.pf-score-card,
+.pf-review-section,
+.pf-question-preview,
+.pf-roster-card,
+.pf-area-card,
+.pf-work-row {
+  border-radius: 14px;
+}
+
+.pf-panel-header h2,
+.pf-card h3,
+.pf-card h4,
+.pf-empty strong,
+.pf-score-card strong,
+.pf-metric-row strong {
+  color: #ffffff;
+}
+
+.pf-stat {
+  border-radius: 16px;
+}
+
+.pf-stat span {
+  color: rgba(255, 255, 255, 0.64);
+}
+
+.pf-stat strong,
+.pf-stat.accent strong,
+.pf-stat.success strong {
+  color: var(--pf-accent);
+}
+
+.pf-button,
+.pf-button-secondary,
+.pf-button-danger {
+  min-height: 48px;
+  border-radius: 10px;
+  padding: 12px 18px;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.pf-button {
+  border-color: var(--pf-accent);
+  background: var(--pf-accent);
+  color: #050515;
+  box-shadow: 0 12px 28px rgba(220, 255, 50, 0.2);
+}
+
+.pf-button:hover {
+  background: var(--pf-accent-strong);
+  border-color: var(--pf-accent-strong);
+  color: #050515;
+}
+
+.pf-button-secondary {
+  color: var(--pf-accent);
+  background: rgba(2, 2, 25, 0.36);
+  border-color: rgba(220, 255, 50, 0.68);
+}
+
+.pf-button-secondary:hover {
+  background: rgba(220, 255, 50, 0.12);
+}
+
+.pf-button-danger {
+  background: var(--pf-danger);
+  color: #050515;
+}
+
+.pf-ai-tuner-shell .pf-actions,
+.pf-ai-tuner-shell .pf-row {
+  gap: 14px;
+}
+
+.pf-ai-tuner-shell .pf-actions {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.pf-ai-tuner-shell .pf-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 18px;
+  margin-top: 26px;
+}
+
+.pf-ai-tuner-shell .pf-inline-action-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 18px;
+  margin-top: 22px;
+}
+
+.pf-ai-tuner-shell .pf-inline-action-row .pf-button,
+.pf-ai-tuner-shell .pf-inline-action-row .pf-button-secondary,
+.pf-ai-tuner-shell .pf-inline-action-row .pf-button-danger {
+  align-self: end;
+  margin: 0;
+}
+
+.pf-ai-tuner-shell .pf-panel-header .pf-actions,
+.pf-ai-tuner-shell .pf-card .pf-actions,
+.pf-ai-tuner-shell .pf-panel > .pf-actions,
+.pf-ai-tuner-shell .pf-prompt-management .pf-actions {
+  margin-top: 18px;
+}
+
+.pf-ai-tuner-shell .pf-button,
+.pf-ai-tuner-shell .pf-button-secondary,
+.pf-ai-tuner-shell .pf-button-danger {
+  margin: 3px;
+}
+
+.pf-ai-tuner-shell .pf-form-actions .pf-button,
+.pf-ai-tuner-shell .pf-form-actions .pf-button-secondary,
+.pf-ai-tuner-shell .pf-form-actions .pf-button-danger {
+  margin: 0;
+}

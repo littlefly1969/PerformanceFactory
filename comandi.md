@@ -8,7 +8,7 @@ in [`docs/operations/production-deployment.md`](./docs/operations/production-dep
 
 ## Toolchain
 
-Il progetto usa Node.js 22 e pnpm 10.28.2.
+Il progetto usa Node.js 26.8.2 e pnpm 10.28.2.
 
 Verifica:
 

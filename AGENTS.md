@@ -15,7 +15,7 @@ This is a TypeScript monorepo using pnpm and Turborepo.
 ## Tooling
 
 - Use `pnpm`, not `npm` or `yarn`.
-- Use Node.js 22, matching `.nvmrc` and the Docker base images.
+- Use Node.js 26.8.2, matching `.nvmrc` and the Docker base images.
 - Run `pnpm run doctor` first if the shell appears to use a different Node or pnpm.
 - Inspect the relevant `package.json` scripts before inventing commands.
 - Root scripts include `dev`, `build`, `lint`, `lint:fix`, `test`, `typecheck`, `db:up`, and `db:down`.
@@ -46,9 +46,9 @@ When feasible, validate changes with the narrowest relevant command first, then 
 - Tests
 - Build
 
-Backend tests use Jest, Supertest, ts-jest, and e2e tests. Frontend tests are not configured yet; the web test script reports that gap explicitly and should not be treated as frontend coverage.
+Backend tests use Jest, Supertest, ts-jest, and e2e tests. Frontend tests use Vitest, Testing Library, and jsdom. `test:cov` collects repository-wide coverage with thresholds on selected critical modules. Coverage is not complete; inspect the reports before claiming a flow is covered.
 
-PostgreSQL-backed integration tests are explicit and separate from the root test gate. Run them with `TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/performancefactory_test pnpm --filter api test:db` after `pnpm db:up`; the guard requires a local database name containing `test`.
+PostgreSQL-backed integration tests are explicit and separate from the root test gate. Prefer `pnpm test:docker` for an isolated PostgreSQL 16 test container. `pnpm docker:up` builds and starts the complete local stack, including PostgreSQL, Redis, migrations, API and web. Run them with `TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/performancefactory_test pnpm --filter api test:db` after `pnpm db:up`; the guard requires a local database name containing `test`.
 
 ## Definition of Done
 

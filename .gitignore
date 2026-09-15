@@ -12,3 +12,4 @@ apps/web/.next/
 cookies.txt
 apps/api/cookies.txt
 coverage/
+!infra/.env.docker.example

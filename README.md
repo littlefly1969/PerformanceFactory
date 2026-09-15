@@ -12,7 +12,7 @@ Monorepo TypeScript con pnpm e Turborepo.
 
 ## Prerequisiti
 
-- Node.js 22. Il repository include `.nvmrc` e `package.json` richiede `>=22 <23`; i Dockerfile usano `node:22-bookworm-slim`.
+- Node.js 26.8.2. Il repository include `.nvmrc` e `package.json` richiede `>=26.8.2 <27`; i Dockerfile usano `node:26.8.2-bookworm-slim`.
 - pnpm 10.28.2, dichiarato in `packageManager`.
 - Docker con Docker Compose per i servizi locali.
 
@@ -21,7 +21,9 @@ Con `nvm`:
 ```bash
 nvm install
 nvm use
-corepack enable
+# Installa pnpm 10.28.2 con il metodo standalone ufficiale:
+curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=10.28.2 sh -
+# Riapri la shell per caricare PNPM_HOME, poi verifica:
 pnpm --version
 ```
 
@@ -31,8 +33,26 @@ Verifica rapida dell'ambiente:
 pnpm run doctor
 ```
 
-Il progetto richiede Node.js 22 e pnpm 10.28.2. Se usi zsh con nvm, la shell
-carica `.nvmrc` quando entri nella directory del progetto.
+Il progetto richiede Node.js 26.8.2 e pnpm 10.28.2. Con nvm esegui `nvm use`
+dalla directory del progetto per caricare `.nvmrc`.
+
+## Deploy locale completamente Docker
+
+```bash
+pnpm docker:up
+pnpm docker:ps
+pnpm test:docker
+```
+
+Frontend, backend, PostgreSQL e Redis sono container separati. `.env.docker`
+viene inizializzato con segreti casuali, PostgreSQL ha un volume persistente e le
+migrazioni vengono applicate prima dell'avvio dell'API. I test usano un altro
+container PostgreSQL effimero. Frontend su `http://127.0.0.1:3000`, API su
+`http://127.0.0.1:4000/api`. Per fermare lo stack: `pnpm docker:stop`.
+
+La possibilità di usare PostgreSQL remoto resta configurabile tramite
+`DATABASE_URL` e disabilitazione del profilo `local-db`.
+Vedi [deploy Docker e backup](docs/operations/production-deployment.md).
 
 ## Setup Locale
 
@@ -144,24 +164,35 @@ pnpm lint:fix
 
 ## CI
 
-GitHub Actions esegue i gate deterministici su Node.js 22 e pnpm 10.28.2:
+[GitHub Actions](.github/workflows/ci.yml) parte su **ogni pull request**, sui push
+in `main`, sulla merge queue e manualmente. Tutti i job usano Node.js da `.nvmrc`
+e pnpm da `packageManager`, con installazione `--frozen-lockfile`.
 
-- `pnpm install --frozen-lockfile`
-- `pnpm --filter api prisma:validate`
-- `pnpm --filter api prisma:generate`
-- `pnpm lint`
-- `pnpm typecheck`
-- `pnpm test`
-- `pnpm build`
+- **Lint and types**: validazione Prisma, lint e TypeScript per API e web.
+- **Tests (api/web)**: test unitari e di interazione con coverage; anche e2e API.
+- **PostgreSQL Docker integration**: container PostgreSQL 16 dedicato, migrazioni e test reali
+  di persistenza, relazioni, unicità e rollback.
+- **Production build**: build NestJS e Next.js standalone.
+- **Docker full stack**: build e avvio di PostgreSQL, Redis, migrazioni, API e web,
+  con verifica runtime e degli endpoint HTTP.
+- **CI required**: fallisce se un job necessario fallisce, viene cancellato o saltato.
 
-Un job separato avvia solo PostgreSQL 16 e lancia `pnpm --filter api test:db` con `TEST_DATABASE_URL` locale di test. Non usa staging e non richiede Redis.
+I report HTML, LCOV e JSON sono allegati alle esecuzioni per 14 giorni. I nuovi
+commit interrompono le esecuzioni precedenti della stessa PR. I job non richiedono
+chiavi AI o altri segreti applicativi e possono verificare anche PR da fork.
+
+Per impedire il merge con controlli falliti, aggiungere **CI required** ai check
+obbligatori della ruleset/branch protection di `main`. Questa impostazione di
+GitHub è distinta dal workflow versionato nel repository.
 
 ## Testing
 
-- API: test Jest unitari ed e2e reali; al momento passano.
+- API: test Jest unitari, e2e HTTP e integrazione PostgreSQL separata. Gli e2e
+  HTTP usano i fake di persistenza esistenti; solo `test:db` usa un database reale.
 - Web: test Vitest sulle funzioni di dominio e test d'interazione React con
   Testing Library. La copertura iniziale protegge chiavi, parsing e validazione
-  delle bozze prompt, oltre alla selezione delle categorie nell'interfaccia.
+  delle bozze prompt, il flusso di modifica e salvataggio dei prompt, il rinnovo
+  dei token e gli errori di rete.
 
 `prisma:generate` genera soltanto Prisma Client, così non richiede un browser nei
 runner CI. Il diagramma `prisma/erd.svg` si aggiorna esplicitamente con
@@ -174,11 +205,26 @@ TEST_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/performancefacto
 ```
 
 `test:db` non fa parte di `pnpm test`: richiede PostgreSQL avviato con `pnpm db:up` e rifiuta URL che non puntano a un database locale dedicato con `test` nel nome.
-Il database di test viene creato automaticamente se manca; le migrazioni non vengono applicate da questo smoke test iniziale.
+Il database di test viene creato automaticamente se manca e tutte le migrazioni
+vengono applicate prima dei test. I dati di prova sono racchiusi in transazioni
+che vengono annullate; non usare database applicativi.
+
+Coverage:
+
+```bash
+pnpm --filter api test:cov
+pnpm --filter web test:cov
+```
+
+I report includono anche i file non esercitati. Le soglie bloccanti proteggono
+scoring performance, risposte onboarding e storage bozze. Non equivalgono a una
+copertura completa di tutte le schermate o integrazioni esterne.
+
+Vedi [struttura del refactoring e verifiche](docs/refactoring.md).
 
 ## Caveat Locali
 
-- Usa Node.js 22. Verifica con `pnpm run doctor` prima dei gate locali.
+- Usa Node.js 26.8.2. Verifica con `pnpm run doctor` prima dei gate locali.
 - In sandbox ristrette, `pnpm build` puo fallire durante il build web perche Turbopack tenta un bind di porta. In un ambiente locale/CI non ristretto il build passa.
 - `pnpm lint` passa con warning noti; i warning non bloccano ancora il gate.
 
@@ -191,8 +237,8 @@ Il compose di produzione e `infra/docker-compose.prod.example.yml` e usa:
 
 - immagini applicative configurabili (`IMAGE_TAG`, `API_IMAGE`, `WEB_IMAGE`);
 - Redis self-hosted con volume persistente `redis-data`;
-- PostgreSQL esterno via `DATABASE_URL`;
-- healthcheck per API, web e Redis;
+- PostgreSQL in container con volume persistente `postgres-data` (remoto opzionale via `DATABASE_URL`);
+- migrazioni automatiche e healthcheck per PostgreSQL, Redis, API e web;
 - log Docker con rotazione `json-file`;
 - `restart: unless-stopped`;
 - `up -d --remove-orphans` nello script di deploy.
