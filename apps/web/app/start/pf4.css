@@ -59,6 +59,15 @@
 .pf4 h1:focus {
   outline: none;
 }
+.pf4-desktop-rail {
+  display: none;
+}
+.pf4-stage {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
 .pf4-device {
   width: 402px;
   min-height: 874px;
@@ -420,7 +429,7 @@
     transform: none;
   }
 }
-@media (max-width: 480px) {
+@media (max-width: 899px) {
   .pf4 {
     padding: 0;
     background: #fff;

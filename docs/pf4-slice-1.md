@@ -60,7 +60,7 @@ The browser clears the discovery draft after registration; it never persists reg
 ## Visual reference
 
 Source: https://www.murru.cloud/demo/pf4/ (inspected in Chromium at desktop and mobile sizes).
-Reproduced Public Sans (bundled locally with OFL license), 402 px desktop composition, 24 px gutters, lightweight headings, thin divided options, lime selection, segmented progress, 12 px buttons, 18 px lime result card and screen transition. Mobile fills the viewport rather than overflowing the demo's fixed device frame. Browser UI/status icons are not simulated.
+Reproduced Public Sans (bundled locally with OFL license), lightweight headings, thin divided options, lime selection, segmented progress, 12 px buttons, 18 px lime result card and screen transition. At 900 px and above, the desktop layout expands to a maximum 1320 px with a brand column and a spacious assessment column; it does not simulate a phone. Below 900 px the flow fills the viewport with 24 px gutters. This responsive desktop treatment follows the user’s explicit refinement of the reference. Browser UI/status icons are not simulated.
 
 Scope-driven differences: explicit intro and required sport/specialization sequence; separate first/last name fields for the existing identity model; result content summarizes the selected profile/goal without claiming a free trial, generated program, BMI, forecast, or official Performance Index. Health measurements and injury questions are not part of the initial seven-question configuration. The five renderer types remain available for backend configuration.
 

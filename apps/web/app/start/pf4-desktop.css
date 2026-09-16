@@ -1,0 +1,194 @@
+@media (min-width: 900px) {
+  .pf4 {
+    padding: 40px clamp(24px, 4vw, 72px);
+    align-items: stretch;
+    background: #eeefea;
+  }
+  .pf4 .pf4-device {
+    display: grid;
+    grid-template-columns: minmax(300px, 0.82fr) minmax(0, 1.65fr);
+    width: min(1320px, 100%);
+    min-height: calc(100dvh - 80px);
+    margin: auto;
+    border: 1px solid #dedfd8;
+    border-radius: 24px;
+    box-shadow: 0 20px 70px #18220d0a;
+  }
+  .pf4 .pf4-desktop-rail {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 64px;
+    padding: 44px clamp(30px, 3vw, 52px);
+    background:
+      radial-gradient(ellipse at 100% 100%, #465026 0%, transparent 65%),
+      #161a12;
+    color: #fff;
+  }
+  .pf4-rail-brand {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+  }
+  .pf4-rail-brand > span:first-child {
+    font-size: 34px;
+    font-weight: 600;
+    letter-spacing: -3px;
+  }
+  .pf4-rail-brand > span:first-child span {
+    color: #c8f02e;
+    font-size: 26px;
+    margin-left: 5px;
+  }
+  .pf4-rail-brand > span:last-child {
+    font-size: 10px;
+    line-height: 16px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .pf4-rail-eyebrow {
+    display: block;
+    color: #c8f02e;
+    font-size: 10px;
+    line-height: 18px;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+  }
+  .pf4 .pf4-rail-copy h2 {
+    margin: 24px 0 0;
+    font-size: clamp(35px, 3.3vw, 48px);
+    line-height: 1.12;
+    letter-spacing: -0.055em;
+    color: #fff;
+  }
+  .pf4-rail-copy em {
+    color: #c8f02e;
+    font-style: normal;
+  }
+  .pf4 .pf4-rail-copy p {
+    max-width: 250px;
+    margin-top: 26px;
+    color: #b7bcaf;
+    font-size: 14px;
+    line-height: 23px;
+  }
+  .pf4-rail-bottom {
+    border-top: 1px solid #ffffff24;
+    padding-top: 24px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    color: #b7bcaf;
+    font-size: 11px;
+    line-height: 19px;
+  }
+  .pf4-rail-mark {
+    font-size: 38px;
+    line-height: 1;
+    color: #c8f02e;
+  }
+  .pf4 .pf4-header {
+    margin: 42px clamp(36px, 5vw, 80px) 0;
+    grid-template-columns: 32px 1fr 32px;
+  }
+  .pf4 .pf4-header button {
+    font-size: 22px;
+  }
+  .pf4 .pf4-progress {
+    margin: 24px clamp(36px, 5vw, 80px) 0;
+    gap: 7px;
+  }
+  .pf4 .pf4-progress span {
+    height: 3px;
+  }
+  .pf4 .pf4-body {
+    padding: 48px clamp(36px, 5vw, 80px) 32px;
+  }
+  .pf4 .pf4-stage h1 {
+    max-width: 660px;
+    font-size: clamp(36px, 3.3vw, 48px);
+    line-height: 1.1;
+    letter-spacing: -0.05em;
+  }
+  .pf4 .pf4-stage p {
+    font-size: 15px;
+    line-height: 25px;
+  }
+  .pf4 .pf4-options {
+    margin-top: 36px;
+  }
+  .pf4 .pf4-option {
+    min-height: 82px;
+    padding-right: 8px;
+    font-size: 19px;
+  }
+  .pf4 .pf4-option:hover {
+    opacity: 1;
+    background: #f8f9f4;
+  }
+  .pf4 .pf4-option.is-selected {
+    background: #f5fadf;
+  }
+  .pf4 .pf4-dot {
+    width: 21px;
+    height: 21px;
+  }
+  .pf4 .pf4-footer {
+    padding: 24px clamp(36px, 5vw, 80px) 42px;
+  }
+  .pf4 .pf4-cta {
+    min-height: 58px;
+    font-size: 12px;
+  }
+  .pf4 .pf4-intro {
+    padding-top: 64px;
+    padding-bottom: 64px;
+  }
+  .pf4 .pf4-intro > svg,
+  .pf4 .pf4-intro > .pf4-kicker {
+    display: none;
+  }
+  .pf4 .pf4-intro h1 {
+    margin: 0;
+    font-size: clamp(44px, 4.5vw, 64px);
+    max-width: 570px;
+  }
+  .pf4 .pf4-intro > p:not(.pf4-login) {
+    margin-top: 26px;
+    font-size: 18px;
+    line-height: 29px;
+  }
+  .pf4 .pf4-intro .pf4-cta {
+    margin-top: 46px;
+  }
+  .pf4 .pf4-login,
+  .pf4 .pf4-stage .pf4-kicker {
+    font-size: 10px;
+    line-height: 18px;
+  }
+  .pf4 .pf4-stage .pf4-note {
+    font-size: 12px;
+    line-height: 20px;
+  }
+  .pf4 .pf4-highlight {
+    padding: 30px;
+  }
+  .pf4 .pf4-profile > div {
+    padding: 20px 0;
+  }
+  .pf4 .pf4-profile dt {
+    max-width: 60%;
+  }
+  .pf4 .pf4-registration .pf4-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px 24px;
+  }
+  .pf4 .pf4-fields label:has(input[type="email"]) {
+    grid-column: 1 / -1;
+  }
+  .pf4 .pf4-fields input {
+    min-width: 0;
+    font-size: 17px;
+  }
+}
