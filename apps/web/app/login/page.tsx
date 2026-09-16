@@ -307,7 +307,7 @@ export default function LoginPage() {
                   <input type="checkbox" />
                   Ricordami
                 </label>
-                <Link className="pf-auth-text-link" href="/register">
+                <Link className="pf-auth-text-link" href="/start">
                   Crea nuovo utente
                 </Link>
               </div>

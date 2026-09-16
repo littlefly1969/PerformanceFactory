@@ -35,7 +35,7 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        window.location.href = "/login";
+        window.location.replace("/start");
         return;
       }
 
