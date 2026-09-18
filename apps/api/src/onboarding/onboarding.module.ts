@@ -8,5 +8,6 @@ import { OnboardingService } from './onboarding.service';
   imports: [PrismaModule, AiOrchestratorModule],
   controllers: [OnboardingController],
   providers: [OnboardingService],
+  exports: [OnboardingService],
 })
 export class OnboardingModule {}

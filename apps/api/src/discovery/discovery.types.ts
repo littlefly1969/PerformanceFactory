@@ -8,7 +8,13 @@ export type DiscoveryOption = {
 export type DiscoveryQuestion = {
   id: string;
   code: string;
-  type: 'single_choice' | 'multi_choice' | 'scale' | 'number' | 'boolean';
+  type:
+    | 'single_choice'
+    | 'multi_choice'
+    | 'scale'
+    | 'number'
+    | 'boolean'
+    | 'date';
   title: string;
   description?: string;
   required: boolean;
@@ -16,6 +22,7 @@ export type DiscoveryQuestion = {
   target?: 'sportId' | 'specializationId' | 'goalId';
   dependsOn?: 'sportId';
   options: DiscoveryOption[];
+  contextKey?: string;
   min?: number;
   max?: number;
   step?: number;

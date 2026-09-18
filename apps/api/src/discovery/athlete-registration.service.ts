@@ -20,6 +20,24 @@ export class AthleteRegistrationService {
   ) {}
 
   async register(input: RegisterAthleteDto) {
+    return this.createAthlete(input);
+  }
+
+  async createAthlete(
+    input: {
+      firstName: string;
+      lastName: string;
+      email: string;
+      password: string;
+      discovery: unknown;
+    },
+    google?: {
+      subject: string;
+      profileJson: Prisma.InputJsonValue;
+      documents: Awaited<ReturnType<ConsentsService['requiredDocuments']>>;
+      audit: { ipAddress?: string | null; userAgent?: string | null };
+    },
+  ) {
     const firstName = input.firstName.trim();
     const lastName = input.lastName.trim();
     if (!firstName || !lastName)
@@ -40,7 +58,7 @@ export class AthleteRegistrationService {
             (q) => q.target === 'goalId',
           );
           const goal = goalQuestion?.options.find((o) => o.id === draft.goalId);
-          return tx.user.create({
+          const created = await tx.user.create({
             data: {
               email,
               password,
@@ -48,6 +66,26 @@ export class AthleteRegistrationService {
               lastName,
               role: 'USER',
               isActive: true,
+              authIdentities: google
+                ? {
+                    create: {
+                      provider: 'google',
+                      subject: google.subject,
+                      email,
+                      emailVerified: true,
+                      profileJson: google.profileJson,
+                      lastLoginAt: new Date(),
+                    },
+                  }
+                : {
+                    create: {
+                      provider: 'local',
+                      subject: email,
+                      email,
+                      emailVerified: false,
+                      lastLoginAt: new Date(),
+                    },
+                  },
               onboardingAssessment: { create: { status: 'PENDING' } },
               sportSelection: {
                 create: {
@@ -79,6 +117,13 @@ export class AthleteRegistrationService {
               createdAt: true,
             },
           });
+          if (google)
+            for (const document of google.documents)
+              await this.consents.createConsent(tx, created.id, document, {
+                ...google.audit,
+                source: 'google_register',
+              });
+          return created;
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );

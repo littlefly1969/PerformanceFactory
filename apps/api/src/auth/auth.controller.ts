@@ -1,3 +1,4 @@
+import { AthleteJourneyService } from '../discovery/athlete-journey.service';
 import { AthleteRegistrationService } from '../discovery/athlete-registration.service';
 import {
   registrationSession,
@@ -32,7 +33,7 @@ import { LocalAuthGuard } from '../common/guards/local-auth.guard';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { LoginRateLimitGuard } from '../common/guards/login-rate-limit.guard';
 import { RegisterAthleteDto } from './dto/register-athlete.dto';
-import { ConsentAcceptanceDto } from '../consents/dto/consent-acceptance.dto';
+import { GoogleRegistrationDto } from './dto/google-registration.dto';
 import { AccessTokenResponseDto } from '../common/openapi/openapi.models';
 
 @ApiTags('auth')
@@ -44,6 +45,7 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly googleOidc?: GoogleOidcService,
     private readonly athleteRegistration?: AthleteRegistrationService,
+    private readonly athleteJourney?: AthleteJourneyService,
   ) {}
 
   @Post('login')
@@ -222,7 +224,7 @@ export class AuthController {
       ip?: string;
       headers?: { 'user-agent'?: string };
     },
-    @Body() body: ConsentAcceptanceDto,
+    @Body() body: GoogleRegistrationDto,
   ) {
     const result = await this.google().completeRegistration(
       req as Parameters<GoogleOidcService['completeRegistration']>[0],
@@ -232,9 +234,7 @@ export class AuthController {
         userAgent: req.headers?.['user-agent'],
       },
     );
-    await this.google().persistSession(
-      req as Parameters<GoogleOidcService['persistSession']>[0],
-    );
+    await registrationSession(req as RegistrationRequest, result.user.id);
     return result;
   }
 
@@ -285,7 +285,9 @@ export class AuthController {
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard)
   journey(@Req() req: { user: { id: string } }) {
-    return this.athleteRegistration!.journey(req.user.id);
+    return this.athleteJourney
+      ? this.athleteJourney.state(req.user.id)
+      : this.athleteRegistration!.journey(req.user.id);
   }
 
   @Get('me')

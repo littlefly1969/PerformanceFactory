@@ -1,4 +1,10 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import StartPage from "./page";
@@ -34,12 +40,10 @@ const config: DiscoveryConfiguration = {
 function mockConfig(configuration = config) {
   vi.stubGlobal(
     "fetch",
-    vi
-      .fn()
-      .mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(configuration),
-      }),
+    vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(configuration),
+    }),
   );
 }
 afterEach(() => {
@@ -70,9 +74,13 @@ describe("PF4 configured journey", () => {
     render(<StartPage />);
     await screen.findByRole("heading", { name: "Altra domanda configurata" });
     await userEvent.click(screen.getByRole("button", { name: "No" }));
-    await screen.findByRole("button", {
-      name: "Continua con il mio assessment",
-    });
+    await screen.findByRole(
+      "button",
+      {
+        name: "Continua con il mio assessment",
+      },
+      { timeout: 3000 },
+    );
     expect(
       JSON.parse(window.sessionStorage.getItem(DRAFT_KEY)!).answers,
     ).toEqual({ "backend-first": "option-a", "backend-second": false });
@@ -103,8 +111,8 @@ describe("PF4 configured journey", () => {
     await userEvent.click(
       await screen.findByRole("button", { name: "Inizia il percorso →" }),
     );
-    await userEvent.click(screen.getByRole("button", { name: "Risposta A" }));
-    await userEvent.click(screen.getByRole("button", { name: "Indietro" }));
+    fireEvent.click(screen.getByRole("button", { name: "Risposta A" }));
+    fireEvent.click(screen.getByRole("button", { name: "Indietro" }));
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(
       screen.getByRole("heading", { name: "Eleva la tua performance." }),

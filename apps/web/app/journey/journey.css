@@ -1,0 +1,175 @@
+.pf4 .pf4-consent {
+  padding: 24px 0;
+  border-bottom: 1px solid #eaeae7;
+}
+.pf4-consent summary {
+  cursor: pointer;
+  font-size: 18px;
+}
+.pf4-consent label {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 20px;
+  font-size: 14px;
+  line-height: 22px;
+}
+.pf4-consent input {
+  width: 20px;
+  height: 20px;
+  accent-color: #161a12;
+  flex-shrink: 0;
+}
+.pf4 .pf4-body > .pf4-cta,
+.pf4-consent + .pf4-cta {
+  margin-top: 32px;
+}
+.pf4 .pf4-secondary {
+  background: #fff;
+  color: #0b0b0c;
+  border: 1px solid #dadad6;
+  margin: 24px 0;
+}
+.pf4-assessment .pf4-stage {
+  background:
+    radial-gradient(ellipse at 0 0, #344020 0%, transparent 60%), #111411;
+  color: #fff;
+}
+.pf4-assessment .pf4-stage h1,
+.pf4-assessment .pf4-stage h2 {
+  color: #fff;
+}
+.pf4-assessment .pf4-stage p,
+.pf4-assessment .pf4-kicker,
+.pf4-assessment .pf4-header {
+  color: #bfc4b8;
+}
+.pf4-assessment .pf4-progress .is-done {
+  background: #c8f02e;
+}
+.pf4-assessment .pf4-option {
+  background: #ffffff0d;
+  border: 1px solid #ffffff22;
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 10px;
+  color: #fff;
+}
+.pf4-assessment .pf4-option:hover {
+  background: #ffffff20;
+}
+.pf4-assessment .pf4-option.is-selected {
+  background: #c8f02e;
+  color: #0b0b0c;
+}
+.pf4-assessment .pf4-cta {
+  background: #c8f02e;
+  color: #0b0b0c;
+  border-radius: 999px;
+}
+.pf4-assessment .pf4-profile dt,
+.pf4-assessment .pf4-profile dd {
+  color: #fff;
+}
+.pf4-assessment .pf4-profile > div {
+  border-color: #ffffff22;
+}
+.pf4-goal {
+  display: grid;
+  gap: 12px;
+  margin: 24px 0;
+}
+.pf4-goal textarea {
+  min-height: 120px;
+  background: #fff;
+  color: #0b0b0c;
+  padding: 16px;
+  border-radius: 12px;
+  font: inherit;
+}
+.pf4-metrics {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 16px;
+  margin-top: 32px;
+}
+.pf4-metrics span {
+  display: block;
+  font-size: 9px;
+  line-height: 16px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.pf4-metrics strong {
+  display: block;
+  font-size: clamp(36px, 5vw, 68px);
+  font-weight: 300;
+  letter-spacing: -3px;
+}
+.pf4-radar {
+  display: block;
+  width: min(100%, 420px);
+  margin: 20px auto 0;
+}
+.pf4-legend {
+  text-align: center;
+  font-size: 12px;
+}
+.pf4-legend span {
+  margin-left: 20px;
+  color: #6a810a;
+}
+.pf4-driver-scores {
+  margin: 28px 0;
+}
+.pf4-driver-scores > div {
+  margin-bottom: 22px;
+}
+.pf4-driver-scores header {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  font-size: 13px;
+}
+.pf4-driver-scores small {
+  color: #748920;
+}
+.pf4-score-track {
+  position: relative;
+  height: 4px;
+  background: #eaeae7;
+  margin-top: 12px;
+}
+.pf4-score-track span {
+  position: absolute;
+  height: 4px;
+  left: 0;
+  background: #c8f02e;
+}
+.pf4-score-track span:last-child {
+  background: #0b0b0c;
+}
+.pf4-duration .pf4-option {
+  border: 1px solid #deded8;
+  border-radius: 18px;
+  padding: 22px;
+  margin-bottom: 12px;
+}
+.pf4 .pf4-bmi {
+  margin: 32px 0;
+  padding: 24px;
+  border-radius: 18px;
+  background: #f5f5f2;
+}
+.pf4-bmi strong {
+  display: block;
+  font-size: 64px;
+  font-weight: 300;
+  letter-spacing: -3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf4 * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -1125,6 +1125,12 @@ model AthleteDiscovery {
   draft Json
   configuration Json
   phase String @default("CONSENTS")
+  assessmentAnswers Json @default("{}")
+  currentQuestion Int @default(0)
+  operationAt DateTime?
+  baselineId String?
+  programDurationWeeks Int?
+  durationSelectedAt DateTime?
   createdAt DateTime @default(now())
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

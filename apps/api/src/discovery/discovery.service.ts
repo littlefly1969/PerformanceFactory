@@ -86,6 +86,7 @@ export class DiscoveryService {
         target: metadata.target,
         dependsOn:
           metadata.target === 'specializationId' ? 'sportId' : undefined,
+        contextKey: metadata.contextKey,
         min: metadata.min,
         max: metadata.max,
         step: metadata.step,

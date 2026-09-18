@@ -44,6 +44,13 @@ export default function Home() {
         onboardingRequired?: boolean;
         consentRequired?: boolean;
       };
+      if (me.role === "USER") {
+        const journey = await secureFetch(`${API_BASE}/auth/journey`);
+        if (journey.ok) {
+          window.location.href = "/journey";
+          return;
+        }
+      }
       window.location.href = destinationFor(
         me.role,
         me.onboardingRequired,
@@ -56,7 +63,10 @@ export default function Home() {
 
   return (
     <main className="pf-redirect-page">
-      <div className="pf-brand pf-brand-with-logo" aria-label="Performance Factory">
+      <div
+        className="pf-brand pf-brand-with-logo"
+        aria-label="Performance Factory"
+      >
         <Image
           className="pf-brand-logo"
           src="/brand/performance-factory-horizontal-clean.png"

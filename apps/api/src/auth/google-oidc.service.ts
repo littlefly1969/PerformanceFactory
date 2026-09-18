@@ -1,3 +1,4 @@
+import { AthleteRegistrationService } from '../discovery/athlete-registration.service';
 import {
   BadRequestException,
   Injectable,
@@ -5,8 +6,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { createHash, createPublicKey, createVerify, randomBytes } from 'crypto';
-import * as bcrypt from 'bcrypt';
-import { Prisma, UserRole } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConsentsService } from '../consents/consents.service';
 
@@ -95,6 +95,7 @@ export class GoogleOidcService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly consents: ConsentsService,
+    private readonly athletes: AthleteRegistrationService,
   ) {}
 
   buildAuthorizationUrl(
@@ -207,7 +208,7 @@ export class GoogleOidcService {
       session.googleOidc = undefined;
       return {
         pendingRegistration: true as const,
-        returnTo: `${this.webOrigin()}/register/google/consents`,
+        returnTo: `${this.webOrigin()}/journey?google=complete`,
       };
     }
     const user = result.user;
@@ -234,6 +235,7 @@ export class GoogleOidcService {
   async completeRegistration(
     req: SessionCarrier,
     input: {
+      discovery?: unknown;
       privacyAccepted?: boolean;
       aiAssistantAccepted?: boolean;
       acceptedDocuments?: Array<{
@@ -251,7 +253,7 @@ export class GoogleOidcService {
         'Registrazione Google non disponibile o scaduta',
       );
     }
-    await this.consents.assertAcceptedCurrentDocuments(input);
+    const documents = await this.consents.assertAcceptedCurrentDocuments(input);
     const [existingIdentity, existingUser] = await Promise.all([
       this.prisma.authIdentity.findUnique({
         where: {
@@ -272,47 +274,31 @@ export class GoogleOidcService {
         'Non e possibile usare Google: la mail e gia presente nel sistema',
       );
     }
-    const password = await bcrypt.hash(
-      `google:${pending.subject}:${this.randomToken()}`,
-      10,
+    if (!input.discovery)
+      throw new BadRequestException(
+        'Completa la discovery prima di registrarti',
+      );
+    const result = await this.athletes.createAthlete(
+      {
+        email: pending.email,
+        firstName: pending.givenName || 'Atleta',
+        lastName: pending.familyName || 'Google',
+        password: `google:${pending.subject}:${this.randomToken()}`,
+        discovery: input.discovery,
+      },
+      {
+        subject: pending.subject,
+        profileJson: pending.profileJson,
+        documents,
+        audit,
+      },
     );
-    const user = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.user.create({
-        data: {
-          email: pending.email,
-          password,
-          role: UserRole.USER,
-          firstName: pending.givenName ?? null,
-          lastName: pending.familyName ?? null,
-          isActive: false,
-          onboardingAssessment: {
-            create: { status: 'PENDING' },
-          },
-        },
-      });
-      await tx.authIdentity.create({
-        data: {
-          userId: created.id,
-          provider: GOOGLE_PROVIDER,
-          subject: pending.subject,
-          email: pending.email,
-          emailVerified: true,
-          profileJson: pending.profileJson,
-          lastLoginAt: new Date(),
-        },
-      });
-      return created;
-    });
-    await this.consents.grantRequired(user.id, {
-      ipAddress: audit.ipAddress,
-      userAgent: audit.userAgent,
-      source: 'google_register',
-    });
     session.pendingGoogleRegistration = undefined;
     return {
-      email: user.email,
-      status: 'PENDING_ADMIN_ACTIVATION',
-      returnTo: pending.returnTo,
+      ...result,
+      status: 'ACTIVE',
+      journey: { phase: 'ASSESSMENT_INTRO', nextStep: 'ASSESSMENT_INTRO' },
+      returnTo: `${this.webOrigin()}/journey`,
     };
   }
 

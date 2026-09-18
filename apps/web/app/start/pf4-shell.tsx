@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import "./pf4.css";
 import "./pf4-desktop.css";
+import "../journey/journey.css";
 
 export function PF4Shell({
   children,

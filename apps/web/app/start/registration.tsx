@@ -71,6 +71,27 @@ export function Registration({
     >
       <h1>Crea il tuo account.</h1>
       <p className="pf4-kicker">Salviamo il tuo punto di partenza</p>
+      <button
+        type="button"
+        className="pf4-cta pf4-secondary"
+        disabled={busy}
+        onClick={() => {
+          try {
+            sessionStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+          } catch {
+            setError(
+              "Abilita la memoria del browser per continuare con Google.",
+            );
+            return;
+          }
+          window.location.assign(
+            `${API_BASE}/auth/google/register?returnTo=${encodeURIComponent("/journey")}`,
+          );
+        }}
+      >
+        Continua con Google
+      </button>
+      <p className="pf4-kicker">Oppure continua con email</p>
       <div className="pf4-fields">
         <label>
           Nome

@@ -9,9 +9,14 @@ export function assertDiscoveryMetadata(value: unknown, required: boolean) {
     return fail();
   const m = value as Record<string, unknown>;
   if (
-    !['single_choice', 'multi_choice', 'number', 'scale', 'boolean'].includes(
-      String(m.type),
-    )
+    ![
+      'single_choice',
+      'multi_choice',
+      'number',
+      'scale',
+      'boolean',
+      'date',
+    ].includes(String(m.type))
   )
     return fail();
   if (
@@ -41,6 +46,13 @@ export function assertDiscoveryMetadata(value: unknown, required: boolean) {
     )
       return fail();
   }
+  if (
+    m.contextKey !== undefined &&
+    (typeof m.contextKey !== 'string' ||
+      !/^[a-z][a-z0-9_]{0,99}$/.test(m.contextKey))
+  )
+    return fail();
+  if (m.type === 'date') return;
   if (m.type === 'number' || m.type === 'scale') {
     if (
       typeof m.min !== 'number' ||

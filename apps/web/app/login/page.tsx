@@ -122,11 +122,7 @@ const rejectedApplicationMessage =
 
 function GoogleIcon() {
   return (
-    <svg
-      aria-hidden="true"
-      className="pf-google-icon"
-      viewBox="0 0 18 18"
-    >
+    <svg aria-hidden="true" className="pf-google-icon" viewBox="0 0 18 18">
       <path
         fill="#4285F4"
         d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62Z"
@@ -187,7 +183,9 @@ export default function LoginPage() {
       let errorMessage = "Credenziali non valide oppure API non raggiungibile.";
       try {
         const data = (await response.json()) as { message?: string };
-        if (data.message === "Account in attesa di attivazione amministratore") {
+        if (
+          data.message === "Account in attesa di attivazione amministratore"
+        ) {
           errorMessage = pendingAdminActivationMessage;
         } else if (
           data.message ===
@@ -211,20 +209,28 @@ export default function LoginPage() {
       onboardingRequired?: boolean;
     };
     storeAccessToken(user.accessToken);
-    setMessage(`Accesso effettuato come ${user.email ?? "utente"} (${user.role ?? "ruolo"})`);
+    setMessage(
+      `Accesso effettuato come ${user.email ?? "utente"} (${user.role ?? "ruolo"})`,
+    );
     setLoading(false);
 
-    const destination =
-      user.consentRequired
-        ? "/consents"
-        : user.role === "USER"
+    if (user.role === "USER") {
+      const journey = await secureFetch(`${API_BASE}/auth/journey`);
+      if (journey.ok) {
+        window.location.href = "/journey";
+        return;
+      }
+    }
+    const destination = user.consentRequired
+      ? "/consents"
+      : user.role === "USER"
         ? user.onboardingRequired
           ? "/onboarding"
           : "/user"
         : user.role === "PROFESSIONAL"
           ? "/professional"
-            : user.role === "ADMIN"
-              ? "/admin/cycles"
+          : user.role === "ADMIN"
+            ? "/admin/cycles"
             : user.role === "AI_TUNER"
               ? "/ai-tuner/prompts"
               : "/";
@@ -233,7 +239,10 @@ export default function LoginPage() {
 
   return (
     <main className="pf-auth-screen">
-      <section className="pf-auth-brand-panel" aria-labelledby="pf-auth-heading">
+      <section
+        className="pf-auth-brand-panel"
+        aria-labelledby="pf-auth-heading"
+      >
         <div className="pf-auth-brand-content">
           <Link
             className="pf-auth-brand-lockup"

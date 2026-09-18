@@ -11,6 +11,18 @@ export function DiscoveryQuestionRenderer({
   options: DiscoveryOption[];
   onChange: (value: unknown) => void;
 }) {
+  if (question.type === "date")
+    return (
+      <div className="pf4-number">
+        <label htmlFor={question.id}>Data dell’evento</label>
+        <input
+          id={question.id}
+          type="date"
+          value={typeof value === "string" ? value : ""}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    );
   if (question.type === "number" || question.type === "scale")
     return (
       <div className="pf4-number">

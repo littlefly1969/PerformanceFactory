@@ -15,6 +15,13 @@ export function validAnswer(
   const options = question.options.filter(
     (o) => !question.dependsOn || o.parentId === sportId,
   );
+  if (question.type === 'date')
+    return (
+      typeof value === 'string' &&
+      /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+      Number.isFinite(Date.parse(value)) &&
+      new Date(value).toISOString().slice(0, 10) === value
+    );
   if (question.type === 'number' || question.type === 'scale') {
     if (typeof value !== 'number' || !Number.isFinite(value)) return false;
     if (question.min !== undefined && value < question.min) return false;

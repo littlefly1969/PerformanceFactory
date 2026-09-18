@@ -68,6 +68,19 @@ export default function StartPage() {
     }
   }, [draft]);
   useEffect(() => {
+    if (draft?.currentStep !== "processing") return;
+    const timer = setTimeout(
+      () =>
+        setDraft((current) =>
+          current?.currentStep === "processing"
+            ? { ...current, currentStep: "result" }
+            : current,
+        ),
+      900,
+    );
+    return () => clearTimeout(timer);
+  }, [draft?.currentStep]);
+  useEffect(() => {
     heading.current?.focus();
   }, [draft?.currentStep]);
   if (!config || !draft)
@@ -89,6 +102,7 @@ export default function StartPage() {
   const steps = [
     "intro",
     ...config.questions.map((q) => q.id),
+    "processing",
     "result",
     "registration",
   ];
@@ -111,7 +125,11 @@ export default function StartPage() {
       label={label}
       progress={Math.min(index, config.questions.length)}
       total={index > 0 ? config.questions.length : 0}
-      onBack={index > 0 && !registering ? () => move(-1) : undefined}
+      onBack={
+        index > 0 && !registering
+          ? () => move(draft.currentStep === "result" ? -2 : -1)
+          : undefined
+      }
     >
       {storageWarning && (
         <p role="status" className="pf4-storage">
@@ -192,6 +210,14 @@ export default function StartPage() {
             </footer>
           )}
         </>
+      )}
+      {draft.currentStep === "processing" && (
+        <section className="pf4-body" role="status">
+          <h1>Analizziamo le tue risposte…</h1>
+          <p>
+            Prepariamo il riepilogo del tuo profilo fisico e dei tuoi obiettivi.
+          </p>
+        </section>
       )}
       {draft.currentStep === "result" && (
         <PreliminaryResult

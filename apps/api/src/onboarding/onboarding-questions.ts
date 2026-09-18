@@ -1,3 +1,4 @@
+import { discoveryContext } from '../discovery/discovery-context';
 import {
   OnboardingInputType,
   OnboardingQuestionScope,
@@ -41,7 +42,7 @@ export async function loadQuestionnaireQuestions(
   userId: string,
 ) {
   const [general, specialist] = await Promise.all([
-    loadActiveGeneralTemplates(prisma),
+    loadUserGeneralTemplates(prisma, userId),
     loadSpecialistQuestionRecords(prisma, userId),
   ]);
   return [...general, ...specialist];
@@ -110,6 +111,7 @@ export async function loadSpecialistQuestionRecords(
       id: true,
       areaId: true,
       text: true,
+      provider: true,
       inputType: true,
       optionsJson: true,
       orderIndex: true,
@@ -117,6 +119,8 @@ export async function loadSpecialistQuestionRecords(
     },
     orderBy: [{ area: { name: 'asc' } }, { orderIndex: 'asc' }],
   });
+  if (questions.every((q) => q.provider === 'configuration'))
+    questions.sort((a, b) => a.orderIndex - b.orderIndex);
   return questions.map((question) => ({
     id: question.id,
     key: `specialist_${question.areaId}_${question.orderIndex}`,
@@ -130,4 +134,12 @@ export async function loadSpecialistQuestionRecords(
     orderIndex: 1000 + question.orderIndex,
     area: question.area,
   }));
+}
+
+export async function loadUserGeneralTemplates(
+  prisma: PrismaService,
+  userId: string,
+) {
+  const context = await discoveryContext(prisma, userId);
+  return context?.templates ?? loadActiveGeneralTemplates(prisma);
 }

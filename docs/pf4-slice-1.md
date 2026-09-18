@@ -1,3 +1,5 @@
+> Stato storico della Slice 1. Il percorso successivo è ora implementato: vedere [PF4 complete journey](pf4-complete-journey.md).
+
 # PF4 Slice 1 — Discovery → registration → authenticated journey
 
 ## Run

@@ -16,7 +16,7 @@ import {
   STARTER_OPTIONS,
 } from './onboarding-model';
 import {
-  loadActiveGeneralTemplates,
+  loadUserGeneralTemplates,
   loadQuestionnaireQuestions,
   saveSpecialistQuestions,
 } from './onboarding-questions';
@@ -137,7 +137,7 @@ export async function generateSpecialistQuestions(
     throw new BadRequestException('L obiettivo performance e obbligatorio');
   }
 
-  const generalTemplates = await loadActiveGeneralTemplates(prisma);
+  const generalTemplates = await loadUserGeneralTemplates(prisma, actor.id);
   const normalizedGeneralAnswers = normalizeAnswersForQuestions(
     generalTemplates,
     answers,
@@ -242,6 +242,14 @@ export async function submit(
   const { normalizedAnswers, profile, scoredAreas, rankingGlobal } = prepared;
 
   const result = await prisma.$transaction(async (tx) => {
+    if (tx.$executeRaw)
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${actor.id}))`;
+    const existing = await tx.athleteDiscovery?.findUnique({
+      where: { userId: actor.id },
+    });
+    if (existing?.baselineId)
+      return { status: 'COMPLETED', snapshot: { id: existing.baselineId } };
+
     await tx.userOnboardingAssessment.upsert({
       where: { userId: actor.id },
       update: {
@@ -279,6 +287,10 @@ export async function submit(
       select: { id: true, rankingGlobal: true, createdAt: true },
     });
 
+    await tx.athleteDiscovery?.updateMany({
+      where: { userId: actor.id },
+      data: { baselineId: snapshot.id, phase: 'RESULT', operationAt: null },
+    });
     for (const area of scoredAreas) {
       await tx.currentState.upsert({
         where: { userId_areaId: { userId: actor.id, areaId: area.areaId } },

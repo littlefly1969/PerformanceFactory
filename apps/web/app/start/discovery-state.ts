@@ -27,6 +27,13 @@ export function answerValid(
   const value = questionValue(draft, question);
   if (value === undefined || value === null || value === "")
     return !question.required;
+  if (question.type === "date")
+    return (
+      typeof value === "string" &&
+      /^\d{4}-\d{2}-\d{2}$/.test(value) &&
+      Number.isFinite(Date.parse(value)) &&
+      new Date(value).toISOString().slice(0, 10) === value
+    );
   if (question.type === "boolean") return typeof value === "boolean";
   if (question.type === "number" || question.type === "scale") {
     if (typeof value !== "number" || !Number.isFinite(value)) return false;
@@ -78,6 +85,7 @@ export function restoreDraft(
     const steps = [
       "intro",
       ...config.questions.map((q) => q.id),
+      "processing",
       "result",
       "registration",
     ];
@@ -94,7 +102,17 @@ export function restoreDraft(
   }
 }
 export function journeyHref(nextStep: string) {
-  if (!["CONSENTS", "ASSESSMENT"].includes(nextStep))
+  if (
+    ![
+      "CONSENTS",
+      "ASSESSMENT_INTRO",
+      "ASSESSMENT",
+      "PROCESSING",
+      "RESULT",
+      "DURATION",
+      "COMPLETE",
+    ].includes(nextStep)
+  )
     throw new Error("Passaggio del percorso non riconosciuto");
   return `/journey?step=${encodeURIComponent(nextStep)}`;
 }

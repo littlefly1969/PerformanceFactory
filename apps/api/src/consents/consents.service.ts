@@ -152,6 +152,7 @@ export class ConsentsService {
         );
       }
     }
+    return documents;
   }
 
   async upsertDocument(
@@ -221,7 +222,7 @@ export class ConsentsService {
     });
   }
 
-  private async createConsent(
+  async createConsent(
     tx: Prisma.TransactionClient,
     userId: string,
     document: Awaited<ReturnType<ConsentsService['requiredDocuments']>>[number],
