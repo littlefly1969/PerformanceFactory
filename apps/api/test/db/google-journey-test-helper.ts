@@ -143,8 +143,10 @@ export async function testGoogleRegistration(
         authIdentities: true,
       },
     });
-    expect(created.discovery?.draft).toEqual(draft);
-    expect(created.sportSelection?.sportId).toBe(draft.sportId);
+    expect(created.discovery?.draft).toMatchObject(draft);
+    expect(created.sportSelection?.sportId).toBe(
+      (created.discovery?.draft as { sportId: string }).sportId,
+    );
     expect(created.performanceGoal).toBeTruthy();
     expect(created.onboardingAssessment?.status).toBe('PENDING');
     expect(created.authIdentities).toHaveLength(1);

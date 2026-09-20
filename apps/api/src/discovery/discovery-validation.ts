@@ -92,8 +92,14 @@ export function validateDiscovery(
   return {
     version: draft.version,
     currentStep: 'registration',
-    sportId: draft.sportId,
-    specializationId: draft.specializationId,
+    sportId:
+      config.sportContext?.mode === 'fixed'
+        ? config.sportContext.sport.id
+        : draft.sportId,
+    specializationId:
+      config.sportContext?.mode === 'fixed'
+        ? config.sportContext.specialization.id
+        : draft.specializationId,
     goalId: draft.goalId,
     answers: draft.answers,
   };

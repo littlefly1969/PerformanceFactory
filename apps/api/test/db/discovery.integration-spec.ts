@@ -110,6 +110,8 @@ describe('PF4 discovery to authenticated journey', () => {
     });
     sportId = sport.id;
     testSportKey = sport.key;
+    process.env.PF4_SPORT_KEY = sport.key;
+    process.env.PF4_SPECIALIZATION_KEY = 'single';
     const demo = await prisma.onboardingQuestionTemplate.findMany({
       where: { key: { startsWith: 'pf4_padel_assessment_' } },
     });
@@ -134,11 +136,19 @@ describe('PF4 discovery to authenticated journey', () => {
     });
     expect(response.statusCode).toBe(200);
     config = response.json();
+    expect(config.sportContext).toMatchObject({
+      mode: 'fixed',
+      sport: { id: sportId },
+    });
+    expect(
+      config.questions.some(
+        (q) => q.target === 'sportId' || q.target === 'specializationId',
+      ),
+    ).toBe(false);
     draft = {
       version: config.version,
       currentStep: 'registration',
-      sportId,
-      specializationId: sport.specializations[0].id,
+      // Neither sport nor specialization is supplied by the client.
       goalId: config.questions.find((q) => q.target === 'goalId')!.options[0]
         .id,
       answers: {},
@@ -153,6 +163,8 @@ describe('PF4 discovery to authenticated journey', () => {
   }, 60000);
 
   afterAll(async () => {
+    delete process.env.PF4_SPORT_KEY;
+    delete process.env.PF4_SPECIALIZATION_KEY;
     if (prisma) {
       const cleanupIds = [userId, ...googleUsers].filter(Boolean);
       for (const userId of cleanupIds) {
@@ -248,7 +260,9 @@ describe('PF4 discovery to authenticated journey', () => {
         })
       ).json<DiscoveryConfiguration>();
       expect(edited.version).not.toBe(added.version);
-      expect(edited.questions[2].title).toBe('Testo aggiornato');
+      expect(edited.questions.find((q) => q.id === template.id)?.title).toBe(
+        'Testo aggiornato',
+      );
       await prisma.onboardingQuestionTemplate.update({
         where: { id: template.id },
         data: { isActive: false },
@@ -301,7 +315,14 @@ describe('PF4 discovery to authenticated journey', () => {
     const persisted = await prisma.athleteDiscovery.findUniqueOrThrow({
       where: { userId },
     });
-    expect(persisted.draft).toEqual(draft);
+    expect(persisted.draft).toEqual({
+      ...draft,
+      sportId,
+      specializationId:
+        config.sportContext?.mode === 'fixed'
+          ? config.sportContext.specialization.id
+          : undefined,
+    });
     expect(persisted.configuration).toHaveProperty('version', config.version);
     expect(
       await prisma.userSportSelection.findUnique({ where: { userId } }),

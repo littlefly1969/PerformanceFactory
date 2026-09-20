@@ -146,7 +146,11 @@ export class AthleteRegistrationService {
     if (!discovery)
       throw new NotFoundException('Percorso discovery non trovato');
     const status = await this.consents.status(userId);
-    const nextStep = status.required ? 'CONSENTS' : 'ASSESSMENT';
+    const nextStep = status.required
+      ? 'CONSENTS'
+      : discovery.phase === 'COMPLETE'
+        ? 'COMPLETE'
+        : 'ASSESSMENT';
     return { phase: nextStep, nextStep };
   }
 }

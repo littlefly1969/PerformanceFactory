@@ -47,7 +47,9 @@ export default function Home() {
       if (me.role === "USER") {
         const journey = await secureFetch(`${API_BASE}/auth/journey`);
         if (journey.ok) {
-          window.location.href = "/journey";
+          const state = (await journey.json()) as { nextStep?: string };
+          window.location.href =
+            state.nextStep === "COMPLETE" ? "/user" : "/journey";
           return;
         }
       }

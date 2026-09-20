@@ -43,25 +43,18 @@ function Radar({ drivers }: { drivers: Driver[] }) {
     </svg>
   );
 }
-export function PerformanceResult({
-  journey,
-  busy,
-  onContinue,
+export function PerformanceVisual({
+  performance: r,
 }: {
-  journey: Journey;
-  busy: boolean;
-  onContinue: () => void;
+  performance: {
+    current: number;
+    potential: number | null;
+    gap: number | null;
+    drivers: Driver[];
+  };
 }) {
-  const r = journey.result;
-  if (!r) return <p role="alert">Il risultato non è ancora disponibile.</p>;
   return (
-    <section className="pf4-body pf4-performance">
-      <span className="pf4-kicker">Performance Result</span>
-      <h1>
-        La tua performance,
-        <br />
-        da qui in avanti.
-      </h1>
+    <>
       <div className="pf4-metrics">
         <div>
           <span>Current Performance Index</span>
@@ -69,11 +62,13 @@ export function PerformanceResult({
         </div>
         <div>
           <span>Potenziale</span>
-          <strong>{r.potential}</strong>
+          <strong>{r.potential ?? "—"}</strong>
         </div>
         <div>
           <span>Gap</span>
-          <strong>+{r.gap}</strong>
+          <strong>
+            {r.gap === null ? "—" : `${r.gap >= 0 ? "+" : ""}${r.gap}`}
+          </strong>
         </div>
       </div>
       <Radar drivers={r.drivers} />
@@ -98,6 +93,29 @@ export function PerformanceResult({
           </div>
         ))}
       </div>
+    </>
+  );
+}
+export function PerformanceResult({
+  journey,
+  busy,
+  onContinue,
+}: {
+  journey: Journey;
+  busy: boolean;
+  onContinue: () => void;
+}) {
+  const r = journey.result;
+  if (!r) return <p role="alert">Il risultato non è ancora disponibile.</p>;
+  return (
+    <section className="pf4-body pf4-performance">
+      <span className="pf4-kicker">Performance Result</span>
+      <h1>
+        La tua performance,
+        <br />
+        da qui in avanti.
+      </h1>
+      <PerformanceVisual performance={r} />
       {r.priority && (
         <div className="pf4-highlight">
           <span className="pf4-kicker">La tua leva di miglioramento</span>
@@ -156,17 +174,6 @@ export function DurationStep({
       >
         Conferma la durata
       </button>
-      {journey.phase === "COMPLETE" && (
-        <p role="status">
-          Durata salvata:{" "}
-          {
-            journey.durationOptions.find(
-              (d) => d.weeks === journey.programDurationWeeks,
-            )?.label
-          }
-          . Il tuo punto di partenza e le tue risposte sono salvati.
-        </p>
-      )}
     </section>
   );
 }

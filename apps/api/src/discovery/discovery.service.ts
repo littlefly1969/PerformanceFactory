@@ -15,6 +15,8 @@ export class DiscoveryService {
       'onboardingQuestionTemplate' | 'sport'
     > = this.prisma,
   ) {
+    const mode =
+      process.env.PF4_SPORT_MODE === 'user_choice' ? 'user_choice' : 'fixed';
     const [templates, sports] = await Promise.all([
       db.onboardingQuestionTemplate.findMany({
         where: { scope: 'DISCOVERY', isActive: true },
@@ -28,11 +30,12 @@ export class DiscoveryService {
         orderBy: [{ label: 'asc' }, { id: 'asc' }],
         select: {
           id: true,
+          key: true,
           label: true,
           specializations: {
             where: { isActive: true },
             orderBy: [{ label: 'asc' }, { id: 'asc' }],
-            select: { id: true, label: true },
+            select: { id: true, key: true, label: true },
           },
         },
       }),
@@ -101,27 +104,60 @@ export class DiscoveryService {
     });
     if (
       !sports.length ||
-      !['sportId', 'specializationId', 'goalId'].every(
+      !(
+        mode === 'fixed'
+          ? ['goalId']
+          : ['sportId', 'specializationId', 'goalId']
+      ).every(
         (target) => questions.filter((q) => q.target === target).length === 1,
       )
     ) {
       throw new ServiceUnavailableException('Discovery non configurata');
     }
     if (
+      mode === 'user_choice' &&
       questions.findIndex((q) => q.target === 'sportId') >
-      questions.findIndex((q) => q.target === 'specializationId')
+        questions.findIndex((q) => q.target === 'specializationId')
     ) {
       throw new ServiceUnavailableException(
         'Lo sport deve precedere la specializzazione',
       );
     }
+    const sport = sports.find(
+      (s) =>
+        s.key.toUpperCase() ===
+        (process.env.PF4_SPORT_KEY ?? 'PADEL').toUpperCase(),
+    );
+    const specialization = sport?.specializations.find(
+      (s) =>
+        s.key.toUpperCase() ===
+        (process.env.PF4_SPECIALIZATION_KEY ?? 'STANDARD').toUpperCase(),
+    );
+    if (mode === 'fixed' && (!sport || !specialization))
+      throw new ServiceUnavailableException(
+        'Configura lo sport Padel e la specializzazione Standard attivi',
+      );
+    const sportContext =
+      mode === 'fixed' && sport && specialization
+        ? {
+            mode: 'fixed' as const,
+            sport: { id: sport.id, key: sport.key, label: sport.label },
+            specialization,
+          }
+        : { mode: 'user_choice' as const };
+    const visibleQuestions =
+      mode === 'fixed'
+        ? questions.filter(
+            (q) => q.target !== 'sportId' && q.target !== 'specializationId',
+          )
+        : questions;
     const version = parseInt(
       createHash('sha256')
-        .update(JSON.stringify(questions))
+        .update(JSON.stringify({ sportContext, questions: visibleQuestions }))
         .digest('hex')
         .slice(0, 12),
       16,
     );
-    return { version, sports, questions };
+    return { version, sports, sportContext, questions: visibleQuestions };
   }
 }

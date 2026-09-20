@@ -106,3 +106,36 @@ describe('Discovery registration boundary', () => {
     ).not.toThrow();
   });
 });
+
+describe('PF4 fixed sport registration', () => {
+  const fixed: DiscoveryConfiguration = {
+    ...config,
+    sportContext: {
+      mode: 'fixed',
+      sport: { id: 'configured-padel', key: 'PADEL', label: 'Padel' },
+      specialization: {
+        id: 'configured-standard',
+        key: 'STANDARD',
+        label: 'Standard',
+      },
+    },
+  };
+  it('persists server-resolved context when client sends no selectors', () => {
+    expect(validateDiscovery(fixed, draft)).toMatchObject({
+      sportId: 'configured-padel',
+      specializationId: 'configured-standard',
+    });
+  });
+  it('does not allow client IDs to override fixed context', () => {
+    expect(
+      validateDiscovery(fixed, {
+        ...draft,
+        sportId: 'tennis',
+        specializationId: 'singles',
+      }),
+    ).toMatchObject({
+      sportId: 'configured-padel',
+      specializationId: 'configured-standard',
+    });
+  });
+});

@@ -93,9 +93,9 @@ describe("PF4 authenticated journey functions", () => {
     expect(
       requests.filter((r) => r.url.endsWith("/duration")).at(-1)?.body,
     ).toEqual({ weeks: 12 });
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Durata salvata",
-    );
+    expect(
+      await screen.findByRole("link", { name: /Vai al programma/ }),
+    ).toHaveAttribute("href", "/user");
   });
   it("resumes the backend duration stage directly, without an anonymous draft", async () => {
     vi.stubGlobal(

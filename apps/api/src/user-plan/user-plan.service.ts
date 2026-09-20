@@ -1,3 +1,4 @@
+import { finishTrainingSession } from '../athlete/training-sessions';
 import {
   BadRequestException,
   ConflictException,
@@ -335,6 +336,29 @@ export class UserPlanService {
       data.completionRating = input.completionRating;
     }
 
+    const session = await this.prisma.trainingSession.findFirst({
+      where: { trainingPlanItemId: planItemId, userId },
+      select: { id: true },
+    });
+    if (session) {
+      await finishTrainingSession(
+        this.prisma,
+        userId,
+        session.id,
+        'COMPLETED',
+        input,
+      );
+      return this.prisma.trainingPlanItem.findUnique({
+        where: { id: planItemId },
+        select: {
+          id: true,
+          status: true,
+          completedAt: true,
+          completionNotes: true,
+          completionRating: true,
+        },
+      });
+    }
     return this.prisma.trainingPlanItem.update({
       where: { id: planItemId },
       data,

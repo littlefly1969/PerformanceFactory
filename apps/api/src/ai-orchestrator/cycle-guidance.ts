@@ -134,7 +134,8 @@ export function buildQuestions(
 export function buildTrainingPlanItems(
   proposal: CycleProposal,
 ): Prisma.TrainingPlanItemUncheckedCreateWithoutTrainingPlanReleaseInput[] {
-  return proposal.planItems.map((item) => ({
+  return proposal.planItems.map((item, orderIndex) => ({
+    orderIndex,
     type: item.type,
     title: item.title,
     body: item.body,

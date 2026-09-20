@@ -76,6 +76,7 @@ model User {
   performanceGoal      UserPerformanceGoal?
   sportSelection       UserSportSelection?
   userAreaPromptInstructions UserAreaPromptInstruction[]
+  trainingSessions TrainingSession[]
   trainingPlanReleases TrainingPlanRelease[]
   trainingQuestionSets TrainingQuestionSet[]
   trainingUserAnswers  TrainingUserAnswer[]
@@ -646,6 +647,7 @@ model TrainingPlanRelease {
   sourceSnapshot PerformanceProfileSnapshot? @relation(fields: [sourceSnapshotId], references: [id])
   proposedBy     User?                      @relation("TrainingPlanReleaseProposedBy", fields: [proposedByAdminId], references: [id])
   specialization SportSpecialization        @relation(fields: [specializationId], references: [id])
+  sessions       TrainingSession[]
   items          TrainingPlanItem[]
   questionSets   TrainingQuestionSet[]
 
@@ -654,7 +656,37 @@ model TrainingPlanRelease {
   @@index([specializationId, status])
 }
 
+enum TrainingSessionStatus {
+  SCHEDULED
+  COMPLETED
+  SKIPPED
+}
+
+model TrainingSession {
+  id String @id @default(uuid())
+  userId String
+  trainingPlanReleaseId String
+  trainingPlanItemId String
+  scheduledDate DateTime @db.Date
+  sequence Int
+  status TrainingSessionStatus @default(SCHEDULED)
+  completedAt DateTime?
+  skippedAt DateTime?
+  completionNotes String?
+  completionRating Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id])
+  trainingPlanRelease TrainingPlanRelease @relation(fields: [trainingPlanReleaseId], references: [id], onDelete: Cascade)
+  trainingPlanItem TrainingPlanItem @relation(fields: [trainingPlanItemId], references: [id], onDelete: Cascade)
+  @@unique([trainingPlanReleaseId, trainingPlanItemId])
+  @@index([userId, scheduledDate])
+  @@index([trainingPlanReleaseId, scheduledDate])
+}
+
 model TrainingPlanItem {
+  orderIndex Int @default(0)
+  sessions TrainingSession[]
   id                    String @id @default(uuid())
   trainingPlanReleaseId String
 

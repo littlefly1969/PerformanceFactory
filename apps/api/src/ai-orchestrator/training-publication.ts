@@ -1,3 +1,4 @@
+import { createTrainingSessions } from '../athlete/training-sessions';
 import { BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -182,12 +183,14 @@ export async function publishTrainingPlan(
   }
 
   return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${trainingPlanReleaseId}))`;
     const plan = await tx.trainingPlanRelease.findUnique({
       where: { id: trainingPlanReleaseId },
       select: {
         id: true,
         userId: true,
         specializationId: true,
+        publishedAt: true,
         status: true,
         items: { select: { status: true } },
         questionSets: {
@@ -204,6 +207,13 @@ export async function publishTrainingPlan(
       throw new BadRequestException('Allenamento non trovato');
     }
 
+    if (plan.status === 'ACTIVE' && plan.publishedAt) {
+      await createTrainingSessions(tx, plan.id, plan.publishedAt);
+      return {
+        trainingPlanReleaseId: plan.id,
+        trainingQuestionSetId: plan.questionSets[0]?.id,
+      };
+    }
     if (plan.status !== 'PENDING_APPROVAL') {
       throw new BadRequestException('L allenamento non e in approvazione');
     }
@@ -225,6 +235,7 @@ export async function publishTrainingPlan(
       );
     }
 
+    const publishedAt = new Date();
     await tx.trainingPlanRelease.updateMany({
       where: { userId: plan.userId, status: 'ACTIVE' },
       data: {
@@ -239,7 +250,7 @@ export async function publishTrainingPlan(
       data: {
         status: 'ACTIVE',
         cycleStatus: 'PUBLISHED',
-        publishedAt: new Date(),
+        publishedAt,
       },
     });
 
@@ -248,9 +259,11 @@ export async function publishTrainingPlan(
       data: { status: 'ACTIVE' },
     });
 
+    await createTrainingSessions(tx, plan.id, publishedAt);
+
     await tx.trainingQuestionSet.update({
       where: { id: questionSet.id },
-      data: { status: 'PUBLISHED', publishedAt: new Date() },
+      data: { status: 'PUBLISHED', publishedAt },
     });
 
     await tx.aiContextSummary.updateMany({

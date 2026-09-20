@@ -27,6 +27,7 @@ const API_TAGS = [
   ['questions', 'Questionari, domande e flusso di revisione.'],
   ['answers', 'Invio delle risposte ai questionari.'],
   ['plans', 'Piani di miglioramento e flussi di approvazione.'],
+  ['athlete', 'Esperienza PF4, calendario, sessioni e check-in personali.'],
   ['user', 'Vista atleta su questionari, piani e allenamenti.'],
   ['performance', 'Snapshot e storico del profilo prestazionale.'],
   ['professional-approvals', 'Coda e decisioni dei professionisti.'],

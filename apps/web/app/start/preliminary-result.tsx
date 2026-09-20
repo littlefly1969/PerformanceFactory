@@ -48,9 +48,13 @@ export function PreliminaryResult({
             <br />i tuoi vincoli.
           </h1>
           <p>
-            {rows.find((r) => r.target === "sportId")?.value}
+            {config.sportContext?.mode === "fixed"
+              ? config.sportContext.sport.label
+              : rows.find((r) => r.target === "sportId")?.value}
             <br />
-            {rows.find((r) => r.target === "specializationId")?.value}
+            {config.sportContext?.mode === "fixed"
+              ? config.sportContext.specialization.label
+              : rows.find((r) => r.target === "specializationId")?.value}
           </p>
           <div className="pf4-highlight-meta">
             Discovery completata · {config.questions.length} passaggi

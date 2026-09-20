@@ -1,3 +1,4 @@
+import { assertTrainingCycleFinished } from '../athlete/training-sessions';
 import { BadRequestException } from '@nestjs/common';
 import { Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -70,6 +71,7 @@ export async function runTrainingPlan(
   actorId: string,
   reason = 'Allenamento AI generato',
 ) {
+  await assertTrainingCycleFinished(prisma, userId);
   const proposalInput = await prepareTrainingProposalInput(
     prisma,
     aiProposalProvider,
@@ -80,6 +82,7 @@ export async function runTrainingPlan(
     await aiProposalProvider.generateCycleProposal(proposalInput);
 
   return prisma.$transaction(async (tx) => {
+    await assertTrainingCycleFinished(tx, userId);
     const trainingContext = await loadTrainingCoachContext(tx, userId);
     const existingPending = await tx.trainingPlanRelease.findFirst({
       where: { userId, status: 'PENDING_APPROVAL' },

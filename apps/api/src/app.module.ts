@@ -1,3 +1,4 @@
+import { AthleteModule } from './athlete/athlete.module';
 import { Logger, Module } from '@nestjs/common';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
@@ -54,6 +55,7 @@ function buildThrottlerStorage() {
       }),
     }),
     PrismaModule,
+    AthleteModule,
     AuthModule,
     RelationshipsModule,
     GuidanceModule,

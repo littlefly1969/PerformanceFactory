@@ -1,3 +1,4 @@
+import { performanceDriverName as driverName } from '../performance/performance-display';
 import { requireSportContext } from '../onboarding/onboarding-sports';
 import { QUESTIONS_PER_AREA } from '../ai-orchestrator/proposal-provider-model';
 import {
@@ -33,14 +34,6 @@ export const PROGRAM_DURATIONS = [
   },
   { weeks: 52, label: '12 mesi', description: 'Un percorso di lungo periodo.' },
 ];
-const driverName = (name: string) =>
-  ({
-    'Tecnico-tattica': 'Tecnico-tattico',
-    'Preparazione atletica': 'Preparazione',
-    'Allenamento mentale': 'Mental',
-    Equipaggiamento: 'Attrezzatura',
-    Fisioterapia: 'Biomeccanica',
-  })[name] ?? name;
 const LEASE_MS = 10 * 60 * 1000;
 const actor = (id: string) => ({ id, role: 'USER' as const });
 

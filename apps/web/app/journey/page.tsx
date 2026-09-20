@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useState } from "react";
 import { PF4Shell } from "../start/pf4-shell";
 import { ConsentStep } from "./consent-step";
@@ -178,7 +179,7 @@ export default function JourneyPage() {
             }}
           />
         )}
-        {(j?.phase === "DURATION" || j?.phase === "COMPLETE") && (
+        {j?.phase === "DURATION" && (
           <DurationStep
             journey={j}
             busy={busy}
@@ -186,6 +187,25 @@ export default function JourneyPage() {
               void action("duration", { weeks });
             }}
           />
+        )}
+        {j?.phase === "COMPLETE" && (
+          <section className="pf4-body">
+            <span className="pf4-badge">✓ Programma confermato</span>
+            <h1>Il tuo prossimo passo, ogni giorno.</h1>
+            <p>
+              La Home ti accompagna con le sessioni del tuo programma e i
+              check-in al momento giusto.
+            </p>
+            <dl className="pf4-profile">
+              <div>
+                <dt>Il tuo percorso</dt>
+                <dd>{j.programDurationWeeks} settimane</dd>
+              </div>
+            </dl>
+            <Link className="pf4-cta" href="/user">
+              Vai al programma →
+            </Link>
+          </section>
         )}
       </PF4Shell>
     </div>

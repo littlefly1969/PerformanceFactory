@@ -33,6 +33,13 @@ export type DiscoveryQuestion = {
   };
 };
 export type DiscoveryConfiguration = {
+  sportContext?:
+    | {
+        mode: "fixed";
+        sport: { id: string; key: string; label: string };
+        specialization: { id: string; key: string; label: string };
+      }
+    | { mode: "user_choice" };
   version: number;
   questions: DiscoveryQuestion[];
 };

@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { terminalTrainingStates } from '../athlete/training-sessions';
 import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SubmitAnswersDto } from './dto/submit-answers.dto';
@@ -153,6 +154,9 @@ export class AnswersService {
         userId: true,
         status: true,
         trainingPlanReleaseId: true,
+        trainingPlanRelease: {
+          select: { status: true, items: { select: { status: true } } },
+        },
         questions: {
           select: {
             id: true,
@@ -171,6 +175,17 @@ export class AnswersService {
     if (questionSet.status !== 'PUBLISHED') {
       throw new BadRequestException('Il questionario non e pubblicato');
     }
+
+    if (
+      questionSet.trainingPlanRelease.status !== 'ACTIVE' ||
+      !questionSet.trainingPlanRelease.items.length ||
+      questionSet.trainingPlanRelease.items.some(
+        (i) => !terminalTrainingStates.includes(i.status),
+      )
+    )
+      throw new BadRequestException(
+        'Completa o salta le sessioni prima del check-in',
+      );
 
     const questionMap = new Map(
       questionSet.questions.map((question) => [question.id, question]),
@@ -223,11 +238,26 @@ export class AnswersService {
     });
 
     return this.prisma.$transaction(async (tx) => {
-      const result = await tx.trainingUserAnswer.createMany({ data });
-      await tx.trainingQuestionSet.update({
-        where: { id: input.questionSetId },
+      const claimed = await tx.trainingQuestionSet.updateMany({
+        where: {
+          id: input.questionSetId,
+          userId: actor.id,
+          status: 'PUBLISHED',
+          trainingPlanRelease: {
+            status: 'ACTIVE',
+            items: {
+              some: {},
+              every: { status: { in: terminalTrainingStates } },
+            },
+          },
+        },
         data: { status: 'CLOSED', closedAt: new Date() },
       });
+      if (claimed.count !== 1)
+        throw new BadRequestException(
+          'Check-in già inviato o non più disponibile',
+        );
+      const result = await tx.trainingUserAnswer.createMany({ data });
 
       return {
         count: result.count,
