@@ -168,3 +168,30 @@ it("skips a conditional date, revisits the parent, and restores only the newly s
   await userEvent.click(screen.getByRole("button", { name: "Torneo" }));
   expect(await screen.findByLabelText("Quando sarà?")).toHaveValue("");
 });
+
+it("allows skipping an optional choice without opening its conditional branch", async () => {
+  const optional = { ...config.questions[0], required: false };
+  const child = {
+    ...config.questions[1],
+    visibleWhen: {
+      match: "all" as const,
+      rules: [
+        {
+          question: optional.code,
+          operator: "not_in" as const,
+          values: ["option-a"],
+        },
+      ],
+    },
+  };
+  mockConfig({ version: 9, questions: [optional, child] });
+  render(<StartPage />);
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Inizia il percorso →" }),
+  );
+  await userEvent.click(screen.getByRole("button", { name: "Continua" }));
+  expect(
+    screen.getByRole("heading", { name: "Analizziamo le tue risposte…" }),
+  ).toBeInTheDocument();
+  expect(JSON.parse(sessionStorage.getItem(DRAFT_KEY)!).answers).toEqual({});
+});

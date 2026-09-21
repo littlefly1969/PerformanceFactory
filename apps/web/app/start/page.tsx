@@ -236,7 +236,7 @@ export default function StartPage() {
               }}
             />
           </section>
-          {!autoAdvance && (
+          {(!autoAdvance || !question.required) && (
             <footer className="pf4-footer">
               <button
                 className="pf4-cta"
