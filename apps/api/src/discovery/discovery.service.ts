@@ -1,3 +1,4 @@
+import { assertDiscoveryGraph } from './discovery-conditions';
 import { assertDiscoveryMetadata } from './discovery-metadata';
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
@@ -40,6 +41,11 @@ export class DiscoveryService {
         },
       }),
     ]);
+    try {
+      assertDiscoveryGraph(templates);
+    } catch {
+      throw new ServiceUnavailableException('Percorsi discovery non validi');
+    }
     const questions: DiscoveryQuestion[] = templates.map((t) => {
       try {
         assertDiscoveryMetadata(t.optionsJson, t.required);
@@ -89,6 +95,7 @@ export class DiscoveryService {
         target: metadata.target,
         dependsOn:
           metadata.target === 'specializationId' ? 'sportId' : undefined,
+        visibleWhen: metadata.visibleWhen,
         contextKey: metadata.contextKey,
         min: metadata.min,
         max: metadata.max,

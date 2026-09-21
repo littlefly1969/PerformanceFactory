@@ -1,3 +1,4 @@
+import { visibleQuestions } from './discovery-branches';
 import { OnboardingInputType, OnboardingQuestionScope } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -16,7 +17,7 @@ export async function discoveryContext(prisma: PrismaService, userId: string) {
   const draft = saved.draft as unknown as DiscoveryDraft;
   const templates: TemplateRecord[] = [];
   const answers: OnboardingAnswer[] = [];
-  for (const q of config.questions) {
+  for (const q of visibleQuestions(config.questions, draft)) {
     const raw = q.target ? draft[q.target] : draft.answers[q.id];
     const value = Array.isArray(raw)
       ? raw

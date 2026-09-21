@@ -1,3 +1,4 @@
+import { visibleQuestions } from "./discovery-branches";
 import type { DiscoveryConfiguration, DiscoveryDraft } from "./discovery-types";
 import { optionsFor, questionValue } from "./discovery-state";
 
@@ -10,7 +11,8 @@ export function PreliminaryResult({
   draft: DiscoveryDraft;
   onContinue: () => void;
 }) {
-  const rows = config.questions.map((q) => {
+  const questions = visibleQuestions(config.questions, draft);
+  const rows = questions.map((q) => {
     const value = questionValue(draft, q);
     const selected = optionsFor(q, draft).filter((o) =>
       q.type === "boolean"
@@ -31,7 +33,7 @@ export function PreliminaryResult({
     };
   });
   const measure = (key: string) => {
-    const q = config.questions.find((q) => q.contextKey === key);
+    const q = questions.find((q) => q.contextKey === key);
     return q ? Number(questionValue(draft, q)) : NaN;
   };
   const weight = measure("general_weight_kg");
@@ -57,7 +59,7 @@ export function PreliminaryResult({
               : rows.find((r) => r.target === "specializationId")?.value}
           </p>
           <div className="pf4-highlight-meta">
-            Discovery completata · {config.questions.length} passaggi
+            Discovery completata · {questions.length} passaggi
           </div>
         </div>
         <h2>Ora serve la misura.</h2>

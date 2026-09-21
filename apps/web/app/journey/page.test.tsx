@@ -123,6 +123,25 @@ describe("PF4 authenticated journey functions", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string, init?: RequestInit) => {
+        if (url.endsWith("/athlete-discovery"))
+          return new Response(
+            JSON.stringify({
+              version: 9,
+              questions: [
+                {
+                  id: "weight",
+                  code: "weight",
+                  title: "Peso",
+                  type: "number",
+                  required: true,
+                  order: 1,
+                  min: 30,
+                  max: 200,
+                  options: [],
+                },
+              ],
+            }),
+          );
         if (url.endsWith("/pending"))
           return new Response(JSON.stringify({ email: "google@example.test" }));
         if (url.endsWith("/documents"))

@@ -1,3 +1,11 @@
+export type DiscoveryCondition = {
+  match: 'all' | 'any';
+  rules: {
+    question: string;
+    operator: 'in' | 'not_in';
+    values: (string | number | boolean)[];
+  }[];
+};
 export type DiscoveryOption = {
   id: string;
   label: string;
@@ -22,6 +30,7 @@ export type DiscoveryQuestion = {
   target?: 'sportId' | 'specializationId' | 'goalId';
   dependsOn?: 'sportId';
   options: DiscoveryOption[];
+  visibleWhen?: DiscoveryCondition;
   contextKey?: string;
   min?: number;
   max?: number;

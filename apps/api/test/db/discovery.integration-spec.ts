@@ -1,3 +1,5 @@
+import { validateDiscovery } from '../../src/discovery/discovery-validation';
+import { deleteOnboardingTemplate } from '../../src/admin/admin-onboarding';
 type JourneyResponse = {
   phase: string;
   count: number;
@@ -220,6 +222,34 @@ describe('PF4 discovery to authenticated journey', () => {
     expect(config.questions.map((q) => q.order)).toEqual(
       config.questions.map((q) => q.order).sort((a, b) => a - b),
     );
+  });
+
+  it('migrates the event branch and rejects breaking its parent configuration', async () => {
+    const event = config.questions.find((q) => q.code === 'pf4_event')!;
+    const date = config.questions.find((q) => q.code === 'pf4_event_date')!;
+    expect(date.visibleWhen).toEqual({
+      match: 'all',
+      rules: [
+        { question: event.code, operator: 'in', values: ['0', '1', '2'] },
+      ],
+    });
+    const withoutEvent = validateDiscovery(config, {
+      ...draft,
+      answers: {
+        ...draft.answers,
+        [event.id]: '3',
+        [date.id]: 'forged-hidden-date',
+      },
+    });
+    expect(withoutEvent.answers).not.toHaveProperty(date.id);
+    await expect(deleteOnboardingTemplate(prisma, event.id)).rejects.toThrow(
+      'deve dipendere',
+    );
+    expect(
+      await prisma.onboardingQuestionTemplate.findUnique({
+        where: { id: event.id },
+      }),
+    ).not.toBeNull();
   });
 
   it('reflects added, edited and disabled backend questions with a new version', async () => {

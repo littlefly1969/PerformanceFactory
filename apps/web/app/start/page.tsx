@@ -1,4 +1,8 @@
 "use client";
+import {
+  GoogleRegistrationButton,
+  usePendingGoogle,
+} from "./google-registration";
 import { useEffect, useRef, useState } from "react";
 import { API_BASE } from "../lib/api";
 import type { DiscoveryConfiguration, DiscoveryDraft } from "./discovery-types";
@@ -13,9 +17,12 @@ import {
 import { DiscoveryQuestionRenderer } from "./question-renderer";
 import { PF4Shell } from "./pf4-shell";
 import { Registration } from "./registration";
+import { pruneHiddenAnswers, visibleQuestions } from "./discovery-branches";
 import { PreliminaryResult } from "./preliminary-result";
 
 export default function StartPage() {
+  const googlePending = usePendingGoogle();
+  const [googleError, setGoogleError] = useState("");
   const [config, setConfig] = useState<DiscoveryConfiguration>();
   const [draft, setDraft] = useState<DiscoveryDraft>();
   const [error, setError] = useState("");
@@ -99,15 +106,16 @@ export default function StartPage() {
         </div>
       </PF4Shell>
     );
+  const questions = visibleQuestions(config.questions, draft);
   const steps = [
     "intro",
-    ...config.questions.map((q) => q.id),
+    ...questions.map((q) => q.id),
     "processing",
     "result",
     "registration",
   ];
   const index = steps.indexOf(draft.currentStep);
-  const question = config.questions.find((q) => q.id === draft.currentStep);
+  const question = questions.find((q) => q.id === draft.currentStep);
   const move = (delta: number) => {
     timers.current.forEach(clearTimeout);
     timers.current.clear();
@@ -116,15 +124,15 @@ export default function StartPage() {
   const autoAdvance =
     question && ["single_choice", "boolean"].includes(question.type);
   const label = question
-    ? `${String(index).padStart(2, "0")} / ${String(config.questions.length).padStart(2, "0")} · Discovery`
+    ? `${String(index).padStart(2, "0")} / ${String(questions.length).padStart(2, "0")} · Discovery`
     : draft.currentStep === "registration"
       ? "Il tuo percorso"
       : "Performance Factory";
   return (
     <PF4Shell
       label={label}
-      progress={Math.min(index, config.questions.length)}
-      total={index > 0 ? config.questions.length : 0}
+      progress={Math.min(index, questions.length)}
+      total={index > 0 ? questions.length : 0}
       onBack={
         index > 0 && !registering
           ? () => move(draft.currentStep === "result" ? -2 : -1)
@@ -163,6 +171,19 @@ export default function StartPage() {
           <button className="pf4-cta" onClick={() => move(1)}>
             Inizia il percorso →
           </button>
+          {!googlePending && (
+            <GoogleRegistrationButton onError={setGoogleError} />
+          )}
+          {googlePending && (
+            <p className="pf4-note">
+              Account Google riconosciuto. Completa le domande per proseguire.
+            </p>
+          )}
+          {googleError && (
+            <p role="alert" className="pf4-error">
+              {googleError}
+            </p>
+          )}
           <p className="pf4-login">
             Hai già un account? <a href="/login">Accedi</a>
           </p>
@@ -180,7 +201,10 @@ export default function StartPage() {
               options={optionsFor(question, draft)}
               value={questionValue(draft, question)}
               onChange={(value) => {
-                const updated = setAnswer(draft, question, value);
+                const updated = pruneHiddenAnswers(
+                  config.questions,
+                  setAnswer(draft, question, value),
+                );
                 setDraft(updated);
                 timers.current.forEach(clearTimeout);
                 timers.current.clear();
@@ -189,7 +213,21 @@ export default function StartPage() {
                     timers.current.delete(timer);
                     setDraft((current) =>
                       current?.currentStep === question.id
-                        ? { ...current, currentStep: steps[index + 1] }
+                        ? {
+                            ...current,
+                            currentStep: [
+                              ...visibleQuestions(
+                                config.questions,
+                                current,
+                              ).map((q) => q.id),
+                              "processing",
+                            ][
+                              visibleQuestions(
+                                config.questions,
+                                current,
+                              ).findIndex((q) => q.id === question.id) + 1
+                            ],
+                          }
                         : current,
                     );
                   }, 240);
@@ -227,7 +265,11 @@ export default function StartPage() {
         />
       )}
       {draft.currentStep === "registration" && (
-        <Registration draft={draft} onBusyChange={setRegistering} />
+        <Registration
+          googlePending={googlePending}
+          draft={draft}
+          onBusyChange={setRegistering}
+        />
       )}
     </PF4Shell>
   );

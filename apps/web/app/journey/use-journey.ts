@@ -1,3 +1,4 @@
+import { googleDiscoveryReady } from "../start/google-registration";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE, secureFetch } from "../lib/api";
 import { DRAFT_KEY } from "../start/discovery-state";
@@ -45,6 +46,21 @@ export function useJourney() {
             credentials: "include",
           }),
         );
+        const config = await read(
+          await fetch(`${API_BASE}/public/athlete-discovery`, {
+            cache: "no-store",
+          }),
+        );
+        let raw: string | null = null;
+        try {
+          raw = sessionStorage.getItem(DRAFT_KEY);
+        } catch {
+          /* Resume discovery with storage guidance. */
+        }
+        if (!googleDiscoveryReady(raw, config)) {
+          window.location.replace("/start?google=complete");
+          return;
+        }
         const docs = await read(await fetch(`${API_BASE}/consents/documents`));
         if (active) {
           setDocuments(docs);

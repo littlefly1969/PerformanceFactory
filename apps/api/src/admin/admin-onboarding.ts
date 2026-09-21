@@ -1,3 +1,4 @@
+import { assertDiscoveryGraph } from '../discovery/discovery-conditions';
 import { assertDiscoveryMetadata } from '../discovery/discovery-metadata';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { OnboardingQuestionScope, Prisma } from '@prisma/client';
@@ -52,6 +53,14 @@ export async function upsertOnboardingTemplate(
     updatedById: actorId,
   };
 
+  const discoveryTemplates = await prisma.onboardingQuestionTemplate.findMany({
+    where: { scope: 'DISCOVERY' },
+  });
+  assertDiscoveryGraph([
+    ...discoveryTemplates.filter((t) => t.id !== body.id),
+    ...(body.scope === OnboardingQuestionScope.DISCOVERY ? [data] : []),
+  ]);
+
   if (body.id) {
     const existing = await prisma.onboardingQuestionTemplate.findUnique({
       where: { id: body.id },
@@ -85,6 +94,10 @@ export async function deleteOnboardingTemplate(
   if (!existing) {
     throw new NotFoundException('Template onboarding non trovato');
   }
+  const discoveryTemplates = await prisma.onboardingQuestionTemplate.findMany({
+    where: { scope: 'DISCOVERY' },
+  });
+  assertDiscoveryGraph(discoveryTemplates.filter((t) => t.id !== id));
   await prisma.onboardingQuestionTemplate.delete({ where: { id } });
   return { id, deleted: true };
 }

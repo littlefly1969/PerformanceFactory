@@ -14,7 +14,7 @@ export function DiscoveryQuestionRenderer({
   if (question.type === "date")
     return (
       <div className="pf4-number">
-        <label htmlFor={question.id}>Data dell’evento</label>
+        <label htmlFor={question.id}>{question.title}</label>
         <input
           id={question.id}
           type="date"

@@ -119,3 +119,52 @@ describe("PF4 configured journey", () => {
     ).toBeInTheDocument();
   });
 });
+
+it("skips a conditional date, revisits the parent, and restores only the newly selected branch", async () => {
+  const event = {
+    ...config.questions[0],
+    id: "event",
+    code: "event",
+    title: "Hai un evento?",
+    options: [
+      { id: "yes", label: "Torneo", value: "Torneo" },
+      { id: "no", label: "Nessuno", value: "Nessuno" },
+    ],
+  };
+  const date = {
+    ...config.questions[1],
+    id: "date",
+    code: "date",
+    title: "Quando sarà?",
+    type: "date" as const,
+    visibleWhen: {
+      match: "all" as const,
+      rules: [{ question: "event", operator: "in" as const, values: ["yes"] }],
+    },
+  };
+  mockConfig({ version: 9, questions: [event, date, config.questions[1]] });
+  render(<StartPage />);
+  await userEvent.click(
+    await screen.findByRole("button", { name: "Inizia il percorso →" }),
+  );
+  await userEvent.click(screen.getByRole("button", { name: "Torneo" }));
+  await screen.findByRole("heading", { name: "Quando sarà?" });
+  fireEvent.change(screen.getByLabelText("Quando sarà?"), {
+    target: { value: "2026-12-01" },
+  });
+  await userEvent.click(screen.getByRole("button", { name: "Continua" }));
+  await userEvent.click(screen.getByRole("button", { name: "Indietro" }));
+  await userEvent.click(screen.getByRole("button", { name: "Indietro" }));
+  await userEvent.click(screen.getByRole("button", { name: "Nessuno" }));
+  await screen.findByRole("heading", { name: "Altra domanda configurata" });
+  expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuemax", "2");
+  expect(JSON.parse(sessionStorage.getItem(DRAFT_KEY)!).answers).toEqual({
+    event: "no",
+  });
+  await userEvent.click(screen.getByRole("button", { name: "Indietro" }));
+  expect(
+    screen.getByRole("heading", { name: "Hai un evento?" }),
+  ).toBeInTheDocument();
+  await userEvent.click(screen.getByRole("button", { name: "Torneo" }));
+  expect(await screen.findByLabelText("Quando sarà?")).toHaveValue("");
+});

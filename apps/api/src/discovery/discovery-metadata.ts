@@ -1,3 +1,4 @@
+import { assertDiscoveryCondition } from './discovery-conditions';
 import { BadRequestException } from '@nestjs/common';
 
 /** Metadata is stored in the existing template optionsJson and managed by its admin API. */
@@ -28,6 +29,10 @@ export function assertDiscoveryMetadata(value: unknown, required: boolean) {
       !required)
   )
     return fail();
+  if (m.visibleWhen !== undefined) {
+    assertDiscoveryCondition(m.visibleWhen);
+    if (m.target) return fail();
+  }
   if (m.ui !== undefined) {
     if (!m.ui || typeof m.ui !== 'object' || Array.isArray(m.ui)) return fail();
     const ui = m.ui as Record<string, unknown>;

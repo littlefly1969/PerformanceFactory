@@ -1,46 +1,8 @@
+import { validAnswer } from './discovery-answer';
+export { validAnswer } from './discovery-answer';
+import { pruneHiddenAnswers, visibleQuestions } from './discovery-branches';
 import { BadRequestException } from '@nestjs/common';
-import {
-  DiscoveryConfiguration,
-  DiscoveryDraft,
-  DiscoveryQuestion,
-} from './discovery.types';
-
-export function validAnswer(
-  question: DiscoveryQuestion,
-  value: unknown,
-  sportId?: string,
-): boolean {
-  if (value === undefined || value === null || value === '')
-    return !question.required;
-  const options = question.options.filter(
-    (o) => !question.dependsOn || o.parentId === sportId,
-  );
-  if (question.type === 'date')
-    return (
-      typeof value === 'string' &&
-      /^\d{4}-\d{2}-\d{2}$/.test(value) &&
-      Number.isFinite(Date.parse(value)) &&
-      new Date(value).toISOString().slice(0, 10) === value
-    );
-  if (question.type === 'number' || question.type === 'scale') {
-    if (typeof value !== 'number' || !Number.isFinite(value)) return false;
-    if (question.min !== undefined && value < question.min) return false;
-    if (question.max !== undefined && value > question.max) return false;
-    const units = (value - (question.min ?? 0)) / (question.step ?? 1);
-    return Math.abs(units - Math.round(units)) < 1e-8;
-  }
-  if (question.type === 'boolean') return typeof value === 'boolean';
-  const allowed = (id: unknown) =>
-    typeof id === 'string' && options.some((o) => o.id === id);
-  if (question.type === 'multi_choice')
-    return (
-      Array.isArray(value) &&
-      (!question.required || value.length > 0) &&
-      new Set(value).size === value.length &&
-      value.every(allowed)
-    );
-  return allowed(value);
-}
+import { DiscoveryConfiguration, DiscoveryDraft } from './discovery.types';
 
 export function validateDiscovery(
   config: DiscoveryConfiguration,
@@ -84,7 +46,7 @@ export function validateDiscovery(
   );
   if (Object.keys(draft.answers).some((id) => !keys.has(id)))
     return fail('Domanda non presente nella configurazione');
-  for (const q of config.questions) {
+  for (const q of visibleQuestions(config.questions, draft)) {
     const value = q.target ? draft[q.target] : draft.answers[q.id];
     if (!validAnswer(q, value, draft.sportId))
       return fail(`Risposta non valida: ${q.title}`);
@@ -101,6 +63,6 @@ export function validateDiscovery(
         ? config.sportContext.specialization.id
         : draft.specializationId,
     goalId: draft.goalId,
-    answers: draft.answers,
+    answers: pruneHiddenAnswers(config.questions, draft).answers,
   };
 }

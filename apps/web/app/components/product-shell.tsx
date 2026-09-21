@@ -69,6 +69,7 @@ const roleNav: Record<string, NavItem[]> = {
     { href: "/admin/consents", label: "Privacy" },
   ],
   AI_TUNER: [
+    { href: "/ai-tuner/discovery", label: "Domande iniziali" },
     { href: "/ai-tuner/anamnesi", label: "Anamnesi" },
     { href: "/ai-tuner/prompts", label: "Prompt" },
     {
