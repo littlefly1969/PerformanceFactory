@@ -76,6 +76,7 @@ model User {
   performanceGoal      UserPerformanceGoal?
   sportSelection       UserSportSelection?
   userAreaPromptInstructions UserAreaPromptInstruction[]
+  trainingLifecycleOperations TrainingLifecycleOperation[]
   trainingSessions TrainingSession[]
   trainingPlanReleases TrainingPlanRelease[]
   trainingQuestionSets TrainingQuestionSet[]
@@ -623,7 +624,40 @@ model ImprovementPlanRelease {
   @@index([userId, areaId, status, createdAt])
 }
 
+model TrainingLifecycleOperation {
+  id String @id @default(uuid())
+  userId String
+  generationKey String @unique
+  previousReleaseId String? @unique
+  releaseId String? @unique
+  approvalMode String @default("AUTO")
+  requestedById String?
+  createdAt DateTime @default(now())
+  completedAt DateTime?
+  leaseToken String?
+  leaseUntil DateTime?
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  lastErrorCode String?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  release TrainingPlanRelease? @relation("LifecycleResult", fields: [releaseId], references: [id], onDelete: SetNull)
+  previousRelease TrainingPlanRelease? @relation("LifecyclePrevious", fields: [previousReleaseId], references: [id], onDelete: Cascade)
+  auditLogs CycleAuditLog[]
+  @@index([completedAt, nextAttemptAt, leaseUntil])
+}
+
 model TrainingPlanRelease {
+  lifecycleManaged Boolean @default(false)
+  approvalMode String @default("MANUAL")
+  approvalSource String?
+  approvedAt DateTime?
+  sessionApprovalMode String @default("INHERIT_PLAN")
+  previousReleaseId String? @unique
+  previousRelease TrainingPlanRelease? @relation("TrainingSequence", fields: [previousReleaseId], references: [id], onDelete: SetNull)
+  nextRelease TrainingPlanRelease? @relation("TrainingSequence")
+  lifecycleOperation TrainingLifecycleOperation? @relation("LifecycleResult")
+  continuationOperation TrainingLifecycleOperation? @relation("LifecyclePrevious")
+  auditLogs CycleAuditLog[]
   id               String   @id @default(uuid())
   userId           String
   version          Int
@@ -685,6 +719,7 @@ model TrainingSession {
 }
 
 model TrainingPlanItem {
+  approvalSource String?
   orderIndex Int @default(0)
   sessions TrainingSession[]
   id                    String @id @default(uuid())
@@ -770,6 +805,7 @@ model TrainingUserAnswer {
 }
 
 model TrainingQuestionSetCoachApproval {
+  approvalSource String?
   id                String    @id @default(uuid())
   trainingQuestionSetId String
   coachId           String
@@ -1004,6 +1040,13 @@ model PerformanceScaleConfig {
 }
 
 model CycleAuditLog {
+  trainingPlanReleaseId String?
+  operationId String?
+  coachId String?
+  source String @default("USER")
+  metadata Json?
+  trainingPlanRelease TrainingPlanRelease? @relation(fields: [trainingPlanReleaseId], references: [id], onDelete: Cascade)
+  operation TrainingLifecycleOperation? @relation(fields: [operationId], references: [id], onDelete: SetNull)
   id            String   @id @default(uuid())
   userId        String
   planReleaseId String?

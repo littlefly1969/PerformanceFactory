@@ -63,6 +63,7 @@ const roleNav: Record<string, NavItem[]> = {
   PROFESSIONAL: [
     { href: "/professional", label: "Atleti" },
     { href: "/professional/approvals", label: "Approvazioni" },
+    { href: "/professional/training", label: "Allenamenti" },
   ],
   ADMIN: [
     { href: "/admin/cycles", label: "Operazioni" },

@@ -168,7 +168,7 @@ export async function generateTrainingAction(
     return;
   }
   setMessage(
-    "Allenamento specifico generato e inviato all'approvazione dell'allenatore.",
+    "Richiesta di allenamento salvata. Il programma verrà preparato secondo la policy configurata.",
   );
   closeAiPreview();
   await loadDashboard();

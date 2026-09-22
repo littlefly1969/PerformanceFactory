@@ -1,4 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { TrainingLifecycleOrchestrator } from '../training-lifecycle/training-lifecycle.orchestrator';
+import { TrainingContextService } from '../training-context/training-context.service';
+import { TrainingPublicationService } from '../training-publication/training-publication.service';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -18,11 +21,6 @@ import {
 } from './performance-snapshots';
 import { AiProposalProviderService } from './proposal-provider.service';
 import {
-  previewTrainingProposalInput,
-  runTrainingPlanBatch,
-} from './training-generation';
-import {
-  publishTrainingPlan,
   refreshTrainingReadiness,
   rejectTrainingProposal,
 } from './training-publication';
@@ -33,6 +31,9 @@ export class OrchestratorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly aiProposalProvider: AiProposalProviderService,
+    private readonly lifecycle: TrainingLifecycleOrchestrator,
+    private readonly trainingContext: TrainingContextService,
+    private readonly trainingPublication: TrainingPublicationService,
   ) {}
   async runProposalBatch(
     userIds: string[],
@@ -81,19 +82,23 @@ export class OrchestratorService {
   }
 
   async runTrainingPlanBatch(userIds: string[], actorId: string) {
-    return runTrainingPlanBatch(
-      this.aiProposalProvider,
-      this.prisma,
-      userIds,
-      actorId,
-    );
+    if (!actorId || !userIds?.length)
+      throw new BadRequestException('ID attore e utenti richiesti');
+    const results = [];
+    for (const userId of userIds) {
+      const state = await this.lifecycle.requestPlan(userId, actorId);
+      results.push({
+        userId,
+        trainingPlanReleaseId: state.cycleId,
+        status: state.status,
+      });
+    }
+    return results;
   }
 
   async previewTrainingProposalInput(userId: string) {
-    return previewTrainingProposalInput(
-      this.aiProposalProvider,
-      this.prisma,
-      userId,
+    return this.aiProposalProvider.buildCycleProposalPreview(
+      await this.trainingContext.build(userId),
     );
   }
 
@@ -146,7 +151,10 @@ export class OrchestratorService {
   }
 
   async publishTrainingPlan(trainingPlanReleaseId: string, actorId: string) {
-    return publishTrainingPlan(this.prisma, trainingPlanReleaseId, actorId);
+    return this.trainingPublication.publishIfReady(
+      trainingPlanReleaseId,
+      actorId,
+    );
   }
 
   async rejectCycleProposal(

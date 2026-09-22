@@ -1,3 +1,4 @@
+import { CycleCompletionService } from '../cycle-completion/cycle-completion.service';
 import { finishTrainingSession } from '../athlete/training-sessions';
 import {
   BadRequestException,
@@ -11,7 +12,10 @@ import { CompletePlanItemDto } from './dto/complete-plan-item.dto';
 
 @Injectable()
 export class UserPlanService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly completion: CycleCompletionService,
+  ) {}
 
   async getCurrentPlan(userId: string, areaId?: string) {
     if (!userId) {
@@ -338,7 +342,7 @@ export class UserPlanService {
 
     const session = await this.prisma.trainingSession.findFirst({
       where: { trainingPlanItemId: planItemId, userId },
-      select: { id: true },
+      select: { id: true, trainingPlanReleaseId: true },
     });
     if (session) {
       await finishTrainingSession(
@@ -348,6 +352,7 @@ export class UserPlanService {
         'COMPLETED',
         input,
       );
+      await this.completion.evaluate(session.trainingPlanReleaseId);
       return this.prisma.trainingPlanItem.findUnique({
         where: { id: planItemId },
         select: {

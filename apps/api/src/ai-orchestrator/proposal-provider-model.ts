@@ -23,7 +23,48 @@ export type AiSnapshotInput = {
   }>;
 } | null;
 
+export type TrainingCycleContext = {
+  sport: { key: string; label: string } | null;
+  specialization: { key: string; label: string } | null;
+  currentState: Array<{
+    areaId: string;
+    score: number;
+    level: string;
+    updatedAt: Date;
+  }>;
+  metrics: Array<{ areaId: string; date: Date; metric: string; value: number }>;
+  previousCycle: null | {
+    id: string;
+    version: number;
+    status: string;
+    cycleStatus: string;
+    archivedAt: Date | null;
+    sessions: Array<{
+      scheduledDate: Date;
+      status: string;
+      completedAt: Date | null;
+      skippedAt: Date | null;
+      completionNotes: string | null;
+      completionRating: number | null;
+      trainingPlanItem: { title: string; body: string };
+    }>;
+    questionSets: Array<{
+      status: string;
+      closedAt: Date | null;
+      questions: Array<{
+        text: string;
+        answers: Array<{
+          scoreAwarded: number;
+          answeredAt: Date;
+          answerOption: { label: string } | null;
+        }>;
+      }>;
+    }>;
+  };
+};
+
 export type AiCycleContext = {
+  training?: TrainingCycleContext;
   athlete: {
     performanceGoal?: string | null;
     generalAnamnesis: unknown;

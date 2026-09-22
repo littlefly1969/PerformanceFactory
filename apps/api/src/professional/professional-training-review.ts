@@ -46,17 +46,24 @@ export async function approveTrainingQuestionSet(
     );
   }
 
-  const updated = await prisma.trainingQuestionSetCoachApproval.update({
-    where: { id: approval.id },
-    data: {
-      status: 'APPROVED',
-      approvedByCoachId: actor.id,
-      approvedAt: new Date(),
-      rejectedAt: null,
-      rejectionReason: null,
-    },
-    select: { id: true, status: true, trainingQuestionSetId: true },
-  });
+  const updated = await prisma.trainingQuestionSetCoachApproval
+    .update({
+      where: {
+        id: approval.id,
+        status: 'PENDING',
+        questionSet: { status: 'PENDING_APPROVAL' },
+      },
+      data: {
+        status: 'APPROVED',
+        approvalSource: 'PROFESSIONAL',
+        approvedByCoachId: actor.id,
+        approvedAt: new Date(),
+        rejectedAt: null,
+        rejectionReason: null,
+      },
+      select: { id: true, status: true, trainingQuestionSetId: true },
+    })
+    .catch(trainingReviewConflict);
 
   await orchestrator.refreshTrainingReadiness(
     approval.questionSet.trainingPlanReleaseId,
@@ -107,16 +114,22 @@ export async function rejectTrainingQuestionSet(
     );
   }
 
-  const updated = await prisma.trainingQuestionSetCoachApproval.update({
-    where: { id: approval.id },
-    data: {
-      status: 'REJECTED',
-      approvedByCoachId: actor.id,
-      rejectedAt: new Date(),
-      rejectionReason,
-    },
-    select: { id: true, status: true, trainingQuestionSetId: true },
-  });
+  const updated = await prisma.trainingQuestionSetCoachApproval
+    .update({
+      where: {
+        id: approval.id,
+        status: 'PENDING',
+        questionSet: { status: 'PENDING_APPROVAL' },
+      },
+      data: {
+        status: 'REJECTED',
+        approvedByCoachId: actor.id,
+        rejectedAt: new Date(),
+        rejectionReason,
+      },
+      select: { id: true, status: true, trainingQuestionSetId: true },
+    })
+    .catch(trainingReviewConflict);
 
   await orchestrator.rejectTrainingProposal(
     approval.questionSet.trainingPlanReleaseId,
@@ -175,17 +188,24 @@ export async function approveTrainingPlanItem(
     );
   }
 
-  const updated = await prisma.trainingPlanItem.update({
-    where: { id: planItem.id },
-    data: {
-      status: 'APPROVED',
-      approvedByCoachId: actor.id,
-      approvedAt: new Date(),
-      rejectedAt: null,
-      rejectionReason: null,
-    },
-    select: { id: true, status: true },
-  });
+  const updated = await prisma.trainingPlanItem
+    .update({
+      where: {
+        id: planItem.id,
+        status: 'PROPOSED',
+        trainingPlanRelease: { status: 'PENDING_APPROVAL' },
+      },
+      data: {
+        status: 'APPROVED',
+        approvalSource: 'PROFESSIONAL',
+        approvedByCoachId: actor.id,
+        approvedAt: new Date(),
+        rejectedAt: null,
+        rejectionReason: null,
+      },
+      select: { id: true, status: true },
+    })
+    .catch(trainingReviewConflict);
 
   await orchestrator.refreshTrainingReadiness(
     planItem.trainingPlanReleaseId,
@@ -247,16 +267,22 @@ export async function rejectTrainingPlanItem(
     );
   }
 
-  const updated = await prisma.trainingPlanItem.update({
-    where: { id: planItem.id },
-    data: {
-      status: 'REJECTED',
-      approvedByCoachId: actor.id,
-      rejectedAt: new Date(),
-      rejectionReason,
-    },
-    select: { id: true, status: true },
-  });
+  const updated = await prisma.trainingPlanItem
+    .update({
+      where: {
+        id: planItem.id,
+        status: 'PROPOSED',
+        trainingPlanRelease: { status: 'PENDING_APPROVAL' },
+      },
+      data: {
+        status: 'REJECTED',
+        approvedByCoachId: actor.id,
+        rejectedAt: new Date(),
+        rejectionReason,
+      },
+      select: { id: true, status: true },
+    })
+    .catch(trainingReviewConflict);
 
   await orchestrator.rejectTrainingProposal(
     planItem.trainingPlanReleaseId,
@@ -306,4 +332,13 @@ export async function findTrainingApproval(
   }
 
   return approval;
+}
+
+function trainingReviewConflict(error: unknown): never {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2025'
+  )
+    throw new BadRequestException('Approvazione già decisa');
+  throw error;
 }

@@ -119,6 +119,83 @@ describe("PF4 athlete experience", () => {
       screen.queryByRole("link", { name: /Inizia la sessione/ }),
     ).not.toBeInTheDocument();
   });
+  it("requests a plan once and displays preparation after the saved command", async () => {
+    let requested = false;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          requests.push({ url });
+          requested = true;
+          return respond({ status: "PREPARING" });
+        }
+        return respond({
+          ...home,
+          program: {
+            ...home.program,
+            status: requested ? "PREPARING" : "EMPTY",
+          },
+          primaryAction: { type: requested ? "PREPARING" : "REQUEST_PLAN" },
+          lifecycle: {
+            status: requested ? "PREPARING" : "EMPTY",
+            requestAllowed: !requested,
+          },
+        });
+      }),
+    );
+    render(<HomePage />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: /Prepara il mio piano/ }),
+    );
+    expect(
+      await screen.findByText("Stiamo preparando il tuo programma."),
+    ).toBeInTheDocument();
+    expect(requests).toEqual([{ url: "/api/training/lifecycle/request" }]);
+  });
+  it("explains automatic recovery without exposing provider or approval details", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        respond({
+          ...home,
+          program: { ...home.program, status: "ERROR" },
+          primaryAction: { type: "ERROR" },
+          lifecycle: {
+            status: "ERROR",
+            retryScheduled: true,
+            requestAllowed: true,
+            errorCode: "AI_GENERATION_FAILED",
+          },
+        }),
+      ),
+    );
+    render(<HomePage />);
+    expect(
+      await screen.findByText(/La richiesta è salvata/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        /AI_GENERATION_FAILED|professional approval|coach lookup/,
+      ),
+    ).not.toBeInTheDocument();
+  });
+  it("describes preparation of the next cycle", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        respond({
+          ...home,
+          program: { ...home.program, status: "PREPARING" },
+          primaryAction: { type: "PREPARING" },
+          lifecycle: { status: "PREPARING", preparingNext: true },
+        }),
+      ),
+    );
+    render(<HomePage />);
+    expect(
+      await screen.findByText("Stiamo preparando il prossimo ciclo."),
+    ).toBeInTheDocument();
+  });
   it("navigates bounded calendar months and selects persisted sessions", async () => {
     vi.stubGlobal(
       "fetch",

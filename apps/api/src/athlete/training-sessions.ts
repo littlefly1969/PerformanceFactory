@@ -124,12 +124,16 @@ export async function finishTrainingSession(
   return prisma.$transaction(async (tx) => {
     const session = await tx.trainingSession.findFirst({
       where: { id, userId },
-      include: { trainingPlanRelease: { select: { status: true } } },
+      include: {
+        trainingPlanRelease: {
+          select: { status: true, lifecycleManaged: true },
+        },
+      },
     });
     if (!session) throw new NotFoundException('Sessione non trovata');
+    if (session.status === status) return { id, status };
     if (session.trainingPlanRelease.status !== 'ACTIVE')
-      throw new BadRequestException('Il programma non è più attivo');
-    if (session.status === status) return { id, status }; // Safe request retry.
+      throw new BadRequestException('Il programma non è più attivo'); // Safe request retry.
     if (session.status !== 'SCHEDULED')
       throw new ConflictException('Sessione già conclusa');
     const now = new Date();
@@ -165,6 +169,18 @@ export async function finishTrainingSession(
       throw new ConflictException(
         'Esercizio già aggiornato. Ricarica il calendario.',
       );
+    if (session.trainingPlanRelease.lifecycleManaged)
+      await tx.cycleAuditLog.create({
+        data: {
+          userId,
+          trainingPlanReleaseId: session.trainingPlanReleaseId,
+          actorId: userId,
+          action:
+            status === 'COMPLETED' ? 'SESSION_COMPLETED' : 'SESSION_SKIPPED',
+          source: 'USER',
+          metadata: { sessionId: id },
+        },
+      });
     return { id, status };
   });
 }

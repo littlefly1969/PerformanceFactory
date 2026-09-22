@@ -1,4 +1,7 @@
-import { createTrainingSessions } from '../athlete/training-sessions';
+import {
+  assertTrainingCycleFinished,
+  createTrainingSessions,
+} from '../athlete/training-sessions';
 import { BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -12,6 +15,7 @@ export async function refreshTrainingReadiness(
   }
 
   const readiness = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${trainingPlanReleaseId}))`;
     const plan = await tx.trainingPlanRelease.findUnique({
       where: { id: trainingPlanReleaseId },
       select: {
@@ -19,6 +23,7 @@ export async function refreshTrainingReadiness(
         userId: true,
         status: true,
         cycleStatus: true,
+        lifecycleManaged: true,
         items: { select: { status: true } },
         questionSets: {
           select: {
@@ -51,7 +56,12 @@ export async function refreshTrainingReadiness(
     if (plan.cycleStatus !== nextStatus) {
       await tx.trainingPlanRelease.update({
         where: { id: plan.id },
-        data: { cycleStatus: nextStatus },
+        data: {
+          cycleStatus: nextStatus,
+          ...(nextStatus === 'READY_TO_PUBLISH' && actorId
+            ? { approvalSource: 'PROFESSIONAL', approvedAt: new Date() }
+            : {}),
+        },
       });
 
       await tx.aiContextSummary.updateMany({
@@ -66,6 +76,20 @@ export async function refreshTrainingReadiness(
       });
     }
 
+    if (
+      plan.lifecycleManaged &&
+      plan.cycleStatus !== nextStatus &&
+      nextStatus === 'READY_TO_PUBLISH'
+    )
+      await tx.cycleAuditLog.create({
+        data: {
+          userId: plan.userId,
+          trainingPlanReleaseId: plan.id,
+          action: 'MANUAL_APPROVED',
+          source: 'PROFESSIONAL',
+          actorId,
+        },
+      });
     return { trainingPlanReleaseId, cycleStatus: nextStatus };
   });
 
@@ -95,6 +119,7 @@ export async function rejectTrainingProposal(
   }
 
   return prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${trainingPlanReleaseId}))`;
     const plan = await tx.trainingPlanRelease.findUnique({
       where: { id: trainingPlanReleaseId },
       select: { id: true, userId: true, status: true },
@@ -173,13 +198,10 @@ export async function rejectTrainingProposal(
 export async function publishTrainingPlan(
   prisma: PrismaService,
   trainingPlanReleaseId: string,
-  actorId: string,
+  actorId?: string,
 ) {
   if (!trainingPlanReleaseId) {
     throw new BadRequestException('ID allenamento mancante');
-  }
-  if (!actorId) {
-    throw new BadRequestException('ID attore mancante');
   }
 
   return prisma.$transaction(async (tx) => {
@@ -190,6 +212,9 @@ export async function publishTrainingPlan(
         id: true,
         userId: true,
         specializationId: true,
+        lifecycleManaged: true,
+        cycleStatus: true,
+        approvalSource: true,
         publishedAt: true,
         status: true,
         items: { select: { status: true } },
@@ -217,6 +242,12 @@ export async function publishTrainingPlan(
     if (plan.status !== 'PENDING_APPROVAL') {
       throw new BadRequestException('L allenamento non e in approvazione');
     }
+
+    if (plan.lifecycleManaged && plan.cycleStatus !== 'READY_TO_PUBLISH')
+      throw new BadRequestException('Piano non pronto alla pubblicazione');
+    if (!plan.items.length)
+      throw new BadRequestException('Piano senza sessioni');
+    await assertTrainingCycleFinished(tx, plan.userId);
 
     if (!plan.items.every((item) => item.status === 'APPROVED')) {
       throw new BadRequestException('Non tutti gli esercizi sono approvati');
@@ -260,6 +291,21 @@ export async function publishTrainingPlan(
     });
 
     await createTrainingSessions(tx, plan.id, publishedAt);
+    const sessionCount = await tx.trainingSession.count({
+      where: { trainingPlanReleaseId: plan.id },
+    });
+    if (sessionCount !== plan.items.length)
+      throw new BadRequestException('Calendario incompleto');
+    if (plan.lifecycleManaged)
+      await tx.trainingLifecycleOperation.updateMany({
+        where: { releaseId: plan.id },
+        data: {
+          completedAt: publishedAt,
+          lastErrorCode: null,
+          leaseToken: null,
+          leaseUntil: null,
+        },
+      });
 
     await tx.trainingQuestionSet.update({
       where: { id: questionSet.id },
@@ -277,6 +323,16 @@ export async function publishTrainingPlan(
       data: { cycleStatus: 'PUBLISHED' },
     });
 
+    if (plan.lifecycleManaged)
+      await tx.cycleAuditLog.create({
+        data: {
+          userId: plan.userId,
+          trainingPlanReleaseId: plan.id,
+          action: 'PLAN_PUBLISHED',
+          actorId,
+          source: actorId ? 'USER' : 'SYSTEM',
+        },
+      });
     return {
       trainingPlanReleaseId: plan.id,
       trainingQuestionSetId: questionSet.id,

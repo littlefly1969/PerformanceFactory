@@ -1,3 +1,4 @@
+import { CycleCompletionService } from '../../src/cycle-completion/cycle-completion.service';
 import { Test } from '@nestjs/testing';
 import { ValidationPipe } from '@nestjs/common';
 import {
@@ -325,7 +326,11 @@ describe('PF4 athlete calendar with real PostgreSQL and authenticated HTTP', () 
       where: { userId },
       orderBy: { sequence: 'asc' },
     });
-    const answers = new AnswersService(prisma, {} as OrchestratorService);
+    const answers = new AnswersService(
+      prisma,
+      {} as OrchestratorService,
+      app.get(CycleCompletionService),
+    );
     const q = await prisma.trainingQuestion.findFirstOrThrow({
       where: { trainingQuestionSetId: questionSetId },
       include: { options: true },
@@ -377,7 +382,7 @@ describe('PF4 athlete calendar with real PostgreSQL and authenticated HTTP', () 
     await answers.submitTrainingBatch({ id: userId, role: 'USER' }, input);
     await expect(
       answers.submitTrainingBatch({ id: userId, role: 'USER' }, input),
-    ).rejects.toThrow();
+    ).resolves.toMatchObject({ count: 0 });
     expect(await service.checkIn(userId)).toBeNull();
     await expect(
       assertTrainingCycleFinished(prisma, userId),

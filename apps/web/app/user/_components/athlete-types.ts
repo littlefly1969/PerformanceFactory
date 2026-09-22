@@ -31,7 +31,21 @@ export type Performance = {
   gap: number | null;
   drivers: Driver[];
 };
+export type Lifecycle = {
+  cycleId: string | null;
+  status:
+    | "EMPTY"
+    | "PREPARING"
+    | "READY"
+    | "IN_PROGRESS"
+    | "COMPLETED"
+    | "ERROR";
+  preparingNext: boolean;
+  retryScheduled: boolean;
+  requestAllowed: boolean;
+};
 export type Home = {
+  lifecycle?: Lifecycle;
   firstName: string | null;
   today: string;
   performance: Performance | null;
@@ -44,7 +58,7 @@ export type Home = {
   };
   primaryAction:
     | { type: "TRAINING_SESSION"; session: Session }
-    | { type: "CHECK_IN" | "PREPARING" | "NONE" };
+    | { type: "CHECK_IN" | "PREPARING" | "NONE" | "REQUEST_PLAN" | "ERROR" };
   nextSession: Session | null;
   checkIn: { id: string; kind: string; title: string; count: number } | null;
   streak: { days: number };

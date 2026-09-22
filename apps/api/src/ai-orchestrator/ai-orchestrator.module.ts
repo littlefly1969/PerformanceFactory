@@ -1,9 +1,11 @@
 import { Module } from '@nestjs/common';
 import { OrchestratorService } from './orchestrator.service';
-import { AiProposalProviderService } from './proposal-provider.service';
+import { AiProposalModule } from './ai-proposal.module';
+import { TrainingLifecycleModule } from '../training-lifecycle/training-lifecycle.module';
 
 @Module({
-  providers: [OrchestratorService, AiProposalProviderService],
-  exports: [OrchestratorService, AiProposalProviderService],
+  imports: [AiProposalModule, TrainingLifecycleModule],
+  providers: [OrchestratorService],
+  exports: [OrchestratorService, AiProposalModule],
 })
 export class AiOrchestratorModule {}

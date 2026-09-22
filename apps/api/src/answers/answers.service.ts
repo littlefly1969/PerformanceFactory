@@ -1,3 +1,4 @@
+import { CycleCompletionService } from '../cycle-completion/cycle-completion.service';
 import {
   BadRequestException,
   ForbiddenException,
@@ -20,6 +21,7 @@ export class AnswersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly orchestrator: OrchestratorService,
+    private readonly completion: CycleCompletionService,
   ) {}
 
   async submitBatch(actor: Actor, input: SubmitAnswersDto) {
@@ -172,6 +174,15 @@ export class AnswersService {
     if (questionSet.userId !== actor.id) {
       throw new ForbiddenException('Non puoi rispondere a questo questionario');
     }
+    if (questionSet.status === 'CLOSED') {
+      await this.completion.evaluate(questionSet.trainingPlanReleaseId);
+      return {
+        count: 0,
+        questionSetId: questionSet.id,
+        trainingPlanReleaseId: questionSet.trainingPlanReleaseId,
+        status: 'CLOSED',
+      };
+    }
     if (questionSet.status !== 'PUBLISHED') {
       throw new BadRequestException('Il questionario non e pubblicato');
     }
@@ -237,7 +248,7 @@ export class AnswersService {
       };
     });
 
-    return this.prisma.$transaction(async (tx) => {
+    const saved = await this.prisma.$transaction(async (tx) => {
       const claimed = await tx.trainingQuestionSet.updateMany({
         where: {
           id: input.questionSetId,
@@ -266,5 +277,7 @@ export class AnswersService {
         status: 'CLOSED',
       };
     });
+    await this.completion.evaluate(questionSet.trainingPlanReleaseId);
+    return saved;
   }
 }

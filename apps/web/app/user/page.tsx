@@ -1,18 +1,42 @@
 "use client";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AthleteShell } from "./_components/athlete-shell";
-import { useAthlete } from "./_components/use-athlete";
+import { athleteRequest, useAthlete } from "./_components/use-athlete";
 import type { Home } from "./_components/athlete-types";
 import { displayDate } from "./_components/athlete-types";
 import { CalendarStrip, SessionCard } from "./_components/calendar-strip";
 export default function AthleteHome() {
   const { data: home, error, reload } = useAthlete<Home>("/athlete/home");
+  const [requesting, setRequesting] = useState(false);
+  const [requestError, setRequestError] = useState("");
+  const lock = useRef(false);
+  async function requestPlan() {
+    if (lock.current) return;
+    lock.current = true;
+    setRequesting(true);
+    setRequestError("");
+    try {
+      await athleteRequest("/training/lifecycle/request", {});
+      reload();
+    } catch {
+      setRequestError(
+        "Non è stato possibile avviare il programma. Riprova tra poco.",
+      );
+    } finally {
+      lock.current = false;
+      setRequesting(false);
+    }
+  }
   useEffect(() => {
-    if (home?.program.status !== "PREPARING") return;
-    const timer = setInterval(reload, 30000);
+    if (
+      home?.program.status !== "PREPARING" &&
+      !home?.lifecycle?.retryScheduled
+    )
+      return;
+    const timer = setInterval(reload, 5000);
     return () => clearInterval(timer);
-  }, [home?.program.status, reload]);
+  }, [home?.program.status, home?.lifecycle?.retryScheduled, reload]);
   const action = home?.primaryAction;
   return (
     <AthleteShell label="Home" error={error} reload={reload} loading={!home}>
@@ -45,7 +69,47 @@ export default function AthleteHome() {
             </div>
           </div>
           <section className="pf4-today-card">
-            {action?.type === "TRAINING_SESSION" ? (
+            {action?.type === "REQUEST_PLAN" ? (
+              <>
+                <span className="pf4-kicker">Il tuo prossimo passo</span>
+                <h2>
+                  {home.lifecycle?.status === "COMPLETED"
+                    ? "Pronto per un nuovo ciclo?"
+                    : "Il tuo percorso comincia qui."}
+                </h2>
+                <p>
+                  Prepareremo gli allenamenti a partire dal tuo obiettivo e
+                  dalle tue risposte.
+                </p>
+                <button
+                  className="pf4-cta"
+                  disabled={
+                    requesting || home.lifecycle?.requestAllowed === false
+                  }
+                  onClick={requestPlan}
+                >
+                  {requesting ? "Preparazione…" : "Prepara il mio piano →"}
+                </button>
+              </>
+            ) : action?.type === "ERROR" ? (
+              <>
+                <h2>Il programma richiede ancora un po’ di tempo.</h2>
+                <p>
+                  {home.lifecycle?.retryScheduled
+                    ? "La richiesta è salvata. Riproveremo automaticamente: non serve ricominciare."
+                    : "Contatta il tuo coach per proseguire il percorso."}
+                </p>
+                {home.lifecycle?.requestAllowed && (
+                  <button
+                    className="pf4-cta"
+                    disabled={requesting}
+                    onClick={requestPlan}
+                  >
+                    {requesting ? "Ripresa…" : "Riprova ora →"}
+                  </button>
+                )}
+              </>
+            ) : action?.type === "TRAINING_SESSION" ? (
               <>
                 <span className="pf4-kicker">
                   {action.session.date === home.today
@@ -78,10 +142,14 @@ export default function AthleteHome() {
             ) : action?.type === "PREPARING" ? (
               <>
                 <span className="pf4-kicker">Il tuo programma</span>
-                <h2>Stiamo preparando il tuo programma.</h2>
+                <h2>
+                  {home.lifecycle?.preparingNext
+                    ? "Stiamo preparando il prossimo ciclo."
+                    : "Stiamo preparando il tuo programma."}
+                </h2>
                 <p>
-                  Troverai qui le sessioni appena il programma sarà approvato e
-                  pubblicato.
+                  Troverai qui i tuoi allenamenti appena saranno pronti. Il
+                  percorso riprende dai tuoi progressi e dalle tue risposte.
                 </p>
                 <button className="pf4-cta" onClick={reload}>
                   Aggiorna →
@@ -101,6 +169,11 @@ export default function AthleteHome() {
               </>
             )}
           </section>
+          {requestError && (
+            <p role="alert" className="pf4-error">
+              {requestError}
+            </p>
+          )}
           {home.nextSession &&
             !(
               action?.type === "TRAINING_SESSION" &&

@@ -1,3 +1,5 @@
+import { CycleCompletionService } from '../cycle-completion/cycle-completion.service';
+import { TrainingLifecycleOrchestrator } from '../training-lifecycle/training-lifecycle.orchestrator';
 import { loadSpecialistQuestionRecords } from '../onboarding/onboarding-questions';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -20,7 +22,11 @@ import { dueCheckIn } from './athlete-check-in';
 
 @Injectable()
 export class AthleteService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly completion: CycleCompletionService,
+    private readonly lifecycle: TrainingLifecycleOrchestrator,
+  ) {}
   async calendar(userId: string, from: string, to: string) {
     const scheduledDate = calendarRange(from, to);
     const today = athleteDate();
@@ -45,13 +51,25 @@ export class AthleteService {
     if (!s) throw new NotFoundException('Sessione non trovata');
     return sessionView(s);
   }
-  finish(
+  async finish(
     userId: string,
     id: string,
     status: 'COMPLETED' | 'SKIPPED',
     input: CompletePlanItemDto = {},
   ) {
-    return finishTrainingSession(this.prisma, userId, id, status, input);
+    const result = await finishTrainingSession(
+      this.prisma,
+      userId,
+      id,
+      status,
+      input,
+    );
+    const session = await this.prisma.trainingSession.findUniqueOrThrow({
+      where: { id },
+      select: { trainingPlanReleaseId: true },
+    });
+    await this.completion.evaluate(session.trainingPlanReleaseId);
+    return result;
   }
   async progress(userId: string) {
     const order = await this.driverOrder(userId);
@@ -112,6 +130,7 @@ export class AthleteService {
         this.driverOrder(userId),
       ],
     );
+    const lifecycle = await this.lifecycle.current(userId);
     const sessions = plan?.sessions.map((s) => sessionView(s, today)) ?? [];
     const due = sessions.find(
       (s) => s.date === today && s.status === 'SCHEDULED',
@@ -125,19 +144,28 @@ export class AthleteService {
         : next
           ? { type: 'TRAINING_SESSION', session: next }
           : !plan
-            ? { type: 'PREPARING' }
+            ? {
+                type:
+                  lifecycle.status === 'EMPTY' ||
+                  lifecycle.status === 'COMPLETED'
+                    ? 'REQUEST_PLAN'
+                    : lifecycle.status === 'ERROR'
+                      ? 'ERROR'
+                      : 'PREPARING',
+              }
             : { type: 'NONE' };
     const start = dateOnly(today);
     start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7));
     const end = new Date(start.getTime() + 6 * 86400000);
     return {
+      lifecycle,
       firstName: user.firstName,
       today,
       timeZone: ATHLETE_TIME_ZONE,
       performance: performanceView(snapshot, order),
       program: {
         durationWeeks: user.discovery?.programDurationWeeks ?? null,
-        status: plan ? 'ACTIVE' : 'PREPARING',
+        status: plan ? 'ACTIVE' : lifecycle.status,
         summary: plan?.summaryText ?? null,
         completed: sessions.filter((s) => s.status === 'COMPLETED').length,
         total: sessions.length,
