@@ -8,6 +8,7 @@ import "./athlete.css";
 const destinations = [
   ["/user", "Home", "⌂"],
   ["/user/training", "Training", "◷"],
+  ["/user/abilities", "Abilità", "◇"],
   ["/user/performance", "Progress", "↗"],
   ["/user/profile", "Profilo", "○"],
 ];

@@ -562,3 +562,10 @@
   color: #171717;
   font: inherit;
 }
+
+.pf4-ability-card h2 { margin: 12px 0; }
+.pf4-ability-exercise { border-top: 1px solid #eaeae7; padding: 16px 0; }
+.pf4-ability-exercise summary { cursor: pointer; font-weight: 600; }
+.pf4-ability-exercise p { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; }
+.pf4-ability-actions { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 24px; }
+.pf4-ability-actions a { color: inherit; text-underline-offset: 4px; }

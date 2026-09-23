@@ -5,7 +5,11 @@ type DelegateMap = Record<string, unknown>;
 export function createPrismaTestFake<TDelegates extends DelegateMap>(
   delegates: TDelegates,
 ): TDelegates & PrismaService {
-  const fake: DelegateMap = { ...delegates };
+  // Real lock behavior is exercised in PostgreSQL integration tests.
+  const fake: DelegateMap = {
+    $executeRaw: () => Promise.resolve(0),
+    ...delegates,
+  };
 
   fake.$transaction = async (input: unknown) => {
     if (typeof input === 'function') {

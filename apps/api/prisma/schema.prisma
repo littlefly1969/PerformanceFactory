@@ -49,6 +49,7 @@ enum OnboardingInputType {
 }
 
 model User {
+  abilityPlanOperations AbilityPlanOperation[]
   discovery AthleteDiscovery?
   id        String   @id @default(uuid())
   email     String   @unique
@@ -427,6 +428,7 @@ model ProfessionalUserLink {
 }
 
 model Area {
+  abilityPlanOperations AbilityPlanOperation[]
   id   String @id @default(uuid())
   name String @unique
 
@@ -594,6 +596,9 @@ model PerformanceProfileSnapshotArea {
 }
 
 model ImprovementPlanRelease {
+  abilityOperation AbilityPlanOperation?
+  approvalSource String?
+  approvedAt DateTime?
   id          String      @id @default(uuid())
   userId      String
   areaId      String
@@ -1211,4 +1216,26 @@ model AthleteDiscovery {
   durationSelectedAt DateTime?
   createdAt DateTime @default(now())
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AbilityPlanOperation {
+  id String @id @default(uuid())
+  userId String
+  areaId String
+  generationKey String @unique
+  releaseId String? @unique
+  approvalMode String @default("AUTO")
+  requestedById String?
+  createdAt DateTime @default(now())
+  completedAt DateTime?
+  leaseToken String?
+  leaseUntil DateTime?
+  attempts Int @default(0)
+  nextAttemptAt DateTime @default(now())
+  lastErrorCode String?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  area Area @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  release ImprovementPlanRelease? @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+  @@index([completedAt, nextAttemptAt, leaseUntil])
+  @@index([userId, areaId])
 }

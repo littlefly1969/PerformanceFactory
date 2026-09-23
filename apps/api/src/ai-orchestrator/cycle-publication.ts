@@ -4,16 +4,24 @@ import { PrismaService } from '../prisma/prisma.service';
 export async function publishCycle(
   prisma: PrismaService,
   planReleaseId: string,
-  actorId: string,
+  actorId: string | null,
+  system = false,
 ) {
   if (!planReleaseId) {
     throw new BadRequestException('ID rilascio allenamento mancante');
   }
-  if (!actorId) {
+  if (!actorId && !system) {
     throw new BadRequestException('ID attore mancante');
   }
 
   return prisma.$transaction(async (tx) => {
+    const owner = await tx.improvementPlanRelease.findUnique({
+      where: { id: planReleaseId },
+      select: { userId: true, areaId: true },
+    });
+    if (!owner)
+      throw new BadRequestException('Rilascio allenamento non trovato');
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ability:${owner.userId}:${owner.areaId}`}))`;
     const plan = await tx.improvementPlanRelease.findUnique({
       where: { id: planReleaseId },
       select: {
@@ -37,15 +45,27 @@ export async function publishCycle(
       throw new BadRequestException('Rilascio allenamento non trovato');
     }
 
+    if (plan.status === 'ACTIVE' && plan.cycleStatus === 'PUBLISHED')
+      return {
+        planReleaseId: plan.id,
+        questionSetId: plan.questionSets[0]?.id,
+      };
+    if (system) {
+      const operation = await tx.abilityPlanOperation.findUnique({
+        where: { releaseId: plan.id },
+      });
+      if (!operation || operation.approvalMode !== 'AUTO')
+        throw new BadRequestException('Approvazione automatica non consentita');
+    }
     if (plan.status !== 'PENDING_APPROVAL') {
       throw new BadRequestException(
         'Il rilascio allenamento non e in approvazione',
       );
     }
 
-    const allItemsApproved = plan.items.every(
-      (item) => item.status === 'APPROVED',
-    );
+    const allItemsApproved =
+      plan.items.length > 0 &&
+      plan.items.every((item) => item.status === 'APPROVED');
     if (!allItemsApproved) {
       throw new BadRequestException(
         'Non tutte le attivita allenamento sono approvate',
@@ -106,6 +126,7 @@ export async function publishCycle(
         planReleaseId: plan.id,
         action: 'PUBLISH',
         actorId,
+        source: system ? 'SYSTEM' : 'USER',
       },
     });
 
@@ -123,6 +144,12 @@ export async function refreshCycleReadiness(
   }
 
   const readiness = await prisma.$transaction(async (tx) => {
+    const owner = await tx.improvementPlanRelease.findUnique({
+      where: { id: planReleaseId },
+      select: { userId: true, areaId: true },
+    });
+    if (owner)
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ability:${owner.userId}:${owner.areaId}`}))`;
     const plan = await tx.improvementPlanRelease.findUnique({
       where: { id: planReleaseId },
       select: {
@@ -192,6 +219,12 @@ export async function rejectCycleProposal(
   }
 
   return prisma.$transaction(async (tx) => {
+    const owner = await tx.improvementPlanRelease.findUnique({
+      where: { id: planReleaseId },
+      select: { userId: true, areaId: true },
+    });
+    if (owner)
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ability:${owner.userId}:${owner.areaId}`}))`;
     const plan = await tx.improvementPlanRelease.findUnique({
       where: { id: planReleaseId },
       select: {

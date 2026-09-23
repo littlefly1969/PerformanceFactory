@@ -3,7 +3,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { OrchestratorService } from '../ai-orchestrator/orchestrator.service';
 import { AbacService } from '../common/policies/abac.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -101,17 +101,23 @@ export async function approveQuestionSet(
     throw new ForbiddenException('Operazione non consentita per questa area');
   }
 
-  const updated = await prisma.questionSetAreaApproval.update({
-    where: { id: approval.id },
-    data: {
-      status: 'APPROVED',
-      approvedByProfessionalId: actor.id,
-      approvedAt: new Date(),
-      rejectionReason: null,
-      rejectedAt: null,
-    },
-    select: { id: true, status: true, areaId: true, questionSetId: true },
-  });
+  const updated = await Promise.resolve(
+    prisma.questionSetAreaApproval.update({
+      where: {
+        id: approval.id,
+        status: 'PENDING',
+        questionSet: { status: 'PENDING_APPROVAL' },
+      },
+      data: {
+        status: 'APPROVED',
+        approvedByProfessionalId: actor.id,
+        approvedAt: new Date(),
+        rejectionReason: null,
+        rejectedAt: null,
+      },
+      select: { id: true, status: true, areaId: true, questionSetId: true },
+    }),
+  ).catch(abilityReviewConflict);
 
   if (approval.questionSet.planReleaseId) {
     await orchestrator.refreshCycleReadiness(
@@ -219,16 +225,22 @@ export async function rejectQuestionSet(
     throw new ForbiddenException('Operazione non consentita per questa area');
   }
 
-  const updated = await prisma.questionSetAreaApproval.update({
-    where: { id: approval.id },
-    data: {
-      status: 'REJECTED',
-      approvedByProfessionalId: actor.id,
-      rejectedAt: new Date(),
-      rejectionReason,
-    },
-    select: { id: true, status: true, areaId: true, questionSetId: true },
-  });
+  const updated = await Promise.resolve(
+    prisma.questionSetAreaApproval.update({
+      where: {
+        id: approval.id,
+        status: 'PENDING',
+        questionSet: { status: 'PENDING_APPROVAL' },
+      },
+      data: {
+        status: 'REJECTED',
+        approvedByProfessionalId: actor.id,
+        rejectedAt: new Date(),
+        rejectionReason,
+      },
+      select: { id: true, status: true, areaId: true, questionSetId: true },
+    }),
+  ).catch(abilityReviewConflict);
 
   if (approval.questionSet.planReleaseId) {
     await orchestrator.rejectCycleProposal(
@@ -288,17 +300,23 @@ export async function approvePlanItem(
     );
   }
 
-  const updated = await prisma.planItem.update({
-    where: { id: planItemId },
-    data: {
-      status: 'APPROVED',
-      approvedByProfessionalId: actor.id,
-      approvedAt: new Date(),
-      rejectionReason: null,
-      rejectedAt: null,
-    },
-    select: { id: true, status: true, areaId: true },
-  });
+  const updated = await Promise.resolve(
+    prisma.planItem.update({
+      where: {
+        id: planItemId,
+        status: 'PROPOSED',
+        planRelease: { status: 'PENDING_APPROVAL' },
+      },
+      data: {
+        status: 'APPROVED',
+        approvedByProfessionalId: actor.id,
+        approvedAt: new Date(),
+        rejectionReason: null,
+        rejectedAt: null,
+      },
+      select: { id: true, status: true, areaId: true },
+    }),
+  ).catch(abilityReviewConflict);
 
   if (planItem.planReleaseId) {
     await orchestrator.refreshCycleReadiness(planItem.planReleaseId, actor.id);
@@ -358,16 +376,22 @@ export async function rejectPlanItem(
     );
   }
 
-  const updated = await prisma.planItem.update({
-    where: { id: planItemId },
-    data: {
-      status: 'REJECTED',
-      approvedByProfessionalId: actor.id,
-      rejectedAt: new Date(),
-      rejectionReason,
-    },
-    select: { id: true, status: true, areaId: true },
-  });
+  const updated = await Promise.resolve(
+    prisma.planItem.update({
+      where: {
+        id: planItemId,
+        status: 'PROPOSED',
+        planRelease: { status: 'PENDING_APPROVAL' },
+      },
+      data: {
+        status: 'REJECTED',
+        approvedByProfessionalId: actor.id,
+        rejectedAt: new Date(),
+        rejectionReason,
+      },
+      select: { id: true, status: true, areaId: true },
+    }),
+  ).catch(abilityReviewConflict);
 
   if (planItem.planReleaseId) {
     await orchestrator.rejectCycleProposal(
@@ -378,4 +402,13 @@ export async function rejectPlanItem(
   }
 
   return updated;
+}
+
+function abilityReviewConflict(error: unknown): never {
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2025'
+  )
+    throw new BadRequestException('Approvazione già decisa');
+  throw error;
 }

@@ -1,3 +1,4 @@
+import { AbilityPlansModule } from '../ability-plans/ability-plans.module';
 import { TrainingConstraintsService } from '../ai-orchestrator/training-constraints';
 import { Module } from '@nestjs/common';
 import { AiProposalModule } from '../ai-orchestrator/ai-proposal.module';
@@ -13,7 +14,7 @@ import { TrainingApprovalService } from '../training-approval/training-approval.
 import { TrainingPublicationService } from '../training-publication/training-publication.service';
 import { CycleCompletionService } from '../cycle-completion/cycle-completion.service';
 @Module({
-  imports: [AiProposalModule, ConsentsModule],
+  imports: [AiProposalModule, ConsentsModule, AbilityPlansModule],
   controllers: [TrainingLifecycleController],
   providers: [
     TrainingLifecycleOrchestrator,

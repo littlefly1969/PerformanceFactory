@@ -1,3 +1,4 @@
+import { AbilityPlansService } from '../ability-plans/ability-plans.service';
 import { athleteDate, dateOnly } from '../athlete/training-sessions';
 import {
   Injectable,
@@ -29,6 +30,7 @@ export class TrainingLifecycleOrchestrator
   private timer?: ReturnType<typeof setInterval>;
   private draining = false;
   constructor(
+    private readonly abilities: AbilityPlansService,
     private readonly prisma: PrismaService,
     private readonly policy: TrainingLifecyclePolicy,
     private readonly commands: LifecycleCommandsService,
@@ -65,6 +67,7 @@ export class TrainingLifecycleOrchestrator
       );
     await this.commands.assertEligible(userId);
     await this.prisma.$transaction(async (tx) => {
+      await this.abilities.enqueueAll(tx, userId, actorId);
       const latest = await tx.trainingPlanRelease.findFirst({
         where: { userId },
         orderBy: { version: 'desc' },
