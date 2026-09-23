@@ -1,3 +1,4 @@
+import { athleteDate, dateOnly } from '../athlete/training-sessions';
 import {
   Injectable,
   Logger,
@@ -338,13 +339,16 @@ export class TrainingLifecycleOrchestrator
           lifecycleManaged: true,
           status: 'ACTIVE',
           cycleStatus: 'PUBLISHED',
+          OR: [{ endsOn: null }, { endsOn: { lte: dateOnly(athleteDate()) } }],
           sessions: { some: {}, none: { status: 'SCHEDULED' } },
           questionSets: { none: { status: { not: 'CLOSED' } } },
         },
-        select: { id: true },
+        select: { userId: true },
+        orderBy: [{ endsOn: 'asc' }, { id: 'asc' }],
         take: 25,
       });
-      for (const cycle of active) await this.completion.evaluate(cycle.id);
+      for (const cycle of active)
+        await this.completion.reconcileTrainingLifecycle(cycle.userId);
       const pending = await this.prisma.trainingLifecycleOperation.findMany({
         where: {
           completedAt: null,

@@ -1,3 +1,4 @@
+import { TrainingConstraintsService } from '../ai-orchestrator/training-constraints';
 import { Module } from '@nestjs/common';
 import { AiProposalModule } from '../ai-orchestrator/ai-proposal.module';
 import { ConsentsModule } from '../consents/consents.module';
@@ -20,6 +21,7 @@ import { CycleCompletionService } from '../cycle-completion/cycle-completion.ser
     LifecycleCommandsService,
     CoachAssignmentService,
     TrainingContextService,
+    TrainingConstraintsService,
     TrainingGenerationService,
     TrainingApprovalService,
     TrainingPublicationService,
@@ -29,6 +31,7 @@ import { CycleCompletionService } from '../cycle-completion/cycle-completion.ser
     TrainingLifecycleOrchestrator,
     CycleCompletionService,
     TrainingContextService,
+    TrainingConstraintsService,
     TrainingPublicationService,
   ],
 })

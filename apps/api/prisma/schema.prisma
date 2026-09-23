@@ -647,6 +647,9 @@ model TrainingLifecycleOperation {
 }
 
 model TrainingPlanRelease {
+  startsOn DateTime? @db.Date
+  endsOn DateTime? @db.Date
+  windowDays Int @default(14)
   lifecycleManaged Boolean @default(false)
   approvalMode String @default("MANUAL")
   approvalSource String?

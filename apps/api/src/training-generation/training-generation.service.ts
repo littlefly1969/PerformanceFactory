@@ -1,9 +1,10 @@
+import { validateTrainingSchedule } from '../ai-orchestrator/training-schedule';
 import { Injectable } from '@nestjs/common';
 import { TrainingLifecycleOperation } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   AiProposalProviderService,
-  CycleProposalInput,
+  TrainingProposalInput,
 } from '../ai-orchestrator/proposal-provider.service';
 import { persistTrainingProposal } from '../ai-orchestrator/training-generation';
 import { LifecycleError } from '../training-lifecycle/training-lifecycle.policy';
@@ -17,12 +18,17 @@ export class TrainingGenerationService {
   async generateCycle(
     operation: TrainingLifecycleOperation,
     coach: { coachId: string; specializationId: string },
-    context: CycleProposalInput,
+    context: TrainingProposalInput,
     leaseToken: string,
   ) {
-    const proposal = await this.provider.generateCycleProposal(context);
+    const proposal = await this.provider.generateTrainingProposal(context);
     if (!proposal.planItems?.length || !proposal.questions?.length)
       throw new LifecycleError('INVALID_AI_OUTPUT');
+    validateTrainingSchedule(
+      proposal,
+      context.trainingConstraints,
+      context.trainingWindow.startsOn,
+    );
     return this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`training:${operation.userId}`}))`;
       const owned = await tx.trainingLifecycleOperation.findFirst({
@@ -40,6 +46,7 @@ export class TrainingGenerationService {
             ? operation.requestedById
             : undefined,
         approvalMode: operation.approvalMode,
+        window: context.trainingWindow,
         ...coach,
       });
       await tx.trainingLifecycleOperation.update({

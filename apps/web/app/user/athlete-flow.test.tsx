@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import HomePage from "./page";
+import { TrainingAvailability } from "./profile/training-availability";
 import TrainingPage from "./training/page";
 import CheckInPage from "./check-in/page";
 import ProgressPage from "./performance/page";
@@ -195,6 +196,108 @@ describe("PF4 athlete experience", () => {
     expect(
       await screen.findByText("Stiamo preparando il prossimo ciclo."),
     ).toBeInTheDocument();
+  });
+  it("waits for the end of a completed window and keeps the strategic program duration", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        respond({
+          ...home,
+          primaryAction: { type: "WINDOW_COMPLETE" },
+          program: {
+            ...home.program,
+            cycle: {
+              version: 3,
+              startsOn: "2026-10-01",
+              endsOn: "2026-10-14",
+              windowDays: 14,
+              sessionsPerWeek: 4,
+              macroBlock: 1,
+              windowInProgram: 3,
+              windowsPerProgram: 6,
+            },
+          },
+        }),
+      ),
+    );
+    render(<HomePage />);
+    expect(
+      await screen.findByText("Hai concluso gli allenamenti di questo blocco."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Il prossimo ciclo sarà preparato alla fine della finestra, il 14 ottobre/,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("Finestra corrente")).toHaveTextContent(
+      "Finestra 3 / 6",
+    );
+    expect(
+      screen.queryByRole("button", { name: /Prepara il mio piano/ }),
+    ).not.toBeInTheDocument();
+  });
+  it("asks for missing availability through the athlete profile", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        respond({
+          ...home,
+          primaryAction: { type: "ERROR" },
+          lifecycle: {
+            status: "ERROR",
+            errorCode: "TRAINING_AVAILABILITY_REQUIRED",
+            retryScheduled: true,
+            requestAllowed: true,
+          },
+        }),
+      ),
+    );
+    render(<HomePage />);
+    expect(
+      await screen.findByRole("link", { name: /Completa il profilo/ }),
+    ).toHaveAttribute("href", "/user/profile");
+    expect(
+      screen.queryByText(/TRAINING_AVAILABILITY_REQUIRED/),
+    ).not.toBeInTheDocument();
+  });
+  it("saves actual availability and the existing duration choices", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (init?.method === "POST")
+          requests.push({ url, body: JSON.parse(String(init.body)) });
+        return respond({
+          currentFrequency: "2_3",
+          daysPerWeek: null,
+          sessionDurationMinutes: null,
+          programDurationWeeks: 12,
+          preferredDays: [],
+        });
+      }),
+    );
+    render(<TrainingAvailability />);
+    await userEvent.selectOptions(
+      await screen.findByLabelText(/Quanti giorni/),
+      "4",
+    );
+    await userEvent.selectOptions(screen.getByLabelText(/Quanto tempo/), "60");
+    expect(screen.getByLabelText("Durata del programma")).toHaveValue("12");
+    await userEvent.click(
+      screen.getByRole("button", { name: /Salva disponibilità/ }),
+    );
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Disponibilità salvata",
+    );
+    expect(requests[0]).toEqual({
+      url: "/api/athlete/training/availability",
+      body: {
+        currentFrequency: "2_3",
+        daysPerWeek: 4,
+        sessionDurationMinutes: 60,
+        programDurationWeeks: 12,
+        preferredDays: [],
+      },
+    });
   });
   it("navigates bounded calendar months and selects persisted sessions", async () => {
     vi.stubGlobal(

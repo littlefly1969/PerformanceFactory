@@ -1,3 +1,4 @@
+import { requestStructuredProposal } from './proposal-structured-transport';
 import { BadRequestException, Logger } from '@nestjs/common';
 import { aiFetch } from '../common/ai-fetch';
 import { logDebugPrompt } from './proposal-audit';
@@ -41,82 +42,27 @@ export async function generateOpenAiProposal(
   inputJson: Record<string, unknown>,
   startedAt: number,
 ): Promise<CycleProposal> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new BadRequestException(
-      'OPENAI_API_KEY e obbligatoria per AI_PROVIDER=openai',
-    );
-  }
-
   const model = resolveModel('openai');
-  logDebugPrompt(logger, 'openai', model, inputJson);
-  const response = await aiFetch(
-    'https://api.openai.com/v1/responses',
+  const { outputText, usage } = await requestStructuredProposal(
+    logger,
+    'openai',
+    model,
+    inputJson,
     {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        input: [
-          {
-            role: 'system',
-            content: buildSystemPrompt(input),
-          },
-          {
-            role: 'user',
-            content: JSON.stringify(buildProposalPrompt(input)),
-          },
-        ],
-        text: {
-          format: {
-            type: 'json_schema',
-            name: 'performance_cycle_proposal',
-            strict: true,
-            schema: buildProposalJsonSchema(input),
-          },
-        },
-      }),
+      system: buildSystemPrompt(input),
+      user: buildProposalPrompt(input),
+      schema: buildProposalJsonSchema(input),
     },
-    { provider: 'openai' },
+    'performance_cycle_proposal',
   );
-
-  const payload = (await response.json()) as {
-    output_text?: string;
-    output?: Array<{ content?: Array<{ text?: string }> }>;
-    usage?: {
-      input_tokens?: number;
-      output_tokens?: number;
-      total_tokens?: number;
-    };
-  };
-  const outputText =
-    payload.output_text ??
-    payload.output
-      ?.flatMap((item) => item.content ?? [])
-      .map((content) => content.text)
-      .find((text): text is string => !!text);
-
-  if (!outputText) {
-    throw new BadRequestException('La risposta proposta OpenAI e vuota');
-  }
-
-  const parsed = parseProposalJson(outputText, 'OpenAI');
-
   return normalizeProposal(
     input,
     'openai',
     model,
-    parsed,
+    parseProposalJson(outputText, 'OpenAI'),
     inputJson,
     startedAt,
-    {
-      inputTokens: payload.usage?.input_tokens ?? null,
-      outputTokens: payload.usage?.output_tokens ?? null,
-      totalTokens: payload.usage?.total_tokens ?? null,
-    },
+    usage,
   );
 }
 

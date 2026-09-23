@@ -43,6 +43,7 @@ export type Lifecycle = {
   preparingNext: boolean;
   retryScheduled: boolean;
   requestAllowed: boolean;
+  errorCode?: string | null;
 };
 export type Home = {
   lifecycle?: Lifecycle;
@@ -51,6 +52,16 @@ export type Home = {
   performance: Performance | null;
   program: {
     durationWeeks: number | null;
+    cycle?: {
+      version: number;
+      startsOn: string;
+      endsOn: string;
+      windowDays: number;
+      sessionsPerWeek: number | null;
+      macroBlock: number | null;
+      windowInProgram: number | null;
+      windowsPerProgram: number | null;
+    } | null;
     status: string;
     summary: string | null;
     completed: number;
@@ -58,7 +69,15 @@ export type Home = {
   };
   primaryAction:
     | { type: "TRAINING_SESSION"; session: Session }
-    | { type: "CHECK_IN" | "PREPARING" | "NONE" | "REQUEST_PLAN" | "ERROR" };
+    | {
+        type:
+          | "CHECK_IN"
+          | "PREPARING"
+          | "NONE"
+          | "REQUEST_PLAN"
+          | "ERROR"
+          | "WINDOW_COMPLETE";
+      };
   nextSession: Session | null;
   checkIn: { id: string; kind: string; title: string; count: number } | null;
   streak: { days: number };

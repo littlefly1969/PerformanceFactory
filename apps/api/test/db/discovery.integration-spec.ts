@@ -577,6 +577,17 @@ describe('PF4 discovery to authenticated journey', () => {
     });
     expect(assessment.status).toBe('COMPLETED');
     expect(assessment.profileJson).toHaveProperty(
+      'training_days_available.value',
+      1,
+    );
+    expect(assessment.profileJson).toHaveProperty(
+      'training_session_duration.value',
+      30,
+    );
+    expect(assessment.profileJson).toHaveProperty(
+      'general_training_frequency.value',
+    );
+    expect(assessment.profileJson).toHaveProperty(
       'general_height_cm.value',
       130,
     );

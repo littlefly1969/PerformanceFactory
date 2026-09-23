@@ -175,7 +175,7 @@ export class AnswersService {
       throw new ForbiddenException('Non puoi rispondere a questo questionario');
     }
     if (questionSet.status === 'CLOSED') {
-      await this.completion.evaluate(questionSet.trainingPlanReleaseId);
+      await this.completion.reconcileTrainingLifecycle(actor.id);
       return {
         count: 0,
         questionSetId: questionSet.id,
@@ -277,7 +277,7 @@ export class AnswersService {
         status: 'CLOSED',
       };
     });
-    await this.completion.evaluate(questionSet.trainingPlanReleaseId);
+    await this.completion.reconcileTrainingLifecycle(actor.id);
     return saved;
   }
 }

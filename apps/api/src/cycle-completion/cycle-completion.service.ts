@@ -1,3 +1,4 @@
+import { athleteDate, dateOnly } from '../athlete/training-sessions';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { LifecycleCommandsService } from '../training-lifecycle/lifecycle-commands.service';
@@ -9,6 +10,19 @@ export class CycleCompletionService {
     private readonly commands: LifecycleCommandsService,
     private readonly policy: TrainingLifecyclePolicy,
   ) {}
+  async reconcileTrainingLifecycle(userId: string) {
+    const plan = await this.prisma.trainingPlanRelease.findFirst({
+      where: {
+        userId,
+        lifecycleManaged: true,
+        status: 'ACTIVE',
+        cycleStatus: 'PUBLISHED',
+      },
+      orderBy: { version: 'desc' },
+      select: { id: true },
+    });
+    if (plan) return this.evaluate(plan.id);
+  }
   async evaluate(cycleId: string) {
     if (!this.policy.enabled) return;
     return this.prisma.$transaction(async (tx) => {
@@ -29,6 +43,7 @@ export class CycleCompletionService {
       )
         return;
       if (
+        (plan.endsOn !== null && plan.endsOn > dateOnly(athleteDate())) ||
         !plan.sessions.length ||
         plan.sessions.length !== plan.items.length ||
         plan.sessions.some((s) => s.status === 'SCHEDULED') ||

@@ -1,3 +1,6 @@
+import { TrainingConstraintsService } from '../ai-orchestrator/training-constraints';
+import { trainingWindow } from '../ai-orchestrator/training-schedule';
+import { TrainingProposalInput } from '../ai-orchestrator/proposal-provider-model';
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -174,8 +177,13 @@ export class TrainingContextService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly provider: AiProposalProviderService,
+    private readonly constraints: TrainingConstraintsService,
   ) {}
-  async build(userId: string, previousReleaseId?: string) {
+  async build(
+    userId: string,
+    previousReleaseId?: string,
+  ): Promise<TrainingProposalInput> {
+    const constraints = await this.constraints.build(userId, previousReleaseId);
     const input = await prepareTrainingProposalInput(
       this.prisma,
       this.provider,
@@ -211,6 +219,8 @@ export class TrainingContextService {
               status: true,
               cycleStatus: true,
               archivedAt: true,
+              startsOn: true,
+              endsOn: true,
               sessions: {
                 orderBy: { sequence: 'asc' },
                 select: {
@@ -253,6 +263,17 @@ export class TrainingContextService {
       metrics,
       previousCycle: previous,
     };
-    return input;
+    const rollingCount = await this.prisma.trainingPlanRelease.count({
+      where: { userId, startsOn: { not: null } },
+    });
+    return {
+      ...input,
+      trainingConstraints: constraints,
+      trainingWindow: trainingWindow(
+        previous?.endsOn,
+        rollingCount + 1,
+        constraints.programDurationWeeks,
+      ),
+    };
   }
 }

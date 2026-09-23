@@ -1,3 +1,4 @@
+import { profileValue } from '../ai-orchestrator/training-constraints';
 import { CycleCompletionService } from '../cycle-completion/cycle-completion.service';
 import { TrainingLifecycleOrchestrator } from '../training-lifecycle/training-lifecycle.orchestrator';
 import { loadSpecialistQuestionRecords } from '../onboarding/onboarding-questions';
@@ -64,11 +65,7 @@ export class AthleteService {
       status,
       input,
     );
-    const session = await this.prisma.trainingSession.findUniqueOrThrow({
-      where: { id },
-      select: { trainingPlanReleaseId: true },
-    });
-    await this.completion.evaluate(session.trainingPlanReleaseId);
+    await this.completion.reconcileTrainingLifecycle(userId);
     return result;
   }
   async progress(userId: string) {
@@ -96,6 +93,7 @@ export class AthleteService {
           select: {
             firstName: true,
             discovery: { select: { programDurationWeeks: true } },
+            onboardingAssessment: { select: { profileJson: true } },
             athleteCoachLinks: {
               select: {
                 coach: {
@@ -116,6 +114,11 @@ export class AthleteService {
           select: {
             id: true,
             summaryText: true,
+            version: true,
+            startsOn: true,
+            endsOn: true,
+            windowDays: true,
+            outputJson: true,
             sessions: {
               include: sessionInclude,
               orderBy: [{ scheduledDate: 'asc' }, { sequence: 'asc' }],
@@ -137,6 +140,13 @@ export class AthleteService {
     );
     const next =
       sessions.find((s) => s.date > today && s.status === 'SCHEDULED') ?? null;
+    const waitingForWindow = Boolean(
+      plan?.endsOn &&
+      plan.endsOn > dateOnly(today) &&
+      sessions.length &&
+      sessions.every((s) => s.status !== 'SCHEDULED') &&
+      !checkIn,
+    );
     const primaryAction = due
       ? { type: 'TRAINING_SESSION', session: due }
       : checkIn
@@ -153,7 +163,7 @@ export class AthleteService {
                       ? 'ERROR'
                       : 'PREPARING',
               }
-            : { type: 'NONE' };
+            : { type: waitingForWindow ? 'WINDOW_COMPLETE' : 'NONE' };
     const start = dateOnly(today);
     start.setUTCDate(start.getUTCDate() - ((start.getUTCDay() + 6) % 7));
     const end = new Date(start.getTime() + 6 * 86400000);
@@ -164,7 +174,25 @@ export class AthleteService {
       timeZone: ATHLETE_TIME_ZONE,
       performance: performanceView(snapshot, order),
       program: {
-        durationWeeks: user.discovery?.programDurationWeeks ?? null,
+        durationWeeks:
+          user.discovery?.programDurationWeeks ??
+          (Number(
+            profileValue(
+              user.onboardingAssessment?.profileJson,
+              'program_duration_weeks',
+            ),
+          ) ||
+            null),
+        cycle:
+          plan?.startsOn && plan.endsOn
+            ? {
+                version: plan.version,
+                startsOn: plan.startsOn.toISOString().slice(0, 10),
+                endsOn: plan.endsOn.toISOString().slice(0, 10),
+                windowDays: plan.windowDays,
+                ...rollingSummary(plan.outputJson),
+              }
+            : null,
         status: plan ? 'ACTIVE' : lifecycle.status,
         summary: plan?.summaryText ?? null,
         completed: sessions.filter((s) => s.status === 'COMPLETED').length,
@@ -207,4 +235,29 @@ export class AthleteService {
       ),
     ];
   }
+}
+
+function rollingSummary(output: unknown) {
+  const root =
+    output && typeof output === 'object' && !Array.isArray(output)
+      ? (output as Record<string, unknown>)
+      : {};
+  const window =
+    root.trainingWindow && typeof root.trainingWindow === 'object'
+      ? (root.trainingWindow as Record<string, unknown>)
+      : {};
+  return {
+    sessionsPerWeek:
+      typeof root.sessionsPerWeek === 'number' ? root.sessionsPerWeek : null,
+    macroBlock:
+      typeof window.macroBlock === 'number' ? window.macroBlock : null,
+    windowInProgram:
+      typeof window.windowInProgram === 'number'
+        ? window.windowInProgram
+        : null,
+    windowsPerProgram:
+      typeof window.windowsPerProgram === 'number'
+        ? window.windowsPerProgram
+        : null,
+  };
 }

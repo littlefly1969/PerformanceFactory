@@ -1,5 +1,7 @@
 # Ciclo continuo di allenamento
 
+La finestra temporale e il contratto calendario sono estesi dalla [slice rolling](rolling-training.md): per le nuove release il rinnovo attende anche `endsOn`.
+
 L'atleta completa discovery, consensi e onboarding, poi usa **Prepara il mio piano** in `/user`. La richiesta HTTP viene salvata subito; il worker API la elabora entro il prossimo intervallo (15 secondi). Il coach vede piani e feedback in `/professional/training`.
 
 ## Un'unica pipeline

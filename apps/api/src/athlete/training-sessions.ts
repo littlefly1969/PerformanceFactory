@@ -50,6 +50,8 @@ export function sessionDay(
   index: number,
   count: number,
   metadata: Prisma.JsonValue | null,
+  windowDays = 7,
+  requireSchedule = false,
 ) {
   const schedule =
     metadata && typeof metadata === 'object' && !Array.isArray(metadata)
@@ -59,11 +61,20 @@ export function sessionDay(
     schedule && typeof schedule === 'object' && !Array.isArray(schedule)
       ? schedule.dayOffset
       : null;
+  const valid =
+    typeof offset === 'number' &&
+    Number.isInteger(offset) &&
+    offset >= 0 &&
+    offset < windowDays;
+  if (requireSchedule && !valid)
+    throw new BadRequestException(
+      'Schedule obbligatoria per il calendario rolling',
+    );
   const dayOffset =
     typeof offset === 'number' &&
     Number.isInteger(offset) &&
     offset >= 0 &&
-    offset <= 6
+    offset < windowDays
       ? offset
       : Math.floor((index * 7) / count);
   return new Date(start.getTime() + dayOffset * 86400000);
@@ -79,6 +90,8 @@ export async function createTrainingSessions(
     where: { id: releaseId },
     select: {
       userId: true,
+      startsOn: true,
+      windowDays: true,
       items: {
         orderBy: [{ orderIndex: 'asc' }, { id: 'asc' }],
         select: {
@@ -92,7 +105,22 @@ export async function createTrainingSessions(
       },
     },
   });
-  const start = dateOnly(athleteDate(publishedAt));
+  const start = plan.startsOn ?? dateOnly(athleteDate(publishedAt));
+  const dates = plan.items.map((item, index) =>
+    sessionDay(
+      start,
+      index,
+      plan.items.length,
+      item.metadata,
+      plan.startsOn ? plan.windowDays : 7,
+      Boolean(plan.startsOn),
+    ),
+  );
+  if (
+    plan.startsOn &&
+    new Set(dates.map((date) => date.getTime())).size !== dates.length
+  )
+    throw new BadRequestException('Calendario rolling con giorni duplicati');
   await tx.trainingSession.createMany({
     skipDuplicates: true,
     data: plan.items.map((item, index) => ({
@@ -100,7 +128,7 @@ export async function createTrainingSessions(
       trainingPlanReleaseId: releaseId,
       trainingPlanItemId: item.id,
       sequence: index + 1,
-      scheduledDate: sessionDay(start, index, plan.items.length, item.metadata),
+      scheduledDate: dates[index],
       status:
         item.status === 'COMPLETED'
           ? 'COMPLETED'
@@ -192,13 +220,15 @@ export async function assertTrainingCycleFinished(
   const active = await tx.trainingPlanRelease.findFirst({
     where: { userId, status: 'ACTIVE' },
     select: {
+      endsOn: true,
       items: { select: { status: true } },
       questionSets: { select: { status: true } },
     },
   });
   if (
     active &&
-    (!active.items.length ||
+    ((active.endsOn !== null && active.endsOn > dateOnly(athleteDate())) ||
+      !active.items.length ||
       active.items.some((i) => !terminalTrainingStates.includes(i.status)) ||
       !active.questionSets.length ||
       active.questionSets.some((q) => q.status !== 'CLOSED'))

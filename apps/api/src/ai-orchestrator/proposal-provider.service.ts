@@ -1,3 +1,8 @@
+import {
+  generateTrainingProposal,
+  buildTrainingProposalPreview,
+} from './training-proposal';
+import { TrainingProposalInput } from './proposal-provider-model';
 import { Injectable, Logger } from '@nestjs/common';
 import {
   buildCycleProposalPreview,
@@ -31,6 +36,12 @@ export class AiProposalProviderService {
     return generateCycleProposal(this.logger, input);
   }
 
+  generateTrainingProposal(input: TrainingProposalInput) {
+    return generateTrainingProposal(this.logger, input);
+  }
+  buildTrainingProposalPreview(input: TrainingProposalInput) {
+    return buildTrainingProposalPreview(input);
+  }
   async summarizeCycleHistory(
     input: CycleHistorySummaryInput,
   ): Promise<CycleHistorySummaryResult> {

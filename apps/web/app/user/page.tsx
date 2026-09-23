@@ -38,6 +38,10 @@ export default function AthleteHome() {
     return () => clearInterval(timer);
   }, [home?.program.status, home?.lifecycle?.retryScheduled, reload]);
   const action = home?.primaryAction;
+  const needsAvailability = [
+    "TRAINING_AVAILABILITY_REQUIRED",
+    "TRAINING_PROGRAM_REQUIRED",
+  ].includes(home?.lifecycle?.errorCode ?? "");
   return (
     <AthleteShell label="Home" error={error} reload={reload} loading={!home}>
       {home && (
@@ -68,6 +72,32 @@ export default function AthleteHome() {
               </strong>
             </div>
           </div>
+          {home.program.cycle && (
+            <section
+              className="pf4-athlete-section"
+              aria-label="Finestra corrente"
+            >
+              <span className="pf4-kicker">
+                Finestra{" "}
+                {home.program.cycle.windowInProgram ??
+                  home.program.cycle.version}
+                {home.program.cycle.windowsPerProgram
+                  ? ` / ${home.program.cycle.windowsPerProgram}`
+                  : ""}
+              </span>
+              <p>
+                {displayDate(home.program.cycle.startsOn)} —{" "}
+                {displayDate(home.program.cycle.endsOn)} ·{" "}
+                {home.program.cycle.windowDays} giorni
+              </p>
+              {home.program.cycle.sessionsPerWeek && (
+                <p>
+                  Fino a {home.program.cycle.sessionsPerWeek} sessioni a
+                  settimana
+                </p>
+              )}
+            </section>
+          )}
           <section className="pf4-today-card">
             {action?.type === "REQUEST_PLAN" ? (
               <>
@@ -93,13 +123,24 @@ export default function AthleteHome() {
               </>
             ) : action?.type === "ERROR" ? (
               <>
-                <h2>Il programma richiede ancora un po’ di tempo.</h2>
+                <h2>
+                  {needsAvailability
+                    ? "Completa la tua disponibilità."
+                    : "Il programma richiede ancora un po’ di tempo."}
+                </h2>
                 <p>
-                  {home.lifecycle?.retryScheduled
-                    ? "La richiesta è salvata. Riproveremo automaticamente: non serve ricominciare."
-                    : "Contatta il tuo coach per proseguire il percorso."}
+                  {needsAvailability
+                    ? "Indica nel profilo i giorni e il tempo che puoi dedicare agli allenamenti. Riprenderemo da lì."
+                    : home.lifecycle?.retryScheduled
+                      ? "La richiesta è salvata. Riproveremo automaticamente: non serve ricominciare."
+                      : "Contatta il tuo coach per proseguire il percorso."}
                 </p>
-                {home.lifecycle?.requestAllowed && (
+                {needsAvailability && (
+                  <Link className="pf4-cta" href="/user/profile">
+                    Completa il profilo →
+                  </Link>
+                )}
+                {!needsAvailability && home.lifecycle?.requestAllowed && (
                   <button
                     className="pf4-cta"
                     disabled={requesting}
@@ -137,6 +178,21 @@ export default function AthleteHome() {
                 <p>Le tue risposte aiutano a costruire il prossimo ciclo.</p>
                 <Link className="pf4-cta" href="/user/check-in">
                   Inizia il check-in →
+                </Link>
+              </>
+            ) : action?.type === "WINDOW_COMPLETE" ? (
+              <>
+                <span className="pf4-kicker">Finestra completata</span>
+                <h2>Hai concluso gli allenamenti di questo blocco.</h2>
+                <p>
+                  Il prossimo ciclo sarà preparato alla fine della finestra
+                  {home.program.cycle
+                    ? `, il ${displayDate(home.program.cycle.endsOn)}`
+                    : ""}
+                  . Nel frattempo rispetta il recupero previsto.
+                </p>
+                <Link className="pf4-cta" href="/user/training">
+                  Guarda il calendario →
                 </Link>
               </>
             ) : action?.type === "PREPARING" ? (

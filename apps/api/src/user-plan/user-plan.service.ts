@@ -352,7 +352,7 @@ export class UserPlanService {
         'COMPLETED',
         input,
       );
-      await this.completion.evaluate(session.trainingPlanReleaseId);
+      await this.completion.reconcileTrainingLifecycle(userId);
       return this.prisma.trainingPlanItem.findUnique({
         where: { id: planItemId },
         select: {

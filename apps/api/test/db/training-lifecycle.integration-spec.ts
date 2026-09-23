@@ -1,3 +1,4 @@
+import * as athleteDates from '../../src/athlete/training-sessions';
 import { approveTrainingPlanItem } from '../../src/professional/professional-training-review';
 import { AbacService } from '../../src/common/policies/abac.service';
 import { OrchestratorService } from '../../src/ai-orchestrator/orchestrator.service';
@@ -14,15 +15,15 @@ describe('Automated training lifecycle: real PostgreSQL, HTTP and provider adapt
   let lifecycle: TrainingLifecycleOrchestrator;
   let provider: AiProposalProviderService;
   let generate: jest.SpyInstance<
-    ReturnType<AiProposalProviderService['generateCycleProposal']>,
-    Parameters<AiProposalProviderService['generateCycleProposal']>
+    ReturnType<AiProposalProviderService['generateTrainingProposal']>,
+    Parameters<AiProposalProviderService['generateTrainingProposal']>
   >;
   const env = { ...process.env };
   beforeAll(async () => {
     f = await lifecycleFixture();
     lifecycle = f.app.get(TrainingLifecycleOrchestrator);
     provider = f.app.get(AiProposalProviderService);
-    generate = jest.spyOn(provider, 'generateCycleProposal');
+    generate = jest.spyOn(provider, 'generateTrainingProposal');
   }, 60000);
   afterAll(async () => {
     await f?.cleanup();
@@ -30,7 +31,7 @@ describe('Automated training lifecycle: real PostgreSQL, HTTP and provider adapt
   });
   afterEach(() => {
     jest.restoreAllMocks();
-    generate = jest.spyOn(provider, 'generateCycleProposal');
+    generate = jest.spyOn(provider, 'generateTrainingProposal');
     process.env.TRAINING_APPROVAL_MODE = 'AUTO';
   });
   async function request(user: Awaited<ReturnType<typeof f.user>>) {
@@ -97,20 +98,6 @@ describe('Automated training lifecycle: real PostgreSQL, HTTP and provider adapt
     expect(generate).toHaveBeenCalledTimes(1);
   });
   it('runs request → assignment → AUTO publication → feedback/check-in → second AI cycle exactly once under retries', async () => {
-    generate.mockRestore();
-    const realGenerate = provider.generateCycleProposal.bind(provider);
-    generate = jest
-      .spyOn(provider, 'generateCycleProposal')
-      .mockImplementation(async (input) => {
-        const proposal = await realGenerate(input);
-        return {
-          ...proposal,
-          planItems: [
-            ...proposal.planItems,
-            { ...proposal.planItems[0], title: 'Seconda sessione' },
-          ],
-        };
-      });
     const athlete = await f.user();
     const freeCoach = await f.coach();
     await Promise.all([request(athlete), request(athlete)]);
@@ -228,12 +215,27 @@ describe('Automated training lifecycle: real PostgreSQL, HTTP and provider adapt
     await Promise.all([
       f.app.get(CycleCompletionService).evaluate(first.id),
       f.app.get(CycleCompletionService).evaluate(first.id),
-      lifecycle.continueAfterCycle(athlete.id, first.id),
+      f.app.get(CycleCompletionService).reconcileTrainingLifecycle(athlete.id),
     ]);
     expect(await lifecycle.current(athlete.id)).toMatchObject({
-      status: 'PREPARING',
-      preparingNext: true,
+      status: 'IN_PROGRESS',
     });
+    expect(
+      await f.prisma.trainingLifecycleOperation.count({
+        where: { previousReleaseId: first.id },
+      }),
+    ).toBe(0);
+    await expect(
+      athleteDates.assertTrainingCycleFinished(f.prisma, athlete.id),
+    ).rejects.toThrow();
+    jest
+      .spyOn(athleteDates, 'athleteDate')
+      .mockReturnValue(first.endsOn!.toISOString().slice(0, 10));
+    await Promise.all([
+      lifecycle.drain(),
+      f.app.get(CycleCompletionService).reconcileTrainingLifecycle(athlete.id),
+    ]);
+
     const nextOps = await f.prisma.trainingLifecycleOperation.findMany({
       where: { previousReleaseId: first.id },
     });
@@ -248,7 +250,8 @@ describe('Automated training lifecycle: real PostgreSQL, HTTP and provider adapt
       include: { sessions: true },
     });
     expect(second).toMatchObject({ cycleStatus: 'PUBLISHED', version: 2 });
-    expect(second.sessions).toHaveLength(first.items.length);
+    expect(second.sessions.length).toBeGreaterThan(0);
+    expect(second.startsOn!.getTime()).toBe(first.endsOn!.getTime() + 86400000);
     expect(
       (
         await f.prisma.coachUserLink.findFirstOrThrow({
@@ -262,7 +265,7 @@ describe('Automated training lifecycle: real PostgreSQL, HTTP and provider adapt
     expect(previous.cycleStatus).toBe('CLOSED');
     expect(previous.sessions.map((s) => s.status)).toEqual([
       'SKIPPED',
-      'COMPLETED',
+      ...Array.from({ length: first.sessions.length - 1 }, () => 'COMPLETED'),
     ]);
     expect(previous.sessions[1]).toMatchObject({
       completionRating: 4,

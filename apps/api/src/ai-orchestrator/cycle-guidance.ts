@@ -2,7 +2,10 @@ import { BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AreaRecord } from './orchestrator-model';
-import { CycleProposal } from './proposal-provider.service';
+import {
+  CycleProposal,
+  TrainingCycleProposal,
+} from './proposal-provider.service';
 
 export async function loadAreaGenerationConfig(
   prisma: PrismaService,
@@ -132,19 +135,25 @@ export function buildQuestions(
 }
 
 export function buildTrainingPlanItems(
-  proposal: CycleProposal,
+  proposal: TrainingCycleProposal,
 ): Prisma.TrainingPlanItemUncheckedCreateWithoutTrainingPlanReleaseInput[] {
-  return proposal.planItems.map((item, orderIndex) => ({
-    orderIndex,
+  return proposal.planItems.map((item, index) => ({
+    orderIndex: index,
     type: item.type,
     title: item.title,
     body: item.body,
-    metadata: (item.metadata ?? {
+    metadata: {
       source: 'training-orchestrator',
       provider: proposal.provider,
       model: proposal.model,
       promptVersion: proposal.promptVersion,
-    }) as Prisma.InputJsonObject,
+      durationMinutes: item.durationMinutes,
+      equipment: item.equipment ?? null,
+      sets: item.sets ?? null,
+      reps: item.reps ?? null,
+      restSeconds: item.restSeconds ?? null,
+      schedule: { dayOffset: item.dayOffset },
+    },
     status: 'PROPOSED',
   }));
 }

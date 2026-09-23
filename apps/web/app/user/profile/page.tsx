@@ -1,5 +1,6 @@
 "use client";
 import Link from "next/link";
+import { TrainingAvailability } from "./training-availability";
 import { AthleteShell } from "../_components/athlete-shell";
 import { useAthlete } from "../_components/use-athlete";
 import type { Home } from "../_components/athlete-types";
@@ -28,6 +29,7 @@ export default function ProfilePage() {
                 : "Programma in preparazione"}
             </p>
           </section>
+          <TrainingAvailability />
           <section className="pf4-athlete-section">
             <span className="pf4-kicker">Il tuo coach</span>
             {data.coaches.length ? (

@@ -542,3 +542,23 @@
   padding: 18px;
   margin-top: 14px;
 }
+
+.pf4-availability-form {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 38rem;
+}
+.pf4-availability-form label {
+  display: grid;
+  gap: 0.5rem;
+  line-height: 1.5;
+}
+.pf4-availability-form select {
+  width: 100%;
+  padding: 0.8rem;
+  border: 1px solid #ddd;
+  border-radius: 0.6rem;
+  background: white;
+  color: #171717;
+  font: inherit;
+}

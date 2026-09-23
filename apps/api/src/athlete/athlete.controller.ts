@@ -1,4 +1,8 @@
 import {
+  TrainingAvailabilityDto,
+  TrainingAvailabilityService,
+} from './training-availability';
+import {
   Body,
   Controller,
   Get,
@@ -40,7 +44,28 @@ type Request = { user: { id: string } };
 @UseGuards(AuthenticatedGuard, RolesGuard)
 @Roles(UserRole.USER)
 export class AthleteController {
-  constructor(private readonly athlete: AthleteService) {}
+  constructor(
+    private readonly athlete: AthleteService,
+    private readonly availability: TrainingAvailabilityService,
+  ) {}
+  @Get('training/availability')
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({
+    summary: 'Disponibilità personale per il calendario allenamenti',
+  })
+  trainingAvailability(@Req() req: Request) {
+    return this.availability.get(req.user.id);
+  }
+  @Post('training/availability')
+  @ApiOperation({
+    summary: 'Aggiorna la disponibilità per le prossime finestre',
+  })
+  saveTrainingAvailability(
+    @Req() req: Request,
+    @Body() body: TrainingAvailabilityDto,
+  ) {
+    return this.availability.save(req.user.id, body);
+  }
   @ApiOperation({ summary: 'Home PF4 con azione prioritaria e programma' })
   @Header('Cache-Control', 'private, no-store')
   @Get('home')

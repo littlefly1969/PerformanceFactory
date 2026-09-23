@@ -1,3 +1,4 @@
+import { requestStructuredProposal } from './proposal-structured-transport';
 import { BadRequestException, Logger } from '@nestjs/common';
 import { aiFetch } from '../common/ai-fetch';
 import { logDebugPrompt } from './proposal-audit';
@@ -41,88 +42,27 @@ export async function generateGeminiProposal(
   inputJson: Record<string, unknown>,
   startedAt: number,
 ): Promise<CycleProposal> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new BadRequestException(
-      'GEMINI_API_KEY e obbligatoria per AI_PROVIDER=gemini',
-    );
-  }
-
   const model = resolveModel('gemini');
-  logDebugPrompt(logger, 'gemini', model, inputJson);
-  const modelName = model.startsWith('models/')
-    ? model.slice('models/'.length)
-    : model;
-  const response = await aiFetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelName)}:generateContent`,
+  const { outputText, usage } = await requestStructuredProposal(
+    logger,
+    'gemini',
+    model,
+    inputJson,
     {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': apiKey,
-      },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: buildSystemPrompt(input) }],
-        },
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: JSON.stringify(buildProposalPrompt(input)) }],
-          },
-        ],
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseJsonSchema: buildProposalJsonSchema(input, {
-            includePropertyOrdering: true,
-          }),
-        },
-      }),
+      system: buildSystemPrompt(input),
+      user: buildProposalPrompt(input),
+      schema: buildProposalJsonSchema(input, { includePropertyOrdering: true }),
     },
-    { provider: 'gemini' },
+    'performance_cycle_proposal',
   );
-
-  const payload = (await response.json()) as {
-    candidates?: Array<{
-      finishReason?: string;
-      content?: { parts?: Array<{ text?: string }> };
-    }>;
-    promptFeedback?: { blockReason?: string };
-    usageMetadata?: {
-      promptTokenCount?: number;
-      candidatesTokenCount?: number;
-      totalTokenCount?: number;
-    };
-  };
-  const outputText = payload.candidates?.[0]?.content?.parts
-    ?.map((part) => part.text)
-    .filter((text): text is string => !!text)
-    .join('');
-
-  if (!outputText) {
-    const reason =
-      payload.promptFeedback?.blockReason ??
-      payload.candidates?.[0]?.finishReason ??
-      'risposta vuota';
-    throw new BadRequestException(
-      `La risposta proposta Gemini e vuota: ${reason}`,
-    );
-  }
-
-  const parsed = parseProposalJson(outputText, 'Gemini');
-
   return normalizeProposal(
     input,
     'gemini',
     model,
-    parsed,
+    parseProposalJson(outputText, 'Gemini'),
     inputJson,
     startedAt,
-    {
-      inputTokens: payload.usageMetadata?.promptTokenCount ?? null,
-      outputTokens: payload.usageMetadata?.candidatesTokenCount ?? null,
-      totalTokens: payload.usageMetadata?.totalTokenCount ?? null,
-    },
+    usage,
   );
 }
 

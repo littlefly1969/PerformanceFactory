@@ -32,6 +32,18 @@ describe('PF4 calendar semantics', () => {
         .slice(0, 10),
     ).toBe('2026-09-21');
   });
+  it('preserves day 13 only for rolling releases and rejects missing or invalid schedules', () => {
+    const start = new Date('2026-10-01T00:00:00Z');
+    expect(
+      sessionDay(start, 0, 7, { schedule: { dayOffset: 13 } }, 14, true)
+        .toISOString()
+        .slice(0, 10),
+    ).toBe('2026-10-14');
+    expect(() => sessionDay(start, 0, 7, null, 14, true)).toThrow();
+    expect(() =>
+      sessionDay(start, 0, 7, { schedule: { dayOffset: 14 } }, 14, true),
+    ).toThrow();
+  });
   it.each([
     ['SCHEDULED', '2026-09-18', 'MISSED'],
     ['SKIPPED', '2026-09-18', 'SKIPPED'],

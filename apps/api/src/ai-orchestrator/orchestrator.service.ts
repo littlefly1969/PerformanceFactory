@@ -97,7 +97,7 @@ export class OrchestratorService {
   }
 
   async previewTrainingProposalInput(userId: string) {
-    return this.aiProposalProvider.buildCycleProposalPreview(
+    return this.aiProposalProvider.buildTrainingProposalPreview(
       await this.trainingContext.build(userId),
     );
   }

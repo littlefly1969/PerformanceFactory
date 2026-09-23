@@ -3,12 +3,15 @@ import {
   buildTrainingPlanItems,
   buildTrainingQuestions,
 } from './cycle-guidance';
-import { CycleProposal } from './proposal-provider.service';
+import {
+  TrainingCycleProposal,
+  TrainingWindow,
+} from './proposal-provider.service';
 
 /** Existing persistence shared by initial and subsequent lifecycle commands. */
 export async function persistTrainingProposal(
   tx: Prisma.TransactionClient,
-  proposal: CycleProposal,
+  proposal: TrainingCycleProposal,
   input: {
     userId: string;
     releaseId: string;
@@ -17,6 +20,7 @@ export async function persistTrainingProposal(
     specializationId: string;
     actorId?: string;
     approvalMode: string;
+    window: TrainingWindow;
   },
 ) {
   const { userId } = input;
@@ -51,6 +55,9 @@ export async function persistTrainingProposal(
       proposedByAdminId: input.actorId,
       id: input.releaseId,
       lifecycleManaged: true,
+      startsOn: new Date(`${input.window.startsOn}T00:00:00Z`),
+      endsOn: new Date(`${input.window.endsOn}T00:00:00Z`),
+      windowDays: input.window.windowDays,
       previousReleaseId: input.previousReleaseId,
       approvalMode: input.approvalMode,
       items: { create: buildTrainingPlanItems(proposal) },

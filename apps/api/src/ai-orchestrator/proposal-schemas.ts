@@ -362,3 +362,63 @@ export function cycleQuestionLayout(
     raw: raw ?? null,
   };
 }
+
+export function buildTrainingProposalJsonSchema(
+  input: import('./proposal-provider-model').TrainingProposalInput,
+  options?: { includePropertyOrdering?: boolean },
+) {
+  const base = buildProposalJsonSchema(input, options);
+  const { minSessionsPerWeek, maxSessionsPerWeek } =
+    input.trainingConstraints.prescription;
+  const properties = {
+    type: { type: 'string' },
+    title: { type: 'string' },
+    body: { type: 'string' },
+    dayOffset: { type: 'integer', minimum: 0, maximum: 13 },
+    durationMinutes: {
+      type: 'integer',
+      minimum: 1,
+      maximum: input.trainingConstraints.availability.sessionDurationMinutes,
+    },
+    equipment: { type: ['string', 'null'] },
+    sets: { type: ['integer', 'null'], minimum: 1 },
+    reps: { type: ['string', 'null'] },
+    restSeconds: { type: ['integer', 'null'], minimum: 0 },
+  };
+  return {
+    ...base,
+    required: ['summaryText', 'sessionsPerWeek', 'planItems', 'questions'],
+    properties: {
+      ...base.properties,
+      sessionsPerWeek: {
+        type: 'integer',
+        minimum: minSessionsPerWeek,
+        maximum: maxSessionsPerWeek,
+      },
+      planItems: {
+        type: 'array',
+        minItems: 2 * minSessionsPerWeek,
+        maxItems: 2 * maxSessionsPerWeek,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: Object.keys(properties),
+          properties,
+          ...(options?.includePropertyOrdering
+            ? { propertyOrdering: Object.keys(properties) }
+            : {}),
+        },
+      },
+    },
+    ...(options?.includePropertyOrdering
+      ? {
+          propertyOrdering: [
+            'summaryText',
+            'sessionsPerWeek',
+            'planItems',
+            'questions',
+          ],
+        }
+      : {}),
+  };
+}

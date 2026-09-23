@@ -358,3 +358,43 @@ export const DEFAULT_OPTIONS = [
   { label: 'Spesso', score: 75 },
   { label: 'Con costanza', score: 100 },
 ];
+
+export type TrainingConstraints = {
+  programDurationWeeks: 4 | 12 | 52;
+  operationalWindowDays: 14;
+  currentFrequency: { min: number; max: number };
+  availability: {
+    daysPerWeek: number;
+    sessionDurationMinutes: number;
+    preferredDays?: number[];
+  };
+  prescription: { minSessionsPerWeek: number; maxSessionsPerWeek: number };
+};
+export type TrainingWindow = {
+  startsOn: string;
+  endsOn: string;
+  windowDays: 14;
+  macroBlock: number;
+  windowInProgram: number;
+  windowsPerProgram: number;
+};
+export type TrainingProposalInput = CycleProposalInput & {
+  trainingConstraints: TrainingConstraints;
+  trainingWindow: TrainingWindow;
+};
+export type TrainingSessionProposal = {
+  type: string;
+  title: string;
+  body: string;
+  dayOffset: number;
+  durationMinutes: number;
+  equipment?: string | null;
+  sets?: number | null;
+  reps?: string | null;
+  restSeconds?: number | null;
+};
+export type TrainingCycleProposal = Omit<CycleProposal, 'planItems'> & {
+  sessionsPerWeek: number;
+  planItems: TrainingSessionProposal[];
+};
+export const TRAINING_PROMPT_VERSION = 'training-rolling-v1';
