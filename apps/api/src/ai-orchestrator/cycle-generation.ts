@@ -164,6 +164,7 @@ export async function prepareCycleProposalInput(
   userId: string,
   area: AreaRecord,
   reason: string,
+  scheduled = false,
 ): Promise<CycleProposalInput> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -184,7 +185,7 @@ export async function prepareCycleProposalInput(
     );
   }
 
-  await assertPreviousCycleCompleted(prisma, userId, area.id);
+  await assertPreviousCycleCompleted(prisma, userId, area.id, scheduled);
 
   if (AiProposalProviderService.requiresUserConsent()) {
     const consent = await prisma.consent.findFirst({

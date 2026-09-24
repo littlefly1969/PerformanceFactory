@@ -14,6 +14,11 @@ prompt sport-area e la imposta con `POST /ai-tuning/sports`
 campo lascia il valore invariato, quindi modificare un prompt non spegne il
 calendario di un'area.
 
+Il seed imposta il flag solo nei database appena creati. I deploy eseguono
+soltanto `prisma migrate deploy`, quindi la migrazione
+`20260924150000_area_schedule_backfill` accende `isScheduled` sulla preparazione
+atletica anche nei database esistenti.
+
 ## Finestra e rinnovo
 
 L'area a calendario **non ha una finestra propria**: eredita quella del
@@ -37,42 +42,55 @@ Finché la finestra precedente dell'area è in corso non se ne genera una nuova.
 Quando la finestra è conclusa la successiva parte comunque: le sedute non svolte
 restano nello storico come non svolte e non bloccano il ciclo seguente. Le aree
 senza `startsOn` conservano la regola precedente, che pretende attività
-completate e questionario chiuso.
+completate e questionario chiuso. Fa eccezione il passaggio a calendario:
+un elenco senza date nato prima che l'area diventasse schedulata non blocca la
+prima finestra, che alla pubblicazione lo archivia come ogni release sostituita.
+Un atleta già attivo riceve la prima finestra al successivo rinnovo del programma
+sportivo, perché l'accodamento parte solo dalla pubblicazione sportiva.
 
-## Carico: budget proprio nei soli giorni liberi
+## Carico: giorni liberi, altrimenti accanto allo sport
 
-Le sedute di area non condividono mai la giornata con una sessione sportiva.
-`freeDayOffsets()` parte dai 14 giorni della finestra e toglie:
+Dove possibile le sedute di area non condividono la giornata con una sessione
+sportiva. `freeDayOffsets()` parte dai 14 giorni della finestra e toglie:
 
 - i giorni con una sessione sportiva già a calendario;
 - i giorni fuori dai giorni preferiti dell'atleta, quando sono configurati;
 - i giorni già passati.
 
-Sul residuo, `areaPrescription()` calcola minimo e massimo settimanali. La
-capienza di ogni settimana relativa è il minore fra i giorni liberi di quella
-settimana e i **giorni ancora disponibili**, cioè
-`training_days_available` meno le sessioni sportive della stessa settimana. Il
-carico totale resta quindi dentro la disponibilità dichiarata dall'atleta: la
-preparazione atletica non aggiunge giorni di allenamento oltre quelli concessi.
+`areaScheduleDays()` decide poi settimana per settimana. La capienza sui giorni
+liberi è il minore fra i giorni liberi di quella settimana e i **giorni ancora
+disponibili**, cioè `training_days_available` meno le sessioni sportive della
+stessa settimana. Se è positiva, l'area usa i giorni liberi.
+
+Se è zero, per esempio con due giorni dichiarati e due sedute di padel, l'area
+**affianca le sessioni sportive** future della settimana (`sharedDayOffsets`),
+con una seduta breve di attivazione o prevenzione di al massimo
+`AREA_SHARED_DAY_MINUTES` (20 minuti). In entrambi i casi la preparazione
+atletica non aggiunge giorni di allenamento oltre quelli dichiarati.
+`areaPrescription()` ricava minimo e massimo settimanali dalla capienza di ogni
+settimana.
 
 Il tetto dell'area è di tre sedute a settimana (`AREA_FREQUENCY`), sempre entro
 la capienza. Si applica la stessa politica di aderenza del programma sportivo:
 sotto il 75% di completamento il massimo scende alla media di sedute realmente
 svolte; rating medio ≤2/5 o check-in medio <50/100 tolgono una seduta.
 
-Se una settimana della finestra non ha capienza, la richiesta fallisce con
+Se una settimana della finestra non ha né giorni liberi utilizzabili né sessioni
+sportive future, per esempio perché è già trascorsa, la richiesta fallisce con
 `AREA_SCHEDULE_NO_FREE_DAYS` e non viene creato nulla. La richiesta resta in coda
 e riparte: alla finestra successiva la distribuzione può essere diversa.
 
 ## Contratto AI e persistenza
 
-`area-schedule-v1` è un contratto dedicato: stessa forma del contratto TRAINING
+`area-schedule-v2` è un contratto dedicato: stessa forma del contratto TRAINING
 (`dayOffset`, `durationMinutes`, attrezzatura, serie, ripetizioni, recupero) ma
-con i `dayOffset` ammessi ristretti per enum ai soli giorni liberi. La
-validazione ripete i controlli condivisi — durata entro la disponibilità, min e
-max per settimana relativa, massimo su ogni intervallo di sette giorni, nessun
-giorno duplicato — e aggiunge il rifiuto di qualunque giorno occupato dallo
-sport, anche se il modello lo proponesse comunque.
+con i `dayOffset` ammessi ristretti per enum ai giorni liberi e ai giorni
+condivisi della finestra. La validazione ripete i controlli condivisi — durata
+entro la disponibilità, min e max per settimana relativa, massimo su ogni
+intervallo di sette giorni, nessun giorno duplicato. In più rifiuta qualunque
+altro giorno occupato dallo sport e, nei giorni condivisi, una durata oltre
+`AREA_SHARED_DAY_MINUTES`, anche se il modello la proponesse comunque. La v1
+ammetteva i soli giorni liberi.
 
 La proposta viene normalizzata in un `CycleProposal` ordinario: la schedulazione
 viaggia in `PlanItem.metadata.schedule.dayOffset`, come già fa il programma
@@ -101,15 +119,22 @@ diretto al calendario.
 
 ## Verifica
 
-`src/ai-orchestrator/area-schedule.spec.ts` copre giorni liberi, esclusione dei
-giorni occupati e non preferiti, capienza residua, tetto d'area, riduzione per
-bassa aderenza, rifiuto di una seduta in giorno occupato e di una durata oltre la
-disponibilità, e la generazione con provider controllato.
+`src/ai-orchestrator/area-schedule.spec.ts` copre:
+
+- giorni liberi, esclusione dei giorni occupati e non preferiti e capienza residua;
+- giorni condivisi quando i giorni dichiarati sono già allenati, anche misti
+  settimana per settimana e senza giorni sportivi passati;
+- tetto d'area e riduzione per bassa aderenza;
+- rifiuto di una seduta in un giorno occupato, di una durata oltre la
+  disponibilità e di una seduta lunga in un giorno condiviso;
+- la generazione con provider controllato, anche sui giorni condivisi.
 
 `test/db/area-schedule.integration-spec.ts` esercita su PostgreSQL reale:
 accodamento solo dopo la pubblicazione sportiva, sedute nei soli giorni liberi,
 calendario con entrambe le tracce, completamento che non tocca il ciclo sportivo,
-assenza di doppioni con worker concorrenti e sospensione senza capienza.
+assenza di doppioni con worker concorrenti, sedute brevi nei giorni sportivi
+quando i giorni dichiarati sono tutti allenati e sostituzione dell'elenco nato
+prima del passaggio a calendario.
 
 I test frontend verificano la scheda di area nel calendario e, nella pagina
 Abilità, la finestra con il collegamento al calendario e l'assenza della

@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import {
   areaPrescription,
+  areaScheduleDays,
   freeDayOffsets,
   generateAreaScheduleProposal,
   validateAreaSchedule,
@@ -56,27 +57,89 @@ describe('freeDayOffsets', () => {
   });
 });
 
-describe('areaPrescription', () => {
-  it('limita la frequenza ai giorni disponibili residui', () => {
+describe('areaScheduleDays', () => {
+  it('usa i giorni liberi entro i giorni disponibili residui', () => {
     // Cinque giorni disponibili a settimana, quattro gia usati dallo sport.
-    expect(areaPrescription([1, 3, 5, 8, 10, 12], 14, [4, 4], 5)).toEqual({
+    const days = areaScheduleDays(
+      window,
+      [0, 2, 4, 6, 7, 9, 11, 13].map(day),
+      availability,
+      now,
+    );
+    expect(days).toEqual({
+      freeDayOffsets: [1, 3, 5, 8, 10, 12],
+      sharedDayOffsets: [],
+      capacity: [1, 1],
+    });
+    expect(areaPrescription(days.capacity)).toEqual({
       minSessionsPerWeek: 1,
       maxSessionsPerWeek: 1,
     });
   });
 
+  it('affianca le sessioni sportive quando i giorni dichiarati sono gia allenati', () => {
+    // Due giorni disponibili, entrambi occupati dallo sport in ogni settimana.
+    const days = areaScheduleDays(
+      window,
+      [1, 4, 8, 11].map(day),
+      { daysPerWeek: 2, sessionDurationMinutes: 45 },
+      now,
+    );
+    expect(days).toEqual({
+      freeDayOffsets: [],
+      sharedDayOffsets: [1, 4, 8, 11],
+      capacity: [2, 2],
+    });
+    expect(areaPrescription(days.capacity)).toEqual({
+      minSessionsPerWeek: 1,
+      maxSessionsPerWeek: 2,
+    });
+  });
+
+  it('sceglie giorni liberi o condivisi settimana per settimana', () => {
+    const days = areaScheduleDays(
+      window,
+      [0, 2, 4, 7, 9].map(day),
+      { daysPerWeek: 3, sessionDurationMinutes: 45 },
+      now,
+    );
+    expect(days).toEqual({
+      freeDayOffsets: [8, 10, 11, 12, 13],
+      sharedDayOffsets: [0, 2, 4],
+      capacity: [3, 1],
+    });
+  });
+
+  it('non condivide giorni sportivi gia passati', () => {
+    const days = areaScheduleDays(
+      window,
+      [1, 4, 8, 11].map(day),
+      { daysPerWeek: 2, sessionDurationMinutes: 45 },
+      new Date('2026-10-08T08:00:00Z'),
+    );
+    expect(days.sharedDayOffsets).toEqual([4, 8, 11]);
+    expect(days.capacity).toEqual([1, 2]);
+  });
+});
+
+describe('areaPrescription', () => {
   it('applica il tetto di area quando la capienza e ampia', () => {
-    expect(areaPrescription([0, 1, 2, 3, 7, 8, 9, 10], 14, [0, 0], 7)).toEqual({
+    expect(areaPrescription([4, 4])).toEqual({
       minSessionsPerWeek: 1,
       maxSessionsPerWeek: 3,
     });
   });
 
   it('rifiuta la finestra quando una settimana non ha capienza', () => {
-    expect(() => areaPrescription([0, 1, 2], 14, [0, 0], 5)).toThrow(
-      /Nessun giorno disponibile/,
+    expect(() => areaPrescription([3, 0])).toThrow(/Nessun giorno disponibile/);
+    // Settimana gia trascorsa, senza giorni liberi ne sessioni sportive future.
+    const days = areaScheduleDays(
+      window,
+      [1, 4, 8, 11].map(day),
+      { daysPerWeek: 2, sessionDurationMinutes: 45 },
+      new Date('2026-10-12T08:00:00Z'),
     );
-    expect(() => areaPrescription([0, 1, 8], 14, [5, 0], 5)).toThrow(
+    expect(() => areaPrescription(days.capacity)).toThrow(
       /Nessun giorno disponibile/,
     );
   });
@@ -88,9 +151,10 @@ describe('areaPrescription', () => {
       ratings: [],
       checkInScores: [],
     };
-    expect(
-      areaPrescription([0, 1, 2, 3, 7, 8, 9, 10], 14, [0, 0], 7, previous),
-    ).toEqual({ minSessionsPerWeek: 1, maxSessionsPerWeek: 1 });
+    expect(areaPrescription([4, 4], previous)).toEqual({
+      minSessionsPerWeek: 1,
+      maxSessionsPerWeek: 1,
+    });
   });
 });
 
@@ -147,6 +211,36 @@ describe('validateAreaSchedule', () => {
       ),
     ).toThrow(/durata oltre la disponibilit/);
   });
+
+  it('accetta una seduta breve nel giorno sportivo condiviso', () => {
+    expect(() =>
+      validateAreaSchedule(
+        {
+          sessionsPerWeek: 1,
+          planItems: planItems.map((item) => ({
+            ...item,
+            durationMinutes: 20,
+          })),
+        },
+        constraints(1, 2),
+        window.startsOn,
+        [],
+        [1, 8],
+      ),
+    ).not.toThrow();
+  });
+
+  it('rifiuta una seduta lunga nel giorno sportivo condiviso', () => {
+    expect(() =>
+      validateAreaSchedule(
+        { sessionsPerWeek: 1, planItems },
+        constraints(1, 2),
+        window.startsOn,
+        [],
+        [1, 8],
+      ),
+    ).toThrow(/seduta troppo lunga nel giorno sportivo/);
+  });
 });
 
 describe('generateAreaScheduleProposal', () => {
@@ -184,6 +278,7 @@ describe('generateAreaScheduleProposal', () => {
     },
     areaWindow: window,
     freeDayOffsets: [1, 3, 8, 10],
+    sharedDayOffsets: [],
     scheduleConstraints: constraints(1, 2),
   } as unknown as AreaScheduleInput;
 
@@ -192,7 +287,7 @@ describe('generateAreaScheduleProposal', () => {
       new Logger('test'),
       input,
     );
-    expect(proposal.promptVersion).toBe('area-schedule-v1');
+    expect(proposal.promptVersion).toBe('area-schedule-v2');
     expect(proposal.planItems.length).toBeGreaterThan(0);
     const offsets = proposal.planItems.map(
       (item) =>
@@ -204,5 +299,27 @@ describe('generateAreaScheduleProposal', () => {
     ).toBe(true);
     expect(new Set(offsets).size).toBe(offsets.length);
     expect(proposal.questions.length).toBeGreaterThan(0);
+  });
+
+  it('abbina sedute brevi ai giorni sportivi quando non ci sono giorni liberi', async () => {
+    const proposal = await generateAreaScheduleProposal(new Logger('test'), {
+      ...input,
+      freeDayOffsets: [],
+      sharedDayOffsets: [1, 4, 8, 11],
+      scheduleConstraints: constraints(1, 2, { daysPerWeek: 2 }),
+    });
+    const schedules = proposal.planItems.map(
+      (item) =>
+        (
+          item.metadata as {
+            schedule: { dayOffset: number; durationMinutes: number };
+          }
+        ).schedule,
+    );
+    expect(schedules.length).toBeGreaterThan(0);
+    for (const schedule of schedules) {
+      expect([1, 4, 8, 11]).toContain(schedule.dayOffset);
+      expect(schedule.durationMinutes).toBeLessThanOrEqual(20);
+    }
   });
 });

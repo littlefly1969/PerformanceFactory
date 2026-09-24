@@ -423,6 +423,18 @@ export function buildTrainingProposalJsonSchema(
   };
 }
 
+/** Giorni proponibili all'area: liberi e, dove servono, condivisi con lo sport. */
+export function areaDayOffsets(
+  input: Pick<
+    import('./proposal-provider-model').AreaScheduleInput,
+    'freeDayOffsets' | 'sharedDayOffsets'
+  >,
+) {
+  return [...input.freeDayOffsets, ...input.sharedDayOffsets].sort(
+    (a, b) => a - b,
+  );
+}
+
 export function buildAreaScheduleJsonSchema(
   input: import('./proposal-provider-model').AreaScheduleInput,
   options?: { includePropertyOrdering?: boolean },
@@ -431,12 +443,13 @@ export function buildAreaScheduleJsonSchema(
   const { minSessionsPerWeek, maxSessionsPerWeek } =
     input.scheduleConstraints.prescription;
   const weeks = Math.ceil(input.areaWindow.windowDays / 7);
+  const offsets = areaDayOffsets(input);
   const properties = {
     type: { type: 'string' },
     title: { type: 'string' },
     body: { type: 'string' },
-    // Solo i giorni liberi dal programma sportivo sono proponibili.
-    dayOffset: { type: 'integer', enum: input.freeDayOffsets },
+    // Solo i giorni ammessi all'area sono proponibili.
+    dayOffset: { type: 'integer', enum: offsets },
     durationMinutes: {
       type: 'integer',
       minimum: 1,
@@ -460,10 +473,7 @@ export function buildAreaScheduleJsonSchema(
       planItems: {
         type: 'array',
         minItems: weeks * minSessionsPerWeek,
-        maxItems: Math.min(
-          weeks * maxSessionsPerWeek,
-          input.freeDayOffsets.length,
-        ),
+        maxItems: Math.min(weeks * maxSessionsPerWeek, offsets.length),
         items: {
           type: 'object',
           additionalProperties: false,

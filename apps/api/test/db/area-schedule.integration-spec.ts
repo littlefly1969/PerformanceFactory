@@ -231,9 +231,9 @@ describe('Scheduled area calendar with PostgreSQL', () => {
     expect(release.sessions).toHaveLength(release.items.length);
   });
 
-  it('sospende la finestra quando i giorni disponibili sono gia tutti allenati', async () => {
+  it('affianca sedute brevi alle sessioni sportive quando i giorni disponibili sono gia tutti allenati', async () => {
     const athlete = await f.user();
-    // Disponibilita pari alle sessioni sportive: nessuna capienza residua per l area.
+    // Disponibilita pari alle sessioni sportive: nessun giorno libero per l area.
     await f.prisma.userOnboardingAssessment.update({
       where: { userId: athlete.id },
       data: {
@@ -246,20 +246,68 @@ describe('Scheduled area calendar with PostgreSQL', () => {
         },
       },
     });
-    await publishTrainingWindow(athlete.id);
+    const training = await publishTrainingWindow(athlete.id);
     const [operation] = await runScheduled(athlete.id);
     const after = await f.prisma.abilityPlanOperation.findUniqueOrThrow({
       where: { id: operation.id },
     });
-    expect(after.completedAt).toBeNull();
-    expect(after.lastErrorCode).toBe('AREA_SCHEDULE_NO_FREE_DAYS');
+    expect(after.completedAt).not.toBeNull();
+    expect(after.lastErrorCode).toBeNull();
+    const release = await f.prisma.improvementPlanRelease.findFirstOrThrow({
+      where: { userId: athlete.id, areaId: scheduledAreaId },
+      include: { sessions: { include: { planItem: true } } },
+    });
+    expect(release.status).toBe('ACTIVE');
+    expect(release.sessions.length).toBeGreaterThan(0);
+    const sportDays = training.sessions.map((s) =>
+      s.scheduledDate.toISOString().slice(0, 10),
+    );
+    for (const session of release.sessions) {
+      expect(sportDays).toContain(
+        session.scheduledDate.toISOString().slice(0, 10),
+      );
+      expect(
+        (session.planItem.metadata as { durationMinutes: number })
+          .durationMinutes,
+      ).toBeLessThanOrEqual(20);
+    }
+  });
+
+  it('sostituisce l elenco nato prima del passaggio a calendario con la prima finestra', async () => {
+    const athlete = await f.user();
+    // L area era ancora un elenco quando l atleta ha chiesto i piani.
+    await f.prisma.sportSpecializationAreaPrompt.updateMany({
+      where: { areaId: scheduledAreaId },
+      data: { isScheduled: false },
+    });
+    try {
+      await plans.request(athlete.id);
+      const legacy = await f.prisma.abilityPlanOperation.findFirstOrThrow({
+        where: { userId: athlete.id, areaId: scheduledAreaId },
+      });
+      await worker.resume(legacy.id);
+    } finally {
+      await f.prisma.sportSpecializationAreaPrompt.updateMany({
+        where: { areaId: scheduledAreaId },
+        data: { isScheduled: true },
+      });
+    }
     expect(
-      await f.prisma.improvementPlanRelease.count({
+      await f.prisma.improvementPlanRelease.findFirstOrThrow({
         where: { userId: athlete.id, areaId: scheduledAreaId },
       }),
-    ).toBe(0);
-    expect(
-      await f.prisma.areaSession.count({ where: { userId: athlete.id } }),
-    ).toBe(0);
+    ).toMatchObject({ status: 'ACTIVE', startsOn: null });
+
+    // Le attivita dell elenco non sono completate: la finestra parte comunque.
+    const training = await publishTrainingWindow(athlete.id);
+    await runScheduled(athlete.id);
+    const releases = await f.prisma.improvementPlanRelease.findMany({
+      where: { userId: athlete.id, areaId: scheduledAreaId },
+      include: { sessions: true },
+      orderBy: { version: 'asc' },
+    });
+    expect(releases.map((r) => r.status)).toEqual(['ARCHIVED', 'ACTIVE']);
+    expect(releases[1].trainingReleaseId).toBe(training.id);
+    expect(releases[1].sessions.length).toBeGreaterThan(0);
   });
 });

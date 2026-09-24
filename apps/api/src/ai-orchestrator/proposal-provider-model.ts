@@ -402,7 +402,7 @@ export type TrainingCycleProposal = Omit<CycleProposal, 'planItems'> & {
   planItems: TrainingSessionProposal[];
 };
 export const TRAINING_PROMPT_VERSION = 'training-rolling-v1';
-export const AREA_SCHEDULE_PROMPT_VERSION = 'area-schedule-v1';
+export const AREA_SCHEDULE_PROMPT_VERSION = 'area-schedule-v2';
 /** Finestra dell'area: ricalca quella sportiva a cui e agganciata. */
 export type AreaWindow = {
   startsOn: string;
@@ -414,4 +414,6 @@ export type AreaScheduleInput = CycleProposalInput & {
   scheduleConstraints: ScheduleConstraints;
   areaWindow: AreaWindow;
   freeDayOffsets: number[];
+  /** Giorni con sessione sportiva usati solo nelle settimane senza giorni liberi. */
+  sharedDayOffsets: number[];
 };

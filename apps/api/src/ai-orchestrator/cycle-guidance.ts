@@ -246,6 +246,7 @@ export async function assertPreviousCycleCompleted(
   client: Pick<PrismaService, 'improvementPlanRelease'>,
   userId: string,
   areaId: string,
+  scheduled = false,
 ) {
   const active = await client.improvementPlanRelease.findFirst({
     where: { userId, areaId, status: 'ACTIVE' },
@@ -276,6 +277,10 @@ export async function assertPreviousCycleCompleted(
       );
     return;
   }
+
+  // Un elenco nato prima che l'area passasse a calendario non blocca la prima
+  // finestra: la pubblicazione lo archivia come ogni release sostituita.
+  if (scheduled) return;
 
   const allActivitiesCompleted =
     active.items.length > 0 &&

@@ -33,7 +33,7 @@ Un piano già attivo o in revisione viene preservato, anche quando viene richies
 
 La migrazione aggiunge la coda e due campi di provenienza approvazione su `ImprovementPlanRelease`; non modifica piani preesistenti. Nessun backfill globale a pagamento durante il deploy: gli utenti esistenti attivano la preparazione dalla pagina Abilità.
 
-Questa slice prepara tutte le abilità e ne rende accessibili attività e check-in. Le aree con `isScheduled` producono invece sedute datate nel calendario dell'atleta, sulla finestra del programma sportivo e nei soli giorni liberi: si veda [Aree a calendario](area-training-calendar.md). Per tutte le altre aree resta vero quanto sopra: nessuna data, nessuna finestra di 14 giorni e il workflow di rinnovo esistente. Il carico non viene comunque sommato in silenzio, perché le sedute di area restano dentro i giorni settimanali dichiarati dall'atleta.
+Questa slice prepara tutte le abilità e ne rende accessibili attività e check-in. Le aree con `isScheduled` producono invece sedute datate nel calendario dell'atleta, sulla finestra del programma sportivo, nei giorni liberi o, se mancano, accanto alle sessioni sportive: si veda [Aree a calendario](area-training-calendar.md). Per tutte le altre aree resta vero quanto sopra: nessuna data, nessuna finestra di 14 giorni e il workflow di rinnovo esistente. Il carico non viene comunque sommato in silenzio, perché le sedute di area restano dentro i giorni settimanali dichiarati dall'atleta.
 
 ## Verifica
 
