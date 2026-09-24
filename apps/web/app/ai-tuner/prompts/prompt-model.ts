@@ -27,6 +27,8 @@ export type SportPrompt = {
   areaId: string;
   basePrompt: string;
   isEnabledDriver: boolean;
+  /** L'area produce sedute datate nel calendario dell'atleta. */
+  isScheduled?: boolean;
   version?: number;
   isActive: boolean;
   updatedAt?: string;

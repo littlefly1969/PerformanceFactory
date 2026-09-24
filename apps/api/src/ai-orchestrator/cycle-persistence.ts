@@ -16,6 +16,12 @@ export async function persistAreaProposal(
   actorId: string | null,
   proposal: CycleProposal,
   managed?: { id: string; leaseToken: string; approvalMode: string },
+  window?: {
+    startsOn: string;
+    endsOn: string;
+    windowDays: number;
+    trainingReleaseId: string;
+  },
 ) {
   return prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ability:${userId}:${area.id}`}))`;
@@ -79,6 +85,14 @@ export async function persistAreaProposal(
         sourceSnapshotId: previousSnapshot?.id ?? null,
         cycleStatus: 'WAITING_APPROVALS',
         proposedByAdminId: actorId && actorId !== userId ? actorId : null,
+        ...(window
+          ? {
+              startsOn: new Date(`${window.startsOn}T00:00:00Z`),
+              endsOn: new Date(`${window.endsOn}T00:00:00Z`),
+              windowDays: window.windowDays,
+              trainingReleaseId: window.trainingReleaseId,
+            }
+          : {}),
         items: { create: buildPlanItems(area, proposal) },
       },
       select: { id: true, version: true },

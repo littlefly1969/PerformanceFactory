@@ -11,10 +11,8 @@ export const sessionInclude = {
 type Session = Prisma.TrainingSessionGetPayload<{
   include: typeof sessionInclude;
 }>;
-export function sessionView(s: Session, today = athleteDate()) {
-  const date = s.scheduledDate.toISOString().slice(0, 10);
-  const metadata = s.trainingPlanItem.metadata;
-  // Only present useful, stored metadata; never leak provider/prompt internals.
+/** Only present useful, stored metadata; never leak provider/prompt internals. */
+export function sessionDetails(metadata: Prisma.JsonValue | null) {
   const details: { label: string; value: string }[] = [];
   if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
     for (const [key, label] of [
@@ -29,7 +27,14 @@ export function sessionView(s: Session, today = athleteDate()) {
         details.push({ label, value: String(value) });
     }
   }
+  return details;
+}
+export function sessionView(s: Session, today = athleteDate()) {
+  const date = s.scheduledDate.toISOString().slice(0, 10);
+  const details = sessionDetails(s.trainingPlanItem.metadata);
   return {
+    track: 'SPORT' as const,
+    areaName: null as string | null,
     id: s.id,
     date,
     sequence: s.sequence,
@@ -42,6 +47,48 @@ export function sessionView(s: Session, today = athleteDate()) {
     summary: s.trainingPlanRelease.summaryText,
     canAct:
       s.status === 'SCHEDULED' && s.trainingPlanRelease.status === 'ACTIVE',
+    completedAt: s.completedAt,
+    skippedAt: s.skippedAt,
+    completionNotes: s.completionNotes,
+    completionRating: s.completionRating,
+  };
+}
+export const areaSessionInclude = {
+  planItem: {
+    select: { title: true, type: true, body: true, metadata: true },
+  },
+  planRelease: {
+    select: {
+      status: true,
+      aiContextSummaries: {
+        select: { summaryText: true },
+        orderBy: { createdAt: 'desc' as const },
+        take: 1,
+      },
+    },
+  },
+  area: { select: { name: true } },
+} satisfies Prisma.AreaSessionInclude;
+type AreaSessionRecord = Prisma.AreaSessionGetPayload<{
+  include: typeof areaSessionInclude;
+}>;
+/** Stessa forma della sessione sportiva: il calendario unisce le due tracce. */
+export function areaSessionView(s: AreaSessionRecord, today = athleteDate()) {
+  const date = s.scheduledDate.toISOString().slice(0, 10);
+  return {
+    track: 'AREA' as const,
+    areaName: s.area.name as string | null,
+    id: s.id,
+    date,
+    sequence: s.sequence,
+    status: s.status,
+    displayStatus: presentationStatus(s.status, date, today),
+    title: s.planItem.title,
+    type: s.planItem.type,
+    body: s.planItem.body,
+    details: sessionDetails(s.planItem.metadata),
+    summary: s.planRelease.aiContextSummaries[0]?.summaryText ?? '',
+    canAct: s.status === 'SCHEDULED' && s.planRelease.status === 'ACTIVE',
     completedAt: s.completedAt,
     skippedAt: s.skippedAt,
     completionNotes: s.completionNotes,

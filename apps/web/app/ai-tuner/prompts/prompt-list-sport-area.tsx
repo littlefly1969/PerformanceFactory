@@ -105,6 +105,10 @@ export function renderSportAreaPrompts(model: PromptManagementModel) {
                         </strong>
                       </span>
                       <span>
+                        A calendario
+                        <strong>{prompt?.isScheduled ? "Sì" : "No"}</strong>
+                      </span>
+                      <span>
                         Bozze
                         <strong>{draftsCount}</strong>
                       </span>

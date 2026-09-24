@@ -32,6 +32,7 @@ export function sportAreaPromptVersionContent(prompt: {
   areaId: string;
   basePrompt: string;
   isEnabledDriver: boolean;
+  isScheduled: boolean;
   isActive: boolean;
 }): Prisma.InputJsonObject {
   return {
@@ -39,6 +40,7 @@ export function sportAreaPromptVersionContent(prompt: {
     areaId: prompt.areaId,
     basePrompt: prompt.basePrompt,
     isEnabledDriver: prompt.isEnabledDriver,
+    isScheduled: prompt.isScheduled,
     isActive: prompt.isActive,
   };
 }
@@ -119,6 +121,7 @@ export async function createSportAreaPromptVersion(
     basePrompt: string;
     version: number;
     isEnabledDriver: boolean;
+    isScheduled: boolean;
     isActive: boolean;
   },
   actorId: string | null,

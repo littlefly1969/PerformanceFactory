@@ -28,6 +28,7 @@ export async function upsertSportCatalog(
         areaId?: string;
         basePrompt?: string;
         isEnabledDriver?: boolean;
+        isScheduled?: boolean;
         isActive?: boolean;
       }>;
     }>;
@@ -158,6 +159,10 @@ export async function upsertSportCatalog(
           update: {
             basePrompt,
             isEnabledDriver: prompt.isEnabledDriver ?? true,
+            // Assente significa invariato: un salvataggio parziale non spegne il calendario.
+            ...(prompt.isScheduled === undefined
+              ? {}
+              : { isScheduled: prompt.isScheduled }),
             isActive: prompt.isActive ?? true,
             version: { increment: 1 },
             updatedById: actorId,
@@ -167,6 +172,7 @@ export async function upsertSportCatalog(
             areaId,
             basePrompt,
             isEnabledDriver: prompt.isEnabledDriver ?? true,
+            isScheduled: prompt.isScheduled ?? false,
             isActive: prompt.isActive ?? true,
             createdById: actorId,
             updatedById: actorId,

@@ -31,3 +31,12 @@ it("requests only missing plans and explains failures without exposing internal 
   await waitFor(() => expect(fetcher.mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1));
   expect(screen.getByText("Controllo della volée")).toBeVisible();
 });
+it("porta al calendario le abilita a giornate e non offre la richiesta manuale", async () => {
+  const scheduled = { id: "athletic", name: "Preparazione atletica", status: "READY", isScheduled: true, plan: { id: "plan-a", version: 2, items: [{ id: "i1", title: "Forza", body: "Squat.", status: "ACTIVE" }], checkInId: "check-a", window: { startsOn: "2026-10-05", endsOn: "2026-10-18", sessions: 4, completed: 1, nextDate: "2026-10-07" } } };
+  vi.stubGlobal("fetch", vi.fn(async () => Response.json({ abilities: [scheduled, { id: "mental", name: "Mentale", status: "EMPTY", isScheduled: true, plan: null }] })));
+  render(<AbilitiesPage />);
+  await screen.findByText(/1\/4 sedute fatte/);
+  expect(screen.getByRole("link", { name: /Vedi le sedute nel calendario/ })).toHaveAttribute("href", "/user/training?date=2026-10-07");
+  expect(screen.queryByRole("button", { name: "Prepara i piani mancanti" })).not.toBeInTheDocument();
+  expect(within(screen.getByRole("region", { name: "Mentale" })).getByText(/nei giorni liberi da allenamento/)).toBeVisible();
+});

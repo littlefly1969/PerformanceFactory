@@ -403,6 +403,20 @@ const makePrismaMock = () => {
             : [],
         };
       },
+      // I cicli di quest'area non sono a calendario: nessuna finestra, nessuna seduta datata.
+      findUniqueOrThrow: ({ where }: { where: { id: string } }) => {
+        const plan = planReleases.find((item) => item.id === where.id);
+        if (!plan) {
+          throw new Error(`Plan release ${where.id} not found`);
+        }
+        return {
+          userId: plan.userId,
+          areaId: plan.areaId,
+          startsOn: null,
+          windowDays: null,
+          items: [],
+        };
+      },
     },
     planItem: {
       updateMany: () => ({ count: 1 }),

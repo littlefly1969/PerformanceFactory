@@ -78,6 +78,7 @@ export class AdminService {
           areaId?: string;
           basePrompt?: string;
           isEnabledDriver?: boolean;
+          isScheduled?: boolean;
           isActive?: boolean;
         }>;
       }>;

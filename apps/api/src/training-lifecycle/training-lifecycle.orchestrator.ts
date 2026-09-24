@@ -194,6 +194,11 @@ export class TrainingLifecycleOrchestrator
       await this.approval.process(releaseId, operation.approvalMode);
       stage = 'PUBLICATION_FAILED';
       const published = await this.publication.publishIfReady(releaseId);
+      // Con la finestra sportiva pubblicata le aree a calendario conoscono i giorni liberi.
+      if (published.cycleStatus === 'PUBLISHED')
+        await this.prisma.$transaction((tx) =>
+          this.abilities.enqueueScheduled(tx, operation.userId, releaseId),
+        );
       await this.prisma.trainingLifecycleOperation.updateMany({
         where: { id: operationId, leaseToken },
         data: {
@@ -243,7 +248,20 @@ export class TrainingLifecycleOrchestrator
   }
   async approveManual(releaseId: string, actor: { id: string; role: string }) {
     await this.approval.approveManual(releaseId, actor);
-    return this.publication.publishIfReady(releaseId, actor.id);
+    const published = await this.publication.publishIfReady(
+      releaseId,
+      actor.id,
+    );
+    if (published.cycleStatus === 'PUBLISHED') {
+      const release = await this.prisma.trainingPlanRelease.findUniqueOrThrow({
+        where: { id: releaseId },
+        select: { userId: true },
+      });
+      await this.prisma.$transaction((tx) =>
+        this.abilities.enqueueScheduled(tx, release.userId, releaseId),
+      );
+    }
+    return published;
   }
   async coachPlans(actor: { id: string; role: string }) {
     const links = await this.prisma.coachUserLink.findMany({

@@ -13,12 +13,15 @@ import {
   finishTrainingSession,
 } from './training-sessions';
 import {
+  areaSessionInclude,
+  areaSessionView,
   completedStreak,
   performanceView,
   sessionInclude,
   sessionView,
   snapshotInclude,
 } from './athlete-views';
+import { finishAreaSession } from './area-sessions';
 import { dueCheckIn } from './athlete-check-in';
 
 @Injectable()
@@ -31,17 +34,38 @@ export class AthleteService {
   async calendar(userId: string, from: string, to: string) {
     const scheduledDate = calendarRange(from, to);
     const today = athleteDate();
-    const sessions = await this.prisma.trainingSession.findMany({
-      where: { userId, scheduledDate },
-      include: sessionInclude,
-      orderBy: [{ scheduledDate: 'asc' }, { sequence: 'asc' }, { id: 'asc' }],
-    });
+    const order = [
+      { scheduledDate: 'asc' as const },
+      { sequence: 'asc' as const },
+      { id: 'asc' as const },
+    ];
+    const [sessions, areaSessions] = await Promise.all([
+      this.prisma.trainingSession.findMany({
+        where: { userId, scheduledDate },
+        include: sessionInclude,
+        orderBy: order,
+      }),
+      this.prisma.areaSession.findMany({
+        where: { userId, scheduledDate },
+        include: areaSessionInclude,
+        orderBy: order,
+      }),
+    ]);
     return {
       from,
       to,
       today,
       timeZone: ATHLETE_TIME_ZONE,
-      sessions: sessions.map((s) => sessionView(s, today)),
+      // Le due tracce convivono nello stesso calendario, sportiva per prima a parita di data.
+      sessions: [
+        ...sessions.map((s) => sessionView(s, today)),
+        ...areaSessions.map((s) => areaSessionView(s, today)),
+      ].sort(
+        (a, b) =>
+          a.date.localeCompare(b.date) ||
+          a.track.localeCompare(b.track) ||
+          a.sequence - b.sequence,
+      ),
     };
   }
   async session(userId: string, id: string) {
@@ -49,8 +73,13 @@ export class AthleteService {
       where: { id, userId },
       include: sessionInclude,
     });
-    if (!s) throw new NotFoundException('Sessione non trovata');
-    return sessionView(s);
+    if (s) return sessionView(s);
+    const areaSession = await this.prisma.areaSession.findFirst({
+      where: { id, userId },
+      include: areaSessionInclude,
+    });
+    if (!areaSession) throw new NotFoundException('Sessione non trovata');
+    return areaSessionView(areaSession);
   }
   async finish(
     userId: string,
@@ -58,6 +87,12 @@ export class AthleteService {
     status: 'COMPLETED' | 'SKIPPED',
     input: CompletePlanItemDto = {},
   ) {
+    const owned = await this.prisma.trainingSession.count({
+      where: { id, userId },
+    });
+    // Le sessioni di area chiudono la loro attivita senza toccare il ciclo sportivo.
+    if (!owned)
+      return finishAreaSession(this.prisma, userId, id, status, input);
     const result = await finishTrainingSession(
       this.prisma,
       userId,

@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { createAreaSessions } from '../athlete/area-sessions';
 
 export async function publishCycle(
   prisma: PrismaService,
@@ -109,6 +110,9 @@ export async function publishCycle(
       where: { planReleaseId: plan.id },
       data: { status: 'ACTIVE' },
     });
+
+    // Le aree a calendario materializzano le occorrenze datate nella stessa transazione.
+    await createAreaSessions(tx, plan.id);
 
     await tx.questionSet.update({
       where: { id: questionSet.id },

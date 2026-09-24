@@ -28,7 +28,7 @@ Ogni sessione richiede `dayOffset` 0–13 e `durationMinutes`. Attrezzatura, ser
 
 `createTrainingSessions()` continua a materializzare le sessioni, ma per le release rolling usa `startsOn + dayOffset`. Una schedule assente o invalida è un errore; non viene distribuito il lavoro automaticamente. Le release storiche senza `startsOn` conservano il precedente fallback su sette giorni e le sessioni già persistite.
 
-Il calendario PF4 `/user/training` continua a leggere `TrainingSession`. La home aggiunge intervallo corrente, numero finestra nel macroblocco e frequenza; i dettagli delle sessioni mostrano immediatamente i metadata utili.
+Il calendario PF4 `/user/training` unisce `TrainingSession` e le sedute delle aree a calendario ([Aree a calendario](area-training-calendar.md)), che riusano la finestra del programma sportivo occupando i soli giorni liberi. La home aggiunge intervallo corrente, numero finestra nel macroblocco e frequenza; i dettagli delle sessioni mostrano immediatamente i metadata utili.
 
 ## Rinnovo e recupero
 

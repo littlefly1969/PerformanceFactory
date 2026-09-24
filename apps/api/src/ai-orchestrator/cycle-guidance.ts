@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { athleteDate, dateOnly } from '../athlete/training-sessions';
 import { AreaRecord } from './orchestrator-model';
 import {
   CycleProposal,
@@ -251,6 +252,8 @@ export async function assertPreviousCycleCompleted(
     orderBy: { createdAt: 'desc' },
     select: {
       id: true,
+      startsOn: true,
+      endsOn: true,
       items: { select: { status: true } },
       questionSets: {
         select: { status: true, closedAt: true },
@@ -261,6 +264,16 @@ export async function assertPreviousCycleCompleted(
   });
 
   if (!active) {
+    return;
+  }
+
+  // Un'area a calendario segue la finestra: blocca finche la finestra corre,
+  // poi lascia spazio alla successiva senza pretendere il recupero degli arretrati.
+  if (active.startsOn) {
+    if (active.endsOn && dateOnly(athleteDate()) < active.endsOn)
+      throw new BadRequestException(
+        'La finestra dell area precedente e ancora in corso',
+      );
     return;
   }
 

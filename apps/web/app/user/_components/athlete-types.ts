@@ -1,5 +1,8 @@
 import type { Driver } from "../../journey/journey-types";
 export type Session = {
+  /** SPORT: programma sportivo. AREA: seduta di un'abilità a calendario. */
+  track: "SPORT" | "AREA";
+  areaName: string | null;
   id: string;
   date: string;
   sequence: number;
