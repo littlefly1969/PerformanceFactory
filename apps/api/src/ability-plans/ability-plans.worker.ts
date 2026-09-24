@@ -10,6 +10,10 @@ import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiProposalProviderService } from '../ai-orchestrator/proposal-provider.service';
 import { prepareCycleProposalInput } from '../ai-orchestrator/cycle-generation';
+import {
+  generateAreaScheduleProposal,
+  prepareAreaScheduleInput,
+} from '../ai-orchestrator/area-schedule';
 import { persistAreaProposal } from '../ai-orchestrator/cycle-persistence';
 import { publishCycle } from '../ai-orchestrator/cycle-publication';
 import { AbilityPlansService } from './ability-plans.service';
@@ -117,23 +121,41 @@ export class AbilityPlansWorker
             userId: op.userId,
             areaId: op.areaId,
             status: { in: ['ACTIVE', 'PENDING_APPROVAL'] },
+            // Una finestra nuova non eredita la release della precedente.
+            ...(op.trainingReleaseId
+              ? { trainingReleaseId: op.trainingReleaseId }
+              : {}),
           },
         });
         if (existing) {
           await this.finish(id, token);
           return;
         }
-        const input = await prepareCycleProposalInput(
-          this.prisma,
-          this.provider,
-          op.userId,
-          area,
-          'Piano iniziale o successivo per abilità, richiesto dall’atleta',
-        );
-        const proposal = await this.provider.generateCycleProposal(input);
+        // L'area a calendario usa il proprio contratto: sedute datate nei giorni liberi.
+        const scheduled = op.trainingReleaseId
+          ? await prepareAreaScheduleInput(
+              this.prisma,
+              this.provider,
+              op.userId,
+              area,
+              op.trainingReleaseId,
+              'Sedute di area per la finestra sportiva corrente',
+            )
+          : null;
+        const proposal = scheduled
+          ? await generateAreaScheduleProposal(this.logger, scheduled)
+          : await this.provider.generateCycleProposal(
+              await prepareCycleProposalInput(
+                this.prisma,
+                this.provider,
+                op.userId,
+                area,
+                'Piano iniziale o successivo per abilità, richiesto dall’atleta',
+              ),
+            );
         if (
           !proposal.planItems?.length ||
-          proposal.planItems.length > 3 ||
+          (!scheduled && proposal.planItems.length > 3) ||
           !proposal.questions?.length
         )
           throw new ConflictException({
@@ -148,6 +170,12 @@ export class AbilityPlansWorker
             op.requestedById,
             proposal,
             { id, leaseToken: token, approvalMode: op.approvalMode },
+            scheduled
+              ? {
+                  ...scheduled.areaWindow,
+                  trainingReleaseId: op.trainingReleaseId!,
+                }
+              : undefined,
           )
         ).planReleaseId;
       }

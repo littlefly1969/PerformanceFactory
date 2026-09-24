@@ -199,6 +199,7 @@ export class AiTuningController {
                     areaId: { type: 'string' },
                     basePrompt: { type: 'string' },
                     isEnabledDriver: { type: 'boolean' },
+                    isScheduled: { type: 'boolean' },
                     isActive: { type: 'boolean' },
                   },
                 },
@@ -230,6 +231,7 @@ export class AiTuningController {
           areaId?: string;
           basePrompt?: string;
           isEnabledDriver?: boolean;
+          isScheduled?: boolean;
           isActive?: boolean;
         }>;
       }>;

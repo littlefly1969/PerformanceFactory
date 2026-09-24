@@ -64,6 +64,9 @@ export function SessionCard({ session }: { session: Session }) {
       <div>
         <span className="pf4-kicker">
           {sessionLabels[session.displayStatus]} · {displayDate(session.date)}
+          {session.track === "AREA" && session.areaName
+            ? ` · ${session.areaName}`
+            : ""}
         </span>
         <h2>{session.title}</h2>
         <p>

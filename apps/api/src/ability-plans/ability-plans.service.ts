@@ -23,10 +23,13 @@ export class AbilityPlansService {
         isActive: true,
         isEnabledDriver: true,
       },
-      select: { area: { select: { id: true, name: true } } },
+      select: {
+        isScheduled: true,
+        area: { select: { id: true, name: true } },
+      },
       orderBy: { area: { name: 'asc' } },
     });
-    return prompts.map((p) => p.area);
+    return prompts.map((p) => ({ ...p.area, isScheduled: p.isScheduled }));
   }
   async assertEligible(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -58,6 +61,8 @@ export class AbilityPlansService {
     if (!['AUTO', 'MANUAL'].includes(mode))
       throw new Error('ABILITY_APPROVAL_MODE must be AUTO or MANUAL');
     for (const area of await this.enabledAreas(userId, tx)) {
+      // Le aree a calendario si accodano per finestra, dopo la pubblicazione sportiva.
+      if (area.isScheduled) continue;
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ability:${userId}:${area.id}`}))`;
       const latest = await tx.improvementPlanRelease.findFirst({
         where: { userId, areaId: area.id },
@@ -98,6 +103,63 @@ export class AbilityPlansService {
       }
     }
   }
+  /**
+   * Accoda le aree a calendario sulla finestra appena pubblicata: una richiesta per
+   * area e release sportiva, cosi un rinnovo non genera due volte lo stesso lavoro.
+   */
+  async enqueueScheduled(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    trainingReleaseId: string,
+    actorId = userId,
+  ) {
+    const mode = process.env.ABILITY_APPROVAL_MODE ?? 'AUTO';
+    if (!['AUTO', 'MANUAL'].includes(mode))
+      throw new Error('ABILITY_APPROVAL_MODE must be AUTO or MANUAL');
+    for (const area of await this.enabledAreas(userId, tx)) {
+      if (!area.isScheduled) continue;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`ability:${userId}:${area.id}`}))`;
+      const existing = await tx.improvementPlanRelease.findFirst({
+        where: { userId, areaId: area.id, trainingReleaseId },
+        select: { id: true },
+      });
+      if (existing) continue;
+      const generationKey = `${userId}:${area.id}:window:${trainingReleaseId}`;
+      const operation = await tx.abilityPlanOperation.findUnique({
+        where: { generationKey },
+      });
+      if (operation) {
+        if (!operation.completedAt)
+          await tx.abilityPlanOperation.update({
+            where: { id: operation.id },
+            data: { nextAttemptAt: new Date() },
+          });
+        continue;
+      }
+      const created = await tx.abilityPlanOperation.create({
+        data: {
+          userId,
+          areaId: area.id,
+          generationKey,
+          trainingReleaseId,
+          approvalMode: mode,
+          requestedById: actorId,
+        },
+      });
+      await tx.cycleAuditLog.create({
+        data: {
+          userId,
+          action: 'AREA_SCHEDULE_REQUESTED',
+          actorId,
+          metadata: {
+            areaId: area.id,
+            abilityOperationId: created.id,
+            trainingReleaseId,
+          },
+        },
+      });
+    }
+  }
   async request(userId: string) {
     await this.assertEligible(userId);
     if (!(await this.enabledAreas(userId)).length)
@@ -122,6 +184,10 @@ export class AbilityPlansService {
                   select: { id: true, title: true, body: true, status: true },
                 },
                 questionSets: { select: { id: true, status: true } },
+                sessions: {
+                  select: { id: true, scheduledDate: true, status: true },
+                  orderBy: { scheduledDate: 'asc' },
+                },
               },
             }),
             this.prisma.abilityPlanOperation.findFirst({
@@ -165,6 +231,22 @@ export class AbilityPlansService {
                     checkInId:
                       plan.questionSets.find((q) => q.status === 'PUBLISHED')
                         ?.id ?? null,
+                    window: plan.startsOn
+                      ? {
+                          startsOn: plan.startsOn.toISOString().slice(0, 10),
+                          endsOn:
+                            plan.endsOn?.toISOString().slice(0, 10) ?? null,
+                          sessions: plan.sessions.length,
+                          completed: plan.sessions.filter(
+                            (s) => s.status === 'COMPLETED',
+                          ).length,
+                          nextDate:
+                            plan.sessions
+                              .find((s) => s.status === 'SCHEDULED')
+                              ?.scheduledDate.toISOString()
+                              .slice(0, 10) ?? null,
+                        }
+                      : null,
                   }
                 : null,
           };

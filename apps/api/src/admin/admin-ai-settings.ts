@@ -116,6 +116,7 @@ export async function getAiSettings(prisma: PrismaService) {
                 areaId: true,
                 basePrompt: true,
                 isEnabledDriver: true,
+                isScheduled: true,
                 version: true,
                 isActive: true,
                 activePromptVersionId: true,

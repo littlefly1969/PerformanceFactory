@@ -50,6 +50,7 @@ enum OnboardingInputType {
 
 model User {
   abilityPlanOperations AbilityPlanOperation[]
+  areaSessions AreaSession[]
   discovery AthleteDiscovery?
   id        String   @id @default(uuid())
   email     String   @unique
@@ -324,6 +325,7 @@ model SportSpecializationAreaPrompt {
   areaId           String
   basePrompt       String
   isEnabledDriver  Boolean  @default(true)
+  isScheduled      Boolean  @default(false)
   version          Int      @default(1)
   isActive         Boolean  @default(true)
   activePromptVersionId String? @unique
@@ -429,6 +431,7 @@ model ProfessionalUserLink {
 
 model Area {
   abilityPlanOperations AbilityPlanOperation[]
+  areaSessions AreaSession[]
   id   String @id @default(uuid())
   name String @unique
 
@@ -599,6 +602,12 @@ model ImprovementPlanRelease {
   abilityOperation AbilityPlanOperation?
   approvalSource String?
   approvedAt DateTime?
+  startsOn DateTime? @db.Date
+  endsOn DateTime? @db.Date
+  windowDays Int?
+  trainingReleaseId String?
+  trainingRelease TrainingPlanRelease? @relation("AreaScheduleWindow", fields: [trainingReleaseId], references: [id], onDelete: SetNull)
+  sessions AreaSession[]
   id          String      @id @default(uuid())
   userId      String
   areaId      String
@@ -626,6 +635,7 @@ model ImprovementPlanRelease {
   auditLogs          CycleAuditLog[]
 
   @@unique([userId, areaId, version])
+  @@unique([userId, areaId, trainingReleaseId])
   @@index([userId, areaId, status, createdAt])
 }
 
@@ -692,6 +702,7 @@ model TrainingPlanRelease {
   sessions       TrainingSession[]
   items          TrainingPlanItem[]
   questionSets   TrainingQuestionSet[]
+  areaSchedules  ImprovementPlanRelease[] @relation("AreaScheduleWindow")
 
   @@unique([userId, version])
   @@index([userId, status, createdAt])
@@ -881,6 +892,32 @@ model PlanItem {
   planRelease ImprovementPlanRelease @relation(fields: [planReleaseId], references: [id])
   area        Area                   @relation(fields: [areaId], references: [id])
   approvedBy  User?                  @relation("PlanItemApprovedBy", fields: [approvedByProfessionalId], references: [id])
+  sessions    AreaSession[]
+}
+
+/// Occorrenze datate delle attivita di un'area schedulata, gemelle di TrainingSession.
+model AreaSession {
+  id String @id @default(uuid())
+  userId String
+  planReleaseId String
+  planItemId String
+  areaId String
+  scheduledDate DateTime @db.Date
+  sequence Int
+  status TrainingSessionStatus @default(SCHEDULED)
+  completedAt DateTime?
+  skippedAt DateTime?
+  completionNotes String?
+  completionRating Int?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id])
+  planRelease ImprovementPlanRelease @relation(fields: [planReleaseId], references: [id], onDelete: Cascade)
+  planItem PlanItem @relation(fields: [planItemId], references: [id], onDelete: Cascade)
+  area Area @relation(fields: [areaId], references: [id])
+  @@unique([planReleaseId, planItemId])
+  @@index([userId, scheduledDate])
+  @@index([planReleaseId, scheduledDate])
 }
 
 model QuestionSet {
@@ -1224,6 +1261,7 @@ model AbilityPlanOperation {
   areaId String
   generationKey String @unique
   releaseId String? @unique
+  trainingReleaseId String?
   approvalMode String @default("AUTO")
   requestedById String?
   createdAt DateTime @default(now())

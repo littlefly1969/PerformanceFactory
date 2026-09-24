@@ -422,3 +422,68 @@ export function buildTrainingProposalJsonSchema(
       : {}),
   };
 }
+
+export function buildAreaScheduleJsonSchema(
+  input: import('./proposal-provider-model').AreaScheduleInput,
+  options?: { includePropertyOrdering?: boolean },
+) {
+  const base = buildProposalJsonSchema(input, options);
+  const { minSessionsPerWeek, maxSessionsPerWeek } =
+    input.scheduleConstraints.prescription;
+  const weeks = Math.ceil(input.areaWindow.windowDays / 7);
+  const properties = {
+    type: { type: 'string' },
+    title: { type: 'string' },
+    body: { type: 'string' },
+    // Solo i giorni liberi dal programma sportivo sono proponibili.
+    dayOffset: { type: 'integer', enum: input.freeDayOffsets },
+    durationMinutes: {
+      type: 'integer',
+      minimum: 1,
+      maximum: input.scheduleConstraints.availability.sessionDurationMinutes,
+    },
+    equipment: { type: ['string', 'null'] },
+    sets: { type: ['integer', 'null'], minimum: 1 },
+    reps: { type: ['string', 'null'] },
+    restSeconds: { type: ['integer', 'null'], minimum: 0 },
+  };
+  return {
+    ...base,
+    required: ['summaryText', 'sessionsPerWeek', 'planItems', 'questions'],
+    properties: {
+      ...base.properties,
+      sessionsPerWeek: {
+        type: 'integer',
+        minimum: minSessionsPerWeek,
+        maximum: maxSessionsPerWeek,
+      },
+      planItems: {
+        type: 'array',
+        minItems: weeks * minSessionsPerWeek,
+        maxItems: Math.min(
+          weeks * maxSessionsPerWeek,
+          input.freeDayOffsets.length,
+        ),
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: Object.keys(properties),
+          properties,
+          ...(options?.includePropertyOrdering
+            ? { propertyOrdering: Object.keys(properties) }
+            : {}),
+        },
+      },
+    },
+    ...(options?.includePropertyOrdering
+      ? {
+          propertyOrdering: [
+            'summaryText',
+            'sessionsPerWeek',
+            'planItems',
+            'questions',
+          ],
+        }
+      : {}),
+  };
+}

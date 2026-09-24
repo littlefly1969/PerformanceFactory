@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import {
-  TrainingConstraints,
+  ScheduleConstraints,
   TrainingSessionProposal,
   TrainingWindow,
 } from './proposal-provider-model';
@@ -30,7 +30,7 @@ export function trainingWindow(
 }
 export function validateTrainingSchedule(
   proposal: { sessionsPerWeek: number; planItems: TrainingSessionProposal[] },
-  constraints: TrainingConstraints,
+  constraints: ScheduleConstraints,
   startsOn: string,
 ) {
   const invalid = (reason: string): never => {

@@ -223,6 +223,17 @@ async function main() {
     });
   }
 
+  // La preparazione atletica lavora a calendario: sedute datate nei giorni liberi.
+  const scheduledArea = areaRecords.find(
+    (area) => area.name === 'Preparazione atletica',
+  );
+  if (scheduledArea) {
+    await prisma.sportSpecializationAreaPrompt.updateMany({
+      where: { areaId: scheduledArea.id },
+      data: { isScheduled: true },
+    });
+  }
+
   for (const area of areaRecords) {
     await prisma.professionalUserLink.upsert({
       where: {

@@ -359,9 +359,9 @@ export const DEFAULT_OPTIONS = [
   { label: 'Con costanza', score: 100 },
 ];
 
-export type TrainingConstraints = {
-  programDurationWeeks: 4 | 12 | 52;
-  operationalWindowDays: 14;
+/** Vincoli comuni a ogni traccia schedulata: programma sportivo e aree a calendario. */
+export type ScheduleConstraints = {
+  operationalWindowDays: number;
   currentFrequency: { min: number; max: number };
   availability: {
     daysPerWeek: number;
@@ -369,6 +369,10 @@ export type TrainingConstraints = {
     preferredDays?: number[];
   };
   prescription: { minSessionsPerWeek: number; maxSessionsPerWeek: number };
+};
+export type TrainingConstraints = ScheduleConstraints & {
+  programDurationWeeks: 4 | 12 | 52;
+  operationalWindowDays: 14;
 };
 export type TrainingWindow = {
   startsOn: string;
@@ -398,3 +402,16 @@ export type TrainingCycleProposal = Omit<CycleProposal, 'planItems'> & {
   planItems: TrainingSessionProposal[];
 };
 export const TRAINING_PROMPT_VERSION = 'training-rolling-v1';
+export const AREA_SCHEDULE_PROMPT_VERSION = 'area-schedule-v1';
+/** Finestra dell'area: ricalca quella sportiva a cui e agganciata. */
+export type AreaWindow = {
+  startsOn: string;
+  endsOn: string;
+  windowDays: number;
+};
+export type AreaSessionProposal = TrainingSessionProposal;
+export type AreaScheduleInput = CycleProposalInput & {
+  scheduleConstraints: ScheduleConstraints;
+  areaWindow: AreaWindow;
+  freeDayOffsets: number[];
+};

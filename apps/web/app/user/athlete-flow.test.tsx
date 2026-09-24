@@ -17,6 +17,8 @@ vi.mock("../lib/api", () => ({
   secureFetch: (path: string, init?: RequestInit) => fetch(path, init),
 }));
 const session: Session = {
+  track: "SPORT",
+  areaName: null,
   id: "session-one",
   date: "2026-09-19",
   sequence: 1,
@@ -324,6 +326,34 @@ describe("PF4 athlete experience", () => {
     expect(
       await screen.findByText("Nessuna sessione in questa data."),
     ).toBeInTheDocument();
+  });
+  it("mostra nel calendario anche le sedute di area con la loro abilita", async () => {
+    const areaSession: Session = {
+      ...session,
+      track: "AREA",
+      areaName: "Preparazione atletica",
+      id: "area-session",
+      title: "Forza e stabilità",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        const query = new URL(url, "http://test").searchParams;
+        return respond({
+          ...home.week,
+          from: query.get("from"),
+          to: query.get("to"),
+          sessions:
+            query.get("from") === "2026-09-01" ? [session, areaSession] : [],
+        });
+      }),
+    );
+    render(<TrainingPage />);
+    expect((await screen.findAllByText("Forza e stabilità")).length).toBe(2);
+    expect(screen.getAllByText(/Preparazione atletica/).length).toBeGreaterThan(
+      0,
+    );
+    expect(screen.getAllByText(session.title).length).toBe(2);
   });
   it("uses one check-in question at a time and submits existing option IDs", async () => {
     vi.stubGlobal(
