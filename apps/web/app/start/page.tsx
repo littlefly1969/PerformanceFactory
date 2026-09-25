@@ -19,6 +19,10 @@ import { PF4Shell } from "./pf4-shell";
 import { Registration } from "./registration";
 import { pruneHiddenAnswers, visibleQuestions } from "./discovery-branches";
 import { PreliminaryResult } from "./preliminary-result";
+import {
+  AnalysisTransition,
+  DISCOVERY_ANALYSIS_MIN_DURATION_MS,
+} from "./analysis-transition";
 
 export default function StartPage() {
   const googlePending = usePendingGoogle();
@@ -83,7 +87,7 @@ export default function StartPage() {
             ? { ...current, currentStep: "result" }
             : current,
         ),
-      900,
+      DISCOVERY_ANALYSIS_MIN_DURATION_MS,
     );
     return () => clearTimeout(timer);
   }, [draft?.currentStep]);
@@ -249,14 +253,7 @@ export default function StartPage() {
           )}
         </>
       )}
-      {draft.currentStep === "processing" && (
-        <section className="pf4-body" role="status">
-          <h1>Analizziamo le tue risposte…</h1>
-          <p>
-            Prepariamo il riepilogo del tuo profilo fisico e dei tuoi obiettivi.
-          </p>
-        </section>
-      )}
+      {draft.currentStep === "processing" && <AnalysisTransition />}
       {draft.currentStep === "result" && (
         <PreliminaryResult
           config={config}
