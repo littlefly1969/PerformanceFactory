@@ -16,6 +16,7 @@ import {
   ScheduleConstraints,
 } from './proposal-provider-model';
 import {
+  areaDayOffsets,
   buildAreaScheduleJsonSchema,
   cycleQuestionLayout,
 } from './proposal-schemas';
@@ -30,6 +31,8 @@ import { validateTrainingSchedule } from './training-schedule';
 
 /** Tetto di prodotto per la traccia area: resta sotto al programma sportivo. */
 export const AREA_FREQUENCY = { min: 1, max: 2 };
+/** Durata massima di una seduta di area nel giorno di una sessione sportiva. */
+export const AREA_SHARED_DAY_MINUTES = 20;
 
 export function areaWindowFromTraining(release: {
   startsOn: Date | null;
@@ -80,15 +83,55 @@ export function freeDayOffsets(
 }
 
 /**
- * Capienza dell'area in ogni settimana relativa: giorni liberi, ma senza superare
- * i giorni settimanali che l'atleta ha dichiarato disponibili. Se una settimana
+ * Giorni dell'area settimana per settimana. Valgono i giorni liberi entro i giorni
+ * dichiarati dall'atleta; una settimana che non ne ha affianca sedute brevi alle
+ * sessioni sportive, cosi l'area non aggiunge giorni di impegno.
+ */
+export function areaScheduleDays(
+  window: AreaWindow,
+  sportDates: Date[],
+  availability: ScheduleConstraints['availability'],
+  now = new Date(),
+) {
+  const free = freeDayOffsets(window, sportDates, availability, now);
+  // Giorni futuri e preferiti, a prescindere dallo sport.
+  const open = new Set(freeDayOffsets(window, [], availability, now));
+  const start = dateOnly(window.startsOn).getTime();
+  const sport = sportDates
+    .map((date) => Math.round((date.getTime() - start) / 86400000))
+    .sort((a, b) => a - b);
+  const days = {
+    freeDayOffsets: [] as number[],
+    sharedDayOffsets: [] as number[],
+    capacity: [] as number[],
+  };
+  for (let week = 0; week < Math.ceil(window.windowDays / 7); week += 1) {
+    const inWeek = (offset: number) =>
+      offset >= week * 7 && offset < (week + 1) * 7;
+    const weekSport = sport.filter(inWeek);
+    const weekFree = free.filter(inWeek);
+    const freeCapacity = Math.min(
+      weekFree.length,
+      availability.daysPerWeek - weekSport.length,
+    );
+    if (freeCapacity > 0) {
+      days.freeDayOffsets.push(...weekFree);
+      days.capacity.push(freeCapacity);
+    } else {
+      const shared = weekSport.filter((offset) => open.has(offset));
+      days.sharedDayOffsets.push(...shared);
+      days.capacity.push(Math.min(shared.length, availability.daysPerWeek));
+    }
+  }
+  return days;
+}
+
+/**
+ * Frequenza dell'area dalla capienza di ogni settimana relativa. Se una settimana
  * non ha capienza la finestra non viene pianificata.
  */
 export function areaPrescription(
-  offsets: number[],
-  windowDays: number,
-  sportSessionsPerWeek: number[],
-  daysPerWeek: number,
+  capacity: number[],
   previous?: {
     planned: number;
     completed: number;
@@ -96,13 +139,6 @@ export function areaPrescription(
     checkInScores: number[];
   },
 ) {
-  const weeks = Math.ceil(windowDays / 7);
-  const capacity = Array.from({ length: weeks }, (_, week) =>
-    Math.min(
-      offsets.filter((o) => o >= week * 7 && o < (week + 1) * 7).length,
-      daysPerWeek - (sportSessionsPerWeek[week] ?? 0),
-    ),
-  );
   if (capacity.some((count) => count <= 0))
     throw new ConflictException({
       code: 'AREA_SCHEDULE_NO_FREE_DAYS',
@@ -116,30 +152,44 @@ export function validateAreaSchedule(
   constraints: ScheduleConstraints,
   startsOn: string,
   offsets: number[],
+  shared: number[] = [],
 ) {
   validateTrainingSchedule(proposal, constraints, startsOn);
   const free = new Set(offsets);
-  for (const session of proposal.planItems)
-    if (!free.has(session.dayOffset))
+  const sharedDays = new Set(shared);
+  for (const session of proposal.planItems) {
+    if (sharedDays.has(session.dayOffset)) {
+      if (session.durationMinutes > AREA_SHARED_DAY_MINUTES)
+        throw new BadRequestException({
+          code: 'INVALID_AI_OUTPUT',
+          message:
+            'Calendario AI non valido: seduta troppo lunga nel giorno sportivo',
+        });
+    } else if (!free.has(session.dayOffset))
       throw new BadRequestException({
         code: 'INVALID_AI_OUTPUT',
         message: 'Calendario AI non valido: giorno gia occupato dallo sport',
       });
+  }
 }
 
 export function buildAreaSchedulePreview(input: AreaScheduleInput) {
+  const shared = input.sharedDayOffsets;
   const prompt = {
-    system: `${buildSystemPrompt(input)}\nCONTRATTO AREA A CALENDARIO: pianifica sedute della sola area ${input.area.name} nei giorni liberi indicati della finestra operativa. Non sostituisci il programma sportivo: lo affianchi. I vincoli numerici e i giorni ammessi prevalgono su indicazioni generiche di produrre da una a tre attivita. Massimo una seduta al giorno. Non inventare disponibilita o giorni.`,
+    system: `${buildSystemPrompt(input)}\nCONTRATTO AREA A CALENDARIO: pianifica sedute della sola area ${input.area.name} nei giorni ammessi indicati della finestra operativa. Non sostituisci il programma sportivo: lo affianchi. I vincoli numerici e i giorni ammessi prevalgono su indicazioni generiche di produrre da una a tre attivita. Massimo una seduta al giorno. Non inventare disponibilita o giorni.`,
     user: {
-      task: `Programma sedute di ${input.area.name} eseguibili nei giorni liberi della finestra e ${cycleQuestionLayout(input).questions} domande di monitoraggio.`,
+      task: `Programma sedute di ${input.area.name} eseguibili nei giorni ammessi della finestra e ${cycleQuestionLayout(input).questions} domande di monitoraggio.`,
       constraints: input.scheduleConstraints,
       window: input.areaWindow,
       freeDayOffsets: input.freeDayOffsets,
+      sharedDayOffsets: shared,
       context: buildModelContext(input.context),
       rules: [
-        `dayOffset ammessi esclusivamente: ${input.freeDayOffsets.join(', ')}.`,
+        `dayOffset ammessi esclusivamente: ${areaDayOffsets(input).join(', ')}.`,
         'Ogni settimana relativa alla finestra (offset 0..6, 7..13) deve rispettare min/max sedute.',
-        'I giorni occupati dal programma sportivo non sono disponibili: non proporli.',
+        shared.length
+          ? `Dei giorni occupati dal programma sportivo sono ammessi solo i dayOffset ${shared.join(', ')}: li proponi una seduta breve di attivazione o prevenzione da abbinare alla seduta sportiva, al massimo ${AREA_SHARED_DAY_MINUTES} minuti.`
+          : 'I giorni occupati dal programma sportivo non sono disponibili: non proporli.',
         'Non superare la disponibilita di durata; considera skip, note, rating e check-in precedenti.',
         'Il lavoro di area integra il programma sportivo, senza duplicarne il contenuto.',
       ],
@@ -223,6 +273,7 @@ export function normalizeAreaScheduleProposal(
     input.scheduleConstraints,
     input.areaWindow.startsOn,
     input.freeDayOffsets,
+    input.sharedDayOffsets,
   );
   const layout = cycleQuestionLayout(input);
   if ((raw.questions as unknown[]).length !== layout.questions) fail();
@@ -297,23 +348,29 @@ export async function generateAreaScheduleProposal(
   if (provider === 'stub') {
     const weeks = Math.ceil(input.areaWindow.windowDays / 7);
     const count = Math.max(prescription.minSessionsPerWeek, 1);
+    const shared = new Set(input.sharedDayOffsets);
     const planItems = Array.from({ length: weeks }, (_, week) =>
-      input.freeDayOffsets
+      areaDayOffsets(input)
         .filter((o) => o >= week * 7 && o < (week + 1) * 7)
         .slice(0, Math.min(count, prescription.maxSessionsPerWeek)),
     ).flatMap((offsets, week) =>
       offsets.map((dayOffset, index) => ({
         type: 'AREA_SESSION',
         title: `${input.area.name} ${week + 1}.${index + 1}`,
-        body: 'Attivazione, lavoro specifico di area e defaticamento.',
+        body: shared.has(dayOffset)
+          ? 'Attivazione e prevenzione da abbinare alla seduta sportiva.'
+          : 'Attivazione, lavoro specifico di area e defaticamento.',
         dayOffset,
-        durationMinutes: Math.min(45, availability.sessionDurationMinutes),
+        durationMinutes: Math.min(
+          shared.has(dayOffset) ? AREA_SHARED_DAY_MINUTES : 45,
+          availability.sessionDurationMinutes,
+        ),
       })),
     );
     return normalizeAreaScheduleProposal(
       input,
       {
-        summaryText: `Sedute di ${input.area.name} nei giorni liberi della finestra`,
+        summaryText: `Sedute di ${input.area.name} nella finestra sportiva`,
         sessionsPerWeek: Math.max(
           ...Array.from(
             { length: weeks },
@@ -427,22 +484,13 @@ export async function prepareAreaScheduleInput(
     select: { profileJson: true },
   });
   const { availability } = trainingAvailability(assessment?.profileJson);
-  const dates = training.sessions.map((s) => s.scheduledDate);
-  const offsets = freeDayOffsets(areaWindow, dates, availability);
-  const start = dateOnly(areaWindow.startsOn).getTime();
-  const sportPerWeek = Array.from(
-    { length: Math.ceil(areaWindow.windowDays / 7) },
-    (_, week) =>
-      dates.filter((date) => {
-        const offset = Math.round((date.getTime() - start) / 86400000);
-        return offset >= week * 7 && offset < (week + 1) * 7;
-      }).length,
+  const days = areaScheduleDays(
+    areaWindow,
+    training.sessions.map((s) => s.scheduledDate),
+    availability,
   );
   const prescription = areaPrescription(
-    offsets,
-    areaWindow.windowDays,
-    sportPerWeek,
-    availability.daysPerWeek,
+    days.capacity,
     await previousAreaWork(prisma, userId, area.id),
   );
   const base = await prepareCycleProposalInput(
@@ -451,11 +499,13 @@ export async function prepareAreaScheduleInput(
     userId,
     area,
     reason,
+    true,
   );
   return {
     ...base,
     areaWindow,
-    freeDayOffsets: offsets,
+    freeDayOffsets: days.freeDayOffsets,
+    sharedDayOffsets: days.sharedDayOffsets,
     scheduleConstraints: {
       operationalWindowDays: areaWindow.windowDays,
       currentFrequency: AREA_FREQUENCY,

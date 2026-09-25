@@ -60,7 +60,7 @@ export async function persistAreaProposal(
       );
     }
 
-    await assertPreviousCycleCompleted(tx, userId, area.id);
+    await assertPreviousCycleCompleted(tx, userId, area.id, !!window);
 
     const previousSnapshot = await tx.performanceProfileSnapshot.findFirst({
       where: { userId },
