@@ -2,7 +2,7 @@ import type {
   DiscoveryCondition,
   DiscoveryQuestion,
 } from "../../start/discovery-types";
-export function ConditionEditor({
+export function DiscoveryConditionBuilder({
   value,
   parents,
   onChange,

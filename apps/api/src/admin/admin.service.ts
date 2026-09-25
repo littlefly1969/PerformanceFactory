@@ -14,6 +14,13 @@ import {
 } from './admin-athletes';
 import { getDashboard } from './admin-dashboard';
 import {
+  createDiscoveryTemplate,
+  deleteDiscoveryTemplate,
+  listDiscoveryTemplates,
+  reorderDiscoveryTemplates,
+  updateDiscoveryTemplate,
+} from './admin-discovery';
+import {
   deleteOnboardingTemplate,
   upsertOnboardingTemplate,
 } from './admin-onboarding';
@@ -21,6 +28,10 @@ import { deleteSport, upsertSportCatalog } from './admin-sports';
 import { UpsertAiAreaGenerationConfigDto } from './dto/upsert-ai-area-generation-config.dto';
 import { UpsertGoalPromptConfigDto } from './dto/upsert-goal-prompt-config.dto';
 import { UpsertOnboardingTemplateDto } from './dto/upsert-onboarding-template.dto';
+import {
+  CreateDiscoveryTemplateDto,
+  UpdateDiscoveryTemplateDto,
+} from './dto/discovery-template.dto';
 export * from './admin-model';
 
 @Injectable()
@@ -108,5 +119,29 @@ export class AdminService {
 
   async deleteOnboardingTemplate(id: string) {
     return deleteOnboardingTemplate(this.prisma, id);
+  }
+
+  listDiscoveryTemplates() {
+    return listDiscoveryTemplates(this.prisma);
+  }
+
+  createDiscoveryTemplate(body: CreateDiscoveryTemplateDto, actorId: string) {
+    return createDiscoveryTemplate(this.prisma, body, actorId);
+  }
+
+  updateDiscoveryTemplate(
+    id: string,
+    body: UpdateDiscoveryTemplateDto,
+    actorId: string,
+  ) {
+    return updateDiscoveryTemplate(this.prisma, id, body, actorId);
+  }
+
+  deleteDiscoveryTemplate(id: string) {
+    return deleteDiscoveryTemplate(this.prisma, id);
+  }
+
+  reorderDiscoveryTemplates(ids: string[], actorId: string) {
+    return reorderDiscoveryTemplates(this.prisma, ids, actorId);
   }
 }

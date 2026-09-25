@@ -7,6 +7,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -15,6 +16,7 @@ import {
   ApiCookieAuth,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
@@ -26,6 +28,11 @@ import { ConsentsService } from '../consents/consents.service';
 import { RunCycleDto } from './dto/run-cycle.dto';
 import { AdminService } from './admin.service';
 import { UpsertConsentDocumentDto } from '../consents/dto/upsert-consent-document.dto';
+import {
+  CreateDiscoveryTemplateDto,
+  ReorderOnboardingTemplatesDto,
+  UpdateDiscoveryTemplateDto,
+} from './dto/discovery-template.dto';
 
 @ApiTags('admin-cycles')
 @Controller('admin')
@@ -187,6 +194,74 @@ export class AdminController {
     @Body() body: UpsertConsentDocumentDto,
   ) {
     return this.consents.upsertDocument(body, req.user?.id ?? '');
+  }
+
+  @Get('onboarding-templates')
+  @ApiOperation({
+    summary:
+      'Domande discovery con conteggi derivati (configurate, attive, condizionali, percorso massimo)',
+  })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @ApiQuery({ name: 'scope', enum: ['DISCOVERY'] })
+  @Roles(UserRole.ADMIN)
+  onboardingTemplates(@Query('scope') scope?: string) {
+    // L'area admin gestisce oggi le sole domande DISCOVERY.
+    if (scope !== 'DISCOVERY')
+      throw new BadRequestException('Scope non supportato: usa DISCOVERY');
+    return this.admin.listDiscoveryTemplates();
+  }
+
+  @Post('onboarding-templates')
+  @ApiOperation({ summary: 'Crea una domanda discovery, subito operativa' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  createOnboardingTemplate(
+    @Req() req: { user?: { id: string } },
+    @Body() body: CreateDiscoveryTemplateDto,
+  ) {
+    return this.admin.createDiscoveryTemplate(body, req.user?.id ?? '');
+  }
+
+  @Post('onboarding-templates/reorder')
+  @ApiOperation({
+    summary: 'Riordina tutte le domande discovery in modo atomico',
+  })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  reorderOnboardingTemplates(
+    @Req() req: { user?: { id: string } },
+    @Body() body: ReorderOnboardingTemplatesDto,
+  ) {
+    return this.admin.reorderDiscoveryTemplates(body.ids, req.user?.id ?? '');
+  }
+
+  @Patch('onboarding-templates/:id')
+  @ApiOperation({ summary: 'Modifica parziale di una domanda discovery' })
+  @ApiParam({ name: 'id' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  updateOnboardingTemplate(
+    @Req() req: { user?: { id: string } },
+    @Param('id') id: string,
+    @Body() body: UpdateDiscoveryTemplateDto,
+  ) {
+    return this.admin.updateDiscoveryTemplate(id, body, req.user?.id ?? '');
+  }
+
+  @Delete('onboarding-templates/:id')
+  @ApiOperation({
+    summary: 'Elimina una domanda discovery non referenziata',
+  })
+  @ApiParam({ name: 'id' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  deleteOnboardingTemplate(@Param('id') id: string) {
+    return this.admin.deleteDiscoveryTemplate(id);
   }
 
   @Post('cycles/:cycleId/publish')

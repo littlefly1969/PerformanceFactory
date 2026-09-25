@@ -243,7 +243,7 @@ describe('PF4 discovery to authenticated journey', () => {
     });
     expect(withoutEvent.answers).not.toHaveProperty(date.id);
     await expect(deleteOnboardingTemplate(prisma, event.id)).rejects.toThrow(
-      'deve dipendere',
+      'Impossibile eliminare',
     );
     expect(
       await prisma.onboardingQuestionTemplate.findUnique({
