@@ -88,7 +88,8 @@ export function DiscoveryQuestionForm({
           <select
             className="pf-input"
             value={meta.type}
-            disabled={Boolean(draft.id) || Boolean(meta.target)}
+            // Sport, specializzazione e obiettivo restano strutturali.
+            disabled={Boolean(meta.target)}
             onChange={(e) => {
               const type = e.target.value as DiscoveryQuestion["type"];
               patch({
@@ -108,6 +109,13 @@ export function DiscoveryQuestionForm({
             ))}
           </select>
         </label>
+        {draft.id && !meta.target && (
+          <small className="pf-muted">
+            Cambiare tipo azzera le opzioni; il salvataggio viene rifiutato se
+            invalida le condizioni che dipendono da questa domanda.
+          </small>
+        )}
+
         <label>
           <input
             type="checkbox"

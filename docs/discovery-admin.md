@@ -15,12 +15,14 @@ Non esiste un secondo modello di domande. Admin e `/start` leggono gli stessi
 ```
 
 L'editor viveva in `/ai-tuner/discovery`: ora c'è un solo editor, nell'area
-amministrazione. Gli endpoint `/ai-tuning/onboarding-templates` restano per
-l'anamnesi dell'AI Tuner.
+amministrazione. Per gli endpoint storici dell'AI Tuner si veda
+[Ownership temporanea](#ownership-temporanea).
 
 ## Numeri derivati
 
-Il numero di domande non è un campo: lo calcola il server dai template.
+Il numero di domande non è un campo: lo calcola il server dai template. La
+pagina admin mostra dati della **configurazione**. Il numero di domande che vede
+un atleta dipende dal ramo e lo mostra solo l'anteprima.
 
 | Conteggio | Significato |
 |---|---|
@@ -28,11 +30,12 @@ Il numero di domande non è un campo: lo calcola il server dai template.
 | Attive | template attivi |
 | Sempre visibili | attivi nel percorso pubblico, senza condizione |
 | Condizionali | attivi nel percorso pubblico, con `visibleWhen` |
-| Percorso massimo | attivi nel percorso pubblico, condizionali comprese |
+| Attive nel percorso (`activePathCount`) | attivi nel percorso pubblico, condizionali comprese |
 
 Con `PF4_SPORT_MODE=fixed` sport e specializzazione restano fuori dal percorso
-pubblico e non entrano negli ultimi tre conteggi. Il percorso massimo non è il
-numero che vede ogni atleta: rami alternativi possono escludersi a vicenda.
+pubblico e non entrano negli ultimi tre conteggi. «Attive nel percorso» non è un
+massimo raggiungibile: rami alternativi possono escludersi a vicenda. Per questo
+non esiste più il conteggio «Percorso massimo» (`maxVisible`).
 
 ## Regole che l'admin non può rompere
 
@@ -80,7 +83,11 @@ nulla.
 - **Codice.** Si sceglie alla creazione e poi resta fisso, perché le condizioni
   lo referenziano.
 - **Tipo.** Scelta singola, Scelta multipla, Numero, Scala, Sì / No, Data: gli
-  enum Prisma non compaiono. Si sceglie solo alla creazione.
+  enum Prisma non compaiono. Si può cambiare anche su una domanda già salvata;
+  resta bloccato per le domande strutturali (sport, specializzazione,
+  obiettivo). Il cambio azzera le opzioni e il server lo rifiuta se invalida le
+  condizioni delle domande dipendenti. Le discovery già completate non cambiano,
+  perché conservano la loro configurazione.
 - **Opzioni.** Hanno ID, etichetta, valore (se vuoto, uguale all'etichetta) e
   descrizione, e si ordinano con **Sposta su/giù**. Gli ID già salvati restano
   fissi, perché risposte storiche e condizioni li usano.
@@ -95,6 +102,23 @@ una modifica non reinterpreta i percorsi esistenti. Un flusso bozza → anteprim
 pubblica richiederebbe il versioning della configurazione e resta fuori da
 questa slice.
 
+## Ownership temporanea
+
+La UI Discovery è attualmente esposta sotto ADMIN (`/admin/discovery`, endpoint
+`/admin/onboarding-templates`), che gestisce operativamente la discovery.
+
+Gli endpoint storici AI_TUNER sui template onboarding
+(`/ai-tuning/onboarding-templates`) restano intenzionalmente disponibili per
+compatibilità con l'assetto attuale: servono all'anamnesi e consentono ancora di
+modificare i template discovery. Anche da lì valgono le stesse regole di grafo e
+struttura.
+
+La futura ownership di Discovery, Anamnesi e configurazioni AI deve essere
+definita in una decisione architetturale separata.
+
+**Decision status: TEMPORARY.** Questa sovrapposizione non è l'architettura
+definitiva.
+
 ## Anteprima
 
 **Anteprima discovery** apre `/admin/discovery/preview` in una nuova scheda.
@@ -108,7 +132,8 @@ ramo e, quando una risposta apre o chiude un ramo, la variazione (per esempio
 ## Verifica
 
 - **API unit** (`src/admin/admin-discovery.spec.ts`): conteggi in modalità fixed
-  e user_choice; riordino con dipendenza violata, ID mancanti o duplicati e sport
+  e user_choice; cambio tipo consentito senza dipendenti e rifiutato se invalida
+  una condizione; riordino con dipendenza violata, ID mancanti o duplicati e sport
   dopo la specializzazione; nessuna scrittura su un riordino invalido; creazione
   in fondo con metadati numerici; codice duplicato; seconda domanda obiettivo;
   condizione numerica con stringhe; disattivazione parziale; obiettivo
@@ -117,7 +142,9 @@ ramo e, quando una risposta apre o chiude un ramo, la variazione (per esempio
 - **API e2e** (`test/admin-discovery.e2e-spec.ts`): ruolo, scope, conteggi,
   riordino atomico, validazione del body, `PATCH` senza campi fuori contratto,
   eliminazione protetta.
-- **Web** (`app/admin/discovery/*.test.tsx`): conteggi, disattivazione,
+- **Web** (`app/admin/discovery/*.test.tsx`): conteggi (con «Attive nel
+  percorso» e senza «Percorso massimo»), cambio tipo su domanda salvata e blocco
+  sui target strutturali, disattivazione,
   trascinamento, blocco leggibile del riordino, editor numero e opzioni, builder
   delle condizioni, errore del backend, duplica ed eliminazione con conferma,
   anteprima con variazione del numero di domande.

@@ -26,13 +26,13 @@ describe('discoveryAdminStats', () => {
       inactive: 1,
       conditional: 1,
       unconditional: 3,
-      maxVisible: 4,
+      activePathCount: 4,
     });
   });
 
   it('include sport e specializzazione quando lo sport e a scelta', () => {
     expect(discoveryAdminStats(discoveryFixture(), 'user_choice')).toEqual(
-      expect.objectContaining({ unconditional: 4, maxVisible: 5 }),
+      expect.objectContaining({ unconditional: 4, activePathCount: 5 }),
     );
   });
 });
@@ -116,7 +116,7 @@ describe('reorderDiscoveryTemplates', () => {
     const result = await reorderDiscoveryTemplates(prisma, ids, 'admin');
     expect(order(rows())).toEqual(ids);
     expect(result.templates.map((t) => t.id)).toEqual(ids);
-    expect(result.stats.maxVisible).toBe(4);
+    expect(result.stats.activePathCount).toBe(4);
   });
 
   it('non scrive nulla quando il nuovo ordine rompe una dipendenza', async () => {
@@ -260,6 +260,37 @@ describe('domande discovery admin', () => {
         'a',
       ),
     ).rejects.toThrow(/deve dipendere/);
+  });
+
+  it('cambia il tipo di una domanda senza dipendenti', async () => {
+    const { prisma, rows } = discoveryTemplatesPrisma(discoveryFixture());
+    await updateDiscoveryTemplate(
+      prisma,
+      'weight',
+      { optionsJson: { type: 'scale', min: 1, max: 10, step: 1 } },
+      'a',
+    );
+    expect(rows().find((r) => r.id === 'weight')!.optionsJson).toMatchObject({
+      type: 'scale',
+    });
+  });
+
+  it('rifiuta un cambio tipo che invalida le condizioni dipendenti', async () => {
+    const { prisma, rows } = discoveryTemplatesPrisma(discoveryFixture());
+    await expect(
+      updateDiscoveryTemplate(
+        prisma,
+        'injury',
+        {
+          inputType: 'NUMBER',
+          optionsJson: { type: 'number', min: 0, max: 10 },
+        },
+        'a',
+      ),
+    ).rejects.toThrow(/condizioni numeriche richiedono numeri/);
+    expect(rows().find((r) => r.id === 'injury')!.optionsJson).toMatchObject({
+      type: 'boolean',
+    });
   });
 
   it('non elimina una domanda usata in una condizione', async () => {

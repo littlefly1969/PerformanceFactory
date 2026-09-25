@@ -26,7 +26,7 @@ export type DiscoveryAdminStats = {
   inactive: number;
   conditional: number;
   unconditional: number;
-  maxVisible: number;
+  activePathCount: number;
 };
 
 type AdminTemplate = {
@@ -38,9 +38,10 @@ type AdminTemplate = {
 };
 
 /**
- * Numeri derivati dai template, mai salvati. maxVisible conta le domande attive
- * del percorso pubblico, condizionali comprese: nessun atleta le vede
- * necessariamente tutte.
+ * Numeri derivati dai template, mai salvati: descrivono la configurazione.
+ * activePathCount conta le domande attive del percorso pubblico, condizionali
+ * comprese, anche quando rami alternativi si escludono. Quante domande vede un
+ * atleta dipende dal ramo e lo mostra l'anteprima.
  */
 export function discoveryAdminStats(
   templates: AdminTemplate[],
@@ -64,7 +65,7 @@ export function discoveryAdminStats(
     inactive: templates.length - active.length,
     conditional,
     unconditional: path.length - conditional,
-    maxVisible: path.length,
+    activePathCount: path.length,
   };
 }
 

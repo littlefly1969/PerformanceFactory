@@ -26,7 +26,7 @@ export type DiscoveryStats = {
   inactive: number;
   conditional: number;
   unconditional: number;
-  maxVisible: number;
+  activePathCount: number;
 };
 export type DiscoveryList = {
   sportMode: SportMode;

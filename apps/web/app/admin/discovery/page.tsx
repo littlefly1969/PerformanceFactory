@@ -150,13 +150,17 @@ export default function AdminDiscoveryPage() {
   return (
     <ProductShell
       title="Discovery"
-      description={`Percorso massimo: ${stats.maxVisible} domande. Nessun atleta le vede per forza tutte: le condizionali dipendono dalle risposte.${sportMode === "fixed" ? " Con sport fisso sport e specializzazione restano fuori dal percorso." : ""}`}
+      description={`Dati della configurazione. Quante domande vede un atleta dipende dal ramo: lo mostra l’anteprima.${sportMode === "fixed" ? " Con sport fisso sport e specializzazione restano fuori dal percorso." : ""}`}
       stats={[
         { label: "Configurate", value: stats.configured },
         { label: "Attive", value: stats.active },
         { label: "Sempre visibili", value: stats.unconditional },
         { label: "Condizionali", value: stats.conditional },
-        { label: "Percorso massimo", value: stats.maxVisible, tone: "accent" },
+        {
+          label: "Attive nel percorso",
+          value: stats.activePathCount,
+          tone: "accent",
+        },
       ]}
       actions={
         <>

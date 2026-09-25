@@ -106,7 +106,7 @@ describe('Admin discovery manager (e2e)', () => {
         active: 5,
         conditional: 1,
         unconditional: 3,
-        maxVisible: 4,
+        activePathCount: 4,
       },
     });
   });

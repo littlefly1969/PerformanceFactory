@@ -85,7 +85,7 @@ const list = () => {
       inactive: templates.length - active.length,
       conditional,
       unconditional: active.length - conditional,
-      maxVisible: active.length,
+      activePathCount: active.length,
     },
   };
 };
@@ -135,9 +135,11 @@ describe("Admin discovery manager", () => {
       "Attive: 4",
       "Sempre visibili: 3",
       "Condizionali: 1",
-      "Percorso massimo: 4",
+      "Attive nel percorso: 4",
     ])
       expect(screen.getByText(text)).toBeInTheDocument();
+    // Il numero reale del ramo lo mostra solo l'anteprima.
+    expect(screen.queryByText(/Percorso massimo/)).not.toBeInTheDocument();
     expect(
       screen.getByRole("listitem", { name: "INJURY_DETAIL" }),
     ).toHaveTextContent("Condizionale");
@@ -292,6 +294,25 @@ describe("Admin discovery manager", () => {
           rules: [{ question: "injury", operator: "in", values: [true] }],
         },
       },
+    });
+  });
+
+  it("cambia il tipo di una domanda salvata ma non quello dei target strutturali", async () => {
+    await open();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Modifica GOAL" }),
+    );
+    expect(screen.getByLabelText("Tipo")).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Annulla" }));
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Modifica WEIGHT" }),
+    );
+    await userEvent.selectOptions(screen.getByLabelText("Tipo"), "scale");
+    await userEvent.click(screen.getByRole("button", { name: "Salva" }));
+    expect(sent("PATCH")[0]).toMatchObject({
+      url: "/api/admin/onboarding-templates/weight",
+      body: { inputType: "NUMBER", optionsJson: { type: "scale" } },
     });
   });
 

@@ -199,7 +199,7 @@ export class AdminController {
   @Get('onboarding-templates')
   @ApiOperation({
     summary:
-      'Domande discovery con conteggi derivati (configurate, attive, condizionali, percorso massimo)',
+      'Domande discovery con conteggi derivati (configurate, attive, condizionali, attive nel percorso)',
   })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
