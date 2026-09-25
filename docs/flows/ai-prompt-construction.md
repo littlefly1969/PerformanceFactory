@@ -313,7 +313,7 @@ Il system prompt chiede di generare domande anamnestiche specialistiche per spor
 
 `buildSpecialistOnboardingQuestionJsonSchema` richiede `areaQuestions`, con elementi `{ areaId, questions }`, dove ogni `questions` contiene esattamente tre oggetti `{ text, orderIndex }`.
 
-Se una risposta provider non contiene tre domande valide per un'area, il servizio usa `buildFallbackSpecialistQuestions` per quell'area.
+Se una risposta provider non contiene tre domande valide per un'area, il servizio usa `buildFallbackSpecialistQuestions` per quell'area. Il journey PF5 non usa più questa generazione: parte solo con 2 domande configurate per driver ([Assessment PF5](../assessment-pf5.md)).
 
 ## 6. Prompt test libero
 

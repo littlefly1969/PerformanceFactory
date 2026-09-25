@@ -1,4 +1,10 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import JourneyPage from "./page";
@@ -19,6 +25,7 @@ const base = {
   phase: "ASSESSMENT",
   nextStep: "ASSESSMENT",
   currentQuestion: 0,
+  assessmentComplete: false,
   count: 1,
   estimatedMinutes: 1,
   driverList: [],
@@ -53,7 +60,7 @@ afterEach(() => {
   window.history.replaceState(null, "", "/journey");
 });
 describe("PF4 authenticated journey functions", () => {
-  it("renders server questions, submits, displays server result and saves duration", async () => {
+  it("renders server questions and stops after the last answer without submitting", async () => {
     let state = { ...base };
     const requests: { url: string; body: Record<string, unknown> }[] = [];
     vi.stubGlobal(
@@ -61,10 +68,8 @@ describe("PF4 authenticated journey functions", () => {
       vi.fn(async (url: string, init?: RequestInit) => {
         const body = JSON.parse(String(init?.body ?? "{}"));
         requests.push({ url, body });
-        if (url.endsWith("/answer")) state = { ...state, currentQuestion: 1 };
-        if (url.endsWith("/submit")) state = { ...state, phase: "RESULT" };
-        if (url.endsWith("/duration"))
-          state = { ...state, phase: body.weeks ? "COMPLETE" : "DURATION" };
+        if (url.endsWith("/answer"))
+          state = { ...state, currentQuestion: 1, assessmentComplete: true };
         return new Response(JSON.stringify(state));
       }),
     );
@@ -80,9 +85,29 @@ describe("PF4 authenticated journey functions", () => {
       questionId: "configured-question",
       value: "yes",
     });
-    await userEvent.click(
-      await screen.findByRole("button", { name: "Scopri la tua performance" }),
+    expect(
+      await screen.findByRole("heading", { name: "Risposte registrate." }),
+    ).toBeInTheDocument();
+    // STOP: nessuna azione verso invio, elaborazione o risultato.
+    expect(
+      screen.queryAllByRole("button", { name: /Scopri|Invia|Continua/ }),
+    ).toHaveLength(0);
+    expect(requests.some((r) => r.url.endsWith("/submit"))).toBe(false);
+  });
+  it("keeps the existing result and duration steps for already submitted athletes", async () => {
+    let state = { ...base, phase: "RESULT" };
+    const requests: { url: string; body: Record<string, unknown> }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body ?? "{}"));
+        requests.push({ url, body });
+        if (url.endsWith("/duration"))
+          state = { ...state, phase: body.weeks ? "COMPLETE" : "DURATION" };
+        return new Response(JSON.stringify(state));
+      }),
     );
+    render(<JourneyPage />);
     expect((await screen.findAllByText("37")).length).toBeGreaterThan(0);
     await userEvent.click(
       screen.getByRole("button", { name: /Quanto tempo ti dai/ }),
@@ -167,5 +192,123 @@ describe("PF4 authenticated journey functions", () => {
     ]);
     expect(await screen.findByText("Domanda configurata")).toBeInTheDocument();
     expect(sessionStorage.getItem(DRAFT_KEY)).toBeNull();
+  });
+});
+
+describe("PF5 assessment intro and questions", () => {
+  const journey = (extra: Record<string, unknown>) => ({
+    ...base,
+    phase: "ASSESSMENT_INTRO",
+    questions: [],
+    firstName: "Stefano",
+    trial: { days: 7, daysLeft: 5 },
+    ...extra,
+  });
+  function serve(state: Record<string, unknown>) {
+    const requests: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        requests.push(url);
+        return new Response(JSON.stringify(state));
+      }),
+    );
+    return requests;
+  }
+
+  it.each([
+    [12, 4, "dodici domande, quattro minuti."],
+    [14, 5, "quattordici domande, cinque minuti."],
+    [16, 6, "sedici domande, sei minuti."],
+  ])(
+    "shows the backend count %i in the PF5 intro",
+    async (count, estimatedMinutes, text) => {
+      serve(journey({ count, estimatedMinutes }));
+      render(<JourneyPage />);
+      expect(
+        await screen.findByRole("heading", { name: "Ciao Stefano." }),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Prova gratuita attiva")).toBeInTheDocument();
+      expect(screen.getByText("5 giorni rimasti")).toBeInTheDocument();
+      // I numeri arrivano dal backend e sono scritti in lettere, come nel PF5.
+      expect(
+        screen.getByText(
+          `Prima di programmare qualcosa misuriamo dove sei: ${text}`,
+        ),
+      ).toBeInTheDocument();
+      const later = screen.getByRole("region", { name: "Cosa si attiva dopo" });
+      expect(within(later).getAllByText("Bloccato")).toHaveLength(3);
+      expect(later).toHaveTextContent("Programma di 4 settimane");
+      expect(
+        screen.getByRole("button", { name: "Scopri la tua performance" }),
+      ).toBeEnabled();
+      cleanup();
+    },
+  );
+
+  it("starts from the intro and shows the operational section first", async () => {
+    const requests = serve(journey({ count: 14, estimatedMinutes: 5 }));
+    render(<JourneyPage />);
+    const operational = {
+      ...base,
+      count: 14,
+      questions: [
+        {
+          id: "days",
+          kind: "OPERATIONAL",
+          section: "Disponibilità",
+          title: "Quanti giorni alla settimana puoi realisticamente allenarti?",
+          areaId: null,
+          areaName: null,
+          options: [{ value: 2, label: "2 giorni" }],
+        },
+      ],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        requests.push(url);
+        return new Response(JSON.stringify(operational));
+      }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Scopri la tua performance" }),
+    );
+    expect(requests.at(-1)).toBe("/api/athlete-journey/start");
+    expect(await screen.findByText("1 / 14 · Disponibilità")).toBeVisible();
+    // Il progressivo usa il totale del backend.
+    expect(screen.getByRole("progressbar")).toHaveAttribute(
+      "aria-valuemax",
+      "14",
+    );
+  });
+
+  it("shows the stop state at the last answer without any next action", async () => {
+    const requests = serve({
+      ...base,
+      count: 14,
+      currentQuestion: 14,
+      assessmentComplete: true,
+    });
+    render(<JourneyPage />);
+    expect(
+      await screen.findByRole("heading", { name: "Risposte registrate." }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("14 / 14 · Assessment completato")).toBeVisible();
+    expect(screen.queryByText("Domanda configurata")).not.toBeInTheDocument();
+    expect(requests.some((url) => url.endsWith("/submit"))).toBe(false);
+  });
+
+  it("explains a configuration error instead of starting", async () => {
+    serve({ ...base, phase: "ASSESSMENT_UNAVAILABLE", questions: [] });
+    render(<JourneyPage />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Il questionario non è ancora disponibile.",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Scopri la tua performance" }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -1,5 +1,9 @@
 import { discoveryContext } from '../discovery/discovery-context';
 import {
+  loadOperationalTemplates,
+  semanticRoleOf,
+} from '../discovery/assessment-configuration';
+import {
   OnboardingInputType,
   OnboardingQuestionScope,
   Prisma,
@@ -68,8 +72,10 @@ export async function loadActiveGeneralTemplates(
     },
     orderBy: [{ orderIndex: 'asc' }],
   });
-  if (templates.length > 0) {
-    return templates;
+  // Le domande operative appartengono all'assessment PF5, non al questionario legacy.
+  const general = templates.filter((t) => !semanticRoleOf(t));
+  if (general.length > 0) {
+    return general;
   }
   return [
     {
@@ -141,5 +147,8 @@ export async function loadUserGeneralTemplates(
   userId: string,
 ) {
   const context = await discoveryContext(prisma, userId);
-  return context?.templates ?? loadActiveGeneralTemplates(prisma);
+  // Journey PF5: dopo la discovery vengono le operative, cosi l'ultima risposta prevale.
+  return context
+    ? [...context.templates, ...(await loadOperationalTemplates(prisma))]
+    : loadActiveGeneralTemplates(prisma);
 }

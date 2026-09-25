@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
 import { PF4Shell } from "../start/pf4-shell";
+import { AssessmentIntro } from "./assessment-intro";
 import { ConsentStep } from "./consent-step";
 import { DurationStep, PerformanceResult } from "./performance-result";
 import { useJourney } from "./use-journey";
@@ -13,17 +13,13 @@ export default function JourneyPage() {
     busy,
     google,
     documents,
-    goalReview,
     action,
     accept,
     refresh,
   } = useJourney();
-  const [goal, setGoal] = useState("");
   const q = j?.questions?.[j.currentQuestion];
-  const assessment =
-    j?.phase === "ASSESSMENT" ||
-    j?.phase === "ASSESSMENT_INTRO" ||
-    j?.phase === "PROCESSING";
+  // L'intro PF5 e chiara, come /start; il questionario resta sullo stage scuro.
+  const assessment = j?.phase === "ASSESSMENT" || j?.phase === "PROCESSING";
   return (
     <div className={assessment ? "pf4-assessment" : undefined}>
       <PF4Shell
@@ -68,39 +64,28 @@ export default function JourneyPage() {
           />
         )}
         {j?.phase === "ASSESSMENT_INTRO" && (
-          <section className="pf4-body">
-            <span className="pf4-kicker">
-              {j.count} domande · circa {j.estimatedMinutes} minuti
-            </span>
-            <h1>
-              Dove sei adesso,
-              <br />e dove puoi arrivare.
-            </h1>
+          <AssessmentIntro
+            journey={j}
+            busy={busy}
+            onStart={() => void action("start")}
+          />
+        )}
+        {j?.phase === "ASSESSMENT_UNAVAILABLE" && (
+          <section className="pf4-body" role="status">
+            <h1>Il questionario non è ancora disponibile.</h1>
             <p>
-              Rispondi con sincerità: il valore di partenza serve a te, non a
-              fare bella figura.
+              Stiamo completando la configurazione delle domande. Riprova tra
+              poco.
             </p>
-            <dl className="pf4-profile">
-              {j.driverList.map((d) => (
-                <div key={d.id}>
-                  <dt>{d.name}</dt>
-                  <dd>{d.count} domande</dd>
-                </div>
-              ))}
-            </dl>
-            <button
-              className="pf4-cta"
-              disabled={busy}
-              onClick={() => action("start")}
-            >
-              {busy ? "Prepariamo le domande…" : "Inizia"}
+            <button className="pf4-cta" onClick={() => void refresh()}>
+              Aggiorna
             </button>
           </section>
         )}
-        {j?.phase === "ASSESSMENT" && q && (
+        {j?.phase === "ASSESSMENT" && !j.assessmentComplete && q && (
           <section className="pf4-body pf4-question" key={q.id}>
             <span className="pf4-kicker">
-              {j.currentQuestion + 1} / {j.count} · {q.areaName}
+              {j.currentQuestion + 1} / {j.count} · {q.section ?? q.areaName}
             </span>
             <h1>{q.title}</h1>
             <div className="pf4-options">
@@ -121,36 +106,17 @@ export default function JourneyPage() {
             </div>
           </section>
         )}
-        {j?.phase === "ASSESSMENT" && !q && (
-          <section className="pf4-body">
-            <h1>
-              {busy
-                ? "Analizziamo le tue risposte…"
-                : "Le tue risposte sono complete."}
-            </h1>
+        {/* STOP della slice PF5: dopo l'ultima risposta nessuna azione successiva. */}
+        {j?.phase === "ASSESSMENT" && j.assessmentComplete && (
+          <section className="pf4-body" role="status">
+            <span className="pf4-kicker">
+              {j.count} / {j.count} · Assessment completato
+            </span>
+            <h1>Risposte registrate.</h1>
             <p>
-              {busy
-                ? "Stiamo validando il tuo obiettivo e costruendo il tuo baseline."
-                : "Ora possiamo misurare il tuo punto di partenza sui driver della performance."}
+              Hai risposto a tutte le domande. Puoi ancora tornare indietro e
+              modificarle.
             </p>
-            {goalReview && (
-              <label className="pf4-goal">
-                Precisa il tuo obiettivo
-                <textarea
-                  value={goal}
-                  onChange={(e) => setGoal(e.target.value)}
-                  minLength={10}
-                  maxLength={2000}
-                />
-              </label>
-            )}
-            <button
-              className="pf4-cta"
-              disabled={busy || (goalReview && goal.trim().length < 10)}
-              onClick={() => action("submit", goalReview ? { goal } : {})}
-            >
-              {busy ? "Elaborazione in corso…" : "Scopri la tua performance"}
-            </button>
           </section>
         )}
         {j?.phase === "PROCESSING" && (

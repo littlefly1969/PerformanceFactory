@@ -68,6 +68,7 @@ const roleNav: Record<string, NavItem[]> = {
   ADMIN: [
     { href: "/admin/cycles", label: "Operazioni" },
     { href: "/admin/discovery", label: "Discovery" },
+    { href: "/admin/assessment", label: "Assessment" },
     { href: "/admin/consents", label: "Privacy" },
   ],
   AI_TUNER: [
@@ -118,6 +119,7 @@ const pathMatchesRole = (path: string, role?: string) => {
       path === "/consents" ||
       path === "/admin/cycles" ||
       path.startsWith("/admin/discovery") ||
+      path.startsWith("/admin/assessment") ||
       path.startsWith("/admin/consents")
     );
   }

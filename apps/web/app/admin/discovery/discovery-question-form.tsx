@@ -1,11 +1,11 @@
 import type { DiscoveryQuestion } from "../../start/discovery-types";
+import { OptionListEditor } from "../components/option-list-editor";
 import { DiscoveryConditionBuilder } from "./discovery-condition-builder";
 import {
   asQuestion,
   inputTypeFor,
   isSportTarget,
   metadataFor,
-  moveItem,
   TYPE_LABELS,
   type Template,
 } from "./discovery-types";
@@ -33,10 +33,6 @@ export function DiscoveryQuestionForm({
   const metadata = (value: Partial<Template["optionsJson"]>) =>
     patch({ optionsJson: { ...meta, ...value } });
   const options = meta.options ?? [];
-  const setOption = (index: number, value: Partial<(typeof options)[0]>) =>
-    metadata({
-      options: options.map((o, i) => (i === index ? { ...o, ...value } : o)),
-    });
   return (
     <form
       className="pf-card pf-stack"
@@ -147,118 +143,44 @@ export function DiscoveryQuestionForm({
         </label>
         {["single_choice", "multi_choice"].includes(meta.type) &&
           !isSportTarget(draft) && (
-            <fieldset className="pf-stack">
-              <legend>Opzioni</legend>
-              {options.map((option, index) => (
-                <fieldset className="pf-stack" key={index}>
-                  <legend>Opzione {index + 1}</legend>
-                  <label className="pf-field">
-                    ID
-                    <input
-                      className="pf-input"
-                      required
-                      maxLength={100}
-                      disabled={savedOptionIds.has(option.id)}
-                      value={option.id}
-                      onChange={(e) => setOption(index, { id: e.target.value })}
-                    />
-                  </label>
-                  <label className="pf-field">
-                    Etichetta
-                    <input
-                      className="pf-input"
-                      required
-                      maxLength={500}
-                      value={option.label}
-                      onChange={(e) =>
-                        setOption(index, { label: e.target.value })
-                      }
-                    />
-                  </label>
-                  <label className="pf-field">
-                    Valore
-                    <input
-                      className="pf-input"
-                      maxLength={100}
-                      placeholder="Uguale all'etichetta"
-                      value={String(option.value)}
-                      onChange={(e) =>
-                        setOption(index, { value: e.target.value })
-                      }
-                    />
-                  </label>
-                  <label className="pf-field">
-                    Descrizione
-                    <input
-                      className="pf-input"
-                      maxLength={2000}
-                      value={option.description ?? ""}
-                      onChange={(e) =>
-                        setOption(index, {
-                          description: e.target.value || undefined,
-                        })
-                      }
-                    />
-                  </label>
-                  <div className="pf-actions">
-                    <button
-                      type="button"
-                      className="pf-button-secondary"
-                      disabled={index === 0}
-                      onClick={() =>
-                        metadata({
-                          options: moveItem(options, index, index - 1),
-                        })
-                      }
-                    >
-                      Sposta su <span className="sr-only">{option.label}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="pf-button-secondary"
-                      disabled={index === options.length - 1}
-                      onClick={() =>
-                        metadata({
-                          options: moveItem(options, index, index + 1),
-                        })
-                      }
-                    >
-                      Sposta giù <span className="sr-only">{option.label}</span>
-                    </button>
-                    <button
-                      type="button"
-                      className="pf-button-secondary"
-                      disabled={options.length === 1}
-                      onClick={() =>
-                        metadata({
-                          options: options.filter((_, i) => i !== index),
-                        })
-                      }
-                    >
-                      Rimuovi <span className="sr-only">{option.label}</span>
-                    </button>
-                  </div>
-                </fieldset>
-              ))}
-              <button
-                type="button"
-                className="pf-button-secondary"
-                onClick={() =>
-                  metadata({
-                    options: [
-                      ...options,
-                      {
-                        id: `opzione_${options.length + 1}`,
-                        label: "",
-                        value: "",
-                      },
-                    ],
-                  })
-                }
-              >
-                Aggiungi opzione
-              </button>
-            </fieldset>
+            <OptionListEditor
+              legend="Opzioni"
+              options={options}
+              labelOf={(o) => o.label}
+              create={(index) => ({
+                id: `opzione_${index + 1}`,
+                label: "",
+                value: "",
+              })}
+              fields={[
+                {
+                  key: "id",
+                  label: "ID",
+                  required: true,
+                  maxLength: 100,
+                  disabled: (o) => savedOptionIds.has(o.id),
+                },
+                {
+                  key: "label",
+                  label: "Etichetta",
+                  required: true,
+                  maxLength: 500,
+                },
+                {
+                  key: "value",
+                  label: "Valore",
+                  maxLength: 100,
+                  placeholder: "Uguale all'etichetta",
+                },
+                {
+                  key: "description",
+                  label: "Descrizione",
+                  maxLength: 2000,
+                  parse: (raw) => raw || undefined,
+                },
+              ]}
+              onChange={(next) => metadata({ options: next })}
+            />
           )}
         {["number", "scale"].includes(meta.type) && (
           <fieldset className="pf-stack">

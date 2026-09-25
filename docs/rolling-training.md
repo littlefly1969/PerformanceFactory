@@ -4,7 +4,7 @@ Il programma scelto dall'atleta resta di **4, 12 o 52 settimane**. Ogni release 
 
 ## Disponibilità e vincoli
 
-La discovery configurabile aggiunge due domande: `training_days_available` (1–7 giorni) e `training_session_duration` (30, 45, 60, 90, 120+ minuti). 120+ viene trattato come limite conservativo di 120 minuti. La frequenza abituale rimane un dato distinto: `general_training_frequency` supporta i valori 0_1 / 2_3 / 4_5 / 6_PLUS e i valori testuali della discovery precedente.
+Due domande forniscono la disponibilità: `training_days_available` (1–7 giorni) e `training_session_duration` (30, 45, 60, 90, 120+ minuti). Nate nella discovery, sono ora le domande operative bloccate all'inizio dell'assessment ([Assessment PF5](assessment-pf5.md)). 120+ viene trattato come limite conservativo di 120 minuti. La frequenza abituale rimane un dato distinto: `general_training_frequency` supporta i valori 0_1 / 2_3 / 4_5 / 6_PLUS e i valori testuali della discovery precedente.
 
 `TrainingConstraintsService` legge profilo e `AthleteDiscovery.programDurationWeeks`. Non modifica la durata già scelta. Per atleti precedenti alla discovery usa l'orizzonte salvato nel profilo; non inventa durata o disponibilità mancanti. `/user/profile` permette di completare e aggiornare questi dati, mantenendo immutabile la configurazione accettata alla registrazione. Una richiesta già salvata riparte automaticamente dopo il completamento dei dati. API personali: GET/POST `/athlete/training/availability`.
 

@@ -144,7 +144,7 @@ describe('buildOpenApiDocument', () => {
       ({ operation }) => operation.operationId,
     );
 
-    expect(operations).toHaveLength(149);
+    expect(operations).toHaveLength(154);
     expect(
       document.paths['/api/public/athlete-discovery']?.get?.security,
     ).toBeUndefined();
