@@ -1,6 +1,5 @@
 "use client";
 import Link from "next/link";
-import { useState } from "react";
 import { PF4Shell } from "../start/pf4-shell";
 import { AssessmentIntro } from "./assessment-intro";
 import { ConsentStep } from "./consent-step";
@@ -14,17 +13,13 @@ export default function JourneyPage() {
     busy,
     google,
     documents,
-    goalReview,
     action,
     accept,
     refresh,
   } = useJourney();
-  const [goal, setGoal] = useState("");
   const q = j?.questions?.[j.currentQuestion];
-  const assessment =
-    j?.phase === "ASSESSMENT" ||
-    j?.phase === "ASSESSMENT_INTRO" ||
-    j?.phase === "PROCESSING";
+  // L'intro PF5 e chiara, come /start; il questionario resta sullo stage scuro.
+  const assessment = j?.phase === "ASSESSMENT" || j?.phase === "PROCESSING";
   return (
     <div className={assessment ? "pf4-assessment" : undefined}>
       <PF4Shell
@@ -111,37 +106,17 @@ export default function JourneyPage() {
             </div>
           </section>
         )}
-        {/* Confine della slice: da qui in poi il flusso resta quello esistente. */}
+        {/* STOP della slice PF5: dopo l'ultima risposta nessuna azione successiva. */}
         {j?.phase === "ASSESSMENT" && j.assessmentComplete && (
-          <section className="pf4-body">
-            <h1>
-              {busy
-                ? "Analizziamo le tue risposte…"
-                : "Le tue risposte sono complete."}
-            </h1>
+          <section className="pf4-body" role="status">
+            <span className="pf4-kicker">
+              {j.count} / {j.count} · Assessment completato
+            </span>
+            <h1>Risposte registrate.</h1>
             <p>
-              {busy
-                ? "Stiamo validando il tuo obiettivo e costruendo il tuo baseline."
-                : "Ora possiamo misurare il tuo punto di partenza sui driver della performance."}
+              Hai risposto a tutte le domande. Puoi ancora tornare indietro e
+              modificarle.
             </p>
-            {goalReview && (
-              <label className="pf4-goal">
-                Precisa il tuo obiettivo
-                <textarea
-                  value={goal}
-                  onChange={(e) => setGoal(e.target.value)}
-                  minLength={10}
-                  maxLength={2000}
-                />
-              </label>
-            )}
-            <button
-              className="pf4-cta"
-              disabled={busy || (goalReview && goal.trim().length < 10)}
-              onClick={() => action("submit", goalReview ? { goal } : {})}
-            >
-              {busy ? "Elaborazione in corso…" : "Scopri la tua performance"}
-            </button>
           </section>
         )}
         {j?.phase === "PROCESSING" && (

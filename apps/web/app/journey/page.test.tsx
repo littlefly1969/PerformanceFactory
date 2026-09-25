@@ -1,4 +1,10 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import JourneyPage from "./page";
@@ -54,7 +60,7 @@ afterEach(() => {
   window.history.replaceState(null, "", "/journey");
 });
 describe("PF4 authenticated journey functions", () => {
-  it("renders server questions, submits, displays server result and saves duration", async () => {
+  it("renders server questions and stops after the last answer without submitting", async () => {
     let state = { ...base };
     const requests: { url: string; body: Record<string, unknown> }[] = [];
     vi.stubGlobal(
@@ -64,9 +70,6 @@ describe("PF4 authenticated journey functions", () => {
         requests.push({ url, body });
         if (url.endsWith("/answer"))
           state = { ...state, currentQuestion: 1, assessmentComplete: true };
-        if (url.endsWith("/submit")) state = { ...state, phase: "RESULT" };
-        if (url.endsWith("/duration"))
-          state = { ...state, phase: body.weeks ? "COMPLETE" : "DURATION" };
         return new Response(JSON.stringify(state));
       }),
     );
@@ -82,9 +85,29 @@ describe("PF4 authenticated journey functions", () => {
       questionId: "configured-question",
       value: "yes",
     });
-    await userEvent.click(
-      await screen.findByRole("button", { name: "Scopri la tua performance" }),
+    expect(
+      await screen.findByRole("heading", { name: "Risposte registrate." }),
+    ).toBeInTheDocument();
+    // STOP: nessuna azione verso invio, elaborazione o risultato.
+    expect(
+      screen.queryAllByRole("button", { name: /Scopri|Invia|Continua/ }),
+    ).toHaveLength(0);
+    expect(requests.some((r) => r.url.endsWith("/submit"))).toBe(false);
+  });
+  it("keeps the existing result and duration steps for already submitted athletes", async () => {
+    let state = { ...base, phase: "RESULT" };
+    const requests: { url: string; body: Record<string, unknown> }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        const body = JSON.parse(String(init?.body ?? "{}"));
+        requests.push({ url, body });
+        if (url.endsWith("/duration"))
+          state = { ...state, phase: body.weeks ? "COMPLETE" : "DURATION" };
+        return new Response(JSON.stringify(state));
+      }),
     );
+    render(<JourneyPage />);
     expect((await screen.findAllByText("37")).length).toBeGreaterThan(0);
     await userEvent.click(
       screen.getByRole("button", { name: /Quanto tempo ti dai/ }),
@@ -194,9 +217,9 @@ describe("PF5 assessment intro and questions", () => {
   }
 
   it.each([
-    [12, 4, "12 domande, circa 4 minuti."],
-    [14, 5, "14 domande, circa 5 minuti."],
-    [16, 6, "16 domande, circa 6 minuti."],
+    [12, 4, "dodici domande, quattro minuti."],
+    [14, 5, "quattordici domande, cinque minuti."],
+    [16, 6, "sedici domande, sei minuti."],
   ])(
     "shows the backend count %i in the PF5 intro",
     async (count, estimatedMinutes, text) => {
@@ -205,10 +228,17 @@ describe("PF5 assessment intro and questions", () => {
       expect(
         await screen.findByRole("heading", { name: "Ciao Stefano." }),
       ).toBeInTheDocument();
+      expect(screen.getByText("Prova gratuita attiva")).toBeInTheDocument();
+      expect(screen.getByText("5 giorni rimasti")).toBeInTheDocument();
+      // I numeri arrivano dal backend e sono scritti in lettere, come nel PF5.
       expect(
-        screen.getByText("Prova gratuita attiva · 5 giorni rimasti"),
+        screen.getByText(
+          `Prima di programmare qualcosa misuriamo dove sei: ${text}`,
+        ),
       ).toBeInTheDocument();
-      expect(screen.getByText(text)).toBeInTheDocument();
+      const later = screen.getByRole("region", { name: "Cosa si attiva dopo" });
+      expect(within(later).getAllByText("Bloccato")).toHaveLength(3);
+      expect(later).toHaveTextContent("Programma di 4 settimane");
       expect(
         screen.getByRole("button", { name: "Scopri la tua performance" }),
       ).toBeEnabled();
@@ -253,7 +283,7 @@ describe("PF5 assessment intro and questions", () => {
     );
   });
 
-  it("stops at the last answer without submitting on its own", async () => {
+  it("shows the stop state at the last answer without any next action", async () => {
     const requests = serve({
       ...base,
       count: 14,
@@ -262,10 +292,9 @@ describe("PF5 assessment intro and questions", () => {
     });
     render(<JourneyPage />);
     expect(
-      await screen.findByRole("heading", {
-        name: "Le tue risposte sono complete.",
-      }),
+      await screen.findByRole("heading", { name: "Risposte registrate." }),
     ).toBeInTheDocument();
+    expect(screen.getByText("14 / 14 · Assessment completato")).toBeVisible();
     expect(screen.queryByText("Domanda configurata")).not.toBeInTheDocument();
     expect(requests.some((url) => url.endsWith("/submit"))).toBe(false);
   });

@@ -13,20 +13,24 @@ login → consensi → intro PF5 → domande operative → domande dei driver
 
 ## Intro
 
-La schermata mostra:
+Replica il mockup PF5 su pagina chiara:
 
-- **PROVA GRATUITA ATTIVA · X GIORNI RIMASTI.** X è 7 meno i giorni trascorsi
-  dalla creazione dell'account, con minimo 0. È solo visualizzazione: il sistema
-  non ha ancora una prova reale e allo zero non si blocca nulla.
-- **Ciao {nome}.**
-- **"Prima di programmare qualcosa misuriamo dove sei: {count} domande, circa
-  {estimatedMinutes} minuti."**
-- CTA **Scopri la tua performance**, che avvia l'assessment.
-- Sotto, un blocco informativo: disponibilità, driver, punto di partenza.
+- **Card lime.** Contiene:
+  - la pillola nera «PROVA GRATUITA ATTIVA» con accanto «X GIORNI RIMASTI»: X è 7
+    meno i giorni trascorsi dalla creazione dell'account, con minimo 0. È solo
+    visualizzazione: non esiste ancora una prova reale e allo zero non si blocca
+    nulla;
+  - «Ciao {nome}.»;
+  - «Prima di programmare qualcosa misuriamo dove sei: quattordici domande,
+    cinque minuti.»;
+  - la CTA nera **Scopri la tua performance** con freccia lime.
+- **Sotto la card.** «Cosa si attiva dopo»: Programma di 4 settimane, Sessioni e
+  video corsi, Performance index, tutti «Bloccato». È testo commerciale statico.
 
-La UI usa solo `count` ed `estimatedMinutes` restituiti dal backend: non conosce
-aree, domande per area né formula. Nessun numero di domande è scritto nel
-frontend.
+I numeri sono `count` ed `estimatedMinutes` del backend, scritti in lettere da
+`italian-number.ts` («dodici domande, quattro minuti»; «una domanda, un
+minuto»). La UI non conosce aree, domande per area né formula, e nessun numero
+di domande è scritto nel frontend.
 
 ## Composizione del questionario
 
@@ -102,12 +106,16 @@ All'avvio le domande dei driver vengono copiate nella banca per atleta
 (`UserOnboardingQuestion`) con la loro posizione nella sequenza. Le modifiche
 successive dell'editor valgono solo per i nuovi assessment.
 
-## Confine della slice
+## Confine della slice (STOP)
 
-`assessmentComplete` diventa `true` quando il cursore supera l'ultima domanda.
-La pagina mostra la schermata di completamento esistente e **non** invia nulla da
-sola: l'invio (`POST /athlete-journey/submit`), l'elaborazione, il risultato e la
-durata restano quelli di prima, da ridefinire nella slice successiva.
+`assessmentComplete` diventa `true` quando il cursore supera l'ultima domanda. La
+pagina mostra uno stato finale neutro, «Risposte registrate.», con il
+progressivo completo e la possibilità di tornare indietro a correggere. Non c'è
+**nessuna azione successiva**: niente invio, elaborazione, risultato o durata.
+L'endpoint `POST /athlete-journey/submit` e le schermate di risultato e durata
+restano nel codice per gli atleti che le hanno già raggiunte, ma il nuovo
+percorso non vi arriva finché la slice successiva non definisce il passo dopo
+l'ultima risposta.
 
 ## Editor admin (`/admin/assessment`)
 
@@ -154,7 +162,8 @@ descritta in [Gestione admin della discovery](discovery-admin.md).
 - **PostgreSQL** (`test/db/assessment-editor.integration-spec.ts`): operative
   bloccate, modifica di testo e punteggi, vincolo di 2 domande, bozze, riordino
   interno al driver.
-- **Web**: intro con 12, 14 e 16 domande dal backend; sezione Disponibilità per
-  prima; progressivo sul `count`; stop senza invio automatico; configurazione
+- **Web**: numeri in lettere (`italian-number.test.ts`); intro con 12, 14 e 16
+  domande dal backend e la sezione «Cosa si attiva dopo»; sezione Disponibilità per
+  prima; progressivo sul `count`; stop senza alcuna azione successiva né invio; configurazione
   non disponibile; editor con operative bloccate, modifica punteggi, messaggi del
   backend e riordino.
