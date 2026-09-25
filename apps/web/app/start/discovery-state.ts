@@ -73,6 +73,7 @@ export function journeyHref(nextStep: string) {
     ![
       "CONSENTS",
       "ASSESSMENT_INTRO",
+      "ASSESSMENT_UNAVAILABLE",
       "ASSESSMENT",
       "PROCESSING",
       "RESULT",

@@ -1,6 +1,4 @@
 import { performanceDriverName as driverName } from '../performance/performance-display';
-import { requireSportContext } from '../onboarding/onboarding-sports';
-import { QUESTIONS_PER_AREA } from '../ai-orchestrator/proposal-provider-model';
 import {
   BadRequestException,
   ConflictException,
@@ -15,6 +13,12 @@ import { OnboardingService } from '../onboarding/onboarding.service';
 import { loadSpecialistQuestionRecords } from '../onboarding/onboarding-questions';
 import { discoveryContext } from './discovery-context';
 import { configuredAssessment } from './configured-assessment';
+import {
+  estimatedMinutes,
+  logAssessmentProblems,
+  loadAssessmentConfiguration,
+  loadOperationalTemplates,
+} from './assessment-configuration';
 import {
   OnboardingAnswer,
   TemplateRecord,
@@ -35,6 +39,8 @@ export const PROGRAM_DURATIONS = [
   { weeks: 52, label: '12 mesi', description: 'Un percorso di lungo periodo.' },
 ];
 const LEASE_MS = 10 * 60 * 1000;
+/** Prova mostrata all'atleta: solo visualizzazione, nessun blocco a scadenza. */
+const TRIAL_DAYS = 7;
 const actor = (id: string) => ({ id, role: 'USER' as const });
 
 @Injectable()
@@ -54,43 +60,38 @@ export class AthleteJourneyService {
         nextStep: 'CONSENTS',
         documents: consent.documents,
       };
-    const questions = await loadSpecialistQuestionRecords(this.prisma, userId);
-    const context = await requireSportContext(this.prisma, userId);
-    const configured = questions.length
-      ? []
-      : await this.prisma.onboardingQuestionTemplate.findMany({
-          where: {
-            scope: 'AREA',
-            isActive: true,
-            areaId: { in: context.areas.map((a) => a.id) },
-            optionsJson: {
-              path: ['sportKey'],
-              equals: context.selection.sportKey,
-            },
-          },
-        });
-    configured.sort((a, b) => a.orderIndex - b.orderIndex);
-    const orderedAreas = [
-      ...new Set(
-        (questions.length ? questions : configured).map((q) => q.areaId),
-      ),
-    ];
-    context.areas.sort(
-      (a, b) => orderedAreas.indexOf(a.id) - orderedAreas.indexOf(b.id),
-    );
-    const count =
-      questions.length ||
-      configured.length ||
-      context.areas.length * QUESTIONS_PER_AREA;
-    const driverList = context.areas.map((a) => ({
-      ...a,
-      name: driverName(a.name),
-      count: questions.length
-        ? questions.filter((q) => q.areaId === a.id).length
-        : configured.length
-          ? configured.filter((q) => q.areaId === a.id).length
-          : QUESTIONS_PER_AREA,
-    }));
+    const [operational, bank, user] = await Promise.all([
+      loadOperationalTemplates(this.prisma),
+      loadSpecialistQuestionRecords(this.prisma, userId),
+      this.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { firstName: true, createdAt: true },
+      }),
+    ]);
+    const started = bank.length > 0;
+    // Prima dell'avvio l'intro legge la configurazione; dopo fa fede la banca copiata.
+    const config = started
+      ? null
+      : await loadAssessmentConfiguration(this.prisma, userId);
+    if (config?.problems.length) logAssessmentProblems(config.problems);
+    const questions = started ? [...operational, ...bank] : [];
+    const drivers = started
+      ? [...new Set(bank.map((q) => q.areaId!))].map((id) => {
+          const area = bank.find((q) => q.areaId === id)!.area!;
+          return {
+            id,
+            name: area.name,
+            count: bank.filter((q) => q.areaId === id).length,
+          };
+        })
+      : config!.areas.map((a) => ({
+          id: a.id,
+          name: a.name,
+          count: a.templates.length,
+        }));
+    const orderedAreas = drivers.map((d) => d.id);
+    const driverList = drivers.map((d) => ({ ...d, name: driverName(d.name) }));
+    const count = started ? questions.length : config!.count;
     const answers = saved.assessmentAnswers as Record<
       string,
       OnboardingAnswer['value']
@@ -105,16 +106,18 @@ export class AthleteJourneyService {
           : 'RESULT'
       : processing
         ? 'PROCESSING'
-        : questions.length
+        : started
           ? 'ASSESSMENT'
-          : 'ASSESSMENT_INTRO';
+          : config!.problems.length
+            ? 'ASSESSMENT_UNAVAILABLE'
+            : 'ASSESSMENT_INTRO';
     const snapshot = saved.baselineId
       ? await this.prisma.performanceProfileSnapshot.findFirst({
           where: { id: saved.baselineId, userId },
           include: { areas: { include: { area: true } } },
         })
       : null;
-    const drivers =
+    const results =
       snapshot?.areas.map((a) => ({
         id: a.areaId,
         name: driverName(a.area.name),
@@ -122,24 +125,37 @@ export class AthleteJourneyService {
         potential: a.potentialP,
         gap: a.potentialP - a.realR,
       })) ?? [];
-    drivers.sort(
+    results.sort(
       (a, b) => orderedAreas.indexOf(a.id) - orderedAreas.indexOf(b.id),
     );
-    const potential = drivers.length
+    const potential = results.length
       ? Math.round(
-          drivers.reduce((sum, d) => sum + d.potential, 0) / drivers.length,
+          results.reduce((sum, d) => sum + d.potential, 0) / results.length,
         )
       : 0;
-    const priority = [...drivers].sort(
+    const priority = [...results].sort(
       (a, b) => b.gap - a.gap || a.current - b.current,
     )[0];
     return {
       phase,
       nextStep: phase,
+      firstName: user.firstName,
+      trial: {
+        days: TRIAL_DAYS,
+        daysLeft: Math.max(
+          0,
+          TRIAL_DAYS -
+            Math.floor((Date.now() - user.createdAt.getTime()) / 86400000),
+        ),
+      },
       currentQuestion: Math.min(saved.currentQuestion, questions.length),
+      // Confine della slice: tutte le risposte date, prima di qualunque passo successivo.
+      assessmentComplete: started && saved.currentQuestion >= questions.length,
       answers,
       questions: questions.map((q) => ({
         id: q.id,
+        kind: q.areaId ? 'AREA' : 'OPERATIONAL',
+        section: q.area ? driverName(q.area.name) : 'Disponibilità',
         title: q.label,
         areaId: q.areaId,
         areaName: q.area ? driverName(q.area.name) : null,
@@ -147,16 +163,20 @@ export class AthleteJourneyService {
         required: q.required,
         inputType: q.inputType,
       })),
+      fixedQuestionCount: started
+        ? operational.length
+        : config!.fixedQuestionCount,
+      areaQuestionCount: started ? bank.length : config!.areaQuestionCount,
       count,
       driverList,
-      estimatedMinutes: Math.max(1, Math.ceil(count / 3)),
+      estimatedMinutes: estimatedMinutes(count),
       result: snapshot
         ? {
             snapshotId: snapshot.id,
             current: snapshot.rankingGlobal,
             potential,
             gap: potential - snapshot.rankingGlobal,
-            drivers,
+            drivers: results,
             priority,
           }
         : null,
@@ -179,14 +199,8 @@ export class AthleteJourneyService {
       if (
         !(await this.prisma.userOnboardingQuestion.count({ where: { userId } }))
       ) {
-        if (!(await configuredAssessment(this.prisma, userId))) {
-          const context = await discoveryContext(this.prisma, userId);
-          await this.onboarding.generateSpecialistQuestions(
-            actor(userId),
-            await this.goal(userId),
-            context!.answers,
-          );
-        }
+        // Solo domande configurate e valide: un errore ferma l'avvio.
+        await configuredAssessment(this.prisma, userId);
         await this.prisma.athleteDiscovery.update({
           where: { userId },
           data: { phase: 'ASSESSMENT', currentQuestion: 0 },
@@ -200,7 +214,7 @@ export class AthleteJourneyService {
 
   async answer(userId: string, questionId: string, value: unknown) {
     await this.allowed(userId);
-    const questions = await loadSpecialistQuestionRecords(this.prisma, userId);
+    const questions = await this.sequence(userId);
     const index = questions.findIndex((q) => q.id === questionId);
     if (index < 0 || !this.valid(questions[index], value))
       throw new BadRequestException('Risposta non valida');
@@ -223,6 +237,9 @@ export class AthleteJourneyService {
         where: { userId },
         data: { assessmentAnswers: answers, currentQuestion: index + 1 },
       });
+      // Le risposte operative vanno subito nel profilo letto dal training.
+      if (!questions[index].areaId)
+        await this.saveOperational(tx, userId, questions[index], value);
     });
     return this.state(userId);
   }
@@ -250,10 +267,7 @@ export class AthleteJourneyService {
     if (saved.baselineId) return this.state(userId);
     const claimed = await this.claim(userId);
     try {
-      const questions = await loadSpecialistQuestionRecords(
-        this.prisma,
-        userId,
-      );
+      const questions = await this.sequence(userId);
       const stored = claimed.assessmentAnswers as Record<string, unknown>;
       if (
         !questions.length ||
@@ -321,6 +335,36 @@ export class AthleteJourneyService {
     return this.state(userId);
   }
 
+  /** Operative per prime, poi la banca di area; vuota finché l'assessment non parte. */
+  private async sequence(userId: string) {
+    const bank = await loadSpecialistQuestionRecords(this.prisma, userId);
+    return bank.length
+      ? [...(await loadOperationalTemplates(this.prisma)), ...bank]
+      : [];
+  }
+  private async saveOperational(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    question: TemplateRecord,
+    value: unknown,
+  ) {
+    const option = (
+      normalizeOptions(question.optionsJson) as { value: unknown }[]
+    ).find((o) => String(o.value) === String(value))!;
+    const assessment = await tx.userOnboardingAssessment.findUnique({
+      where: { userId },
+      select: { profileJson: true },
+    });
+    const profileJson = {
+      ...((assessment?.profileJson as Prisma.JsonObject | null) ?? {}),
+      [question.key]: { label: question.label, value: option.value },
+    } as Prisma.InputJsonValue;
+    await tx.userOnboardingAssessment.upsert({
+      where: { userId },
+      update: { profileJson },
+      create: { userId, profileJson },
+    });
+  }
   private valid(q: TemplateRecord, value: unknown) {
     const options = normalizeOptions(q.optionsJson) as { value: unknown }[];
     return (

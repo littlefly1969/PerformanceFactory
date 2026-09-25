@@ -3,10 +3,17 @@ import { deleteOnboardingTemplate } from '../../src/admin/admin-onboarding';
 type JourneyResponse = {
   phase: string;
   count: number;
+  fixedQuestionCount: number;
+  areaQuestionCount: number;
+  estimatedMinutes: number;
+  assessmentComplete: boolean;
+  firstName: string;
+  trial: { days: number; daysLeft: number };
   currentQuestion: number;
   programDurationWeeks: number;
   questions: Array<{
     id: string;
+    kind: string;
     areaId: string;
     options: Array<{ value: string }>;
   }>;
@@ -431,18 +438,66 @@ describe('PF4 discovery to authenticated journey', () => {
       })
     ).json<JourneyResponse>();
 
-  it('starts twelve configured specialist questions without repeating discovery', async () => {
+  it('does not start an invalid configuration and never falls back to AI questions', async () => {
+    // Una delle due domande del driver Nutrizione dello sport di test.
+    const nutrition = await prisma.onboardingQuestionTemplate.findFirstOrThrow({
+      where: { id: { in: templateIds }, area: { name: 'Nutrizione' } },
+    });
+    await prisma.onboardingQuestionTemplate.update({
+      where: { id: nutrition.id },
+      data: { isActive: false },
+    });
+    try {
+      expect((await state()).phase).toBe('ASSESSMENT_UNAVAILABLE');
+      const start = await post('start');
+      expect(start.statusCode).toBe(409);
+      expect(start.json<{ code: string }>().code).toBe(
+        'ASSESSMENT_CONFIGURATION_INVALID',
+      );
+      expect(
+        await prisma.userOnboardingQuestion.count({ where: { userId } }),
+      ).toBe(0);
+    } finally {
+      await prisma.onboardingQuestionTemplate.update({
+        where: { id: nutrition.id },
+        data: { isActive: true },
+      });
+    }
+  });
+
+  it('starts two operational questions and twelve configured driver questions', async () => {
     expect((await post('duration', { weeks: 12 })).statusCode).toBe(409);
+    const intro = await state();
+    expect(intro).toMatchObject({
+      phase: 'ASSESSMENT_INTRO',
+      fixedQuestionCount: 2,
+      areaQuestionCount: 12,
+      count: 14,
+      estimatedMinutes: 5,
+      trial: { days: 7, daysLeft: 7 },
+    });
+    // Giorni e durata non sono piu domande della discovery.
+    expect(
+      config.questions.some((q) =>
+        ['training_days_available', 'training_session_duration'].includes(
+          q.contextKey ?? '',
+        ),
+      ),
+    ).toBe(false);
     const start = await post('start');
     expect(start.statusCode).toBe(201);
-    expect(start.json<JourneyResponse>().count).toBe(12);
-    expect(
-      new Set(
-        start
-          .json<JourneyResponse>()
-          .questions.map((q: { areaId: string }) => q.areaId),
-      ).size,
-    ).toBe(6);
+    const started = start.json<JourneyResponse>();
+    expect(started.count).toBe(14);
+    expect(started.questions.slice(0, 2).map((q) => q.kind)).toEqual([
+      'OPERATIONAL',
+      'OPERATIONAL',
+    ]);
+    expect(started.questions.slice(2).every((q) => q.kind === 'AREA')).toBe(
+      true,
+    );
+    expect(new Set(started.questions.slice(2).map((q) => q.areaId)).size).toBe(
+      6,
+    );
     expect(
       start
         .json<JourneyResponse>()
@@ -470,6 +525,14 @@ describe('PF4 discovery to authenticated journey', () => {
         .statusCode,
     ).toBe(201);
     expect((await state()).currentQuestion).toBe(1);
+    // La risposta operativa entra subito nel profilo letto dal training.
+    expect(
+      (
+        await prisma.userOnboardingAssessment.findUniqueOrThrow({
+          where: { userId },
+        })
+      ).profileJson,
+    ).toHaveProperty('training_days_available.value', 1);
     expect(
       (await post('answer', { questionId: q.id, value: q.options[0].value }))
         .statusCode,
@@ -483,7 +546,22 @@ describe('PF4 discovery to authenticated journey', () => {
       });
       expect(response.statusCode).toBe(201);
     }
-    expect((await state()).currentQuestion).toBe(12);
+    const complete = await state();
+    expect(complete.currentQuestion).toBe(14);
+    expect(complete).toMatchObject({
+      phase: 'ASSESSMENT',
+      assessmentComplete: true,
+    });
+    expect(
+      (
+        await prisma.userOnboardingAssessment.findUniqueOrThrow({
+          where: { userId },
+        })
+      ).profileJson,
+    ).toMatchObject({
+      training_days_available: { value: 2 },
+      training_session_duration: { value: 45 },
+    });
   });
 
   it('preserves questions and progress when a competing start finishes before claiming', async () => {
@@ -580,9 +658,10 @@ describe('PF4 discovery to authenticated journey', () => {
       'training_days_available.value',
       1,
     );
+    // La durata arriva dalla risposta operativa dell'assessment.
     expect(assessment.profileJson).toHaveProperty(
       'training_session_duration.value',
-      30,
+      45,
     );
     expect(assessment.profileJson).toHaveProperty(
       'general_training_frequency.value',

@@ -29,6 +29,11 @@ import { RunCycleDto } from './dto/run-cycle.dto';
 import { AdminService } from './admin.service';
 import { UpsertConsentDocumentDto } from '../consents/dto/upsert-consent-document.dto';
 import {
+  CreateAssessmentTemplateDto,
+  ReorderAssessmentTemplatesDto,
+  UpdateAssessmentTemplateDto,
+} from './dto/assessment-template.dto';
+import {
   CreateDiscoveryTemplateDto,
   ReorderOnboardingTemplatesDto,
   UpdateDiscoveryTemplateDto,
@@ -262,6 +267,72 @@ export class AdminController {
   @Roles(UserRole.ADMIN)
   deleteOnboardingTemplate(@Param('id') id: string) {
     return this.admin.deleteDiscoveryTemplate(id);
+  }
+
+  @Get('assessment-templates')
+  @ApiOperation({
+    summary:
+      'Domande assessment PF4: operative bloccate, driver con 2 domande e conteggi del journey',
+  })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  assessmentTemplates() {
+    return this.admin.listAssessmentTemplates();
+  }
+
+  @Post('assessment-templates')
+  @ApiOperation({ summary: 'Crea una domanda di driver' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  createAssessmentTemplate(
+    @Req() req: { user?: { id: string } },
+    @Body() body: CreateAssessmentTemplateDto,
+  ) {
+    return this.admin.createAssessmentTemplate(body, req.user?.id ?? '');
+  }
+
+  @Post('assessment-templates/reorder')
+  @ApiOperation({ summary: 'Riordina le domande di un driver' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  reorderAssessmentTemplates(
+    @Req() req: { user?: { id: string } },
+    @Body() body: ReorderAssessmentTemplatesDto,
+  ) {
+    return this.admin.reorderAssessmentTemplates(
+      body.areaId,
+      body.ids,
+      req.user?.id ?? '',
+    );
+  }
+
+  @Patch('assessment-templates/:id')
+  @ApiOperation({
+    summary: 'Modifica una domanda di driver; le operative sono bloccate',
+  })
+  @ApiParam({ name: 'id' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  updateAssessmentTemplate(
+    @Req() req: { user?: { id: string } },
+    @Param('id') id: string,
+    @Body() body: UpdateAssessmentTemplateDto,
+  ) {
+    return this.admin.updateAssessmentTemplate(id, body, req.user?.id ?? '');
+  }
+
+  @Delete('assessment-templates/:id')
+  @ApiOperation({ summary: 'Elimina una domanda di driver' })
+  @ApiParam({ name: 'id' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  deleteAssessmentTemplate(@Param('id') id: string) {
+    return this.admin.deleteAssessmentTemplate(id);
   }
 
   @Post('cycles/:cycleId/publish')

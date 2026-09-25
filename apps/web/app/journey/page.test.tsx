@@ -19,6 +19,7 @@ const base = {
   phase: "ASSESSMENT",
   nextStep: "ASSESSMENT",
   currentQuestion: 0,
+  assessmentComplete: false,
   count: 1,
   estimatedMinutes: 1,
   driverList: [],
@@ -61,7 +62,8 @@ describe("PF4 authenticated journey functions", () => {
       vi.fn(async (url: string, init?: RequestInit) => {
         const body = JSON.parse(String(init?.body ?? "{}"));
         requests.push({ url, body });
-        if (url.endsWith("/answer")) state = { ...state, currentQuestion: 1 };
+        if (url.endsWith("/answer"))
+          state = { ...state, currentQuestion: 1, assessmentComplete: true };
         if (url.endsWith("/submit")) state = { ...state, phase: "RESULT" };
         if (url.endsWith("/duration"))
           state = { ...state, phase: body.weeks ? "COMPLETE" : "DURATION" };
@@ -167,5 +169,117 @@ describe("PF4 authenticated journey functions", () => {
     ]);
     expect(await screen.findByText("Domanda configurata")).toBeInTheDocument();
     expect(sessionStorage.getItem(DRAFT_KEY)).toBeNull();
+  });
+});
+
+describe("PF5 assessment intro and questions", () => {
+  const journey = (extra: Record<string, unknown>) => ({
+    ...base,
+    phase: "ASSESSMENT_INTRO",
+    questions: [],
+    firstName: "Stefano",
+    trial: { days: 7, daysLeft: 5 },
+    ...extra,
+  });
+  function serve(state: Record<string, unknown>) {
+    const requests: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        requests.push(url);
+        return new Response(JSON.stringify(state));
+      }),
+    );
+    return requests;
+  }
+
+  it.each([
+    [12, 4, "12 domande, circa 4 minuti."],
+    [14, 5, "14 domande, circa 5 minuti."],
+    [16, 6, "16 domande, circa 6 minuti."],
+  ])(
+    "shows the backend count %i in the PF5 intro",
+    async (count, estimatedMinutes, text) => {
+      serve(journey({ count, estimatedMinutes }));
+      render(<JourneyPage />);
+      expect(
+        await screen.findByRole("heading", { name: "Ciao Stefano." }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByText("Prova gratuita attiva · 5 giorni rimasti"),
+      ).toBeInTheDocument();
+      expect(screen.getByText(text)).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: "Scopri la tua performance" }),
+      ).toBeEnabled();
+      cleanup();
+    },
+  );
+
+  it("starts from the intro and shows the operational section first", async () => {
+    const requests = serve(journey({ count: 14, estimatedMinutes: 5 }));
+    render(<JourneyPage />);
+    const operational = {
+      ...base,
+      count: 14,
+      questions: [
+        {
+          id: "days",
+          kind: "OPERATIONAL",
+          section: "Disponibilità",
+          title: "Quanti giorni alla settimana puoi realisticamente allenarti?",
+          areaId: null,
+          areaName: null,
+          options: [{ value: 2, label: "2 giorni" }],
+        },
+      ],
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        requests.push(url);
+        return new Response(JSON.stringify(operational));
+      }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Scopri la tua performance" }),
+    );
+    expect(requests.at(-1)).toBe("/api/athlete-journey/start");
+    expect(await screen.findByText("1 / 14 · Disponibilità")).toBeVisible();
+    // Il progressivo usa il totale del backend.
+    expect(screen.getByRole("progressbar")).toHaveAttribute(
+      "aria-valuemax",
+      "14",
+    );
+  });
+
+  it("stops at the last answer without submitting on its own", async () => {
+    const requests = serve({
+      ...base,
+      count: 14,
+      currentQuestion: 14,
+      assessmentComplete: true,
+    });
+    render(<JourneyPage />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Le tue risposte sono complete.",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Domanda configurata")).not.toBeInTheDocument();
+    expect(requests.some((url) => url.endsWith("/submit"))).toBe(false);
+  });
+
+  it("explains a configuration error instead of starting", async () => {
+    serve({ ...base, phase: "ASSESSMENT_UNAVAILABLE", questions: [] });
+    render(<JourneyPage />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Il questionario non è ancora disponibile.",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Scopri la tua performance" }),
+    ).not.toBeInTheDocument();
   });
 });

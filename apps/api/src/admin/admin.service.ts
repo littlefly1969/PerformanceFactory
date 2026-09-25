@@ -14,6 +14,17 @@ import {
 } from './admin-athletes';
 import { getDashboard } from './admin-dashboard';
 import {
+  createAssessmentTemplate,
+  deleteAssessmentTemplate,
+  listAssessmentTemplates,
+  reorderAssessmentTemplates,
+  updateAssessmentTemplate,
+} from './admin-assessment';
+import {
+  CreateAssessmentTemplateDto,
+  UpdateAssessmentTemplateDto,
+} from './dto/assessment-template.dto';
+import {
   createDiscoveryTemplate,
   deleteDiscoveryTemplate,
   listDiscoveryTemplates,
@@ -143,5 +154,29 @@ export class AdminService {
 
   reorderDiscoveryTemplates(ids: string[], actorId: string) {
     return reorderDiscoveryTemplates(this.prisma, ids, actorId);
+  }
+
+  listAssessmentTemplates() {
+    return listAssessmentTemplates(this.prisma);
+  }
+
+  createAssessmentTemplate(body: CreateAssessmentTemplateDto, actorId: string) {
+    return createAssessmentTemplate(this.prisma, body, actorId);
+  }
+
+  updateAssessmentTemplate(
+    id: string,
+    body: UpdateAssessmentTemplateDto,
+    actorId: string,
+  ) {
+    return updateAssessmentTemplate(this.prisma, id, body, actorId);
+  }
+
+  deleteAssessmentTemplate(id: string) {
+    return deleteAssessmentTemplate(this.prisma, id);
+  }
+
+  reorderAssessmentTemplates(areaId: string, ids: string[], actorId: string) {
+    return reorderAssessmentTemplates(this.prisma, areaId, ids, actorId);
   }
 }

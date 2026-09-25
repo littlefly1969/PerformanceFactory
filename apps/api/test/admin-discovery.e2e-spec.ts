@@ -170,4 +170,41 @@ describe('Admin discovery manager (e2e)', () => {
     );
     expect((await call('DELETE', '/injury_detail')).statusCode).toBe(200);
   });
+
+  it('protegge le rotte assessment e ne valida il contratto', async () => {
+    const assessment = (
+      method: string,
+      url: string,
+      body?: unknown,
+      role: UserRole = UserRole.ADMIN,
+    ) =>
+      inject({
+        method,
+        url: `/api/admin/assessment-templates${url}`,
+        headers: {
+          'x-test-role': role,
+          ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+        },
+        payload: body === undefined ? undefined : JSON.stringify(body),
+      });
+    expect(
+      (await assessment('GET', '', undefined, UserRole.AI_TUNER)).statusCode,
+    ).toBe(403);
+    // Il driver di appartenenza non si cambia in modifica.
+    expect(
+      (await assessment('PATCH', '/q1', { areaId: 'other' })).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await assessment('POST', '', {
+          areaId: 'area',
+          label: 'Domanda',
+          options: [
+            { value: 'a', label: 'A', score: 150 },
+            { value: 'b', label: 'B', score: 0 },
+          ],
+        })
+      ).statusCode,
+    ).toBe(400);
+  });
 });
