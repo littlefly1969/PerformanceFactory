@@ -278,7 +278,9 @@ describe("PF5 pre-account experience", () => {
     start("processing");
     await act(() => vi.advanceTimersByTimeAsync(0));
     const phase = () => screen.getByRole("heading", { level: 1 });
+    const header = () => document.querySelector(".pf4-header");
     expect(phase()).toHaveTextContent("Analizziamo le tue risposte…");
+    expect(header()).toHaveTextContent("Misure");
     await act(() => vi.advanceTimersByTimeAsync(1300));
     expect(phase()).toHaveTextContent("Organizziamo il tuo profilo…");
     await act(() => vi.advanceTimersByTimeAsync(1300));
@@ -293,13 +295,18 @@ describe("PF5 pre-account experience", () => {
     expect(
       screen.getByRole("button", { name: "Attiva la prova gratuita" }),
     ).toBeInTheDocument();
+    expect(header()).toHaveTextContent("Misure");
   });
 
   it("separates the free trial offer from the athlete constraints", async () => {
     start("result");
     const offer = await screen.findByRole("complementary", { name: "Offerta" });
     expect(within(offer).getByText("Premio sbloccato")).toBeInTheDocument();
-    expect(within(offer).getByText("7 giorni gratis")).toBeInTheDocument();
+    // Gerarchia PF5: numero e etichetta sono elementi distinti.
+    expect(within(offer).getByText("7")).toHaveClass("pf4-offer-days");
+    expect(within(offer).getByText("giorni gratis")).toHaveClass(
+      "pf4-offer-label",
+    );
     expect(offer).toHaveTextContent(
       "Assessment, programma e analisi dei sei driver.",
     );

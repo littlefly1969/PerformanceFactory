@@ -334,12 +334,24 @@
   text-transform: uppercase;
 }
 .pf4 .pf4-highlight .pf4-offer-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
   margin-top: 16px;
-  font-size: 38px;
-  line-height: 40px;
-  font-weight: 300;
-  letter-spacing: -0.045em;
   color: #0b0b0c;
+}
+/* Gerarchia PF5: il numero domina, l'etichetta lo accompagna. */
+.pf4-offer-days {
+  font-size: 72px;
+  line-height: 64px;
+  font-weight: 300;
+  letter-spacing: -0.06em;
+}
+.pf4-offer-label {
+  font-size: 22px;
+  line-height: 26px;
+  font-weight: 400;
+  letter-spacing: -0.03em;
 }
 .pf4-offer-terms {
   display: flex;

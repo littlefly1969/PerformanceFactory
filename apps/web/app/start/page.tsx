@@ -131,7 +131,9 @@ export default function StartPage() {
     ? `${String(index).padStart(2, "0")} / ${String(questions.length).padStart(2, "0")} · Discovery`
     : draft.currentStep === "registration"
       ? "Il tuo percorso"
-      : "Performance Factory";
+      : ["processing", "result"].includes(draft.currentStep)
+        ? "Misure"
+        : "Performance Factory";
   return (
     <PF4Shell
       label={label}

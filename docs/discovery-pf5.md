@@ -34,9 +34,11 @@ avanzamento compare già piena, ma l'attesa minima resta.
 
 ## Pagina risultato
 
-`PreliminaryResult` separa due contenuti.
+Durante analisi e risultato l'header mostra **MISURE**. `PreliminaryResult`
+separa due contenuti.
 
-- **Riquadro giallo: offerta commerciale.** «Premio sbloccato», «7 giorni gratis»,
+- **Riquadro giallo: offerta commerciale.** «Premio sbloccato», «7 giorni gratis»
+  (con «7» e «giorni gratis» in elementi separati, per la gerarchia visiva PF5),
   «Assessment, programma e analisi dei sei driver. Tutto sbloccato da subito.»,
   «Nessuna carta», «Disdici quando vuoi». Il testo è statico e non usa le
   risposte della discovery.
@@ -62,7 +64,8 @@ continuano a consumare `answersJson`, `profileJson` e snapshot come prima.
 
 `apps/web/app/start/page.test.tsx` usa fake timers e copre:
 
-- l'analisi ancora visibile a 3999 ms, le tre fasi e il risultato a 4000 ms;
+- l'analisi ancora visibile a 3999 ms, le tre fasi e il risultato a 4000 ms,
+  con l'header MISURE in entrambi i passi;
 - offerta separata dai dati dell'atleta;
 - BMI 27,8 «Sovrappeso» per 180 cm e 90 kg;
 - righe obiettivo, sport ed esperienza;

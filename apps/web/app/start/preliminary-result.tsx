@@ -86,7 +86,10 @@ export function PreliminaryResult({
         {/* Offerta commerciale: non dipende dalle risposte della discovery. */}
         <aside className="pf4-highlight pf4-offer" aria-label="Offerta">
           <span className="pf4-badge">Premio sbloccato</span>
-          <p className="pf4-offer-title">7 giorni gratis</p>
+          <p className="pf4-offer-title">
+            <span className="pf4-offer-days">7</span>{" "}
+            <span className="pf4-offer-label">giorni gratis</span>
+          </p>
           <p>
             Assessment, programma e analisi dei sei driver.
             <br />
