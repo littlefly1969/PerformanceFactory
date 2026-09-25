@@ -12,10 +12,10 @@ Le variabili OIDC rimangono quelle descritte in `apps/api/docs/google-oidc.md`. 
 
 ## Configurare un percorso
 
-Il profilo **Gestione prompt** trova **Domande iniziali** nel menu, all'indirizzo `/ai-tuner/discovery`.
+Il profilo **Amministratore** trova **Discovery** nel menu, all'indirizzo `/admin/discovery` (si veda [Gestione admin della discovery](discovery-admin.md)). La pagina `/ai-tuner/discovery` non esiste più.
 
-1. Crea o modifica una domanda, le risposte possibili e la posizione.
-2. Scegli **Sempre**, **Se tutte le condizioni sono vere** oppure **Se almeno una condizione è vera**.
+1. Crea o modifica una domanda con le sue opzioni; riordina trascinando o scegliendo la posizione.
+2. Nella sezione **Quando mostrare la domanda** scegli **Sempre**, **Se tutte le condizioni sono vere** oppure **Se almeno una condizione è vera**.
 3. Per ogni condizione seleziona una domanda precedente, il confronto e le risposte che aprono il ramo.
 4. Salva: la nuova configurazione è immediatamente disponibile per nuove discovery. Le discovery già registrate conservano la configurazione accettata.
 

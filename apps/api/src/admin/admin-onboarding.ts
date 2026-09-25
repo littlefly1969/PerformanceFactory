@@ -1,5 +1,7 @@
 import { assertDiscoveryGraph } from '../discovery/discovery-conditions';
 import { assertDiscoveryMetadata } from '../discovery/discovery-metadata';
+import { assertDiscoveryStructure } from '../discovery/discovery-structure';
+import { DiscoveryCondition } from '../discovery/discovery.types';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { OnboardingQuestionScope, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -56,10 +58,17 @@ export async function upsertOnboardingTemplate(
   const discoveryTemplates = await prisma.onboardingQuestionTemplate.findMany({
     where: { scope: 'DISCOVERY' },
   });
-  assertDiscoveryGraph([
+  const next = [
     ...discoveryTemplates.filter((t) => t.id !== body.id),
     ...(body.scope === OnboardingQuestionScope.DISCOVERY ? [data] : []),
-  ]);
+  ];
+  assertDiscoveryGraph(next);
+  // Le altre aree non devono pagare una discovery gia incoerente.
+  if (
+    body.scope === OnboardingQuestionScope.DISCOVERY ||
+    discoveryTemplates.some((t) => t.id === body.id)
+  )
+    assertDiscoveryStructure(next);
 
   if (body.id) {
     const existing = await prisma.onboardingQuestionTemplate.findUnique({
@@ -89,7 +98,7 @@ export async function deleteOnboardingTemplate(
 ) {
   const existing = await prisma.onboardingQuestionTemplate.findUnique({
     where: { id },
-    select: { id: true },
+    select: { id: true, key: true, label: true, scope: true },
   });
   if (!existing) {
     throw new NotFoundException('Template onboarding non trovato');
@@ -97,7 +106,22 @@ export async function deleteOnboardingTemplate(
   const discoveryTemplates = await prisma.onboardingQuestionTemplate.findMany({
     where: { scope: 'DISCOVERY' },
   });
-  assertDiscoveryGraph(discoveryTemplates.filter((t) => t.id !== id));
+  const remaining = discoveryTemplates.filter((t) => t.id !== id);
+  if (existing.scope === OnboardingQuestionScope.DISCOVERY) {
+    // Anche una domanda disattivata che la usa tornerebbe invalida alla riattivazione.
+    const dependent = remaining.find((t) =>
+      (
+        t.optionsJson as { visibleWhen?: DiscoveryCondition } | null
+      )?.visibleWhen?.rules.some((r) => r.question === existing.key),
+    );
+    if (dependent)
+      throw new BadRequestException(
+        `Impossibile eliminare «${existing.label}»: la usa la condizione di «${dependent.label}»`,
+      );
+  }
+  assertDiscoveryGraph(remaining);
+  if (existing.scope === OnboardingQuestionScope.DISCOVERY)
+    assertDiscoveryStructure(remaining);
   await prisma.onboardingQuestionTemplate.delete({ where: { id } });
   return { id, deleted: true };
 }
