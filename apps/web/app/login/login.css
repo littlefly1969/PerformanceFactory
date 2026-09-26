@@ -1,0 +1,127 @@
+.pf-login {
+  min-height: 100svh;
+  background: #fff;
+  color: #111;
+  font-family: Arial, Helvetica, sans-serif;
+  padding: 48px 24px;
+}
+.pf-login-content {
+  width: 100%;
+  max-width: 354px;
+  margin: 0 auto;
+}
+.pf-login-back {
+  display: inline-flex;
+  align-items: center;
+  min-width: 44px;
+  min-height: 44px;
+  color: #111;
+  text-decoration: none;
+  font-size: 27px;
+}
+.pf-login h1 {
+  margin: 12px 0 32px;
+  font-size: 36px;
+  line-height: 1.2;
+  font-weight: 400;
+  letter-spacing: -1.5px;
+}
+.pf-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.pf-login-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pf-login-field span {
+  color: #757575;
+  font-size: 9px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+}
+.pf-login-field input {
+  width: 100%;
+  min-height: 32px;
+  border: 0;
+  border-bottom: 1px solid #e5e5e5;
+  border-radius: 0;
+  background: #fff;
+  color: #111;
+  padding: 0 0 8px;
+  font-size: 19px;
+}
+.pf-login-field input::placeholder {
+  color: #757575;
+  opacity: 1;
+}
+.pf-login-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid #747775;
+  border-radius: 4px;
+  background: #fff;
+  color: #1f1f1f;
+  font-size: 14px;
+  cursor: pointer;
+}
+.pf-login-google svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.pf-login-google:hover {
+  background: #f8f9fa;
+}
+.pf-login-submit {
+  min-height: 54px;
+  border: 0;
+  border-radius: 13px;
+  background: #111;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  cursor: pointer;
+}
+.pf-login-submit:disabled {
+  background: #929292;
+  cursor: default;
+}
+.pf-login-register {
+  margin: 20px 0 0;
+  text-align: center;
+  font-size: 9px;
+  color: #757575;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+}
+.pf-login-register a {
+  color: #333;
+  text-decoration: underline;
+  text-decoration-color: #b3aa72;
+  text-underline-offset: 3px;
+}
+.pf-login-message {
+  margin: 0;
+  color: #a12622;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.pf-login :is(a, button, input):focus-visible {
+  outline: 2px solid #4285f4;
+  outline-offset: 4px;
+}
+@media (min-width: 768px) {
+  .pf-login {
+    padding-top: 80px;
+  }
+}

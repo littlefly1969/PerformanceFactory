@@ -4,16 +4,12 @@ import { useEffect } from "react";
 import Image from "next/image";
 import { API_BASE, secureFetch } from "@/app/lib/api";
 
-const destinationFor = (
-  role?: string,
-  onboardingRequired?: boolean,
-  consentRequired?: boolean,
-) => {
+const destinationFor = (role?: string, consentRequired?: boolean) => {
   if (consentRequired) {
     return "/consents";
   }
   if (role === "USER") {
-    return onboardingRequired ? "/onboarding" : "/user";
+    return "/journey";
   }
   if (role === "PROFESSIONAL") {
     return "/professional";
@@ -41,23 +37,20 @@ export default function Home() {
 
       const me = (await response.json()) as {
         role?: string;
-        onboardingRequired?: boolean;
         consentRequired?: boolean;
       };
       if (me.role === "USER") {
         const journey = await secureFetch(`${API_BASE}/auth/journey`);
-        if (journey.ok) {
-          const state = (await journey.json()) as { nextStep?: string };
-          window.location.href =
-            state.nextStep === "COMPLETE" ? "/user" : "/journey";
+        if (!journey.ok) {
+          window.location.href = "/journey";
           return;
         }
+        const state = (await journey.json()) as { nextStep?: string };
+        window.location.href =
+          state.nextStep === "COMPLETE" ? "/user" : "/journey";
+        return;
       }
-      window.location.href = destinationFor(
-        me.role,
-        me.onboardingRequired,
-        me.consentRequired,
-      );
+      window.location.href = destinationFor(me.role, me.consentRequired);
     };
 
     void route();

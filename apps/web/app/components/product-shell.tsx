@@ -102,7 +102,7 @@ const pathMatchesRole = (path: string, role?: string) => {
   if (role === "USER") {
     return (
       path === "/consents" ||
-      path === "/onboarding" ||
+      path === "/journey" ||
       path === "/user" ||
       path.startsWith("/user/")
     );
@@ -276,9 +276,9 @@ export function ProductShell({
       if (
         data.role === "USER" &&
         data.onboardingRequired &&
-        pathname !== "/onboarding"
+        pathname !== "/journey"
       ) {
-        window.location.href = "/onboarding";
+        window.location.href = "/journey";
         return;
       }
 
@@ -297,7 +297,7 @@ export function ProductShell({
     if (nav) {
       return nav;
     }
-    if (pathname === "/onboarding") {
+    if (pathname === "/journey") {
       return [];
     }
     return roleNav[me?.role ?? ""] ?? [];

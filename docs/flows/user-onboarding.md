@@ -1,3 +1,5 @@
+> Nota: il wizard frontend legacy descritto qui è stato rimosso. Il percorso attuale è `/journey`; `/onboarding` vi reindirizza. Le API backend restano disponibili e condivise con il journey. Vedi [accesso e discovery](../discovery-branches-and-access.md).
+
 # Flusso di onboarding utente
 
 ## Scopo

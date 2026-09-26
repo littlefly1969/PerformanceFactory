@@ -30,8 +30,7 @@ export function useJourney() {
       return;
     }
     if (response.status === 404) {
-      window.location.replace("/");
-      return;
+      throw new Error("Il tuo percorso non è disponibile. Contatta l’assistenza.");
     }
     setJourney(await read(response));
   }, []);

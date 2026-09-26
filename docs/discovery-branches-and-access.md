@@ -2,13 +2,13 @@
 
 ## Accesso
 
-- `/login`: accesso normale con password o Google; link esplicito alla registrazione Google.
-- `/accesso-assistito`: i precedenti profili di test (amministratore, atleta, professionisti, allenatori e gestione prompt). Il pulsante compila le credenziali; **Accedi** usa la normale autenticazione e i controlli di ruolo del server. Non crea utenti e non assegna ruoli.
+- `/login`: accesso con email/password o Google; **Fai il quiz** avvia la registrazione su `/start`.
+- `/accesso-assistito`: URL precedente, ora reindirizza a `/login`. I profili precompilati sono stati rimossi.
 - `/start`: il pulsante **Registrati con Google** permette di identificarsi prima delle domande. Rimane disponibile anche alla fine della discovery.
 
 Google usa l'OIDC già configurato, con state, nonce, PKCE e verifica server del token. Un nuovo utente Google completa prima una discovery valida e poi accetta i documenti correnti. Se Google viene avviato prima delle domande, il ritorno accompagna l'utente su `/start?google=complete`; al termine prosegue ai consensi senza chiedere password o ripetere Google. Una discovery incompleta o non più aggiornata viene ripresa prima dei consensi. Gli account Google già registrati passano dal router dell'applicazione, che sceglie l'area del ruolo. Un indirizzo già associato a credenziali locali continua a richiedere il suo accesso esistente: non viene collegato implicitamente a Google.
 
-Le variabili OIDC rimangono quelle descritte in `apps/api/docs/google-oidc.md`. I profili assistiti sono gli account di test già esistenti: questa pagina temporanea non è un meccanismo di accesso privilegiato senza autenticazione.
+Le variabili OIDC rimangono quelle descritte in `apps/api/docs/google-oidc.md`.
 
 ## Configurare un percorso
 
@@ -45,3 +45,7 @@ Le condizioni sono conservate in `OnboardingQuestionTemplate.optionsJson.visible
 `question` identifica la chiave stabile del template, non il testo. `values` usa gli ID delle opzioni per scelta singola/multipla, booleani per sì/no, numeri per numero/scala e stringhe ISO per date. `in` corrisponde ad almeno uno dei valori selezionati, `not_in` a nessuno. Una risposta assente, non valida o appartenente a una domanda nascosta non soddisfa mai una condizione, nemmeno negativa. Sono ammessi solo riferimenti a domande attive con posizione strettamente precedente: questo impedisce cicli e riferimenti irrisolvibili. I selettori sport/specializzazione non possono essere genitori perché il contesto fisso può ometterli.
 
 Il motore di visibilità è mantenuto coerente in API e frontend con test equivalenti; la validazione del server resta autorevole. Gli altri questionari (assessment specialistico e check-in) conservano i propri flussi.
+
+## Accesso e ripresa del percorso
+
+La pagina `/login` offre email/password, il pulsante **Accedi con Google** e **Fai il quiz** verso `/start`. Dopo il login la home risolve il ruolo e, per gli atleti, lo stato di `/auth/journey`. Non esiste più il fallback al wizard legacy: `/onboarding` reindirizza a `/journey`. Se il journey manca o il servizio non risponde, viene mostrato un errore con possibilità di riprovare. I servizi backend onboarding rimangono usati per la validazione finale e la baseline.
