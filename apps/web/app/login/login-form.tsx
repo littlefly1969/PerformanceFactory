@@ -1,9 +1,8 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { googleRegistrationHref } from "../start/google-registration";
+import "./login.css";
 import { API_BASE, secureFetch, storeAccessToken } from "@/app/lib/api";
 
 const pendingAdminActivationMessage =
@@ -34,13 +33,7 @@ function GoogleIcon() {
   );
 }
 
-export type AssistedAccount = {
-  group: string;
-  label: string;
-  email: string;
-  password: string;
-};
-export function LoginForm({ accounts = [] }: { accounts?: AssistedAccount[] }) {
+export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -53,11 +46,6 @@ export function LoginForm({ accounts = [] }: { accounts?: AssistedAccount[] }) {
       setMessage(error);
     }
   }, []);
-
-  const fill = (account: AssistedAccount) => {
-    setEmail(account.email);
-    setPassword(account.password);
-  };
 
   const startGoogleLogin = () => {
     const returnTo = `${window.location.origin}/`;
@@ -102,8 +90,6 @@ export function LoginForm({ accounts = [] }: { accounts?: AssistedAccount[] }) {
       email?: string;
       role?: string;
       accessToken?: string;
-      consentRequired?: boolean;
-      onboardingRequired?: boolean;
     };
     storeAccessToken(user.accessToken);
     setMessage(
@@ -111,171 +97,68 @@ export function LoginForm({ accounts = [] }: { accounts?: AssistedAccount[] }) {
     );
     setLoading(false);
 
-    if (user.role === "USER") {
-      const journey = await secureFetch(`${API_BASE}/auth/journey`);
-      if (journey.ok) {
-        const state = (await journey.json()) as { nextStep?: string };
-        window.location.href =
-          state.nextStep === "COMPLETE" ? "/user" : "/journey";
-        return;
-      }
-    }
-    const destination = user.consentRequired
-      ? "/consents"
-      : user.role === "USER"
-        ? user.onboardingRequired
-          ? "/onboarding"
-          : "/user"
-        : user.role === "PROFESSIONAL"
-          ? "/professional"
-          : user.role === "ADMIN"
-            ? "/admin/cycles"
-            : user.role === "AI_TUNER"
-              ? "/ai-tuner/prompts"
-              : "/";
-    window.location.href = destination;
+    window.location.href = "/";
   };
 
   return (
-    <main className="pf-auth-screen">
-      <section
-        className="pf-auth-brand-panel"
-        aria-labelledby="pf-auth-heading"
-      >
-        <div className="pf-auth-brand-content">
-          <Link
-            className="pf-auth-brand-lockup"
-            href="/"
-            aria-label="Performance Factory"
-          >
-            <Image
-              className="pf-auth-brand-logo"
-              src="/brand/performance-factory-horizontal-clean.png"
-              alt="Performance Factory"
-              width={900}
-              height={211}
-              priority
+    <main className="pf-login">
+      <section className="pf-login-content" aria-labelledby="login-title">
+        <Link
+          className="pf-login-back"
+          href="/start"
+          aria-label="Torna all’inizio"
+        >
+          ←
+        </Link>
+        <h1 id="login-title">Bentornato.</h1>
+        <form onSubmit={onSubmit} className="pf-login-form">
+          <label className="pf-login-field">
+            <span>E-mail</span>
+            <input
+              type="email"
+              autoComplete="username"
+              placeholder="mario@email.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
             />
-          </Link>
-
-          <p className="pf-auth-eyebrow">PERFORMANCE FACTORY</p>
-          <h1 id="pf-auth-heading" className="pf-auth-headline">
-            Valuta, monitora e migliora la tua performance
-          </h1>
-          <p className="pf-auth-copy">
-            Un unico spazio per iniziare il tuo percorso, seguire i progressi e
-            costruire un allenamento personalizzato.
-          </p>
-
-          <ul
-            className="pf-auth-benefits"
-            aria-label="Vantaggi Performance Factory"
+          </label>
+          <label className="pf-login-field">
+            <span>Password</span>
+            <input
+              type="password"
+              autoComplete="current-password"
+              placeholder="La tua password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
+          </label>
+          <button
+            className="pf-login-google"
+            type="button"
+            onClick={startGoogleLogin}
+            disabled={loading}
           >
-            <li>Valutazione iniziale</li>
-            <li>Percorso su misura</li>
-            <li>Progressi sempre visibili</li>
-          </ul>
-        </div>
-      </section>
-
-      <section className="pf-auth-panel">
-        <div className="pf-auth-panel-inner">
-          <div className="pf-auth-card">
-            <div className="pf-auth-card-header">
-              <p className="pf-eyebrow">Bentornato</p>
-              <h2>
-                {accounts.length ? "Accesso assistito" : "Accedi alla tua area"}
-              </h2>
-              <p>
-                {accounts.length
-                  ? "Scegli un profilo per compilare le credenziali, poi premi Accedi."
-                  : "Inserisci le tue credenziali per continuare."}
-              </p>
-            </div>
-
-            <form className="pf-stack" onSubmit={onSubmit}>
-              <label className="pf-field">
-                Email
-                <input
-                  className="pf-input"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  required
-                />
-              </label>
-              <label className="pf-field">
-                Password
-                <input
-                  className="pf-input"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
-                />
-              </label>
-              <div className="pf-login-options">
-                <label className="pf-remember">
-                  <input type="checkbox" />
-                  Ricordami
-                </label>
-                <Link className="pf-auth-text-link" href="/start">
-                  Crea nuovo utente
-                </Link>
-              </div>
-              <button className="pf-button" type="submit" disabled={loading}>
-                {loading ? "Accesso in corso..." : "Accedi"}
-              </button>
-            </form>
-
-            <div className="pf-auth-divider">oppure</div>
-
-            <button
-              className="pf-google-button"
-              type="button"
-              onClick={startGoogleLogin}
-            >
-              <GoogleIcon />
-              <span>Continua con Google</span>
-            </button>
-
-            <a className="pf-auth-text-link" href={googleRegistrationHref}>
-              Registrati con Google
-            </a>
-
-            {message && <div className="pf-alert warning">{message}</div>}
-          </div>
-
-          {accounts.length > 0 && (
-            <div className="pf-auth-demo-card">
-              <p className="pf-eyebrow">Profili per test interno</p>
-              <div className="pf-demo-groups">
-                {[...new Set(accounts.map((a) => a.group))].map((group) => (
-                  <div className="pf-demo-group" key={group}>
-                    <span>{group}</span>
-                    <div className="pf-demo-actions coach">
-                      {accounts
-                        .filter((a) => a.group === group)
-                        .map((account) => (
-                          <button
-                            key={account.email}
-                            className="pf-button-secondary"
-                            type="button"
-                            disabled={loading}
-                            onClick={() => fill(account)}
-                          >
-                            {account.label}
-                          </button>
-                        ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <GoogleIcon />
+            <span>Accedi con Google</span>
+          </button>
+          {message && (
+            <p className="pf-login-message" role="alert">
+              {message}
+            </p>
           )}
-        </div>
+          <button
+            className="pf-login-submit"
+            type="submit"
+            disabled={loading || !email.trim() || !password}
+          >
+            {loading ? "Accesso in corso…" : "Accedi"}
+          </button>
+        </form>
+        <p className="pf-login-register">
+          Non hai un account? <Link href="/start">Fai il quiz</Link>
+        </p>
       </section>
     </main>
   );

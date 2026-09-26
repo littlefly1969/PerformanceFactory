@@ -1,5 +1,5 @@
-import { LoginForm } from "../login/login-form";
-import { demoAccounts } from "./accounts";
+import { redirect } from "next/navigation";
+
 export default function AssistedLoginPage() {
-  return <LoginForm accounts={demoAccounts} />;
+  redirect("/login");
 }

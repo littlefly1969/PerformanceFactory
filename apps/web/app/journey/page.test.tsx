@@ -312,3 +312,14 @@ describe("PF5 assessment intro and questions", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+it("shows an error for a missing journey without redirecting back to the home page", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
+    new Response("{}", { status: 404 }),
+  ));
+  render(<JourneyPage />);
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Il tuo percorso non è disponibile. Contatta l’assistenza.",
+  );
+  expect(screen.getByRole("button", { name: "Riprova" })).toBeInTheDocument();
+});

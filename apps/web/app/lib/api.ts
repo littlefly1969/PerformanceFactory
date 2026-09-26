@@ -121,7 +121,7 @@ export async function redirectIfOnboardingRequired() {
     return true;
   }
   if (me.role === 'USER' && me.onboardingRequired) {
-    window.location.href = '/onboarding';
+    window.location.href = '/journey';
     return true;
   }
   return false;

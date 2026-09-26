@@ -32,7 +32,7 @@ const roleHome: Record<string, string> = {
 
 const redirectAfterConsent = (current: CurrentUser | null) => {
   if (current?.role === "USER" && current.onboardingRequired) {
-    window.location.href = "/onboarding";
+    window.location.href = "/journey";
     return;
   }
   window.location.href = roleHome[current?.role ?? ""] ?? "/";
