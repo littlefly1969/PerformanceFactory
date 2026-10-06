@@ -3,6 +3,7 @@ import Link from "next/link";
 import { PF4Shell } from "../start/pf4-shell";
 import { AssessmentIntro } from "./assessment-intro";
 import { ConsentStep } from "./consent-step";
+import { ProvisionalEvaluation } from "./provisional-evaluation";
 import { DurationStep, PerformanceResult } from "./performance-result";
 import { useJourney } from "./use-journey";
 import "./journey.css";
@@ -106,7 +107,7 @@ export default function JourneyPage() {
             </div>
           </section>
         )}
-        {/* STOP della slice PF5: dopo l'ultima risposta nessuna azione successiva. */}
+        {/* Tutte le risposte date: l'atleta conferma e parte la prima valutazione AI. */}
         {j?.phase === "ASSESSMENT" && j.assessmentComplete && (
           <section className="pf4-body" role="status">
             <span className="pf4-kicker">
@@ -115,9 +116,20 @@ export default function JourneyPage() {
             <h1>Risposte registrate.</h1>
             <p>
               Hai risposto a tutte le domande. Puoi ancora tornare indietro e
-              modificarle.
+              modificarle; quando confermi le analizziamo e le risposte non
+              saranno più modificabili.
             </p>
+            <button
+              className="pf4-cta"
+              disabled={busy}
+              onClick={() => void action("evaluate")}
+            >
+              {busy ? "Analizziamo le tue risposte…" : "Analizza le mie risposte →"}
+            </button>
           </section>
+        )}
+        {j?.phase === "EVALUATION" && j.evaluation && (
+          <ProvisionalEvaluation evaluation={j.evaluation} />
         )}
         {j?.phase === "PROCESSING" && (
           <section className="pf4-body" role="status">

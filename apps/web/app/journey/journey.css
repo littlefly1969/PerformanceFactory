@@ -246,3 +246,16 @@
     transition: none !important;
   }
 }
+.pf4-confidence-note {
+  font-size: 12px;
+  color: #5f5f5a;
+  text-align: center;
+}
+.pf4-evaluation-drivers p {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 19px;
+}
+.pf4-evaluation-drivers .pf4-gaps {
+  color: #5f5f5a;
+}

@@ -1,5 +1,9 @@
 import { validateDiscovery } from '../../src/discovery/discovery-validation';
 import { deleteOnboardingTemplate } from '../../src/admin/admin-onboarding';
+import {
+  loadActiveAssessmentPrompt,
+  upsertAssessmentPromptConfig,
+} from '../../src/ai-orchestrator/assessment-prompts';
 type JourneyResponse = {
   phase: string;
   count: number;
@@ -11,6 +15,16 @@ type JourneyResponse = {
   trial: { days: number; daysLeft: number };
   currentQuestion: number;
   programDurationWeeks: number;
+  evaluation: {
+    id: string;
+    status: string;
+    drivers: Array<{
+      id: string;
+      score: number;
+      confidence: number;
+      rationale: string;
+    }>;
+  } | null;
   questions: Array<{
     id: string;
     kind: string;
@@ -634,6 +648,120 @@ describe('PF4 discovery to authenticated journey', () => {
       (await post('answer', { questionId: q.id, value: q.options[1].value }))
         .statusCode,
     ).toBe(201);
+  });
+
+  it('evaluates the answers once with the AI and shows a provisional R per driver', async () => {
+    const before = await state();
+    expect(before).toMatchObject({
+      phase: 'ASSESSMENT',
+      assessmentComplete: true,
+      evaluation: null,
+    });
+    const response = await post('evaluate');
+    expect(response.statusCode).toBe(201);
+    const evaluated = response.json<JourneyResponse>();
+    expect(evaluated.phase).toBe('EVALUATION');
+    expect(evaluated.evaluation).toMatchObject({
+      status: 'PROVISIONAL',
+      source: 'SELF_ASSESSMENT',
+      scale: { min: 0, max: 100 },
+    });
+    // Un asse per driver dell'assessment, nello stesso ordine, con score e confidence separati.
+    const drivers = evaluated.evaluation!.drivers;
+    expect(drivers.map((d) => d.id)).toEqual([
+      ...new Set(before.questions.filter((q) => q.areaId).map((q) => q.areaId)),
+    ]);
+    for (const d of drivers) {
+      expect(d.score).toBeGreaterThanOrEqual(0);
+      expect(d.score).toBeLessThanOrEqual(100);
+      expect(d.confidence).toBeLessThanOrEqual(40);
+      expect(d.rationale).toBeTruthy();
+      expect(d).not.toHaveProperty('potential');
+    }
+    const saved = await prisma.assessmentEvaluation.findFirstOrThrow({
+      where: { userId },
+      include: { areas: true, promptVersion: true },
+    });
+    expect(saved).toMatchObject({
+      provider: 'stub',
+      model: 'deterministic-stub',
+    });
+    expect(saved.areas).toHaveLength(6);
+    expect(saved.promptVersion?.promptType).toBe('ASSESSMENT_EVALUATION');
+    const active = await prisma.aiAssessmentPromptConfig.findFirstOrThrow({
+      where: { isActive: true },
+    });
+    expect(saved.promptVersionId).toBe(active.activePromptVersionId);
+    expect(JSON.stringify(saved.inputJson)).not.toContain(email);
+    expect(
+      (saved.inputJson as { prompt: { system: string } }).prompt.system,
+    ).toContain(active.basePrompt);
+
+    // Una sola valutazione: le risposte sono bloccate.
+    expect(
+      (await post('evaluate')).json<JourneyResponse>().evaluation!.id,
+    ).toBe(saved.id);
+    expect(await prisma.assessmentEvaluation.count({ where: { userId } })).toBe(
+      1,
+    );
+    expect((await post('back')).statusCode).toBe(409);
+    const q = before.questions[0];
+    expect(
+      (await post('answer', { questionId: q.id, value: q.options[0].value }))
+        .statusCode,
+    ).toBe(409);
+    expect((await state()).phase).toBe('EVALUATION');
+  });
+
+  it('versions an edited assessment prompt and makes it the only active one', async () => {
+    const tuner = await prisma.user.create({
+      data: {
+        email: `tuner-${randomUUID()}@example.test`,
+        password: 'x',
+        role: 'AI_TUNER',
+      },
+    });
+    const previous = await prisma.aiAssessmentPromptConfig.findFirstOrThrow({
+      where: { isActive: true },
+    });
+    try {
+      const draft = await upsertAssessmentPromptConfig(
+        prisma,
+        { name: `bozza ${randomUUID()}`, basePrompt: 'Nuovo metodo.' },
+        tuner.id,
+      );
+      expect(draft.isActive).toBe(false);
+      expect((await loadActiveAssessmentPrompt(prisma)).basePrompt).toBe(
+        previous.basePrompt,
+      );
+      const activated = await upsertAssessmentPromptConfig(
+        prisma,
+        { ...draft, basePrompt: 'Nuovo metodo, v2.', isActive: true },
+        tuner.id,
+      );
+      expect(activated.version).toBe(2);
+      expect(await loadActiveAssessmentPrompt(prisma)).toEqual({
+        basePrompt: 'Nuovo metodo, v2.',
+        promptVersionId: activated.activePromptVersionId,
+      });
+      expect(
+        await prisma.aiAssessmentPromptConfig.count({
+          where: { isActive: true },
+        }),
+      ).toBe(1);
+      expect(
+        await prisma.aiPromptVersion.count({
+          where: { assessmentPromptConfigId: draft.id },
+        }),
+      ).toBe(2);
+    } finally {
+      await upsertAssessmentPromptConfig(
+        prisma,
+        { ...previous, isActive: true },
+        tuner.id,
+      );
+      await prisma.user.delete({ where: { id: tuner.id } });
+    }
   });
 
   it('submits a real baseline once and derives result exclusively from its persisted areas', async () => {

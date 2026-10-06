@@ -3,12 +3,13 @@
 ## Risultato
 
 Dopo login (email/password o Google) e consensi, invariati, l'atleta vede l'intro
-PF5 e un unico questionario continuo. La slice si ferma all'ultima risposta: cosa
-succede dopo non è deciso qui.
+PF5 e un unico questionario continuo, seguito dalla prima valutazione AI delle
+risposte.
 
 ```
 login → consensi → intro PF5 → domande operative → domande dei driver
-      → ultima risposta salvata (assessmentComplete) → STOP
+      → ultima risposta salvata (assessmentComplete)
+      → Analizza le mie risposte → valutazione AI (R provvisoria)
 ```
 
 ## Intro
@@ -106,16 +107,18 @@ All'avvio le domande dei driver vengono copiate nella banca per atleta
 (`UserOnboardingQuestion`) con la loro posizione nella sequenza. Le modifiche
 successive dell'editor valgono solo per i nuovi assessment.
 
-## Confine della slice (STOP)
+## Dopo l'ultima risposta
 
 `assessmentComplete` diventa `true` quando il cursore supera l'ultima domanda. La
-pagina mostra uno stato finale neutro, «Risposte registrate.», con il
-progressivo completo e la possibilità di tornare indietro a correggere. Non c'è
-**nessuna azione successiva**: niente invio, elaborazione, risultato o durata.
+pagina mostra «Risposte registrate.», con il progressivo completo e la possibilità
+di tornare indietro a correggere, e la CTA **Analizza le mie risposte**. La CTA avvia
+la prima valutazione AI delle risposte: R provvisoria per driver con confidenza,
+descritta in [Prima valutazione AI dell'assessment](assessment-ai-evaluation.md).
+Dopo la valutazione le risposte non sono più modificabili.
+
 L'endpoint `POST /athlete-journey/submit` e le schermate di risultato e durata
-restano nel codice per gli atleti che le hanno già raggiunte, ma il nuovo
-percorso non vi arriva finché la slice successiva non definisce il passo dopo
-l'ultima risposta.
+restano nel codice per gli atleti che le hanno già raggiunte; il nuovo percorso non
+vi arriva.
 
 ## Editor admin (`/admin/assessment`)
 

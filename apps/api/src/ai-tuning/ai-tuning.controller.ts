@@ -35,6 +35,8 @@ import { UpsertGoldenContextDto } from './dto/upsert-golden-context.dto';
 import { CreateEvaluationRunDto } from './dto/create-evaluation-run.dto';
 import { RateEvaluationResultDto } from './dto/rate-evaluation-result.dto';
 import { TestPromptDto } from './dto/test-prompt.dto';
+import { TestAssessmentPromptDto } from './dto/test-assessment-prompt.dto';
+import { UpsertAssessmentPromptConfigDto } from './dto/upsert-assessment-prompt-config.dto';
 
 type ActorRequest = { user?: { id: string; role: UserRole } };
 type DownloadReply = {
@@ -165,6 +167,35 @@ export class AiTuningController {
     @Body() body: UpsertGoalPromptConfigDto,
   ) {
     return this.promptAdmin.upsertGoalPromptConfig(body, req.user?.id ?? '');
+  }
+
+  @Get('assessment-prompts')
+  @ApiOperation({
+    summary: 'Prompt di valutazione AI dell assessment (attivo e bozze)',
+  })
+  listAssessmentPrompts() {
+    return this.tuning.listAssessmentPrompts();
+  }
+
+  @Post('assessment-prompt')
+  @ApiOperation({
+    summary: 'Crea o aggiorna il prompt di valutazione AI dell assessment',
+  })
+  @Roles(UserRole.AI_TUNER)
+  upsertAssessmentPrompt(
+    @Req() req: ActorRequest,
+    @Body() body: UpsertAssessmentPromptConfigDto,
+  ) {
+    return this.tuning.upsertAssessmentPrompt(body, req.user?.id ?? '');
+  }
+
+  @Post('assessment-prompt/test')
+  @ApiOperation({
+    summary: 'Prova una bozza sull ultima valutazione salvata, senza salvare',
+  })
+  @Roles(UserRole.AI_TUNER)
+  testAssessmentPrompt(@Body() body: TestAssessmentPromptDto) {
+    return this.tuning.testAssessmentPrompt(body.basePrompt);
   }
 
   @Post('sports')

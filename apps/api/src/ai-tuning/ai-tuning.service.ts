@@ -9,6 +9,12 @@ import { TestPromptDto } from './dto/test-prompt.dto';
 import { UpsertGoldenContextDto } from './dto/upsert-golden-context.dto';
 import { exportActivePrompts } from './prompt-export';
 import {
+  listAssessmentPromptConfigs,
+  upsertAssessmentPromptConfig,
+} from '../ai-orchestrator/assessment-prompts';
+import { testAssessmentPrompt } from './assessment-prompt-test';
+import { UpsertAssessmentPromptConfigDto } from './dto/upsert-assessment-prompt-config.dto';
+import {
   getAuditDetail,
   getCostSummary,
   listAudits,
@@ -64,6 +70,21 @@ export class AiTuningService {
 
   async exportActivePrompts(now = new Date()) {
     return exportActivePrompts(this.prisma, now);
+  }
+
+  listAssessmentPrompts() {
+    return listAssessmentPromptConfigs(this.prisma);
+  }
+
+  upsertAssessmentPrompt(
+    body: UpsertAssessmentPromptConfigDto,
+    actorId: string,
+  ) {
+    return upsertAssessmentPromptConfig(this.prisma, body, actorId);
+  }
+
+  testAssessmentPrompt(basePrompt: string) {
+    return testAssessmentPrompt(this.prisma, this.proposalProvider, basePrompt);
   }
 
   async listAudits(params: {

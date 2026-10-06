@@ -24,6 +24,11 @@ import {
   TemplateRecord,
 } from '../onboarding/onboarding-model';
 import { normalizeOptions } from '../onboarding/onboarding-answers';
+import { AiProposalProviderService } from '../ai-orchestrator/proposal-provider.service';
+import {
+  loadAssessmentEvaluation,
+  runAssessmentEvaluation,
+} from './assessment-evaluation';
 
 export const PROGRAM_DURATIONS = [
   {
@@ -49,6 +54,7 @@ export class AthleteJourneyService {
     private readonly prisma: PrismaService,
     private readonly consents: ConsentsService,
     private readonly onboarding: OnboardingService,
+    private readonly ai: AiProposalProviderService,
   ) {}
 
   async state(userId: string) {
@@ -98,19 +104,24 @@ export class AthleteJourneyService {
     >;
     const processing =
       saved.operationAt && Date.now() - saved.operationAt.getTime() < LEASE_MS;
+    const evaluation = started
+      ? await loadAssessmentEvaluation(this.prisma, userId, orderedAreas)
+      : null;
     const phase = saved.baselineId
       ? saved.programDurationWeeks
         ? 'COMPLETE'
         : saved.phase === 'DURATION'
           ? 'DURATION'
           : 'RESULT'
-      : processing
-        ? 'PROCESSING'
-        : started
-          ? 'ASSESSMENT'
-          : config!.problems.length
-            ? 'ASSESSMENT_UNAVAILABLE'
-            : 'ASSESSMENT_INTRO';
+      : evaluation
+        ? 'EVALUATION'
+        : processing
+          ? 'PROCESSING'
+          : started
+            ? 'ASSESSMENT'
+            : config!.problems.length
+              ? 'ASSESSMENT_UNAVAILABLE'
+              : 'ASSESSMENT_INTRO';
     const snapshot = saved.baselineId
       ? await this.prisma.performanceProfileSnapshot.findFirst({
           where: { id: saved.baselineId, userId },
@@ -149,8 +160,9 @@ export class AthleteJourneyService {
         ),
       },
       currentQuestion: Math.min(saved.currentQuestion, questions.length),
-      // Confine della slice: tutte le risposte date, prima di qualunque passo successivo.
+      // Tutte le risposte date: l'atleta può correggerle fino alla valutazione AI.
       assessmentComplete: started && saved.currentQuestion >= questions.length,
+      evaluation,
       answers,
       questions: questions.map((q) => ({
         id: q.id,
@@ -223,7 +235,11 @@ export class AthleteJourneyService {
       const saved = await tx.athleteDiscovery.findUniqueOrThrow({
         where: { userId },
       });
-      if (saved.baselineId || saved.operationAt)
+      if (
+        saved.baselineId ||
+        saved.operationAt ||
+        (await tx.assessmentEvaluation.count({ where: { userId } }))
+      )
         throw new ConflictException('Assessment già inviato o in elaborazione');
       if (index !== saved.currentQuestion)
         throw new ConflictException(
@@ -247,7 +263,11 @@ export class AthleteJourneyService {
   async back(userId: string) {
     await this.allowed(userId);
     const saved = await this.record(userId);
-    if (saved.baselineId || saved.operationAt)
+    if (
+      saved.baselineId ||
+      saved.operationAt ||
+      (await this.prisma.assessmentEvaluation.count({ where: { userId } }))
+    )
       throw new ConflictException('Assessment già inviato o in elaborazione');
     await this.prisma.athleteDiscovery.updateMany({
       where: {
@@ -258,6 +278,41 @@ export class AthleteJourneyService {
       },
       data: { currentQuestion: Math.max(0, saved.currentQuestion - 1) },
     });
+    return this.state(userId);
+  }
+
+  /** Prima valutazione AI delle risposte: R provvisoria per driver, una sola volta. */
+  async evaluate(userId: string) {
+    await this.allowed(userId);
+    const saved = await this.record(userId);
+    if (
+      saved.baselineId ||
+      (await this.prisma.assessmentEvaluation.count({ where: { userId } }))
+    )
+      return this.state(userId);
+    const claimed = await this.claim(userId);
+    try {
+      if (
+        !(await this.prisma.assessmentEvaluation.count({ where: { userId } }))
+      ) {
+        const questions = await this.sequence(userId);
+        const stored = claimed.assessmentAnswers as Record<string, unknown>;
+        if (
+          !questions.length ||
+          questions.some((q) => !this.valid(q, stored[q.id]))
+        )
+          throw new BadRequestException('Completa tutte le domande');
+        await runAssessmentEvaluation(
+          this.prisma,
+          this.ai,
+          userId,
+          questions,
+          stored,
+        );
+      }
+    } finally {
+      await this.release(userId);
+    }
     return this.state(userId);
   }
 

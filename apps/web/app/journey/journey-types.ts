@@ -13,6 +13,24 @@ export type Driver = {
   potential: number;
   gap: number;
 };
+/** Prima valutazione AI: R provvisoria per driver, score e confidence separati. */
+export type Evaluation = {
+  id: string;
+  status: string;
+  source: string;
+  summary: string;
+  overallConfidence: number;
+  scale: { min: number; max: number };
+  createdAt: string;
+  drivers: {
+    id: string;
+    name: string;
+    score: number;
+    confidence: number;
+    rationale: string;
+    evidenceGaps: string[];
+  }[];
+};
 export type Journey = {
   phase:
     | "CONSENTS"
@@ -20,6 +38,7 @@ export type Journey = {
     | "ASSESSMENT_UNAVAILABLE"
     | "ASSESSMENT"
     | "PROCESSING"
+    | "EVALUATION"
     | "RESULT"
     | "DURATION"
     | "COMPLETE";
@@ -30,6 +49,7 @@ export type Journey = {
   currentQuestion: number;
   /** Tutte le risposte date: confine prima del passo successivo. */
   assessmentComplete?: boolean;
+  evaluation?: Evaluation | null;
   /** Totale prodotto dal backend: la UI non conosce aree ne formula. */
   count: number;
   estimatedMinutes: number;
