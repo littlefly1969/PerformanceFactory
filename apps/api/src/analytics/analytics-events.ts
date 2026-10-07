@@ -20,6 +20,27 @@ export type AnalyticsEventName =
 
 export type EventProperties = Record<string, string | number | boolean>;
 
+/**
+ * Proprietà ammesse per ogni evento del browser, ciascuna con il suo formato.
+ * Le altre chiavi vengono scartate: un client non può salvare email, telefono
+ * o testi liberi negli eventi anonimi.
+ */
+const PATH = /^\/[A-Za-z0-9/_-]{0,99}$/;
+export const CLIENT_EVENT_PROPERTIES: Record<
+  ClientEventName,
+  Record<string, (value: unknown) => boolean>
+> = {
+  landing_viewed: {
+    path: (value) => typeof value === 'string' && PATH.test(value),
+  },
+  discovery_started: {},
+  discovery_completed: {},
+  registration_started: {},
+};
+
+/** Eventi per richiesta: il browser ne invia uno alla volta. */
+export const MAX_EVENTS_PER_REQUEST = 5;
+
 const MAX_PROPERTIES = 20;
 const MAX_KEY = 40;
 const MAX_VALUE = 200;
@@ -57,6 +78,20 @@ export function sanitizeProperties(value: unknown): EventProperties {
     else throw new BadRequestException(`Valore non valido per ${key}`);
   }
   return out;
+}
+
+/** Tiene solo le proprietà previste per l'evento e nel formato atteso. */
+export function allowedProperties(
+  name: ClientEventName,
+  value: unknown,
+): EventProperties {
+  const properties = sanitizeProperties(value);
+  const rules = CLIENT_EVENT_PROPERTIES[name];
+  return Object.fromEntries(
+    Object.entries(properties).filter(
+      ([key, raw]) => Object.hasOwn(rules, key) && rules[key](raw),
+    ),
+  );
 }
 
 export function clientEventName(value: unknown): ClientEventName {

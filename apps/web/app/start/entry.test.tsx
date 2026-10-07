@@ -70,6 +70,11 @@ describe("Ingresso: attribuzione, eventi e 18+", () => {
       .filter((call) => call.url.endsWith("/public/events"))
       .map((call) => call.body?.anonymousId);
     expect(new Set(ids).size).toBe(1);
+    // Ogni evento ha il suo id: il server scarta i reinvii.
+    const eventIds = calls
+      .filter((call) => call.url.endsWith("/public/events"))
+      .map((call) => (call.body?.events as { eventId: string }[])[0].eventId);
+    expect(new Set(eventIds).size).toBe(2);
     expect(JSON.parse(localStorage.getItem("pf.firstTouch")!)).toMatchObject({
       club: "padel-nord",
       landingPath: "/start",

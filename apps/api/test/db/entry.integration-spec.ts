@@ -346,26 +346,45 @@ describe('Entry slice with PostgreSQL', () => {
 
   it('accepts only allowlisted anonymous browser events', async () => {
     const visitor = anonymousId();
-    const accepted = await app.inject({
-      method: 'POST',
-      url: '/api/public/events',
-      payload: {
-        anonymousId: visitor,
-        events: [
-          { name: 'landing_viewed', properties: { path: '/start' } },
-          { name: 'discovery_started' },
-        ],
+    const events = [
+      {
+        name: 'landing_viewed',
+        eventId: anonymousId(),
+        properties: { path: '/start', email: 'mario@example.com' },
       },
-    });
+      { name: 'discovery_started', eventId: anonymousId() },
+    ];
+    const send = (payload: object) =>
+      app.inject({ method: 'POST', url: '/api/public/events', payload });
+    const accepted = await send({ anonymousId: visitor, events });
     expect(accepted.statusCode).toBe(202);
-    expect(
-      await prisma.analyticsEvent.count({
-        where: { anonymousId: visitor, origin: 'CLIENT', userId: null },
-      }),
-    ).toBe(2);
+    expect(accepted.json()).toEqual({ accepted: 2 });
+    // Lo stesso invio ripetuto non crea nuovi eventi.
+    expect((await send({ anonymousId: visitor, events })).json()).toEqual({
+      accepted: 0,
+    });
+    const saved = await prisma.analyticsEvent.findMany({
+      where: { anonymousId: visitor, origin: 'CLIENT', userId: null },
+      orderBy: { name: 'desc' },
+    });
+    expect(saved).toHaveLength(2);
+    // Le proprietà non previste per l'evento non vengono salvate.
+    expect(saved[0].properties).toEqual({ path: '/start' });
+    const tooMany = Array.from({ length: 6 }, () => ({
+      name: 'landing_viewed',
+      eventId: anonymousId(),
+    }));
     for (const events of [
-      [{ name: 'registration_completed' }],
-      [{ name: 'landing_viewed', properties: { nested: { a: 1 } } }],
+      [{ name: 'registration_completed', eventId: anonymousId() }],
+      [
+        {
+          name: 'landing_viewed',
+          eventId: anonymousId(),
+          properties: { nested: { a: 1 } },
+        },
+      ],
+      [{ name: 'landing_viewed' }],
+      tooMany,
     ])
       expect(
         (
@@ -430,6 +449,18 @@ describe('Entry slice with PostgreSQL', () => {
     expect((await asAthlete('/api/features/me')).json()).toEqual({
       referral_share: true,
     });
+    // Ripetere la stessa scelta non aggiunge righe al registro.
+    await admin('PUT', '/api/admin/beta-testers', {
+      email: athlete.email,
+      isBetaTester: true,
+    });
+    const betaChanges = await prisma.betaTesterChange.findMany({
+      where: { userId: athlete.id },
+      include: { actor: { select: { role: true } } },
+    });
+    expect(betaChanges).toMatchObject([
+      { before: false, after: true, actor: { role: 'ADMIN' } },
+    ]);
     const first = (await asAthlete('/api/athlete/referral')).json<{
       code: string;
       link: string;
@@ -459,11 +490,12 @@ describe('Entry slice with PostgreSQL', () => {
         })
       ).statusCode,
     ).toBe(404);
-    expect(
-      await prisma.featureFlagChange.count({
-        where: { flagKey: 'referral_share' },
-      }),
-    ).toBeGreaterThanOrEqual(2);
+    const flagChanges = await prisma.featureFlagChange.findMany({
+      where: { flagKey: 'referral_share' },
+      include: { actor: { select: { role: true } } },
+    });
+    expect(flagChanges.length).toBeGreaterThanOrEqual(2);
+    expect(flagChanges.every((c) => c.actor?.role === 'ADMIN')).toBe(true);
   });
 
   it('grants and withdraws the optional marketing consent without touching required ones', async () => {

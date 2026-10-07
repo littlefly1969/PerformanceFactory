@@ -1,5 +1,5 @@
 import { API_BASE } from "./api";
-import { anonymousId } from "./attribution";
+import { anonymousId, newId } from "./attribution";
 
 /** Eventi del funnel prima del login (event map A7). */
 export type ClientEvent =
@@ -27,6 +27,8 @@ export function track(name: ClientEvent, properties?: Properties) {
         events: [
           {
             name,
+            // Un reinvio dello stesso evento non viene contato due volte.
+            eventId: newId(),
             occurredAt: new Date().toISOString(),
             ...(properties ? { properties } : {}),
           },

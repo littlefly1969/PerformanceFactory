@@ -209,7 +209,9 @@ describe('Performance (e2e)', () => {
         { areaId: 'area-2', area: { name: 'Endurance' } },
       ],
     });
-    expect(response.json().areas[0]).toMatchObject({ potentialP: 80 });
+    expect(
+      (response.json() as { areas: Array<{ potentialP?: number }> }).areas[0],
+    ).toMatchObject({ potentialP: 80 });
   });
 
   it('never sends the potential P to the athlete, not even in the payload', async () => {
@@ -220,8 +222,9 @@ describe('Performance (e2e)', () => {
         headers: { 'x-test-user-id': 'user-1', 'x-test-role': UserRole.USER },
       });
       expect(response.statusCode).toBe(200);
-      expect(response.body).toContain('realR');
-      expect(response.body).not.toContain('potentialP');
+      const body = JSON.stringify(response.json());
+      expect(body).toContain('realR');
+      expect(body).not.toContain('potentialP');
     }
   });
 });

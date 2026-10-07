@@ -4,10 +4,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import {
   AnalyticsEventName,
   EventProperties,
+  allowedProperties,
   assertAnonymousId,
   clientEventName,
   eventTime,
-  sanitizeProperties,
 } from './analytics-events';
 import { TrackEventsDto } from './dto/track-events.dto';
 
@@ -17,19 +17,30 @@ type Db = PrismaService | Prisma.TransactionClient;
 export class AnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Eventi anonimi del browser: mai collegati a un utente da qui. */
+  /**
+   * Eventi anonimi del browser: mai collegati a un utente da qui. Ogni evento
+   * ha un eventId, quindi un reinvio (rete instabile, doppio click) non
+   * gonfia il funnel.
+   */
   async trackClient(input: TrackEventsDto) {
     const anonymousId = assertAnonymousId(input.anonymousId);
     const now = new Date();
-    const data = input.events.map((event) => ({
-      name: clientEventName(event.name),
-      occurredAt: eventTime(event.occurredAt, now),
-      anonymousId,
-      origin: 'CLIENT',
-      properties: sanitizeProperties(event.properties),
-    }));
-    await this.prisma.analyticsEvent.createMany({ data });
-    return { accepted: data.length };
+    const data = input.events.map((event) => {
+      const name = clientEventName(event.name);
+      return {
+        name,
+        eventId: assertAnonymousId(event.eventId),
+        occurredAt: eventTime(event.occurredAt, now),
+        anonymousId,
+        origin: 'CLIENT',
+        properties: allowedProperties(name, event.properties),
+      };
+    });
+    const saved = await this.prisma.analyticsEvent.createMany({
+      data,
+      skipDuplicates: true,
+    });
+    return { accepted: saved.count };
   }
 
   /** Evento emesso dal server, anche dentro una transazione di dominio. */

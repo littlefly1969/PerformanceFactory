@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import {
+  allowedProperties,
   assertAnonymousId,
   clientEventName,
   eventTime,
@@ -49,5 +50,21 @@ describe('analytics event validation', () => {
     expect(eventTime('2027-01-01T00:00:00Z', now)).toBe(now);
     expect(eventTime('2026-01-01T00:00:00Z', now)).toBe(now);
     expect(eventTime('not a date', now)).toBe(now);
+  });
+
+  it('keeps only the properties each event allows, in their format', () => {
+    expect(
+      allowedProperties('landing_viewed', {
+        path: '/start',
+        email: 'mario@example.com',
+        phone: '3331234567',
+      }),
+    ).toEqual({ path: '/start' });
+    expect(
+      allowedProperties('landing_viewed', { path: '/start?email=a@b.it' }),
+    ).toEqual({});
+    expect(allowedProperties('discovery_started', { name: 'Mario' })).toEqual(
+      {},
+    );
   });
 });

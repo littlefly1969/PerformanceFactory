@@ -10,12 +10,18 @@ import {
   MaxLength,
   ValidateNested,
 } from 'class-validator';
+import { MAX_EVENTS_PER_REQUEST } from '../analytics-events';
 
 export class ClientEventDto {
   @ApiProperty()
   @IsString()
   @MaxLength(64)
   name: string;
+
+  @ApiProperty({ description: 'UUID dell evento, per non contarlo due volte' })
+  @IsString()
+  @MaxLength(36)
+  eventId: string;
 
   @ApiPropertyOptional({ description: 'ISO 8601, ora del dispositivo' })
   @IsOptional()
@@ -38,7 +44,7 @@ export class TrackEventsDto {
   @ApiProperty({ type: [ClientEventDto] })
   @IsArray()
   @ArrayMinSize(1)
-  @ArrayMaxSize(20)
+  @ArrayMaxSize(MAX_EVENTS_PER_REQUEST)
   @ValidateNested({ each: true })
   @Type(() => ClientEventDto)
   events: ClientEventDto[];

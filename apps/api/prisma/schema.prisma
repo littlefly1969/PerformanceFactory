@@ -70,6 +70,10 @@ model User {
   attribution      UserAttribution?  @relation("UserAttribution")
   referredUsers    UserAttribution[] @relation("ReferredUsers")
   analyticsEvents  AnalyticsEvent[]
+  featureFlagsUpdated FeatureFlag[]       @relation("FeatureFlagUpdatedBy")
+  featureFlagChanges  FeatureFlagChange[] @relation("FeatureFlagChangeActor")
+  betaTesterChanges   BetaTesterChange[]  @relation("BetaTesterChangeUser")
+  betaTesterActions   BetaTesterChange[]  @relation("BetaTesterChangeActor")
 
   professionalLinks ProfessionalUserLink[] @relation("ProfessionalLinks")
   userLinks         ProfessionalUserLink[] @relation("UserLinks")
@@ -1528,6 +1532,8 @@ model AnalyticsEvent {
   receivedAt  DateTime @default(now())
   anonymousId String?
   userId      String?
+  /// UUID scelto dal browser per ogni evento: un reinvio non crea un secondo evento.
+  eventId     String?  @unique
   /// CLIENT (browser) o SERVER.
   origin      String
   properties  Json     @default("{}")
@@ -1548,15 +1554,37 @@ model FeatureFlag {
   rolloutPercent Int      @default(0)
   updatedAt      DateTime @updatedAt
   updatedById    String?
+
+  updatedBy User? @relation("FeatureFlagUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
 }
 
 model FeatureFlagChange {
   id        String   @id @default(uuid())
   flagKey   String
-  actorId   String
+  /// Null solo se l'account dell'autore è stato cancellato.
+  actorId   String?
   before    Json?
   after     Json
   createdAt DateTime @default(now())
 
+  actor User? @relation("FeatureFlagChangeActor", fields: [actorId], references: [id], onDelete: SetNull)
+
   @@index([flagKey, createdAt])
+  @@index([actorId])
+}
+
+/// Registro dei beta tester: chi entra o esce dal pubblico dei rilasci in beta.
+model BetaTesterChange {
+  id        String   @id @default(uuid())
+  userId    String
+  actorId   String?
+  before    Boolean
+  after     Boolean
+  createdAt DateTime @default(now())
+
+  user  User  @relation("BetaTesterChangeUser", fields: [userId], references: [id], onDelete: Cascade)
+  actor User? @relation("BetaTesterChangeActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([actorId])
 }

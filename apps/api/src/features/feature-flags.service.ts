@@ -119,16 +119,38 @@ export class FeatureFlagsService {
     });
   }
 
-  async setBetaTester(email: string, isBetaTester: boolean) {
-    const user = await this.prisma.user.findUnique({
-      where: { email: email.trim().toLowerCase() },
-      select: { id: true },
-    });
-    if (!user) throw new NotFoundException('Utente non trovato');
-    return this.prisma.user.update({
-      where: { id: user.id },
-      data: { isBetaTester },
-      select: { id: true, email: true, isBetaTester: true },
+  /**
+   * Il pubblico beta decide chi riceve una funzione: ogni ingresso o uscita
+   * lascia traccia di autore, prima e dopo, come le modifiche ai flag.
+   */
+  async setBetaTester(email: string, isBetaTester: boolean, actorId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { email: email.trim().toLowerCase() },
+        select: { id: true },
+      });
+      if (!user) throw new NotFoundException('Utente non trovato');
+      // Lock per utente: due modifiche simultanee registrano il prima corretto.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`beta-tester:${user.id}`}))`;
+      const before = await tx.user.findUniqueOrThrow({
+        where: { id: user.id },
+        select: { isBetaTester: true },
+      });
+      const after = await tx.user.update({
+        where: { id: user.id },
+        data: { isBetaTester },
+        select: { id: true, email: true, isBetaTester: true },
+      });
+      if (before.isBetaTester !== isBetaTester)
+        await tx.betaTesterChange.create({
+          data: {
+            userId: user.id,
+            actorId,
+            before: before.isBetaTester,
+            after: isBetaTester,
+          },
+        });
+      return after;
     });
   }
 }

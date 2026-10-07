@@ -81,7 +81,7 @@ export function clearAttribution() {
   }
 }
 
-function newId() {
+export function newId() {
   if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   bytes[6] = (bytes[6] & 0x0f) | 0x40;

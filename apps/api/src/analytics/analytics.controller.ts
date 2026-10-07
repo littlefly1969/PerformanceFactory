@@ -29,7 +29,7 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Eventi anonimi del funnel prima del login' })
   @UseGuards(ThrottlerGuard)
   @SkipThrottle({ 'register-athlete': true })
-  @Throttle({ 'public-events': { limit: 60, ttl: 60 * 1000 } })
+  @Throttle({ 'public-events': { limit: 20, ttl: 60 * 1000 } })
   track(@Body() body: TrackEventsDto) {
     return this.analytics.trackClient(body);
   }

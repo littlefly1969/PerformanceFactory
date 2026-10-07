@@ -74,7 +74,11 @@ export class FeatureFlagsController {
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
-  setBetaTester(@Body() body: SetBetaTesterDto) {
-    return this.flags.setBetaTester(body.email, body.isBetaTester);
+  setBetaTester(@Body() body: SetBetaTesterDto, @Req() req: AuthedRequest) {
+    return this.flags.setBetaTester(
+      body.email,
+      body.isBetaTester,
+      req.user!.id,
+    );
   }
 }

@@ -57,7 +57,7 @@ function buildThrottlerStorage() {
           {
             name: 'public-events',
             ttl: 60 * 1000,
-            limit: 60,
+            limit: 20,
           },
         ],
         storage: buildThrottlerStorage(),
