@@ -5,7 +5,18 @@
 export type CalibrationStatus =
   | 'FREE_CALIBRATING'
   | 'FREE_LEVEL_ESTIMATED'
-  | 'CALIBRATION_COMPLETED';
+  | 'CALIBRATION_COMPLETED'
+  /** Orizzonte scelto dopo il reveal di P3/P6/P12: pronto per l'offerta. */
+  | 'PAYWALL_READY';
+
+/** Stati in cui la calibrazione è chiusa: niente più round né rivalutazioni. */
+export const CLOSED_CALIBRATION_STATUSES = [
+  'CALIBRATION_COMPLETED',
+  'PAYWALL_READY',
+] as const;
+
+export const isCalibrationClosed = (status: string) =>
+  (CLOSED_CALIBRATION_STATUSES as readonly string[]).includes(status);
 
 export type CalibrationSettings = {
   confidenceThreshold: number;
@@ -91,7 +102,7 @@ export function statusAfterEvaluation(
   completionReason?: 'CONFIDENCE_REACHED' | 'CLOSING_ASSESSMENT';
   levelEstimated: boolean;
 } {
-  if (current === 'CALIBRATION_COMPLETED')
+  if (isCalibrationClosed(current))
     return { status: current, levelEstimated: false };
   const levelEstimated =
     current === 'FREE_CALIBRATING' &&

@@ -22,6 +22,7 @@ import { closeAtDeadline, completeCalibration } from './calibration-completion';
 import {
   CalibrationStatus,
   dayOf,
+  isCalibrationClosed,
   nextRoundAt,
   nextRoundKind,
   roundTargets,
@@ -104,7 +105,7 @@ export class CalibrationService {
     let calibration = await this.ensureStarted(userId);
     if (!calibration) return null;
     if (
-      calibration.status !== 'CALIBRATION_COMPLETED' &&
+      !isCalibrationClosed(calibration.status) &&
       calibration.deadlineAt <= now
     ) {
       // Se un'altra operazione ha il lease, chiuderà lei alla prossima visita.
@@ -132,7 +133,7 @@ export class CalibrationService {
         where: { userId, status: 'EVALUATED' },
       }),
     ]);
-    const completed = calibration.status === 'CALIBRATION_COMPLETED';
+    const completed = isCalibrationClosed(calibration.status);
     const available = nextRoundAt(last, settings);
     return {
       status: calibration.status as CalibrationStatus,
@@ -177,7 +178,7 @@ export class CalibrationService {
     const calibration = await this.ensureStarted(userId);
     if (!calibration)
       throw new ConflictException('Completa prima la valutazione iniziale');
-    if (calibration.status === 'CALIBRATION_COMPLETED')
+    if (isCalibrationClosed(calibration.status))
       throw new ConflictException('La calibrazione è già completata');
     const settings = await loadCalibrationSettings(this.prisma);
     await requireAiConsent(this.prisma, userId);
@@ -351,8 +352,7 @@ export class CalibrationService {
         where: { userId },
       });
       // Chiusa nel frattempo (scadenza): nessuna valutazione oltre quella consolidata.
-      if (calibration.status === 'CALIBRATION_COMPLETED')
-        throw new RoundNotOwned();
+      if (isCalibrationClosed(calibration.status)) throw new RoundNotOwned();
       const next = statusAfterEvaluation(
         calibration.status as CalibrationStatus,
         {

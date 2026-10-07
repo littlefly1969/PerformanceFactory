@@ -101,9 +101,13 @@ function AvailabilityForm({ initial }: { initial: Availability }) {
           onChange={(e) => setWeeks(e.target.value)}
         >
           <option value="">Seleziona</option>
-          {[4, 12, 52].map((w) => (
+          {[
+            [12, "3 mesi"],
+            [26, "6 mesi"],
+            [52, "12 mesi"],
+          ].map(([w, label]) => (
             <option key={w} value={w}>
-              {w} settimane
+              {label}
             </option>
           ))}
         </select>

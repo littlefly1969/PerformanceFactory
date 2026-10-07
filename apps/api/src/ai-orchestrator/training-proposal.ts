@@ -20,7 +20,7 @@ import { validateTrainingSchedule } from './training-schedule';
 export function buildTrainingProposalPreview(input: TrainingProposalInput) {
   const provider = resolveProvider();
   const prompt = {
-    system: `${buildSystemPrompt(input)}\nCONTRATTO TRAINING: pianifica esclusivamente la finestra operativa di 14 giorni indicata. L'orizzonte strategico resta il programma di 4, 12 o 52 settimane. I vincoli numerici e il calendario di questo contratto prevalgono su eventuali indicazioni generiche di produrre da uno a tre esercizi. Massimo una sessione al giorno. Non inventare disponibilità o metriche.`,
+    system: `${buildSystemPrompt(input)}\nCONTRATTO TRAINING: pianifica esclusivamente la finestra operativa di 14 giorni indicata. L'orizzonte strategico resta il programma di 3, 6 o 12 mesi (12, 26 o 52 settimane). I vincoli numerici e il calendario di questo contratto prevalgono su eventuali indicazioni generiche di produrre da uno a tre esercizi. Massimo una sessione al giorno. Non inventare disponibilità o metriche.`,
     user: {
       task: `Programma allenamenti eseguibili nei prossimi 14 giorni e ${cycleQuestionLayout(input).questions} domande di monitoraggio. Frequenza e distribuzione devono rispettare i vincoli PF.`,
       constraints: input.trainingConstraints,

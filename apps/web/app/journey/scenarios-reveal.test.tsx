@@ -1,0 +1,86 @@
+import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Scenarios } from "./journey-types";
+import { ScenariosReveal } from "./scenarios-reveal";
+
+const drivers = (p: number) => [
+  { id: "a", name: "Tecnica", current: 40, potential: p, confidence: 70 },
+  { id: "b", name: "Fisico", current: 85, potential: 85, confidence: 40 },
+];
+
+const scenarios = (selectedHorizon: Scenarios["selectedHorizon"] = null) =>
+  ({
+    engine: { key: "provisional-plateau", version: "1", provisional: true },
+    scale: { min: 0, max: 100 },
+    selectedHorizon,
+    horizons: [
+      { horizon: "PROGRAM_3M", months: 3, drivers: drivers(52) },
+      { horizon: "PROGRAM_6M", months: 6, drivers: drivers(61) },
+      { horizon: "PROGRAM_12M", months: 12, drivers: drivers(71) },
+    ],
+  }) satisfies Scenarios;
+
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+
+describe("P3/P6/P12 reveal", () => {
+  it("shows three scenarios marked as provisional and sends the chosen horizon", async () => {
+    const onSelect = vi.fn();
+    render(
+      <ScenariosReveal scenarios={scenarios()} busy={false} onSelect={onSelect} />,
+    );
+    expect(screen.getByText(/stima provvisoria/)).toBeVisible();
+    const six = screen.getByRole("article", { name: "Scenario a 6 mesi" });
+    const items = within(six).getAllByRole("listitem");
+    expect(items[0]).toHaveTextContent("Tecnica: 40 → 61");
+    // Il driver già al tetto resta dov'è.
+    expect(items[1]).toHaveTextContent("Fisico: 85 → 85");
+    await userEvent.click(
+      within(six).getByRole("button", { name: "Scegli 6 mesi →" }),
+    );
+    expect(onSelect).toHaveBeenCalledWith("PROGRAM_6M");
+  });
+
+  it("shows only the payment cadences of the chosen horizon", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(
+          JSON.stringify([
+            {
+              horizon: "PROGRAM_3M",
+              billingOptions: [
+                { billingCycle: "MONTHLY", billingMonths: 1, amountCents: 3900, currency: "EUR" },
+              ],
+            },
+            {
+              horizon: "PROGRAM_12M",
+              billingOptions: [
+                { billingCycle: "MONTHLY", billingMonths: 1, amountCents: 2900, currency: "EUR" },
+                { billingCycle: "ANNUAL", billingMonths: 12, amountCents: 29000, currency: "EUR" },
+              ],
+            },
+          ]),
+        ),
+      ),
+    );
+    render(
+      <ScenariosReveal
+        scenarios={scenarios("PROGRAM_12M")}
+        busy={false}
+        onSelect={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "Percorso scelto" }),
+    ).toHaveAttribute("aria-pressed", "true");
+    const offer = await screen.findByRole("list", {
+      name: "Come pagare il percorso",
+    });
+    expect(within(offer).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(offer).getByText(/all'anno/)).toBeVisible();
+  });
+});

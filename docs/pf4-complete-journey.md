@@ -18,7 +18,7 @@ Authenticated mutations require the existing bearer/session authentication guard
 - `POST /athlete-journey/answer`: validates option membership, persists the answer and advances the server cursor.
 - `POST /athlete-journey/back`: persists the preceding cursor.
 - `POST /athlete-journey/submit`: validates the final goal through the existing provider, then invokes onboarding submit. A rejected goal requires revision; it is not silently bypassed.
-- `POST /athlete-journey/duration`: opens duration selection, or persists 4, 12 or 52 weeks.
+- `POST /athlete-journey/duration`: opens duration selection, or persists 12, 26 or 52 weeks (3, 6 or 12 months).
 
 The migration supplies 12 Padel AREA templates, two for each existing domain area. Their `optionsJson` has `sportKey: "PADEL"` and an `options` array with value/label/score. Admin template editing can change text, options, order, activation and count. Each athlete gets a stable copy when beginning. Other sports keep the existing AI question generator. The UI derives count, progress and estimated time from the server. No fixed twelve-question React flow exists.
 

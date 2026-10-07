@@ -9,6 +9,7 @@ import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { IsInt, IsOptional, IsString, MaxLength, Allow } from 'class-validator';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { AthleteJourneyService } from './athlete-journey.service';
+import { SelectHorizonDto } from './scenarios/select-horizon.dto';
 import { CalibrationAnswersDto } from './calibration/dto/calibration.dto';
 class AnswerDto {
   @ApiProperty() @IsString() @MaxLength(100) questionId!: string;
@@ -90,5 +91,15 @@ export class AthleteJourneyController {
       body.roundId,
       body.answers,
     );
+  }
+  @ApiOperation({
+    summary: 'Sceglie il percorso di 3, 6 o 12 mesi dopo gli scenari P3/P6/P12',
+  })
+  @Post('horizon')
+  horizon(
+    @Req() req: { user: { id: string } },
+    @Body() body: SelectHorizonDto,
+  ) {
+    return this.journey.horizon(req.user.id, body.horizon);
   }
 }

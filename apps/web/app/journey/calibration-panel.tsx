@@ -85,7 +85,8 @@ export function CalibrationPanel({
   onOpenRound: () => void;
   onAnswer: (roundId: string, answers: Record<string, string>) => void;
 }) {
-  const completed = c.status === "CALIBRATION_COMPLETED";
+  const completed =
+    c.status === "CALIBRATION_COMPLETED" || c.status === "PAYWALL_READY";
   const level =
     evaluation.level && c.status !== "FREE_CALIBRATING"
       ? LEVELS[evaluation.level]
