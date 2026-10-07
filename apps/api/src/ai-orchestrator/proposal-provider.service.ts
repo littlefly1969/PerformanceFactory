@@ -4,6 +4,8 @@ import {
 } from './training-proposal';
 import { TrainingProposalInput } from './proposal-provider-model';
 import { Injectable, Logger } from '@nestjs/common';
+import { evaluateAssessment } from './assessment-evaluation';
+import { AssessmentEvaluationInput } from './assessment-evaluation-model';
 import {
   buildCycleProposalPreview,
   generateCycleProposal,
@@ -70,6 +72,10 @@ export class AiProposalProviderService {
     input: SpecialistOnboardingQuestionInput,
   ): Promise<SpecialistOnboardingQuestionResult> {
     return generateSpecialistOnboardingQuestions(this.logger, input);
+  }
+
+  evaluateAssessment(input: AssessmentEvaluationInput) {
+    return evaluateAssessment(this.logger, input);
   }
 
   static requiresUserConsent(provider = process.env.AI_PROVIDER) {

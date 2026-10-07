@@ -88,7 +88,7 @@ describe("PF4 authenticated journey functions", () => {
     expect(
       await screen.findByRole("heading", { name: "Risposte registrate." }),
     ).toBeInTheDocument();
-    // STOP: nessuna azione verso invio, elaborazione o risultato.
+    // Nessun invio automatico: la valutazione parte solo su conferma.
     expect(
       screen.queryAllByRole("button", { name: /Scopri|Invia|Continua/ }),
     ).toHaveLength(0);
@@ -312,6 +312,74 @@ describe("PF5 assessment intro and questions", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("14 / 14 · Assessment completato")).toBeVisible();
     expect(screen.queryByText("Domanda configurata")).not.toBeInTheDocument();
+    expect(requests.some((url) => url.endsWith("/submit"))).toBe(false);
+  });
+
+  it("evaluates the answers on confirmation and shows a provisional spider with confidence", async () => {
+    let state: Record<string, unknown> = {
+      ...base,
+      count: 14,
+      currentQuestion: 14,
+      assessmentComplete: true,
+    };
+    const requests: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        requests.push(url);
+        if (url.endsWith("/evaluate"))
+          state = {
+            ...state,
+            phase: "EVALUATION",
+            evaluation: {
+              id: "evaluation-1",
+              status: "PROVISIONAL",
+              source: "SELF_ASSESSMENT",
+              summary: "Prima lettura delle tue risposte.",
+              overallConfidence: 30,
+              scale: { min: 0, max: 100 },
+              createdAt: "2026-10-06T22:00:00.000Z",
+              drivers: [
+                {
+                  id: "a",
+                  name: "Tecnica",
+                  score: 64,
+                  confidence: 35,
+                  rationale: "Gestisci bene la rete.",
+                  evidenceGaps: ["Un video di una partita."],
+                },
+                {
+                  id: "b",
+                  name: "Mental",
+                  score: 40,
+                  confidence: 75,
+                  rationale: "Ti riprendi dopo un errore.",
+                  evidenceGaps: [],
+                },
+              ],
+            },
+          };
+        return new Response(JSON.stringify(state));
+      }),
+    );
+    render(<JourneyPage />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Analizza le mie risposte →" }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Ecco dove sei oggi." }),
+    ).toBeInTheDocument();
+    expect(requests.filter((url) => url.endsWith("/evaluate"))).toHaveLength(1);
+    expect(screen.getByText("Prima valutazione · provvisoria")).toBeVisible();
+    expect(screen.getByText("Gestisci bene la rete.")).toBeVisible();
+    expect(screen.getByText("Per affinare: Un video di una partita.")).toBeVisible();
+    expect(screen.getByText("affidabilità bassa")).toBeVisible();
+    expect(screen.getByText("affidabilità alta")).toBeVisible();
+    // Confidence bassa: tratto tenue e tratteggiato, nessun potenziale mostrato.
+    const r = screen.getByTestId("provisional-r");
+    expect(Number(r.getAttribute("fill-opacity"))).toBeCloseTo(0.33);
+    expect(r).toHaveAttribute("stroke-dasharray", "4 3");
+    expect(screen.queryByText(/Potenziale/)).not.toBeInTheDocument();
     expect(requests.some((url) => url.endsWith("/submit"))).toBe(false);
   });
 

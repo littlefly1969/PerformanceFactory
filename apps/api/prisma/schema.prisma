@@ -52,6 +52,7 @@ model User {
   abilityPlanOperations AbilityPlanOperation[]
   areaSessions AreaSession[]
   discovery AthleteDiscovery?
+  assessmentEvaluations AssessmentEvaluation[]
   id        String   @id @default(uuid())
   email     String   @unique
   password  String
@@ -128,6 +129,8 @@ model User {
   createdAiEvaluationRuns     AiEvaluationRun[]            @relation("AiEvaluationRunCreatedBy")
   aiReplayFeedbacks           AiReplayFeedback[]           @relation("AiReplayFeedbackCreatedBy")
   ratedAiEvaluationResults    AiEvaluationResult[]         @relation("AiEvaluationResultRatedBy")
+  subscriptions               Subscription[]
+  paymentCustomers            PaymentCustomer[]
 }
 
 model AuthIdentity {
@@ -366,6 +369,7 @@ model AiPromptVersion {
   areaGenerationConfigId          String?
   sportSpecializationAreaPromptId String?
   sportSpecializationId           String?
+  assessmentPromptConfigId        String?
 
   createdBy User? @relation("AiPromptVersionCreatedBy", fields: [createdById], references: [id])
   goalPromptConfig AiGoalPromptConfig? @relation("AiGoalPromptConfigVersions", fields: [goalPromptConfigId], references: [id], onDelete: Cascade)
@@ -376,11 +380,15 @@ model AiPromptVersion {
   activeForSportSpecializationAreaPrompt SportSpecializationAreaPrompt? @relation("SportSpecializationAreaPromptActiveVersion")
   sportSpecialization SportSpecialization? @relation("SportSpecializationTrainingPromptVersions", fields: [sportSpecializationId], references: [id], onDelete: Cascade)
   activeForSportSpecializationTrainingPrompt SportSpecialization? @relation("SportSpecializationActiveTrainingPromptVersion")
+  assessmentPromptConfig AiAssessmentPromptConfig? @relation("AiAssessmentPromptConfigVersions", fields: [assessmentPromptConfigId], references: [id], onDelete: Cascade)
+  activeForAssessmentPromptConfig AiAssessmentPromptConfig? @relation("AiAssessmentPromptConfigActiveVersion")
+  assessmentEvaluations AssessmentEvaluation[]
 
   @@unique([goalPromptConfigId, version])
   @@unique([areaGenerationConfigId, version])
   @@unique([sportSpecializationAreaPromptId, version])
   @@unique([sportSpecializationId, version])
+  @@unique([assessmentPromptConfigId, version])
   @@index([promptType, createdAt])
   @@index([createdById, createdAt])
 }
@@ -463,6 +471,7 @@ model Area {
   sportSpecializationPrompts  SportSpecializationAreaPrompt[]
   userAreaPromptInstructions  UserAreaPromptInstruction[]
   aiGoldenContexts            AiGoldenContext[]                @relation("AiGoldenContextArea")
+  assessmentEvaluationAreas   AssessmentEvaluationArea[]
 }
 
 model FeedbackEntry {
@@ -1285,6 +1294,196 @@ model AbilityPlanOperation {
   release ImprovementPlanRelease? @relation(fields: [releaseId], references: [id], onDelete: SetNull)
   @@index([completedAt, nextAttemptAt, leaseUntil])
   @@index([userId, areaId])
+}
+
+/// Prompt AI_ASSESSMENT che legge il primo set dell'assessment e stima la R provvisoria.
+/// Come per il prompt obiettivo, una sola configurazione e attiva; le altre sono bozze.
+model AiAssessmentPromptConfig {
+  id                    String   @id @default(uuid())
+  name                  String   @unique
+  basePrompt            String
+  version               Int      @default(1)
+  isActive              Boolean  @default(false)
+  activePromptVersionId String?  @unique
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  createdById           String?
+  updatedById           String?
+
+  activePromptVersion AiPromptVersion?  @relation("AiAssessmentPromptConfigActiveVersion", fields: [activePromptVersionId], references: [id])
+  promptVersions      AiPromptVersion[] @relation("AiAssessmentPromptConfigVersions")
+
+  @@index([isActive, version])
+}
+
+/// Prima valutazione dell'assessment: R provvisoria per driver con confidence, mai P.
+/// Ogni valutazione conserva fonte, versione del prompt, input e output validati.
+model AssessmentEvaluation {
+  id                String   @id @default(uuid())
+  userId            String
+  /// 1 = prima valutazione dell'assessment; le successive incrementano. Unico per atleta.
+  sequence          Int      @default(1)
+  status            String   @default("PROVISIONAL")
+  source            String   @default("SELF_ASSESSMENT")
+  summary           String
+  overallConfidence Int
+  minScore          Float
+  maxScore          Float
+  provider          String
+  model             String
+  promptVersionId   String?
+  promptHash        String
+  inputJson         Json
+  outputJson        Json
+  latencyMs         Int?
+  createdAt         DateTime @default(now())
+
+  user          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  promptVersion AiPromptVersion?           @relation(fields: [promptVersionId], references: [id], onDelete: SetNull)
+  areas         AssessmentEvaluationArea[]
+
+  @@unique([userId, sequence])
+  @@index([userId, createdAt])
+}
+
+model AssessmentEvaluationArea {
+  id            String @id @default(uuid())
+  evaluationId  String
+  areaId        String
+  score         Float
+  confidence    Int
+  rationale     String
+  evidenceGaps  Json
+
+  evaluation AssessmentEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  area       Area                 @relation(fields: [areaId], references: [id])
+
+  @@unique([evaluationId, areaId])
+  @@index([areaId])
+}
+
+// Pagamenti (Blueprint A4/A5): PROGRAM_HORIZON e BILLING_CYCLE sono proprieta distinte.
+enum ProgramHorizon {
+  PROGRAM_3M
+  PROGRAM_6M
+  PROGRAM_12M
+}
+
+enum BillingCycle {
+  MONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+}
+
+enum PaymentProviderKind {
+  STUB
+  STRIPE
+}
+
+enum PurchaseChannel {
+  WEB
+  IOS
+  ANDROID
+}
+
+enum SubscriptionStatus {
+  CHECKOUT_PENDING
+  CHECKOUT_EXPIRED
+  CHECKOUT_FAILED
+  ACTIVE
+  PAYMENT_GRACE
+  PAUSED
+  EXPIRED
+}
+
+// Prezzo della cadenza di pagamento, non di un livello di servizio (A5.1-A5.4).
+// Parametrico da back office: i valori seminati sono le ipotesi A5-D01.
+model BillingCyclePrice {
+  billingCycle BillingCycle @id
+  amountCents  Int
+  currency     String       @default("eur")
+  updatedAt    DateTime     @updatedAt
+}
+
+// Matrice PROGRAM_HORIZON x BILLING_CYCLE: quali combinazioni sono offerte (A5-D02).
+model ProgramBillingOption {
+  horizon      ProgramHorizon
+  billingCycle BillingCycle
+  isActive     Boolean        @default(true)
+  updatedAt    DateTime       @updatedAt
+
+  @@id([horizon, billingCycle])
+}
+
+model PaymentCustomer {
+  id                 String              @id @default(uuid())
+  userId             String
+  provider           PaymentProviderKind
+  providerCustomerId String
+  createdAt          DateTime            @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@unique([provider, providerCustomerId])
+}
+
+model Subscription {
+  id                     String              @id @default(uuid())
+  userId                 String
+  horizon                ProgramHorizon
+  billingCycle           BillingCycle
+  status                 SubscriptionStatus  @default(CHECKOUT_PENDING)
+  provider               PaymentProviderKind
+  purchaseChannel        PurchaseChannel     @default(WEB)
+  amountCents            Int
+  currency               String
+  providerCheckoutId     String?
+  checkoutUrl            String?
+  checkoutExpiresAt      DateTime?
+  providerSubscriptionId String?
+  providerCustomerId     String?
+  currentPeriodStart     DateTime?
+  entitlementEndAt       DateTime?
+  nextChargeAt           DateTime?
+  cancelAtPeriodEnd      Boolean             @default(false)
+  graceEndsAt            DateTime?
+  programStartedAt       DateTime?
+  programEndsAt          DateTime?
+  endedAt                DateTime?
+  // created dell'ultimo evento applicato: gli eventi piu vecchi sono scartati.
+  lastProviderEventAt    DateTime?
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events PaymentEvent[]
+
+  @@unique([provider, providerCheckoutId])
+  @@unique([provider, providerSubscriptionId])
+  // Invariante in migrazione (indice parziale, non esprimibile in Prisma):
+  // al massimo un abbonamento non terminale per utente.
+  @@index([userId, status])
+}
+
+// Registro idempotente e auditabile degli eventi ricevuti dal provider.
+model PaymentEvent {
+  id                String              @id @default(uuid())
+  provider          PaymentProviderKind
+  providerEventId   String
+  type              String
+  // Esito sul modello PF: ACTIVATED, RENEWED, PAYMENT_RECOVERED, STALE...
+  outcome           String?
+  subscriptionId    String?
+  payloadJson       Json
+  providerCreatedAt DateTime?
+  receivedAt        DateTime            @default(now())
+
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, providerEventId])
+  @@index([subscriptionId])
 }
 
 /// Circolo o partner territoriale attribuibile (Index, A2.11, A5.11-A5.13).

@@ -76,6 +76,7 @@ Gli esempi puntano a:
 - PostgreSQL: `postgresql://postgres:postgres@localhost:5432/performancefactory`
 - Redis: `redis://localhost:6379`
 - AI: `AI_PROVIDER=stub` per sviluppo deterministico
+- Pagamenti: `PAYMENTS_PROVIDER=stub` in sviluppo, Stripe in modalità test per i collaudi ([pagamenti e abbonamento](docs/payments.md))
 
 Avvia PostgreSQL e Redis:
 
@@ -143,7 +144,8 @@ Documentazione tecnica:
 - [architettura backend](docs/backend/architecture.md);
 - [API e OpenAPI](docs/api/README.md);
 - [autenticazione e autorizzazione](docs/api/authentication.md);
-- [errori e validazione](docs/api/errors.md).
+- [errori e validazione](docs/api/errors.md);
+- [pagamenti e abbonamento](docs/payments.md).
 
 ## Quality Gate
 

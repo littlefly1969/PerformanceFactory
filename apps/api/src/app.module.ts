@@ -23,6 +23,7 @@ import { CyclesModule } from './cycles/cycles.module';
 import { InspectModule } from './inspect/inspect.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { AiTuningModule } from './ai-tuning/ai-tuning.module';
+import { PaymentsModule } from './payments/payments.module';
 import { FeaturesModule } from './features/features.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { PartnersModule } from './partners/partners.module';
@@ -82,6 +83,7 @@ function buildThrottlerStorage() {
     InspectModule,
     OnboardingModule,
     AiTuningModule,
+    PaymentsModule,
     FeaturesModule,
     AnalyticsModule,
     PartnersModule,
