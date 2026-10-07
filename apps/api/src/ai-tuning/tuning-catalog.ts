@@ -2,6 +2,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AiCycleContext } from '../ai-orchestrator/proposal-provider.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ASSESSMENT_PROMPT_TYPE } from '../ai-orchestrator/assessment-evaluation-model';
 import { UpsertGoldenContextDto } from './dto/upsert-golden-context.dto';
 
 export async function listAreas(prisma: PrismaService) {
@@ -37,12 +38,15 @@ export async function listPromptVersions(
       where.sportSpecializationAreaPromptId = ownerId;
     } else if (promptType === 'TRAINING') {
       where.sportSpecializationId = ownerId;
+    } else if (promptType === ASSESSMENT_PROMPT_TYPE) {
+      where.assessmentPromptConfigId = ownerId;
     } else {
       where.OR = [
         { goalPromptConfigId: ownerId },
         { areaGenerationConfigId: ownerId },
         { sportSpecializationAreaPromptId: ownerId },
         { sportSpecializationId: ownerId },
+        { assessmentPromptConfigId: ownerId },
       ];
     }
   }
@@ -61,6 +65,7 @@ export async function listPromptVersions(
       areaGenerationConfigId: true,
       sportSpecializationAreaPromptId: true,
       sportSpecializationId: true,
+      assessmentPromptConfigId: true,
     },
   });
 }
