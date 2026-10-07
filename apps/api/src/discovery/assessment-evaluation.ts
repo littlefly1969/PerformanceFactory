@@ -104,7 +104,10 @@ export async function runAssessmentEvaluation(
   );
   const result = await ai.evaluateAssessment(input);
   try {
-    return await saveEvaluation(prisma, userId, input, result);
+    return await saveEvaluation(prisma, userId, input, result, {
+      sequence: INITIAL_SEQUENCE,
+      source: 'SELF_ASSESSMENT',
+    });
   } catch (error) {
     // Una richiesta concorrente ha già salvato la prima valutazione: vale quella.
     if (
@@ -122,18 +125,24 @@ export async function runAssessmentEvaluation(
 /** Prima valutazione dell'assessment: unica per atleta grazie a (userId, sequence). */
 export const INITIAL_SEQUENCE = 1;
 
-function saveEvaluation(
-  prisma: PrismaService,
+/** Salva una valutazione versionata; sequence e fonte distinguono prima valutazione e round. */
+export function saveEvaluation(
+  prisma: Pick<PrismaService, 'assessmentEvaluation'>,
   userId: string,
   input: AssessmentEvaluationInput,
   result: AssessmentEvaluationResult,
+  meta: { sequence: number; source: string; status?: string },
 ) {
   return prisma.assessmentEvaluation.create({
     data: {
       userId,
-      sequence: INITIAL_SEQUENCE,
+      sequence: meta.sequence,
+      source: meta.source,
+      ...(meta.status ? { status: meta.status } : {}),
       summary: result.output.summary,
       overallConfidence: result.output.overallConfidence,
+      level: result.output.level,
+      levelConfidence: result.output.levelConfidence,
       minScore: input.scale.minScore,
       maxScore: input.scale.maxScore,
       provider: result.provider,
@@ -150,10 +159,11 @@ function saveEvaluation(
           confidence: d.confidence,
           rationale: d.rationale,
           evidenceGaps: d.evidenceGaps,
+          commitment: d.commitment,
         })),
       },
     },
-    select: { id: true },
+    select: { id: true, createdAt: true },
   });
 }
 
@@ -165,7 +175,7 @@ export async function loadAssessmentEvaluation(
 ) {
   const evaluation = await prisma.assessmentEvaluation.findFirst({
     where: { userId },
-    orderBy: { createdAt: 'desc' },
+    orderBy: { sequence: 'desc' },
     include: { areas: { include: { area: { select: { name: true } } } } },
   });
   if (!evaluation) return null;
@@ -177,6 +187,7 @@ export async function loadAssessmentEvaluation(
       confidence: a.confidence,
       rationale: a.rationale,
       evidenceGaps: a.evidenceGaps as string[],
+      commitment: a.commitment,
     }))
     .sort((a, b) => orderedAreas.indexOf(a.id) - orderedAreas.indexOf(b.id));
   return {
@@ -185,6 +196,9 @@ export async function loadAssessmentEvaluation(
     source: evaluation.source,
     summary: evaluation.summary,
     overallConfidence: evaluation.overallConfidence,
+    level: evaluation.level,
+    levelConfidence: evaluation.levelConfidence,
+    sequence: evaluation.sequence,
     scale: { min: evaluation.minScore, max: evaluation.maxScore },
     createdAt: evaluation.createdAt,
     drivers,

@@ -37,13 +37,16 @@ cambiare:
 {
   "summary": "≤ 600 caratteri",
   "overallConfidence": 0,
+  "level": "BEGINNER | INTERMEDIATE | ADVANCED | COMPETITIVE | PRO",
+  "levelConfidence": 0,
   "drivers": [
     {
       "areaId": "id del driver ricevuto",
       "score": 0,
       "confidence": 0,
       "rationale": "≤ 400 caratteri",
-      "evidenceGaps": ["≤ 3 voci, ≤ 160 caratteri"]
+      "evidenceGaps": ["≤ 3 voci, ≤ 160 caratteri"],
+      "commitment": "LOW | MEDIUM | HIGH | UNKNOWN"
     }
   ]
 }
@@ -76,8 +79,9 @@ di training.
 | `AssessmentEvaluation` | `status = PROVISIONAL`, `source = SELF_ASSESSMENT`, sintesi, confidence complessiva, scala, provider, modello, `promptVersionId`, hash, input e output validati, latenza |
 | `AssessmentEvaluationArea` | per driver: score, confidence, motivazione, `evidenceGaps` |
 
-Una sola valutazione per atleta in questa slice, garantita anche dal database:
-`sequence = 1` con vincolo unico `(userId, sequence)`. Due richieste concorrenti, o
+Una sola prima valutazione per atleta, garantita anche dal database:
+`sequence = 1` con vincolo unico `(userId, sequence)`. Le valutazioni successive
+vengono dai round di calibrazione (`sequence` 2, 3, …, vedi `calibrazione.md`). Due richieste concorrenti, o
 un lease scaduto durante una chiamata lenta, salvano comunque una sola valutazione;
 la seconda restituisce quella già salvata. Dopo la valutazione `answer` e `back`
 rispondono 409. `POST /athlete-journey/evaluate` ripetuto restituisce la
@@ -111,13 +115,16 @@ API (`AI_TUNER`; lettura anche `ADMIN`):
 | `GET /ai-tuning/assessment-prompts` | configurazioni, attiva per prima |
 | `POST /ai-tuning/assessment-prompt` | `{ id?, name, basePrompt, isActive? }` |
 | `GET /ai-tuning/assessment-prompt/test-cases` | ultime 20 valutazioni, atleta pseudonimizzato |
-| `POST /ai-tuning/assessment-prompt/test` | `{ basePrompt, evaluationId? }`, nessun salvataggio |
+| `POST /ai-tuning/assessment-prompt/test` | `{ basePrompt, evaluationId?, kind? }`, nessun salvataggio |
+
+`GET /ai-tuning/assessment-prompts?kind=CALIBRATION` e `kind` nel salvataggio
+gestiscono il prompt delle domande di calibrazione con la stessa logica.
 
 ## Sviluppo e test
 
 Con `AI_PROVIDER=stub` (default fuori produzione) lo stub deterministico normalizza i
 punteggi delle opzioni sulla scala e assegna confidence 15 per risposta, al massimo
-40. Test: `assessment-evaluation.spec.ts` (contratto e stub),
+90. Test: `assessment-evaluation.spec.ts` (contratto e stub),
 `test/db/discovery.integration-spec.ts` (percorso reale su PostgreSQL),
 `app/journey/page.test.tsx` e `app/ai-tuner/prompts/valutazione/page.test.tsx`.
 
@@ -126,7 +133,7 @@ punteggi delle opzioni sulla scala e assegna confidence 15 per risposta, al mass
 - **Soglia e formula della confidence** (A4-D01, Parte C): oggi la decide l'AI
   seguendo il prompt; nessun limite massimo è imposto dal codice.
 - **R globale**: non calcolata finché la Parte C non definisce l'aggregazione.
-- **Dopo la valutazione**: domande adattive, stati `FREE_CALIBRATING` e successivi,
-  ricalcolo di R con nuove evidenze. Il campo `evidenceGaps` è pensato per guidarle.
+- **Dopo la valutazione**: la calibrazione gratuita è descritta in
+  `calibrazione.md`.
 - La scala visiva «flebile → consolidato» è una prima proposta (opacità e tratteggio
   in funzione della confidence) in attesa della grammatica visiva di Fabio.

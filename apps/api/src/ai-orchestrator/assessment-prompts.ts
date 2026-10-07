@@ -5,14 +5,42 @@ import {
   ASSESSMENT_PROMPT_TYPE,
   DEFAULT_ASSESSMENT_PROMPT,
 } from './assessment-evaluation-model';
+import {
+  CALIBRATION_PROMPT_TYPE,
+  DEFAULT_CALIBRATION_PROMPT,
+} from './calibration-questions';
 
-const DEFAULT_ID = 'assessment-prompt-default';
+/**
+ * Due famiglie di prompt con lo stesso ciclo di vita (bozze, attivazione,
+ * versioni): la valutazione delle risposte e le domande di calibrazione.
+ * Al massimo un prompt attivo per famiglia.
+ */
+export type AssessmentPromptKind = 'EVALUATION' | 'CALIBRATION';
+const KINDS = {
+  EVALUATION: {
+    defaultId: 'assessment-prompt-default',
+    defaultName: 'valutazione assessment',
+    defaultPrompt: DEFAULT_ASSESSMENT_PROMPT,
+    promptType: ASSESSMENT_PROMPT_TYPE,
+  },
+  CALIBRATION: {
+    defaultId: 'calibration-prompt-default',
+    defaultName: 'domande di calibrazione',
+    defaultPrompt: DEFAULT_CALIBRATION_PROMPT,
+    promptType: CALIBRATION_PROMPT_TYPE,
+  },
+} as const;
+export const isAssessmentPromptKind = (
+  value: unknown,
+): value is AssessmentPromptKind =>
+  value === 'EVALUATION' || value === 'CALIBRATION';
 const select = {
   id: true,
   name: true,
   basePrompt: true,
   version: true,
   isActive: true,
+  kind: true,
   activePromptVersionId: true,
   createdAt: true,
   updatedAt: true,
@@ -29,22 +57,28 @@ type ConfigRecord = {
   basePrompt: string;
   version: number;
   isActive: boolean;
+  kind: string;
 };
 
 /** Il prompt plausibile di partenza nasce attivo alla prima lettura, come il prompt obiettivo. */
-export async function ensureAssessmentPromptConfig(prisma: PrismaService) {
+export async function ensureAssessmentPromptConfig(
+  prisma: PrismaService,
+  kind: AssessmentPromptKind = 'EVALUATION',
+) {
+  const defaults = KINDS[kind];
   await prisma.$transaction(async (tx) => {
     await lockPromptConfigs(tx);
     const config = await tx.aiAssessmentPromptConfig.upsert({
-      where: { id: DEFAULT_ID },
+      where: { id: defaults.defaultId },
       update: {},
       create: {
-        id: DEFAULT_ID,
-        name: 'valutazione assessment',
-        basePrompt: DEFAULT_ASSESSMENT_PROMPT,
-        // Attivo solo se nessun'altra configurazione lo e gia.
+        id: defaults.defaultId,
+        kind,
+        name: defaults.defaultName,
+        basePrompt: defaults.defaultPrompt,
+        // Attivo solo se nessun'altra configurazione della famiglia lo e gia.
         isActive: !(await tx.aiAssessmentPromptConfig.count({
-          where: { isActive: true },
+          where: { isActive: true, kind },
         })),
       },
     });
@@ -53,22 +87,29 @@ export async function ensureAssessmentPromptConfig(prisma: PrismaService) {
   });
 }
 
-export async function loadActiveAssessmentPrompt(prisma: PrismaService) {
-  await ensureAssessmentPromptConfig(prisma);
+export async function loadActiveAssessmentPrompt(
+  prisma: PrismaService,
+  kind: AssessmentPromptKind = 'EVALUATION',
+) {
+  await ensureAssessmentPromptConfig(prisma, kind);
   const config = await prisma.aiAssessmentPromptConfig.findFirst({
-    where: { isActive: true },
+    where: { isActive: true, kind },
     orderBy: [{ version: 'desc' }, { updatedAt: 'desc' }],
     select: { basePrompt: true, activePromptVersionId: true },
   });
   return {
-    basePrompt: config?.basePrompt ?? DEFAULT_ASSESSMENT_PROMPT,
+    basePrompt: config?.basePrompt ?? KINDS[kind].defaultPrompt,
     promptVersionId: config?.activePromptVersionId ?? null,
   };
 }
 
-export async function listAssessmentPromptConfigs(prisma: PrismaService) {
-  await ensureAssessmentPromptConfig(prisma);
+export async function listAssessmentPromptConfigs(
+  prisma: PrismaService,
+  kind: AssessmentPromptKind = 'EVALUATION',
+) {
+  await ensureAssessmentPromptConfig(prisma, kind);
   return prisma.aiAssessmentPromptConfig.findMany({
+    where: { kind },
     select,
     orderBy: [{ isActive: 'desc' }, { updatedAt: 'desc' }],
   });
@@ -76,23 +117,34 @@ export async function listAssessmentPromptConfigs(prisma: PrismaService) {
 
 export async function upsertAssessmentPromptConfig(
   prisma: PrismaService,
-  body: { id?: string; name?: string; basePrompt?: string; isActive?: boolean },
+  body: {
+    id?: string;
+    name?: string;
+    basePrompt?: string;
+    isActive?: boolean;
+    kind?: string;
+  },
   actorId: string,
 ) {
-  const name = body.name?.trim() || 'valutazione assessment';
+  const requestedKind: AssessmentPromptKind = isAssessmentPromptKind(body.kind)
+    ? body.kind
+    : 'EVALUATION';
+  const name = body.name?.trim() || KINDS[requestedKind].defaultName;
   const basePrompt = body.basePrompt?.trim();
   const isActive = body.isActive ?? false;
   if (!actorId || !basePrompt)
     throw new BadRequestException('Testo del prompt di valutazione mancante');
   return prisma.$transaction(async (tx) => {
     await lockPromptConfigs(tx);
-    if (
-      body.id &&
-      !(await tx.aiAssessmentPromptConfig.findUnique({
-        where: { id: body.id },
-      }))
-    )
+    const existing = body.id
+      ? await tx.aiAssessmentPromptConfig.findUnique({
+          where: { id: body.id },
+        })
+      : null;
+    if (body.id && !existing)
       throw new NotFoundException('Prompt di valutazione non trovato');
+    // La famiglia di un prompt esistente non cambia.
+    const kind = (existing?.kind ?? requestedKind) as AssessmentPromptKind;
     const duplicate = await tx.aiAssessmentPromptConfig.findFirst({
       where: { name, ...(body.id ? { id: { not: body.id } } : {}) },
     });
@@ -100,7 +152,11 @@ export async function upsertAssessmentPromptConfig(
       throw new BadRequestException('Esiste già un prompt con questo nome');
     if (isActive) {
       const active = await tx.aiAssessmentPromptConfig.findMany({
-        where: { isActive: true, ...(body.id ? { id: { not: body.id } } : {}) },
+        where: {
+          isActive: true,
+          kind,
+          ...(body.id ? { id: { not: body.id } } : {}),
+        },
       });
       for (const config of active) {
         const deactivated = await tx.aiAssessmentPromptConfig.update({
@@ -127,6 +183,7 @@ export async function upsertAssessmentPromptConfig(
         })
       : await tx.aiAssessmentPromptConfig.create({
           data: {
+            kind,
             name,
             basePrompt,
             isActive,
@@ -149,7 +206,7 @@ async function createAssessmentPromptVersion(
 ) {
   const version = await tx.aiPromptVersion.create({
     data: {
-      promptType: ASSESSMENT_PROMPT_TYPE,
+      promptType: KINDS[config.kind as AssessmentPromptKind].promptType,
       version: config.version,
       contentJson: {
         name: config.name,

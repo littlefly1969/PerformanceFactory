@@ -4,6 +4,7 @@ import { PF4Shell } from "../start/pf4-shell";
 import { AssessmentIntro } from "./assessment-intro";
 import { ConsentStep } from "./consent-step";
 import { ProvisionalEvaluation } from "./provisional-evaluation";
+import { CalibrationPanel } from "./calibration-panel";
 import { DurationStep, PerformanceResult } from "./performance-result";
 import { useJourney } from "./use-journey";
 import "./journey.css";
@@ -129,7 +130,20 @@ export default function JourneyPage() {
           </section>
         )}
         {j?.phase === "EVALUATION" && j.evaluation && (
-          <ProvisionalEvaluation evaluation={j.evaluation} />
+          <>
+            <ProvisionalEvaluation evaluation={j.evaluation} />
+            {j.calibration && (
+              <CalibrationPanel
+                calibration={j.calibration}
+                evaluation={j.evaluation}
+                busy={busy}
+                onOpenRound={() => void action("calibration/round")}
+                onAnswer={(roundId, answers) =>
+                  void action("calibration/answers", { roundId, answers })
+                }
+              />
+            )}
+          </>
         )}
         {j?.phase === "PROCESSING" && (
           <section className="pf4-body" role="status">

@@ -53,6 +53,8 @@ model User {
   areaSessions AreaSession[]
   discovery AthleteDiscovery?
   assessmentEvaluations AssessmentEvaluation[]
+  calibration           AthleteCalibration?
+  calibrationRounds     CalibrationRound[]
   id        String   @id @default(uuid())
   email     String   @unique
   password  String
@@ -1301,10 +1303,14 @@ model AiAssessmentPromptConfig {
   createdById           String?
   updatedById           String?
 
+  /// EVALUATION valuta le risposte (R e confidence); CALIBRATION scrive le domande dei round.
+  kind                  String   @default("EVALUATION")
+
   activePromptVersion AiPromptVersion?  @relation("AiAssessmentPromptConfigActiveVersion", fields: [activePromptVersionId], references: [id])
   promptVersions      AiPromptVersion[] @relation("AiAssessmentPromptConfigVersions")
 
   @@index([isActive, version])
+  @@index([kind, isActive])
 }
 
 /// Prima valutazione dell'assessment: R provvisoria per driver con confidence, mai P.
@@ -1318,6 +1324,9 @@ model AssessmentEvaluation {
   source            String   @default("SELF_ASSESSMENT")
   summary           String
   overallConfidence Int
+  /// Livello stimato (A2.5): BEGINNER, INTERMEDIATE, ADVANCED, COMPETITIVE, PRO. Assente nelle valutazioni precedenti.
+  level             String?
+  levelConfidence   Int?
   minScore          Float
   maxScore          Float
   provider          String
@@ -1332,6 +1341,7 @@ model AssessmentEvaluation {
   user          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   promptVersion AiPromptVersion?           @relation(fields: [promptVersionId], references: [id], onDelete: SetNull)
   areas         AssessmentEvaluationArea[]
+  round         CalibrationRound?
 
   @@unique([userId, sequence])
   @@index([userId, createdAt])
@@ -1345,6 +1355,8 @@ model AssessmentEvaluationArea {
   confidence    Int
   rationale     String
   evidenceGaps  Json
+  /// Commitment profile dell'area (A2.2): LOW, MEDIUM, HIGH o UNKNOWN.
+  commitment    String?
 
   evaluation AssessmentEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
   area       Area                 @relation(fields: [areaId], references: [id])
@@ -1475,4 +1487,67 @@ model PaymentEvent {
 
   @@unique([provider, providerEventId])
   @@index([subscriptionId])
+}
+
+/// Calibrazione gratuita (A4.3, A4.6): dopo la prima valutazione R e confidence si
+/// affinano a round fino alla soglia di confidence o all'assessment di chiusura.
+/// Stato del percorso, separato da abbonamento ed engagement.
+model AthleteCalibration {
+  userId           String    @id
+  /// FREE_CALIBRATING, FREE_LEVEL_ESTIMATED, CALIBRATION_COMPLETED
+  status           String    @default("FREE_CALIBRATING")
+  startedAt        DateTime
+  deadlineAt       DateTime
+  levelEstimatedAt DateTime?
+  completedAt      DateTime?
+  /// CONFIDENCE_REACHED oppure CLOSING_ASSESSMENT
+  completionReason String?
+  /// Lease di un'operazione in corso (generazione domande o valutazione).
+  operationAt      DateTime?
+  updatedAt        DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, deadlineAt])
+}
+
+/// Un round di domande scritte dall'AI sui driver con confidence più bassa.
+/// Le risposte producono una nuova AssessmentEvaluation (sequence successiva).
+model CalibrationRound {
+  id              String    @id @default(uuid())
+  userId          String
+  sequence        Int
+  /// ADAPTIVE oppure CLOSING
+  kind            String    @default("ADAPTIVE")
+  /// OPEN, EVALUATING, EVALUATED
+  status          String    @default("OPEN")
+  questionsJson   Json
+  answersJson     Json      @default("{}")
+  provider        String
+  model           String
+  promptVersionId String?
+  promptHash      String
+  createdAt       DateTime  @default(now())
+  answeredAt      DateTime?
+  evaluationId    String?   @unique
+
+  user       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  evaluation AssessmentEvaluation? @relation(fields: [evaluationId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, sequence])
+  @@index([userId, status])
+}
+
+/// Parametri di back office della calibrazione (A4-D01 aperto): una sola riga.
+model CalibrationConfig {
+  id                       String   @id @default("default")
+  confidenceThreshold      Int      @default(70)
+  levelConfidenceThreshold Int      @default(50)
+  maxDays                  Int      @default(30)
+  closingDay               Int      @default(25)
+  questionsPerDriver       Int      @default(2)
+  driversPerRound          Int      @default(2)
+  minHoursBetweenRounds    Int      @default(20)
+  updatedAt                DateTime @updatedAt
+  updatedById              String?
 }

@@ -259,3 +259,16 @@
 .pf4-evaluation-drivers .pf4-gaps {
   color: #5f5f5a;
 }
+.pf4 .pf4-calibration {
+  border-top: 1px solid #eaeae7;
+}
+.pf4-calibration-round fieldset {
+  border: 0;
+  padding: 0;
+  margin: 24px 0 0;
+}
+.pf4-calibration-round legend {
+  font-size: 16px;
+  line-height: 24px;
+  margin-bottom: 12px;
+}

@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { AiCycleContext } from '../ai-orchestrator/proposal-provider.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ASSESSMENT_PROMPT_TYPE } from '../ai-orchestrator/assessment-evaluation-model';
+import { CALIBRATION_PROMPT_TYPE } from '../ai-orchestrator/calibration-questions';
 import { UpsertGoldenContextDto } from './dto/upsert-golden-context.dto';
 
 export async function listAreas(prisma: PrismaService) {
@@ -38,7 +39,10 @@ export async function listPromptVersions(
       where.sportSpecializationAreaPromptId = ownerId;
     } else if (promptType === 'TRAINING') {
       where.sportSpecializationId = ownerId;
-    } else if (promptType === ASSESSMENT_PROMPT_TYPE) {
+    } else if (
+      promptType === ASSESSMENT_PROMPT_TYPE ||
+      promptType === CALIBRATION_PROMPT_TYPE
+    ) {
       where.assessmentPromptConfigId = ownerId;
     } else {
       where.OR = [

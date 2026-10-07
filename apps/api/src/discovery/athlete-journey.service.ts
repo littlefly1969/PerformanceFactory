@@ -29,6 +29,7 @@ import {
   loadAssessmentEvaluation,
   runAssessmentEvaluation,
 } from './assessment-evaluation';
+import { CalibrationService } from './calibration/calibration.service';
 
 export const PROGRAM_DURATIONS = [
   {
@@ -55,6 +56,7 @@ export class AthleteJourneyService {
     private readonly consents: ConsentsService,
     private readonly onboarding: OnboardingService,
     private readonly ai: AiProposalProviderService,
+    private readonly calibration: CalibrationService,
   ) {}
 
   async state(userId: string) {
@@ -107,6 +109,11 @@ export class AthleteJourneyService {
     const evaluation = started
       ? await loadAssessmentEvaluation(this.prisma, userId, orderedAreas)
       : null;
+    // La calibrazione gratuita parte dalla prima valutazione (A4.3).
+    const calibration =
+      evaluation && !saved.baselineId
+        ? await this.calibration.view(userId)
+        : null;
     const phase = saved.baselineId
       ? saved.programDurationWeeks
         ? 'COMPLETE'
@@ -163,6 +170,7 @@ export class AthleteJourneyService {
       // Tutte le risposte date: l'atleta può correggerle fino alla valutazione AI.
       assessmentComplete: started && saved.currentQuestion >= questions.length,
       evaluation,
+      calibration,
       answers,
       questions: questions.map((q) => ({
         id: q.id,
@@ -313,6 +321,25 @@ export class AthleteJourneyService {
     } finally {
       await this.release(userId);
     }
+    return this.state(userId);
+  }
+
+  async calibrationRound(userId: string) {
+    await this.allowed(userId);
+    await this.calibration.openRound(userId);
+    return this.state(userId);
+  }
+
+  async calibrationAnswers(
+    userId: string,
+    roundId: string,
+    answers: Record<string, unknown>,
+  ) {
+    await this.allowed(userId);
+    const values = Object.fromEntries(
+      Object.entries(answers).map(([id, value]) => [id, String(value)]),
+    );
+    await this.calibration.answerRound(userId, roundId, values);
     return this.state(userId);
   }
 

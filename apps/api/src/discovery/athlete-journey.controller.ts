@@ -9,6 +9,7 @@ import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { IsInt, IsOptional, IsString, MaxLength, Allow } from 'class-validator';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { AthleteJourneyService } from './athlete-journey.service';
+import { CalibrationAnswersDto } from './calibration/dto/calibration.dto';
 class AnswerDto {
   @ApiProperty() @IsString() @MaxLength(100) questionId!: string;
   @ApiProperty({ oneOf: [{ type: 'string' }, { type: 'number' }] })
@@ -67,5 +68,27 @@ export class AthleteJourneyController {
   @Post('duration')
   duration(@Req() req: { user: { id: string } }, @Body() body: DurationDto) {
     return this.journey.duration(req.user.id, body.weeks);
+  }
+  @ApiOperation({
+    summary:
+      'Apre il prossimo round di calibrazione con domande AI sui driver meno affidabili',
+  })
+  @Post('calibration/round')
+  calibrationRound(@Req() req: { user: { id: string } }) {
+    return this.journey.calibrationRound(req.user.id);
+  }
+  @ApiOperation({
+    summary: 'Risponde al round di calibrazione e aggiorna R e confidence',
+  })
+  @Post('calibration/answers')
+  calibrationAnswers(
+    @Req() req: { user: { id: string } },
+    @Body() body: CalibrationAnswersDto,
+  ) {
+    return this.journey.calibrationAnswers(
+      req.user.id,
+      body.roundId,
+      body.answers,
+    );
   }
 }
