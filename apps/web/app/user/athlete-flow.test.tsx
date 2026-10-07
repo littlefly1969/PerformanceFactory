@@ -452,8 +452,10 @@ describe("PF4 athlete experience", () => {
     );
     render(<ProgressPage />);
     expect(
-      await screen.findByRole("img", { name: /Confronto tra performance/ }),
+      await screen.findByRole("img", { name: "Performance attuale per driver" }),
     ).toBeInTheDocument();
+    // La P a passo fisso non si mostra all'atleta.
+    expect(screen.queryByText(/otenziale/)).not.toBeInTheDocument();
     expect(screen.getByText("01 · Tecnica")).toBeInTheDocument();
   });
 });

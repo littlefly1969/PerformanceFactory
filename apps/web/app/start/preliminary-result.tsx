@@ -83,29 +83,30 @@ export function PreliminaryResult({
   return (
     <>
       <section className="pf4-body pf4-result">
-        {/* Offerta commerciale: non dipende dalle risposte della discovery. */}
-        <aside className="pf4-highlight pf4-offer" aria-label="Offerta">
-          <span className="pf4-badge">Premio sbloccato</span>
+        {/* Fase gratuita del Blueprint (A3/A4): misura e stima, il programma si sceglie dopo. */}
+        <aside className="pf4-highlight pf4-offer" aria-label="Come si parte">
+          <span className="pf4-badge">Si parte gratis</span>
           <p className="pf4-offer-title">
-            <span className="pf4-offer-days">7</span>{" "}
-            <span className="pf4-offer-label">giorni gratis</span>
+            <span className="pf4-offer-days">0 €</span>{" "}
+            <span className="pf4-offer-label">per iniziare</span>
           </p>
           <p>
-            Assessment, programma e analisi dei sei driver.
+            Assessment sui sei driver e prima stima del tuo livello, che si
+            affina con le tue risposte.
             <br />
-            Tutto sbloccato da subito.
+            Il programma lo scegli dopo, quando vedi dove puoi arrivare.
           </p>
           <ul className="pf4-highlight-meta pf4-offer-terms">
             <li>Nessuna carta</li>
-            <li>Disdici quando vuoi</li>
+            <li>Nessun impegno</li>
           </ul>
         </aside>
         <h1>
           Questi sono <br />i tuoi vincoli.
         </h1>
         <p>
-          Ora serve la misura: crea l’account, attiva la prova e fai
-          l’assessment sui sei driver.
+          Ora serve la misura: crea l’account e fai l’assessment sui sei
+          driver.
         </p>
         {bmi !== null && band && (
           <div className="pf4-bmi">
@@ -152,7 +153,7 @@ export function PreliminaryResult({
       </section>
       <footer className="pf4-footer">
         <button className="pf4-cta" onClick={onContinue}>
-          Attiva la prova gratuita
+          Crea il tuo account
         </button>
       </footer>
     </>

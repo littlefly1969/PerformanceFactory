@@ -23,6 +23,9 @@ import { CyclesModule } from './cycles/cycles.module';
 import { InspectModule } from './inspect/inspect.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { AiTuningModule } from './ai-tuning/ai-tuning.module';
+import { FeaturesModule } from './features/features.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { PartnersModule } from './partners/partners.module';
 
 function buildThrottlerStorage() {
   const redisUrl = process.env.REDIS_URL;
@@ -50,6 +53,11 @@ function buildThrottlerStorage() {
             ttl: 15 * 60 * 1000,
             limit: 3,
           },
+          {
+            name: 'public-events',
+            ttl: 60 * 1000,
+            limit: 60,
+          },
         ],
         storage: buildThrottlerStorage(),
       }),
@@ -74,6 +82,9 @@ function buildThrottlerStorage() {
     InspectModule,
     OnboardingModule,
     AiTuningModule,
+    FeaturesModule,
+    AnalyticsModule,
+    PartnersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,14 +1,14 @@
 import { minutesInWords, questionsInWords } from "./italian-number";
 import type { Journey } from "./journey-types";
 
-/** Cio che la prova sblocca dopo l'assessment: testo commerciale statico. */
+/** Tappe del Blueprint dopo l'assessment: testo statico, nessuna durata promessa. */
 const UNLOCKED_LATER = [
-  "Programma di 4 settimane",
-  "Sessioni e video corsi",
-  "Performance index",
+  "Livello stimato sui sei driver",
+  "Scenari a 3, 6 e 12 mesi",
+  "Programma e coaching",
 ];
 
-/** Intro PF5 dopo i consensi: nome, giorni e numeri arrivano dal backend. */
+/** Intro PF5 dopo i consensi: nome e numeri arrivano dal backend. */
 export function AssessmentIntro({
   journey,
   busy,
@@ -18,20 +18,12 @@ export function AssessmentIntro({
   busy: boolean;
   onStart: () => void;
 }) {
-  const daysLeft = journey.trial?.daysLeft;
   return (
     <>
       <section className="pf4-body pf5-intro">
         <div className="pf4-highlight pf5-intro-card">
           <div className="pf5-trial">
-            <span className="pf4-badge">Prova gratuita attiva</span>
-            {daysLeft !== undefined && (
-              <span className="pf5-trial-days">
-                {daysLeft === 1
-                  ? "1 giorno rimasto"
-                  : `${daysLeft} giorni rimasti`}
-              </span>
-            )}
+            <span className="pf4-badge">Percorso gratuito</span>
           </div>
           <h1>{journey.firstName ? `Ciao ${journey.firstName}.` : "Ciao."}</h1>
           <p>

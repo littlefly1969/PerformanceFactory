@@ -30,6 +30,13 @@ export class AcceptedDocumentDto {
 }
 
 export class ConsentAcceptanceDto {
+  @ApiPropertyOptional({
+    description: 'Consenso facoltativo alle comunicazioni promozionali',
+  })
+  @IsOptional()
+  @IsBoolean()
+  marketingAccepted?: boolean;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()

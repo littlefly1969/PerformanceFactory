@@ -1,4 +1,5 @@
 import { googleDiscoveryReady } from "../start/google-registration";
+import { currentAttribution } from "../lib/attribution";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE, secureFetch } from "../lib/api";
 import { DRAFT_KEY } from "../start/discovery-state";
@@ -123,6 +124,7 @@ export function useJourney() {
             body: JSON.stringify({
               ...(input as object),
               discovery: JSON.parse(raw),
+              attribution: currentAttribution(),
             }),
           }),
         );

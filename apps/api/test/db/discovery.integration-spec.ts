@@ -211,6 +211,7 @@ describe('PF4 discovery to authenticated journey', () => {
         lastName: 'Rossi',
         email,
         password: 'test-password-123',
+        adultConfirmed: true,
         discovery,
       },
     });

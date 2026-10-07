@@ -61,6 +61,7 @@ export default function JourneyPage() {
             documents={google ? documents : (j?.documents ?? [])}
             busy={busy}
             onAccept={accept}
+            askAdult={google}
           />
         )}
         {j?.phase === "ASSESSMENT_INTRO" && (

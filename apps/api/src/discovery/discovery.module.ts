@@ -3,12 +3,14 @@ import { AthleteJourneyService } from './athlete-journey.service';
 import { AthleteJourneyController } from './athlete-journey.controller';
 import { Module } from '@nestjs/common';
 import { ConsentsModule } from '../consents/consents.module';
+import { PartnersModule } from '../partners/partners.module';
+import { AnalyticsModule } from '../analytics/analytics.module';
 import { DiscoveryController } from './discovery.controller';
 import { DiscoveryService } from './discovery.service';
 import { AthleteRegistrationService } from './athlete-registration.service';
 
 @Module({
-  imports: [ConsentsModule, OnboardingModule],
+  imports: [ConsentsModule, OnboardingModule, PartnersModule, AnalyticsModule],
   controllers: [DiscoveryController, AthleteJourneyController],
   providers: [
     DiscoveryService,

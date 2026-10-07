@@ -182,7 +182,16 @@ describe("PF4 authenticated journey functions", () => {
     expect(
       await screen.findByRole("button", { name: "Accetta e continua" }),
     ).toBeDisabled();
-    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /Ho letto e accetto/ }),
+    );
+    // Con Google l'età si dichiara qui: senza, non si prosegue.
+    expect(
+      screen.getByRole("button", { name: "Accetta e continua" }),
+    ).toBeDisabled();
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /almeno 18 anni/ }),
+    );
     await userEvent.click(
       screen.getByRole("button", { name: "Accetta e continua" }),
     );
@@ -190,6 +199,12 @@ describe("PF4 authenticated journey functions", () => {
     expect(completed?.acceptedDocuments).toEqual([
       { type: "PRIVACY", version: "1", documentHash: "hash" },
     ]);
+    expect(completed?.adultConfirmed).toBe(true);
+    // Il marketing è facoltativo e resta spento se non lo si sceglie.
+    expect(completed?.marketingAccepted).toBe(false);
+    expect(completed?.attribution).toMatchObject({
+      anonymousId: expect.any(String),
+    });
     expect(await screen.findByText("Domanda configurata")).toBeInTheDocument();
     expect(sessionStorage.getItem(DRAFT_KEY)).toBeNull();
   });
@@ -228,8 +243,8 @@ describe("PF5 assessment intro and questions", () => {
       expect(
         await screen.findByRole("heading", { name: "Ciao Stefano." }),
       ).toBeInTheDocument();
-      expect(screen.getByText("Prova gratuita attiva")).toBeInTheDocument();
-      expect(screen.getByText("5 giorni rimasti")).toBeInTheDocument();
+      expect(screen.getByText("Percorso gratuito")).toBeInTheDocument();
+      expect(screen.queryByText("5 giorni rimasti")).not.toBeInTheDocument();
       // I numeri arrivano dal backend e sono scritti in lettere, come nel PF5.
       expect(
         screen.getByText(
@@ -238,7 +253,8 @@ describe("PF5 assessment intro and questions", () => {
       ).toBeInTheDocument();
       const later = screen.getByRole("region", { name: "Cosa si attiva dopo" });
       expect(within(later).getAllByText("Bloccato")).toHaveLength(3);
-      expect(later).toHaveTextContent("Programma di 4 settimane");
+      expect(later).toHaveTextContent("Scenari a 3, 6 e 12 mesi");
+      expect(later).not.toHaveTextContent("settimane");
       expect(
         screen.getByRole("button", { name: "Scopri la tua performance" }),
       ).toBeEnabled();

@@ -129,16 +129,12 @@ export default function UserAreaDetailPage() {
   }, [loadArea]);
 
   const areaName = selectedArea?.area?.name ?? "Area";
-  const scoreGap =
-    typeof selectedArea?.potentialP === "number" && typeof selectedArea?.realR === "number"
-      ? Math.max(0, Math.round(selectedArea.potentialP - selectedArea.realR))
-      : 0;
 
   return (
     <ProductShell
       eyebrow="Ambiente atleta"
       title={areaName}
-      description="Dettaglio della tua performance per questa area, con valori reali, potenziali, lavori e check-in disponibili."
+      description="Dettaglio della tua performance per questa area, con valore reale, lavori e check-in disponibili."
       actions={
         <div className="pf-header-actions">
           <Link className="pf-button-secondary" href="/user">
@@ -155,16 +151,6 @@ export default function UserAreaDetailPage() {
           value: loading ? "..." : formatScore(selectedArea?.realR),
           tone: "accent",
         },
-        {
-          label: "Potenziale",
-          value: loading ? "..." : formatScore(selectedArea?.potentialP),
-          tone: "success",
-        },
-        {
-          label: "Differenza",
-          value: loading ? "..." : scoreGap,
-          tone: "warning",
-        },
       ]}
     >
       {message && <div className="pf-alert warning">{message}</div>}
@@ -174,7 +160,7 @@ export default function UserAreaDetailPage() {
           <div>
             <h2>Dettaglio area</h2>
             <p className="pf-muted">
-              Reale fotografa il livello attuale in {areaName}. Potenziale indica il margine raggiungibile nel prossimo ciclo di lavoro.
+              Reale fotografa il livello attuale in {areaName}.
             </p>
           </div>
           <StatusBadge tone="accent">{areaName}</StatusBadge>
@@ -186,13 +172,6 @@ export default function UserAreaDetailPage() {
               Valore corrente calcolato dalle risposte e dagli ultimi dati disponibili per questa area.
             </p>
             <strong className="pf-score-value">{formatScore(selectedArea?.realR)}</strong>
-          </article>
-          <article className="pf-card">
-            <h3>Potenziale</h3>
-            <p className="pf-muted">
-              Stima del livello verso cui orientare lavori e check-in di questa area.
-            </p>
-            <strong className="pf-score-value">{formatScore(selectedArea?.potentialP)}</strong>
           </article>
         </div>
       </section>
