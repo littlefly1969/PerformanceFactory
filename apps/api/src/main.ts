@@ -108,6 +108,8 @@ async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
     new FastifyAdapter({ trustProxy: isProduction }),
+    // Corpo grezzo necessario per verificare la firma dei webhook di pagamento.
+    { rawBody: true },
   );
 
   const fastify = app.getHttpAdapter().getInstance();
