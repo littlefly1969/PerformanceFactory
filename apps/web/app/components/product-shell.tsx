@@ -70,6 +70,8 @@ const roleNav: Record<string, NavItem[]> = {
     { href: "/admin/discovery", label: "Discovery" },
     { href: "/admin/assessment", label: "Assessment" },
     { href: "/admin/consents", label: "Privacy" },
+    { href: "/admin/partners", label: "Circoli" },
+    { href: "/admin/feature-flags", label: "Rilasci" },
   ],
   AI_TUNER: [
     { href: "/ai-tuner/anamnesi", label: "Anamnesi" },
@@ -120,7 +122,9 @@ const pathMatchesRole = (path: string, role?: string) => {
       path === "/admin/cycles" ||
       path.startsWith("/admin/discovery") ||
       path.startsWith("/admin/assessment") ||
-      path.startsWith("/admin/consents")
+      path.startsWith("/admin/consents") ||
+      path.startsWith("/admin/partners") ||
+      path.startsWith("/admin/feature-flags")
     );
   }
   if (role === "AI_TUNER") {
@@ -215,7 +219,11 @@ const getLogicalBackHref = (path: string, search: string) => {
     return "/professional";
   }
 
-  if (path === "/admin/consents") {
+  if (
+    path === "/admin/consents" ||
+    path === "/admin/partners" ||
+    path === "/admin/feature-flags"
+  ) {
     return "/admin/cycles";
   }
 

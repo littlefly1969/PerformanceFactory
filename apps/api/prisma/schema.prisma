@@ -61,6 +61,19 @@ model User {
   lastName  String?
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
+  /// Dichiarazione di maggiore eta raccolta alla registrazione (Blueprint A2.6-A2.7).
+  adultConfirmedAt DateTime?
+  /// Tester selezionati per i feature flag in beta.
+  isBetaTester     Boolean   @default(false)
+  /// Codice personale da condividere per il referral (A8.19).
+  referralCode     String?   @unique
+  attribution      UserAttribution?  @relation("UserAttribution")
+  referredUsers    UserAttribution[] @relation("ReferredUsers")
+  analyticsEvents  AnalyticsEvent[]
+  featureFlagsUpdated FeatureFlag[]       @relation("FeatureFlagUpdatedBy")
+  featureFlagChanges  FeatureFlagChange[] @relation("FeatureFlagChangeActor")
+  betaTesterChanges   BetaTesterChange[]  @relation("BetaTesterChangeUser")
+  betaTesterActions   BetaTesterChange[]  @relation("BetaTesterChangeActor")
 
   professionalLinks ProfessionalUserLink[] @relation("ProfessionalLinks")
   userLinks         ProfessionalUserLink[] @relation("UserLinks")
@@ -1475,4 +1488,103 @@ model PaymentEvent {
 
   @@unique([provider, providerEventId])
   @@index([subscriptionId])
+}
+
+/// Circolo o partner territoriale attribuibile (Index, A2.11, A5.11-A5.13).
+model Partner {
+  id        String   @id @default(uuid())
+  kind      String   @default("CLUB")
+  /// Codice usato nei link e nei QR (?club=codice), minuscolo.
+  code      String   @unique
+  name      String
+  city      String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attributions UserAttribution[]
+}
+
+/// Provenienza dell'atleta: prima e ultima sorgente prima della registrazione (A6 ricostruito).
+model UserAttribution {
+  userId      String   @id
+  anonymousId String?
+  firstTouch  Json
+  lastTouch   Json
+  partnerId   String?
+  referrerId  String?
+  createdAt   DateTime @default(now())
+
+  user     User     @relation("UserAttribution", fields: [userId], references: [id], onDelete: Cascade)
+  partner  Partner? @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  referrer User?    @relation("ReferredUsers", fields: [referrerId], references: [id], onDelete: SetNull)
+
+  @@index([partnerId])
+  @@index([referrerId])
+  @@index([anonymousId])
+}
+
+/// Evento di prodotto append-only (A7.9 event-first analytics).
+model AnalyticsEvent {
+  id          String   @id @default(uuid())
+  name        String
+  occurredAt  DateTime
+  receivedAt  DateTime @default(now())
+  anonymousId String?
+  userId      String?
+  /// UUID scelto dal browser per ogni evento: un reinvio non crea un secondo evento.
+  eventId     String?  @unique
+  /// CLIENT (browser) o SERVER.
+  origin      String
+  properties  Json     @default("{}")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([name, occurredAt])
+  @@index([userId, occurredAt])
+  @@index([anonymousId, occurredAt])
+}
+
+/// Funzione rilasciabile prima ai beta tester, poi a una percentuale di utenti, poi a tutti.
+model FeatureFlag {
+  key            String   @id
+  description    String
+  enabled        Boolean  @default(false)
+  betaTesters    Boolean  @default(true)
+  rolloutPercent Int      @default(0)
+  updatedAt      DateTime @updatedAt
+  updatedById    String?
+
+  updatedBy User? @relation("FeatureFlagUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+}
+
+model FeatureFlagChange {
+  id        String   @id @default(uuid())
+  flagKey   String
+  /// Null solo se l'account dell'autore è stato cancellato.
+  actorId   String?
+  before    Json?
+  after     Json
+  createdAt DateTime @default(now())
+
+  actor User? @relation("FeatureFlagChangeActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([flagKey, createdAt])
+  @@index([actorId])
+}
+
+/// Registro dei beta tester: chi entra o esce dal pubblico dei rilasci in beta.
+model BetaTesterChange {
+  id        String   @id @default(uuid())
+  userId    String
+  actorId   String?
+  before    Boolean
+  after     Boolean
+  createdAt DateTime @default(now())
+
+  user  User  @relation("BetaTesterChangeUser", fields: [userId], references: [id], onDelete: Cascade)
+  actor User? @relation("BetaTesterChangeActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([actorId])
 }

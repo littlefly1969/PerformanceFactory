@@ -10,7 +10,7 @@ function Radar({ drivers }: { drivers: Driver[] }) {
       viewBox="0 0 300 300"
       className="pf4-radar"
       role="img"
-      aria-label="Confronto tra performance attuale e potenziale per driver"
+      aria-label="Performance attuale per driver"
     >
       {[25, 50, 75, 100].map((s) => (
         <polygon
@@ -20,11 +20,6 @@ function Radar({ drivers }: { drivers: Driver[] }) {
           stroke="#deded8"
         />
       ))}
-      <polygon
-        points={drivers.map((d, i) => point(d.potential, i)).join(" ")}
-        fill="#c8f02e"
-        fillOpacity=".75"
-      />
       <polygon
         points={drivers.map((d, i) => point(d.current, i)).join(" ")}
         fill="#0b0b0c"
@@ -43,15 +38,14 @@ function Radar({ drivers }: { drivers: Driver[] }) {
     </svg>
   );
 }
+/**
+ * Solo la performance attuale: la P a passo fisso resta nel database ma non si
+ * mostra all'atleta finché non arrivano gli scenari P3/P6/P12 (Blueprint A3).
+ */
 export function PerformanceVisual({
   performance: r,
 }: {
-  performance: {
-    current: number;
-    potential: number | null;
-    gap: number | null;
-    drivers: Driver[];
-  };
+  performance: { current: number; drivers: Driver[] };
 }) {
   return (
     <>
@@ -60,21 +54,9 @@ export function PerformanceVisual({
           <span>Current Performance Index</span>
           <strong>{r.current}</strong>
         </div>
-        <div>
-          <span>Potenziale</span>
-          <strong>{r.potential ?? "—"}</strong>
-        </div>
-        <div>
-          <span>Gap</span>
-          <strong>
-            {r.gap === null ? "—" : `${r.gap >= 0 ? "+" : ""}${r.gap}`}
-          </strong>
-        </div>
       </div>
       <Radar drivers={r.drivers} />
-      <div className="pf4-legend">
-        ● Attuale <span>● Potenziale</span>
-      </div>
+      <div className="pf4-legend">● Attuale</div>
       <div className="pf4-driver-scores">
         {r.drivers.map((d, i) => (
           <div key={d.id}>
@@ -82,12 +64,9 @@ export function PerformanceVisual({
               <span>
                 {String(i + 1).padStart(2, "0")} · {d.name}
               </span>
-              <strong>
-                {d.current} <small>→ {d.potential}</small>
-              </strong>
+              <strong>{d.current}</strong>
             </header>
             <div className="pf4-score-track">
-              <span style={{ width: `${d.potential}%` }} />
               <span style={{ width: `${d.current}%` }} />
             </div>
           </div>
@@ -120,9 +99,7 @@ export function PerformanceResult({
         <div className="pf4-highlight">
           <span className="pf4-kicker">La tua leva di miglioramento</span>
           <h2>{r.priority.name}</h2>
-          <p>
-            {r.priority.current} oggi · {r.priority.potential} potenziale
-          </p>
+          <p>{r.priority.current} oggi</p>
         </div>
       )}
       <button className="pf4-cta" disabled={busy} onClick={onContinue}>

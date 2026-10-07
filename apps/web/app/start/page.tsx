@@ -5,6 +5,8 @@ import {
 } from "./google-registration";
 import { useEffect, useRef, useState } from "react";
 import { API_BASE } from "../lib/api";
+import { track } from "../lib/analytics";
+import { captureTouch } from "../lib/attribution";
 import type { DiscoveryConfiguration, DiscoveryDraft } from "./discovery-types";
 import {
   answerValid,
@@ -40,6 +42,22 @@ export default function StartPage() {
     };
   }, []);
   const heading = useRef<HTMLHeadingElement>(null);
+  const lastStep = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    captureTouch(new URL(window.location.href));
+    track("landing_viewed", { path: window.location.pathname });
+  }, []);
+  useEffect(() => {
+    const step = draft?.currentStep;
+    if (!step) return;
+    const previous = lastStep.current;
+    lastStep.current = step;
+    // Solo i passaggi fatti ora: una bozza ripresa non riconta gli eventi.
+    if (previous === undefined || previous === step) return;
+    if (previous === "intro") track("discovery_started");
+    if (step === "processing") track("discovery_completed");
+    if (step === "registration") track("registration_started");
+  }, [draft?.currentStep]);
   useEffect(() => {
     const controller = new AbortController();
     fetch(`${API_BASE}/public/athlete-discovery`, {

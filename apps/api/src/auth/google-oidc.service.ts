@@ -1,4 +1,5 @@
 import { AthleteRegistrationService } from '../discovery/athlete-registration.service';
+import { AttributionInput } from '../partners/attribution';
 import {
   BadRequestException,
   Injectable,
@@ -236,6 +237,9 @@ export class GoogleOidcService {
     req: SessionCarrier,
     input: {
       discovery?: unknown;
+      adultConfirmed?: boolean;
+      attribution?: AttributionInput;
+      marketingAccepted?: boolean;
       privacyAccepted?: boolean;
       aiAssistantAccepted?: boolean;
       acceptedDocuments?: Array<{
@@ -285,11 +289,14 @@ export class GoogleOidcService {
         lastName: pending.familyName || 'Google',
         password: `google:${pending.subject}:${this.randomToken()}`,
         discovery: input.discovery,
+        adultConfirmed: input.adultConfirmed,
+        attribution: input.attribution,
       },
       {
         subject: pending.subject,
         profileJson: pending.profileJson,
         documents,
+        marketingAccepted: input.marketingAccepted,
         audit,
       },
     );

@@ -30,8 +30,6 @@ export type Performance = {
   snapshotId: string;
   date: string;
   current: number;
-  potential: number | null;
-  gap: number | null;
   drivers: Driver[];
 };
 export type Lifecycle = {

@@ -17,16 +17,15 @@ login → consensi → intro PF5 → domande operative → domande dei driver
 Replica il mockup PF5 su pagina chiara:
 
 - **Card lime.** Contiene:
-  - la pillola nera «PROVA GRATUITA ATTIVA» con accanto «X GIORNI RIMASTI»: X è 7
-    meno i giorni trascorsi dalla creazione dell'account, con minimo 0. È solo
-    visualizzazione: non esiste ancora una prova reale e allo zero non si blocca
-    nulla;
+  - la pillola nera «PERCORSO GRATUITO», senza giorni rimasti: il Blueprint non
+    prevede una prova a giorni (il campo `trial` dell'API resta ma non si mostra);
   - «Ciao {nome}.»;
   - «Prima di programmare qualcosa misuriamo dove sei: quattordici domande,
     cinque minuti.»;
   - la CTA nera **Scopri la tua performance** con freccia lime.
-- **Sotto la card.** «Cosa si attiva dopo»: Programma di 4 settimane, Sessioni e
-  video corsi, Performance index, tutti «Bloccato». È testo commerciale statico.
+- **Sotto la card.** «Cosa si attiva dopo»: Livello stimato sui sei driver,
+  Scenari a 3, 6 e 12 mesi, Programma e coaching, tutti «Bloccato». È testo
+  statico e non promette durate.
 
 I numeri sono `count` ed `estimatedMinutes` del backend, scritti in lettere da
 `italian-number.ts` («dodici domande, quattro minuti»; «una domanda, un

@@ -90,7 +90,7 @@ describe("PF4 configured journey", () => {
       JSON.parse(window.sessionStorage.getItem(DRAFT_KEY)!).answers,
     ).toEqual({ "backend-first": "option-a", "backend-second": false });
     await userEvent.click(
-      screen.getByRole("button", { name: "Attiva la prova gratuita" }),
+      screen.getByRole("button", { name: "Crea il tuo account" }),
     );
     expect(
       screen.getByRole("heading", { name: "Crea il tuo account." }),
@@ -289,30 +289,33 @@ describe("PF5 pre-account experience", () => {
       vi.advanceTimersByTimeAsync(DISCOVERY_ANALYSIS_MIN_DURATION_MS - 2601),
     );
     expect(
-      screen.queryByRole("button", { name: "Attiva la prova gratuita" }),
+      screen.queryByRole("button", { name: "Crea il tuo account" }),
     ).not.toBeInTheDocument();
     await act(() => vi.advanceTimersByTimeAsync(1));
     expect(
-      screen.getByRole("button", { name: "Attiva la prova gratuita" }),
+      screen.getByRole("button", { name: "Crea il tuo account" }),
     ).toBeInTheDocument();
     expect(header()).toHaveTextContent("Misure");
   });
 
-  it("separates the free trial offer from the athlete constraints", async () => {
+  it("separates the free start from the athlete constraints", async () => {
     start("result");
-    const offer = await screen.findByRole("complementary", { name: "Offerta" });
-    expect(within(offer).getByText("Premio sbloccato")).toBeInTheDocument();
+    const offer = await screen.findByRole("complementary", {
+      name: "Come si parte",
+    });
+    expect(within(offer).getByText("Si parte gratis")).toBeInTheDocument();
     // Gerarchia PF5: numero e etichetta sono elementi distinti.
-    expect(within(offer).getByText("7")).toHaveClass("pf4-offer-days");
-    expect(within(offer).getByText("giorni gratis")).toHaveClass(
+    expect(within(offer).getByText("0 €")).toHaveClass("pf4-offer-days");
+    expect(within(offer).getByText("per iniziare")).toHaveClass(
       "pf4-offer-label",
     );
+    // Blueprint: nessuna prova a giorni e nessun programma prima della scelta.
+    expect(offer).not.toHaveTextContent(/giorni gratis|Tutto sbloccato/);
     expect(offer).toHaveTextContent(
-      "Assessment, programma e analisi dei sei driver.",
+      "Il programma lo scegli dopo, quando vedi dove puoi arrivare.",
     );
-    expect(offer).toHaveTextContent("Tutto sbloccato da subito.");
     expect(within(offer).getByText("Nessuna carta")).toBeInTheDocument();
-    expect(within(offer).getByText("Disdici quando vuoi")).toBeInTheDocument();
+    expect(within(offer).getByText("Nessun impegno")).toBeInTheDocument();
     // L'offerta e marketing: non riporta le risposte dell'atleta.
     expect(offer).not.toHaveTextContent("Aumentare la resistenza");
     expect(offer).not.toHaveTextContent("Padel");
@@ -335,7 +338,7 @@ describe("PF5 pre-account experience", () => {
     expect(screen.queryByText("Quanto pesi?")).not.toBeInTheDocument();
 
     await userEvent.click(
-      screen.getByRole("button", { name: "Attiva la prova gratuita" }),
+      screen.getByRole("button", { name: "Crea il tuo account" }),
     );
     expect(
       screen.getByRole("heading", { name: "Crea il tuo account." }),
@@ -354,7 +357,7 @@ describe("PF5 pre-account experience", () => {
       }),
     );
     render(<StartPage />);
-    await screen.findByRole("button", { name: "Attiva la prova gratuita" });
+    await screen.findByRole("button", { name: "Crea il tuo account" });
     expect(
       screen.queryByText("Indice di massa corporea"),
     ).not.toBeInTheDocument();

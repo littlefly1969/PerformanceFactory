@@ -42,6 +42,7 @@ Il backend considera l'onboarding completato solo quando viene salvata una `User
 | Precondizione | Dove è verificata | Note |
 | --- | --- | --- |
 | Registrazione account | `POST /auth/register-athlete` o flusso Google | L'utente viene creato con ruolo `USER` e `isActive: false`. |
+| Maggiore età | `adultConfirmed` in registrazione email e Google | Senza dichiarazione 18+ la registrazione è rifiutata (400) prima di ogni scrittura; la data è in `User.adultConfirmedAt`. |
 | Consensi richiesti | `ConsentsService.assertAcceptedCurrentDocuments`, `/consents/required` | Privacy e AI assistant devono essere accettati quando richiesti. |
 | Account attivo per login | `AuthService.validateUser` | Un utente inattivo non può completare il login ordinario. |
 | Sessione autenticata | `AuthenticatedGuard` su `OnboardingController` | Tutti gli endpoint `/onboarding/*` sono protetti. |
@@ -76,6 +77,7 @@ Il frontend salva anche un draft in `sessionStorage` con chiave `performance:onb
 | `/consents/documents` | `GET` | Pubblico | Nessuna | `ConsentsService.getCurrentDocuments` | `ConsentDocument` | Può restituire fallback se mancano documenti attivi. |
 | `/consents/required` | `GET` | Autenticato | Sessione valida | `ConsentsService.status` | `Consent`, `ConsentDocument` | Elenca consensi mancanti. |
 | `/consents/required` | `POST` | Autenticato | Documenti correnti e flag privacy/AI | `ConsentsService.acceptRequired` | `Consent` | Salva consensi in transazione. |
+| `/consents/marketing` | `GET`/`PUT` | Autenticato | `{ granted }` | `ConsentsService.updateMarketing` | `Consent` | Consenso marketing facoltativo, separato e revocabile (vedi [Ingresso](../ingresso-attribuzione-flag.md)). |
 | `/onboarding/questionnaire` | `GET` | Autenticato `USER` | `assertAthlete` | `OnboardingService.getQuestionnaire` | Assessment, obiettivo, sport, template, domande utente | Combina domande generali e specialistiche già generate. |
 | `/onboarding/status` | `GET` | Autenticato `USER` | `assertAthlete` | `getStatus` | Assessment, obiettivo, sport selection | Restituisce stato richiesto/completato. |
 | `/onboarding/sport-selection` | `POST` | Autenticato `USER` | DTO con `sportId`, `specializationId`; verifica attivi | `saveSportSelection` | `Sport`, `SportSpecialization`, `UserSportSelection` | Upsert scelta sport. |

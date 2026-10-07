@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import "./login.css";
 import { API_BASE, secureFetch, storeAccessToken } from "@/app/lib/api";
+import { clearAttribution } from "@/app/lib/attribution";
 
 const pendingAdminActivationMessage =
   "L'amministratore sta valutando la tua richiesta e ti accettera.";
@@ -92,6 +93,8 @@ export function LoginForm() {
       accessToken?: string;
     };
     storeAccessToken(user.accessToken);
+    // Chi accede non è più un visitatore anonimo: niente attribuzione residua.
+    clearAttribution();
     setMessage(
       `Accesso effettuato come ${user.email ?? "utente"} (${user.role ?? "ruolo"})`,
     );

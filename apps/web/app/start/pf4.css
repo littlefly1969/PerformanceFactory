@@ -604,3 +604,17 @@
   border-radius: 50%;
   background: #c8f02e;
 }
+.pf4 .pf4-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 24px;
+  font-size: 14px;
+  line-height: 22px;
+}
+.pf4-check input {
+  width: 20px;
+  height: 20px;
+  accent-color: #161a12;
+  flex-shrink: 0;
+}

@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { TrainingAvailability } from "./training-availability";
+import { MarketingPreference, ReferralCard } from "./marketing-and-referral";
 import { AthleteShell } from "../_components/athlete-shell";
 import { useAthlete } from "../_components/use-athlete";
 import type { Home } from "../_components/athlete-types";
@@ -40,6 +41,8 @@ export default function ProfilePage() {
               </p>
             )}
           </section>
+          <ReferralCard />
+          <MarketingPreference />
           <Link className="pf4-text-link" href="/user/performance">
             La tua performance →
           </Link>

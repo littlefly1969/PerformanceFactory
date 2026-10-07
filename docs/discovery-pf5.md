@@ -3,13 +3,13 @@
 ## Risultato
 
 Dopo l'ultima risposta della discovery l'atleta vede una schermata di analisi di
-almeno 4 secondi. Segue la pagina pre-account PF5: offerta della prova gratuita,
-vincoli dichiarati e CTA **Attiva la prova gratuita**, che porta alla
+almeno 4 secondi. Segue la pagina pre-account PF5: come si parte (gratis),
+vincoli dichiarati e CTA **Crea il tuo account**, che porta alla
 registrazione. L'account non viene creato automaticamente.
 
 ```
 /start → intro → domande visibili → analisi ≥ 4 s → risultato PF5
-       → Attiva la prova gratuita → registrazione → AthleteDiscovery
+       → Crea il tuo account → registrazione (18+) → AthleteDiscovery
 ```
 
 Il numero di domande non è fisso: resta quello dei template `DISCOVERY` attivi,
@@ -37,11 +37,13 @@ avanzamento compare già piena, ma l'attesa minima resta.
 Durante analisi e risultato l'header mostra **MISURE**. `PreliminaryResult`
 separa due contenuti.
 
-- **Riquadro giallo: offerta commerciale.** «Premio sbloccato», «7 giorni gratis»
-  (con «7» e «giorni gratis» in elementi separati, per la gerarchia visiva PF5),
-  «Assessment, programma e analisi dei sei driver. Tutto sbloccato da subito.»,
-  «Nessuna carta», «Disdici quando vuoi». Il testo è statico e non usa le
-  risposte della discovery.
+- **Riquadro giallo: come si parte.** «Si parte gratis», «0 € per iniziare»
+  (con «0 €» e «per iniziare» in elementi separati, per la gerarchia visiva PF5),
+  assessment e prima stima del livello, «Il programma lo scegli dopo, quando vedi
+  dove puoi arrivare.», «Nessuna carta», «Nessun impegno». Il testo è statico e
+  non usa le risposte della discovery. Non promette una prova a giorni né un
+  programma: nel Blueprint la fase gratuita è la calibrazione e il programma si
+  sceglie dopo gli scenari P3/P6/P12 (vedi [Ingresso](ingresso-attribuzione-flag.md)).
 - **Sotto: i vincoli dell'atleta.** «Questi sono i tuoi vincoli.» e le misure
   dichiarate.
   - Il BMI si calcola dalle risposte con `contextKey` `general_height_cm` e

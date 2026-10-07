@@ -74,10 +74,9 @@ export class PerformanceService {
       throw new NotFoundException('Profilo performance non trovato');
     }
 
-    return this.filterSnapshotAreas(
-      snapshot,
-      allowedAreaIds,
-      enabledDriverAreaIds,
+    return this.forActor(
+      actor,
+      this.filterSnapshotAreas(snapshot, allowedAreaIds, enabledDriverAreaIds),
     );
   }
 
@@ -108,8 +107,35 @@ export class PerformanceService {
     });
 
     return snapshots.map((snapshot) =>
-      this.filterSnapshotAreas(snapshot, allowedAreaIds, enabledDriverAreaIds),
+      this.forActor(
+        actor,
+        this.filterSnapshotAreas(
+          snapshot,
+          allowedAreaIds,
+          enabledDriverAreaIds,
+        ),
+      ),
     );
+  }
+
+  /**
+   * Il potenziale P resta a professionisti e admin: all'atleta non arriva
+   * nemmeno nel payload, perché il Blueprint gli mostra solo la R attuale.
+   */
+  private forActor<
+    T extends {
+      areas: Array<{ areaId: string; realR: number; area: unknown }>;
+    },
+  >(actor: Actor, snapshot: T) {
+    if (actor.role !== UserRole.USER) return snapshot;
+    return {
+      ...snapshot,
+      areas: snapshot.areas.map((a) => ({
+        areaId: a.areaId,
+        realR: a.realR,
+        area: a.area,
+      })),
+    };
   }
 
   private async getAllowedAreaIds(professionalId: string) {
