@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   anonymousId,
   captureTouch,
+  clearAttribution,
   currentAttribution,
   touchFromUrl,
 } from "./attribution";
@@ -46,5 +47,30 @@ describe("attribution", () => {
     );
     expect(anonymousId()).toBe(id);
     expect(currentAttribution()).toEqual({ anonymousId: id });
+  });
+
+  it("forgets the source and the anonymous id after 30 days without visits", () => {
+    const start = new Date("2026-10-01T10:00:00Z");
+    captureTouch(new URL("https://pf.test/start?club=padel-nord"), start);
+    const id = anonymousId(start);
+    const later = new Date("2026-10-20T10:00:00Z");
+    expect(currentAttribution(later)).toMatchObject({
+      anonymousId: id,
+      firstTouch: { club: "padel-nord" },
+    });
+    const expired = currentAttribution(new Date("2026-11-25T10:00:00Z"));
+    expect(expired.firstTouch).toBeUndefined();
+    expect(expired.lastTouch).toBeUndefined();
+    expect(expired.anonymousId).not.toBe(id);
+  });
+
+  it("starts clean for the next person after a registration or login", () => {
+    captureTouch(new URL("https://pf.test/start?ref=abc23456"));
+    const id = anonymousId();
+    clearAttribution();
+    expect(window.localStorage.length).toBe(0);
+    const next = currentAttribution();
+    expect(next.anonymousId).not.toBe(id);
+    expect(next.firstTouch).toBeUndefined();
   });
 });

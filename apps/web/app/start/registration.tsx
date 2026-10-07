@@ -2,7 +2,7 @@
 import { GoogleRegistrationButton } from "./google-registration";
 import { useRef, useState } from "react";
 import { API_BASE } from "../lib/api";
-import { currentAttribution } from "../lib/attribution";
+import { clearAttribution, currentAttribution } from "../lib/attribution";
 import type { DiscoveryDraft } from "./discovery-types";
 import { DRAFT_KEY, journeyHref } from "./discovery-state";
 
@@ -56,6 +56,7 @@ export function Registration({
                 : result.message || "Registrazione non riuscita",
             );
           const href = journeyHref(result.journey?.nextStep);
+          clearAttribution();
           try {
             sessionStorage.removeItem(DRAFT_KEY);
             sessionStorage.removeItem("pf.accessToken");

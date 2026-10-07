@@ -22,7 +22,7 @@ const config: DiscoveryConfiguration = {
 
 type Call = { url: string; body?: Record<string, unknown> };
 
-function serve() {
+function serve(registration: "fails" | "succeeds" = "fails") {
   const calls: Call[] = [];
   vi.stubGlobal(
     "fetch",
@@ -33,9 +33,9 @@ function serve() {
         body: init?.body ? JSON.parse(String(init.body)) : undefined,
       });
       if (url.endsWith("/auth/register-athlete"))
-        return new Response(JSON.stringify({ message: "stop" }), {
-          status: 400,
-        });
+        return registration === "succeeds"
+          ? new Response(JSON.stringify({ journey: { nextStep: "CONSENTS" } }))
+          : new Response(JSON.stringify({ message: "stop" }), { status: 400 });
       return new Response(JSON.stringify(config));
     }),
   );
@@ -126,5 +126,37 @@ describe("Ingresso: attribuzione, eventi e 18+", () => {
         firstTouch: { ref: "abc23456" },
       },
     });
+    // Una registrazione rifiutata conserva l'attribuzione per il nuovo tentativo.
+    expect(localStorage.getItem("pf.firstTouch")).not.toBeNull();
+  });
+
+  it("clears the attribution once the account exists", async () => {
+    window.history.replaceState(null, "", "/start?club=padel-nord");
+    sessionStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        version: 3,
+        currentStep: "registration",
+        answers: { only: "a" },
+      }),
+    );
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
+    serve("succeeds");
+    render(<StartPage />);
+    await userEvent.type(await screen.findByLabelText("Nome"), "Mario");
+    await userEvent.type(screen.getByLabelText("Cognome"), "Rossi");
+    await userEvent.type(screen.getByLabelText("E-mail"), "m@pf.test");
+    await userEvent.type(screen.getByLabelText("Password"), "password1");
+    await userEvent.type(screen.getByLabelText("Conferma password"), "password1");
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /almeno 18 anni/ }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Crea account" }));
+    await waitFor(() => expect(assign).toHaveBeenCalled());
+    // Una seconda persona sullo stesso browser non eredita id, circolo o referral.
+    expect(localStorage.getItem("pf.firstTouch")).toBeNull();
+    expect(localStorage.getItem("pf.lastTouch")).toBeNull();
+    expect(localStorage.getItem("pf.anonymousId")).toBeNull();
   });
 });
