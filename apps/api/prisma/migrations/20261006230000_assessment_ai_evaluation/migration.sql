@@ -21,6 +21,7 @@ CREATE TABLE "AiAssessmentPromptConfig" (
 CREATE TABLE "AssessmentEvaluation" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
+    "sequence" INTEGER NOT NULL DEFAULT 1,
     "status" TEXT NOT NULL DEFAULT 'PROVISIONAL',
     "source" TEXT NOT NULL DEFAULT 'SELF_ASSESSMENT',
     "summary" TEXT NOT NULL,
@@ -63,6 +64,9 @@ CREATE INDEX "AiAssessmentPromptConfig_isActive_version_idx" ON "AiAssessmentPro
 
 -- CreateIndex
 CREATE INDEX "AssessmentEvaluation_userId_createdAt_idx" ON "AssessmentEvaluation"("userId", "createdAt");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "AssessmentEvaluation_userId_sequence_key" ON "AssessmentEvaluation"("userId", "sequence");
 
 -- CreateIndex
 CREATE INDEX "AssessmentEvaluationArea_areaId_idx" ON "AssessmentEvaluationArea"("areaId");

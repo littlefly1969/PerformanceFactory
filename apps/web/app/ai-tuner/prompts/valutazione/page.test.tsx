@@ -37,7 +37,10 @@ describe("assessment evaluation prompt", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string, init?: RequestInit) => {
-        if (init?.method !== "POST") return new Response(JSON.stringify(prompts));
+        if (init?.method !== "POST")
+          return new Response(
+            JSON.stringify(url.endsWith("/test-cases") ? [] : prompts),
+          );
         const body = JSON.parse(String(init.body));
         posts.push({ url, body });
         if (url.endsWith("/test"))
@@ -81,11 +84,15 @@ describe("assessment evaluation prompt", () => {
     expect(await screen.findByText("Bozza salvata.")).toBeVisible();
 
     await userEvent.click(
-      screen.getByRole("button", { name: "Prova sull'ultima valutazione" }),
+      screen.getByRole("button", { name: "Prova la bozza" }),
     );
     const result = await screen.findByRole("region", { name: "Risultato della prova" });
     expect(within(result).getByText("Tecnico-tattico")).toBeVisible();
     expect(within(result).getByText("Motivazione di prova.")).toBeVisible();
     expect(posts.filter((p) => p.url.endsWith("/assessment-prompt"))).toHaveLength(1);
+    // Senza scelta esplicita la prova usa il caso sintetico.
+    expect(posts.find((p) => p.url.endsWith("/test"))!.body).not.toHaveProperty(
+      "evaluationId",
+    );
   });
 });

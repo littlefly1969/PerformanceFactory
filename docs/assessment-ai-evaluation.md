@@ -76,8 +76,11 @@ di training.
 | `AssessmentEvaluation` | `status = PROVISIONAL`, `source = SELF_ASSESSMENT`, sintesi, confidence complessiva, scala, provider, modello, `promptVersionId`, hash, input e output validati, latenza |
 | `AssessmentEvaluationArea` | per driver: score, confidence, motivazione, `evidenceGaps` |
 
-Una sola valutazione per atleta in questa slice: dopo la valutazione `answer` e
-`back` rispondono 409. `POST /athlete-journey/evaluate` ripetuto restituisce la
+Una sola valutazione per atleta in questa slice, garantita anche dal database:
+`sequence = 1` con vincolo unico `(userId, sequence)`. Due richieste concorrenti, o
+un lease scaduto durante una chiamata lenta, salvano comunque una sola valutazione;
+la seconda restituisce quella già salvata. Dopo la valutazione `answer` e `back`
+rispondono 409. `POST /athlete-journey/evaluate` ripetuto restituisce la
 valutazione esistente. `GET /auth/journey` espone la fase `EVALUATION` e il campo
 `evaluation`.
 
@@ -92,8 +95,14 @@ valutazione esistente. `GET /auth/journey` espone la fase `EVALUATION` e il camp
   nuove valutazioni e disattiva le altre;
 - ogni salvataggio crea una `AiPromptVersion` con `promptType =
   ASSESSMENT_EVALUATION`, e ogni valutazione ricorda la versione usata;
-- **Prova sull'ultima valutazione** esegue la bozza sull'input dell'ultima
-  valutazione salvata e mostra il risultato accanto, senza salvare nulla.
+- **Prova la bozza** esegue la bozza senza salvare nulla. Di default usa un caso
+  sintetico (`assessment-synthetic-case.ts`), quindi nessun dato reale esce dal
+  sistema. Una valutazione reale si usa solo se scelta esplicitamente dall'elenco
+  (atleta pseudonimizzato) e, con un provider esterno, solo se il suo atleta ha in
+  quel momento il consenso `AI`/`AI_ASSISTANT`; altrimenti la prova viene rifiutata
+  prima di chiamare il provider;
+- le scritture sulle configurazioni sono serializzate con un advisory lock
+  PostgreSQL: due attivazioni simultanee lasciano comunque un solo prompt attivo.
 
 API (`AI_TUNER`; lettura anche `ADMIN`):
 
@@ -101,7 +110,8 @@ API (`AI_TUNER`; lettura anche `ADMIN`):
 |---|---|
 | `GET /ai-tuning/assessment-prompts` | configurazioni, attiva per prima |
 | `POST /ai-tuning/assessment-prompt` | `{ id?, name, basePrompt, isActive? }` |
-| `POST /ai-tuning/assessment-prompt/test` | `{ basePrompt }`, nessun salvataggio |
+| `GET /ai-tuning/assessment-prompt/test-cases` | ultime 20 valutazioni, atleta pseudonimizzato |
+| `POST /ai-tuning/assessment-prompt/test` | `{ basePrompt, evaluationId? }`, nessun salvataggio |
 
 ## Sviluppo e test
 

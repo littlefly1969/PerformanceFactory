@@ -12,7 +12,10 @@ import {
   listAssessmentPromptConfigs,
   upsertAssessmentPromptConfig,
 } from '../ai-orchestrator/assessment-prompts';
-import { testAssessmentPrompt } from './assessment-prompt-test';
+import {
+  listAssessmentTestCases,
+  testAssessmentPrompt,
+} from './assessment-prompt-test';
 import { UpsertAssessmentPromptConfigDto } from './dto/upsert-assessment-prompt-config.dto';
 import {
   getAuditDetail,
@@ -83,8 +86,17 @@ export class AiTuningService {
     return upsertAssessmentPromptConfig(this.prisma, body, actorId);
   }
 
-  testAssessmentPrompt(basePrompt: string) {
-    return testAssessmentPrompt(this.prisma, this.proposalProvider, basePrompt);
+  listAssessmentTestCases() {
+    return listAssessmentTestCases(this.prisma);
+  }
+
+  testAssessmentPrompt(basePrompt: string, evaluationId?: string) {
+    return testAssessmentPrompt(
+      this.prisma,
+      this.proposalProvider,
+      basePrompt,
+      evaluationId,
+    );
   }
 
   async listAudits(params: {

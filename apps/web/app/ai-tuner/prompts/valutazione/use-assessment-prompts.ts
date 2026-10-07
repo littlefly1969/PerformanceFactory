@@ -11,6 +11,13 @@ export type AssessmentPrompt = {
   updatedAt?: string;
 };
 
+export type AssessmentTestCase = {
+  id: string;
+  athlete: string;
+  createdAt: string;
+  provider: string;
+};
+
 export type AssessmentTestResult = {
   provider: string;
   model: string;
@@ -44,6 +51,9 @@ export function useAssessmentPrompts() {
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [test, setTest] = useState<AssessmentTestResult | null>(null);
+  const [testCases, setTestCases] = useState<AssessmentTestCase[]>([]);
+  // Vuoto = caso sintetico: nessun dato reale esce senza una scelta esplicita.
+  const [testCaseId, setTestCaseId] = useState("");
 
   const load = useCallback(async () => {
     const response = await secureFetch(`${API_BASE}/ai-tuning/assessment-prompts`, {
@@ -56,6 +66,15 @@ export function useAssessmentPrompts() {
     const items = (await response.json()) as AssessmentPrompt[];
     setPrompts(items);
     return items;
+  }, []);
+
+  useEffect(() => {
+    void secureFetch(`${API_BASE}/ai-tuning/assessment-prompt/test-cases`, {
+      credentials: "include",
+    })
+      .then((response) => (response.ok ? response.json() : []))
+      .then((items: AssessmentTestCase[]) => setTestCases(items))
+      .catch(() => setTestCases([]));
   }, []);
 
   useEffect(() => {
@@ -124,6 +143,7 @@ export function useAssessmentPrompts() {
     setTest(null);
     const response = await post("assessment-prompt/test", {
       basePrompt: draft.basePrompt,
+      ...(testCaseId ? { evaluationId: testCaseId } : {}),
     });
     setBusy(null);
     if (!response.ok) {
@@ -144,5 +164,8 @@ export function useAssessmentPrompts() {
     save,
     activate,
     runTest,
+    testCases,
+    testCaseId,
+    setTestCaseId,
   };
 }

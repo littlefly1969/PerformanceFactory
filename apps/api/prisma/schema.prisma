@@ -1310,6 +1310,8 @@ model AiAssessmentPromptConfig {
 model AssessmentEvaluation {
   id                String   @id @default(uuid())
   userId            String
+  /// 1 = prima valutazione dell'assessment; le successive incrementano. Unico per atleta.
+  sequence          Int      @default(1)
   status            String   @default("PROVISIONAL")
   source            String   @default("SELF_ASSESSMENT")
   summary           String
@@ -1329,6 +1331,7 @@ model AssessmentEvaluation {
   promptVersion AiPromptVersion?           @relation(fields: [promptVersionId], references: [id], onDelete: SetNull)
   areas         AssessmentEvaluationArea[]
 
+  @@unique([userId, sequence])
   @@index([userId, createdAt])
 }
 

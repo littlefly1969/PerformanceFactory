@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class TestAssessmentPromptDto {
   @ApiProperty()
@@ -7,4 +7,11 @@ export class TestAssessmentPromptDto {
   @IsNotEmpty()
   @MaxLength(20000)
   basePrompt: string;
+
+  /** Valutazione reale scelta esplicitamente; senza, si usa il caso sintetico. */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  evaluationId?: string;
 }

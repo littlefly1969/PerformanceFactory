@@ -189,13 +189,23 @@ export class AiTuningController {
     return this.tuning.upsertAssessmentPrompt(body, req.user?.id ?? '');
   }
 
+  @Get('assessment-prompt/test-cases')
+  @ApiOperation({
+    summary: 'Valutazioni recenti selezionabili come caso di prova',
+  })
+  @Roles(UserRole.AI_TUNER)
+  listAssessmentTestCases() {
+    return this.tuning.listAssessmentTestCases();
+  }
+
   @Post('assessment-prompt/test')
   @ApiOperation({
-    summary: 'Prova una bozza sull ultima valutazione salvata, senza salvare',
+    summary:
+      'Prova una bozza sul caso sintetico o su una valutazione scelta con consenso AI, senza salvare',
   })
   @Roles(UserRole.AI_TUNER)
   testAssessmentPrompt(@Body() body: TestAssessmentPromptDto) {
-    return this.tuning.testAssessmentPrompt(body.basePrompt);
+    return this.tuning.testAssessmentPrompt(body.basePrompt, body.evaluationId);
   }
 
   @Post('sports')

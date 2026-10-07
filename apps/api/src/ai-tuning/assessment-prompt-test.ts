@@ -1,37 +1,68 @@
-import { BadRequestException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { AiProposalProviderService } from '../ai-orchestrator/proposal-provider.service';
 import { AssessmentEvaluationInput } from '../ai-orchestrator/assessment-evaluation-model';
+import { requireAiConsent } from '../discovery/assessment-evaluation';
 import { PrismaService } from '../prisma/prisma.service';
+import { SYNTHETIC_ASSESSMENT_CASE } from './assessment-synthetic-case';
+import { pseudonymizeUserId } from './tuning-audits';
 
-/** Prova una bozza sull'input dell'ultima valutazione salvata, senza salvare nulla. */
+type CaseInput = Omit<
+  AssessmentEvaluationInput,
+  'basePrompt' | 'promptVersionId'
+>;
+
+/** Ultime valutazioni selezionabili come caso di prova, con atleta pseudonimizzato. */
+export async function listAssessmentTestCases(prisma: PrismaService) {
+  const evaluations = await prisma.assessmentEvaluation.findMany({
+    orderBy: { createdAt: 'desc' },
+    take: 20,
+    select: { id: true, userId: true, createdAt: true, provider: true },
+  });
+  return evaluations.map(({ userId, ...evaluation }) => ({
+    ...evaluation,
+    athlete: pseudonymizeUserId(userId),
+  }));
+}
+
+/**
+ * Prova una bozza senza salvare nulla. Di default usa il caso sintetico; una
+ * valutazione reale va scelta esplicitamente e richiede il consenso AI corrente
+ * del suo atleta quando il provider è esterno.
+ */
 export async function testAssessmentPrompt(
   prisma: PrismaService,
   ai: AiProposalProviderService,
   basePrompt: string,
+  evaluationId?: string,
 ) {
-  const latest = await prisma.assessmentEvaluation.findFirst({
-    orderBy: { createdAt: 'desc' },
-    select: { id: true, inputJson: true, outputJson: true },
-  });
-  const user = (
-    latest?.inputJson as {
-      prompt?: { user?: Partial<AssessmentEvaluationInput> };
-    }
-  )?.prompt?.user;
-  if (!latest || !user?.drivers?.length || !user.scale)
-    throw new BadRequestException(
-      'Serve almeno una valutazione salvata da usare come caso di prova.',
-    );
+  let input: CaseInput = SYNTHETIC_ASSESSMENT_CASE;
+  let previousOutput: unknown = null;
+  if (evaluationId) {
+    const selected = await prisma.assessmentEvaluation.findUnique({
+      where: { id: evaluationId },
+      select: { userId: true, inputJson: true, outputJson: true },
+    });
+    const user = (
+      selected?.inputJson as { prompt?: { user?: Partial<CaseInput> } }
+    )?.prompt?.user;
+    if (!selected || !user?.drivers?.length || !user.scale)
+      throw new NotFoundException('Valutazione di prova non trovata');
+    await requireAiConsent(prisma, selected.userId);
+    input = {
+      scale: user.scale,
+      athleteContext: user.athleteContext ?? [],
+      availability: user.availability ?? [],
+      drivers: user.drivers,
+    };
+    previousOutput = selected.outputJson;
+  }
   const result = await ai.evaluateAssessment({
+    ...input,
     basePrompt,
     promptVersionId: null,
-    scale: user.scale,
-    athleteContext: user.athleteContext ?? [],
-    availability: user.availability ?? [],
-    drivers: user.drivers,
   });
   return {
-    caseEvaluationId: latest.id,
+    caseEvaluationId: evaluationId ?? null,
     provider: result.provider,
     model: result.model,
     latencyMs: result.latencyMs,
@@ -39,9 +70,9 @@ export async function testAssessmentPrompt(
       ...result.output,
       drivers: result.output.drivers.map((d) => ({
         ...d,
-        name: user.drivers!.find((x) => x.areaId === d.areaId)?.name,
+        name: input.drivers.find((x) => x.areaId === d.areaId)?.name,
       })),
     },
-    previousOutput: latest.outputJson,
+    previousOutput,
   };
 }

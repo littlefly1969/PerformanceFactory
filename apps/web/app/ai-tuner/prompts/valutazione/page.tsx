@@ -6,8 +6,21 @@ import { formatDate } from "../prompt-management-model";
 import { type AssessmentPrompt, useAssessmentPrompts } from "./use-assessment-prompts";
 
 export default function AssessmentPromptPage() {
-  const { prompts, draft, setDraft, changed, busy, message, test, save, activate, runTest } =
-    useAssessmentPrompts();
+  const {
+    prompts,
+    draft,
+    setDraft,
+    changed,
+    busy,
+    message,
+    test,
+    save,
+    activate,
+    runTest,
+    testCases,
+    testCaseId,
+    setTestCaseId,
+  } = useAssessmentPrompts();
   const [confirm, setConfirm] = useState<AssessmentPrompt | null>(null);
   return (
     <ProductShell
@@ -114,9 +127,28 @@ export default function AssessmentPromptPage() {
                 disabled={busy === "test" || !draft.basePrompt.trim()}
                 onClick={() => void runTest()}
               >
-                {busy === "test" ? "Prova in corso..." : "Prova sull'ultima valutazione"}
+                {busy === "test" ? "Prova in corso..." : "Prova la bozza"}
               </button>
             </div>
+            <label className="pf-field">
+              Caso di prova
+              <select
+                className="pf-input"
+                value={testCaseId}
+                onChange={(event) => setTestCaseId(event.target.value)}
+              >
+                <option value="">Caso sintetico (nessun dato reale)</option>
+                {testCases.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.athlete} · {formatDate(c.createdAt)} · {c.provider}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="pf-muted">
+              Una valutazione reale viene inviata a un provider esterno solo se
+              l&apos;atleta ha il consenso AI attivo in quel momento.
+            </p>
           </section>
         )}
 

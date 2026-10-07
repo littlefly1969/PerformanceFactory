@@ -1,7 +1,10 @@
 import { BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AiProposalProviderService } from '../ai-orchestrator/proposal-provider.service';
-import { AssessmentEvaluationInput } from '../ai-orchestrator/assessment-evaluation-model';
+import {
+  AssessmentEvaluationInput,
+  AssessmentEvaluationResult,
+} from '../ai-orchestrator/assessment-evaluation-model';
 import { loadActiveAssessmentPrompt } from '../ai-orchestrator/assessment-prompts';
 import { loadScaleConfig } from '../ai-orchestrator/performance-scoring';
 import { TemplateRecord } from '../onboarding/onboarding-model';
@@ -100,9 +103,35 @@ export async function runAssessmentEvaluation(
     answers,
   );
   const result = await ai.evaluateAssessment(input);
+  try {
+    return await saveEvaluation(prisma, userId, input, result);
+  } catch (error) {
+    // Una richiesta concorrente ha già salvato la prima valutazione: vale quella.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2002'
+    )
+      return prisma.assessmentEvaluation.findUniqueOrThrow({
+        where: { userId_sequence: { userId, sequence: INITIAL_SEQUENCE } },
+        select: { id: true },
+      });
+    throw error;
+  }
+}
+
+/** Prima valutazione dell'assessment: unica per atleta grazie a (userId, sequence). */
+export const INITIAL_SEQUENCE = 1;
+
+function saveEvaluation(
+  prisma: PrismaService,
+  userId: string,
+  input: AssessmentEvaluationInput,
+  result: AssessmentEvaluationResult,
+) {
   return prisma.assessmentEvaluation.create({
     data: {
       userId,
+      sequence: INITIAL_SEQUENCE,
       summary: result.output.summary,
       overallConfidence: result.output.overallConfidence,
       minScore: input.scale.minScore,

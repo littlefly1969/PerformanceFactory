@@ -18,6 +18,11 @@ const select = {
   updatedAt: true,
 } satisfies Prisma.AiAssessmentPromptConfigSelect;
 
+/** Serializza ogni scrittura: al massimo una configurazione attiva alla volta. */
+async function lockPromptConfigs(tx: Prisma.TransactionClient) {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('ai-assessment-prompt-config'))`;
+}
+
 type ConfigRecord = {
   id: string;
   name: string;
@@ -29,6 +34,7 @@ type ConfigRecord = {
 /** Il prompt plausibile di partenza nasce attivo alla prima lettura, come il prompt obiettivo. */
 export async function ensureAssessmentPromptConfig(prisma: PrismaService) {
   await prisma.$transaction(async (tx) => {
+    await lockPromptConfigs(tx);
     const config = await tx.aiAssessmentPromptConfig.upsert({
       where: { id: DEFAULT_ID },
       update: {},
@@ -78,20 +84,20 @@ export async function upsertAssessmentPromptConfig(
   const isActive = body.isActive ?? false;
   if (!actorId || !basePrompt)
     throw new BadRequestException('Testo del prompt di valutazione mancante');
-  if (
-    body.id &&
-    !(await prisma.aiAssessmentPromptConfig.findUnique({
-      where: { id: body.id },
-    }))
-  )
-    throw new NotFoundException('Prompt di valutazione non trovato');
-  const duplicate = await prisma.aiAssessmentPromptConfig.findFirst({
-    where: { name, ...(body.id ? { id: { not: body.id } } : {}) },
-  });
-  if (duplicate)
-    throw new BadRequestException('Esiste già un prompt con questo nome');
-
   return prisma.$transaction(async (tx) => {
+    await lockPromptConfigs(tx);
+    if (
+      body.id &&
+      !(await tx.aiAssessmentPromptConfig.findUnique({
+        where: { id: body.id },
+      }))
+    )
+      throw new NotFoundException('Prompt di valutazione non trovato');
+    const duplicate = await tx.aiAssessmentPromptConfig.findFirst({
+      where: { name, ...(body.id ? { id: { not: body.id } } : {}) },
+    });
+    if (duplicate)
+      throw new BadRequestException('Esiste già un prompt con questo nome');
     if (isActive) {
       const active = await tx.aiAssessmentPromptConfig.findMany({
         where: { isActive: true, ...(body.id ? { id: { not: body.id } } : {}) },
