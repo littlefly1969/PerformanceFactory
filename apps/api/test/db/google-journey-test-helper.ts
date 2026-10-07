@@ -95,6 +95,7 @@ export async function testGoogleRegistration(
       await app.inject({ method: 'GET', url: '/api/consents/documents' })
     ).json<Awaited<ReturnType<ConsentsService['requiredDocuments']>>>();
     const consents = {
+      adultConfirmed: true,
       privacyAccepted: true,
       aiAssistantAccepted: true,
       acceptedDocuments: docs.map(

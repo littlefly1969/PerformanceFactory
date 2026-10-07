@@ -15,7 +15,7 @@ const select = {
   questionsPerDriver: true,
   driversPerRound: true,
   minHoursBetweenRounds: true,
-  trainingDuringCalibration: true,
+  programBeforePaywall: true,
 } as const;
 
 /** Parametri correnti; la riga nasce con i valori di default alla prima lettura. */
@@ -46,28 +46,27 @@ export async function updateCalibrationSettings(
 }
 
 /**
- * Il programma (baseline e piano) resta chiuso finché la calibrazione è aperta,
- * salvo che il back office abbia attivato gli allenamenti nella fase gratuita.
- * Gli atleti senza valutazione AI seguono ancora il flusso precedente.
+ * Chi è entrato in calibrazione non ottiene il programma (baseline e piano) dal
+ * flusso precedente, nemmeno a calibrazione completata: la sequenza è
+ * calibrazione → P3/P6/P12 → Program Horizon → paywall (slice successive).
+ * Il back office può riaprirlo (decisione 13). Gli atleti senza valutazione AI
+ * seguono ancora il flusso precedente finché non arriva il paywall (gap 1.10).
  */
-export async function assertTrainingAllowed(
+export async function assertProgramAllowed(
   prisma: Pick<PrismaService, 'calibrationConfig' | 'assessmentEvaluation'>,
   userId: string,
 ) {
   const [evaluation, settings] = await Promise.all([
     prisma.assessmentEvaluation.findFirst({
       where: { userId },
-      select: {
-        user: { select: { calibration: { select: { status: true } } } },
-      },
+      select: { id: true },
     }),
     loadCalibrationSettings(prisma),
   ]);
-  if (!evaluation || settings.trainingDuringCalibration) return;
-  if (evaluation.user.calibration?.status === 'CALIBRATION_COMPLETED') return;
+  if (!evaluation || settings.programBeforePaywall) return;
   throw new ConflictException({
-    code: 'CALIBRATION_IN_PROGRESS',
+    code: 'PROGRAM_LOCKED_BEFORE_PAYWALL',
     message:
-      'Il programma si sblocca a calibrazione completata. Continua a rispondere ai round.',
+      'Il programma si sblocca dopo la scelta del percorso e l’abbonamento.',
   });
 }

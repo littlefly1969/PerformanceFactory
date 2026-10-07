@@ -39,6 +39,8 @@ CREATE TABLE "CalibrationRound" (
     "promptHash" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "answeredAt" TIMESTAMP(3),
+    "evaluationToken" TEXT,
+    "evaluatedAt" TIMESTAMP(3),
     "evaluationId" TEXT,
 
     CONSTRAINT "CalibrationRound_pkey" PRIMARY KEY ("id")
@@ -54,7 +56,7 @@ CREATE TABLE "CalibrationConfig" (
     "questionsPerDriver" INTEGER NOT NULL DEFAULT 2,
     "driversPerRound" INTEGER NOT NULL DEFAULT 2,
     "minHoursBetweenRounds" INTEGER NOT NULL DEFAULT 20,
-    "trainingDuringCalibration" BOOLEAN NOT NULL DEFAULT false,
+    "programBeforePaywall" BOOLEAN NOT NULL DEFAULT false,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "updatedById" TEXT,
 

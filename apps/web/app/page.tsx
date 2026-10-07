@@ -31,7 +31,8 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        window.location.replace("/start");
+        // I link di circoli e referral portano i parametri fino alla discovery.
+        window.location.replace(`/start${window.location.search}`);
         return;
       }
 

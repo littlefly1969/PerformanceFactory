@@ -73,5 +73,5 @@ export class UpdateCalibrationConfigDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
-  trainingDuringCalibration?: boolean;
+  programBeforePaywall?: boolean;
 }

@@ -18,7 +18,7 @@ export default function ProgressPage() {
       <h1>La tua prossima versione.</h1>
       {data?.current ? (
         <>
-          <p>Performance attuale → potenziale</p>
+          <p>Performance attuale</p>
           <PerformanceVisual performance={data.current} />
           <section className="pf4-athlete-section">
             <span className="pf4-kicker">Il tuo percorso nel tempo</span>
@@ -53,9 +53,7 @@ export default function ProgressPage() {
                     year: "numeric",
                   })}
                 </span>
-                <strong>
-                  {s.current} <small>→ {s.potential ?? "—"}</small>
-                </strong>
+                <strong>{s.current}</strong>
               </div>
             ))}
           </section>

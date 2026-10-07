@@ -31,7 +31,7 @@ const settings = {
   questionsPerDriver: 2,
   driversPerRound: 2,
   minHoursBetweenRounds: 20,
-  trainingDuringCalibration: false,
+  programBeforePaywall: false,
 };
 
 afterEach(() => {
@@ -71,7 +71,7 @@ it("saves the calibration parameters and shows the server's refusal", async () =
   expect(puts[0]).toMatchObject({
     confidenceThreshold: 80,
     maxDays: 30,
-    trainingDuringCalibration: false,
+    programBeforePaywall: false,
   });
   expect(await screen.findByText(/Parametri salvati/)).toBeVisible();
 
@@ -108,5 +108,5 @@ it("turns on training during calibration only when the admin ticks it", async ()
   await userEvent.click(
     screen.getByRole("button", { name: "Salva parametri" }),
   );
-  expect(puts[0]).toMatchObject({ trainingDuringCalibration: true });
+  expect(puts[0]).toMatchObject({ programBeforePaywall: true });
 });

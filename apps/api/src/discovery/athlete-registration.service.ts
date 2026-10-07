@@ -10,6 +10,12 @@ import { ConsentsService } from '../consents/consents.service';
 import { RegisterAthleteDto } from '../auth/dto/register-athlete.dto';
 import { DiscoveryService } from './discovery.service';
 import { validateDiscovery } from './discovery-validation';
+import { PartnersService } from '../partners/partners.service';
+import { AnalyticsService } from '../analytics/analytics.service';
+import { AttributionInput } from '../partners/attribution';
+
+export const ADULT_REQUIRED_MESSAGE =
+  'Performance Factory è riservata ai maggiorenni: conferma di avere almeno 18 anni.';
 
 @Injectable()
 export class AthleteRegistrationService {
@@ -17,6 +23,8 @@ export class AthleteRegistrationService {
     private readonly prisma: PrismaService,
     private readonly discovery: DiscoveryService,
     private readonly consents: ConsentsService,
+    private readonly partners: PartnersService,
+    private readonly analytics: AnalyticsService,
   ) {}
 
   async register(input: RegisterAthleteDto) {
@@ -30,14 +38,20 @@ export class AthleteRegistrationService {
       email: string;
       password: string;
       discovery: unknown;
+      adultConfirmed?: boolean;
+      attribution?: AttributionInput;
     },
     google?: {
       subject: string;
       profileJson: Prisma.InputJsonValue;
       documents: Awaited<ReturnType<ConsentsService['requiredDocuments']>>;
+      marketingAccepted?: boolean;
       audit: { ipAddress?: string | null; userAgent?: string | null };
     },
   ) {
+    // Age gate MVP 18+ (A2-D01): dichiarazione esplicita, prima di ogni scrittura.
+    if (input.adultConfirmed !== true)
+      throw new BadRequestException(ADULT_REQUIRED_MESSAGE);
     const firstName = input.firstName.trim();
     const lastName = input.lastName.trim();
     if (!firstName || !lastName)
@@ -66,6 +80,7 @@ export class AthleteRegistrationService {
               lastName,
               role: 'USER',
               isActive: true,
+              adultConfirmedAt: new Date(),
               authIdentities: google
                 ? {
                     create: {
@@ -117,12 +132,38 @@ export class AthleteRegistrationService {
               createdAt: true,
             },
           });
-          if (google)
+          if (google) {
             for (const document of google.documents)
               await this.consents.createConsent(tx, created.id, document, {
                 ...google.audit,
                 source: 'google_register',
               });
+            if (google.marketingAccepted === true)
+              await this.consents.setMarketing(tx, created.id, true, {
+                ...google.audit,
+                source: 'google_register',
+              });
+          }
+          const origin = await this.partners.recordAttribution(
+            tx,
+            created.id,
+            input.attribution,
+          );
+          await this.analytics.trackServer(
+            'registration_completed',
+            {
+              userId: created.id,
+              anonymousId: origin.anonymousId,
+              properties: {
+                method: google ? 'google' : 'email',
+                source: origin.source ?? 'direct',
+                ...(origin.campaign && { campaign: origin.campaign }),
+                ...(origin.club && { club: origin.club }),
+                referred: origin.referred,
+              },
+            },
+            tx,
+          );
           return created;
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },

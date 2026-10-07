@@ -6,6 +6,7 @@ import {
   REQUIRED_CONSENTS,
   consentDocumentHash,
 } from './consent-texts';
+import { MARKETING_CONSENT } from './marketing-consent';
 
 type ConsentAuditInput = {
   ipAddress?: string | null;
@@ -14,6 +15,7 @@ type ConsentAuditInput = {
 };
 
 type ConsentAcceptanceInput = {
+  marketingAccepted?: boolean;
   privacyAccepted?: boolean;
   aiAssistantAccepted?: boolean;
   acceptedDocuments?: Array<{
@@ -116,7 +118,59 @@ export class ConsentsService {
   ) {
     await this.assertAcceptedCurrentDocuments(input);
     await this.grantRequired(userId, audit);
+    if (input.marketingAccepted === true)
+      await this.updateMarketing(userId, true, audit);
     return this.status(userId);
+  }
+
+  marketingDocument() {
+    return MARKETING_CONSENT;
+  }
+
+  async marketingStatus(userId: string) {
+    const active = await this.prisma.consent.findFirst({
+      where: {
+        userId,
+        type: MARKETING_CONSENT.type,
+        version: MARKETING_CONSENT.version,
+        documentHash: MARKETING_CONSENT.documentHash,
+        withdrawnAt: null,
+      },
+      select: { grantedAt: true },
+    });
+    return {
+      granted: !!active,
+      grantedAt: active?.grantedAt ?? null,
+      document: MARKETING_CONSENT,
+    };
+  }
+
+  /** Concessione idempotente; la revoca chiude tutte le versioni ancora attive. */
+  async setMarketing(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    granted: boolean,
+    audit: ConsentAuditInput,
+  ) {
+    if (granted) {
+      await this.createConsent(tx, userId, MARKETING_CONSENT, audit);
+      return;
+    }
+    await tx.consent.updateMany({
+      where: { userId, type: MARKETING_CONSENT.type, withdrawnAt: null },
+      data: { withdrawnAt: new Date() },
+    });
+  }
+
+  async updateMarketing(
+    userId: string,
+    granted: boolean,
+    audit: ConsentAuditInput,
+  ) {
+    await this.prisma.$transaction((tx) =>
+      this.setMarketing(tx, userId, granted, audit),
+    );
+    return this.marketingStatus(userId);
   }
 
   async grantRequired(userId: string, audit: ConsentAuditInput) {

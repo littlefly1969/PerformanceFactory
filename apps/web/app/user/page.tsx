@@ -50,11 +50,8 @@ export default function AthleteHome() {
             <h1>Ciao{home.firstName ? ` ${home.firstName}` : ""}.</h1>
             {home.performance && (
               <Link href="/user/performance" className="pf4-compact-index">
-                <span>Attuale → potenziale</span>
-                <strong>
-                  {home.performance.current}{" "}
-                  <em>→ {home.performance.potential ?? "—"}</em>
-                </strong>
+                <span>Performance attuale</span>
+                <strong>{home.performance.current}</strong>
               </Link>
             )}
           </div>

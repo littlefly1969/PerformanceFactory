@@ -321,7 +321,13 @@ export async function submit(
       status: 'COMPLETED',
       snapshot,
       profile,
-      areas: scoredAreas,
+      // P resta nello snapshot per i professionisti, non nella risposta all'atleta.
+      areas: scoredAreas.map((a) => ({
+        areaId: a.areaId,
+        areaName: a.areaName,
+        realR: a.realR,
+        answers: a.answers,
+      })),
       goal: {
         id: goal.id,
         goalText: goal.goalText,

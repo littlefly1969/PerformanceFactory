@@ -4,6 +4,7 @@ import {
   Get,
   Body,
   Post,
+  Put,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -15,6 +16,7 @@ import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { ConsentAcceptanceDto } from './dto/consent-acceptance.dto';
+import { MarketingConsentDto } from './dto/marketing-consent.dto';
 
 const AI_CONSENT_TYPE = 'AI_ASSISTANT';
 
@@ -65,6 +67,36 @@ export class ConsentsController {
       ipAddress: req.ip,
       userAgent: req.headers?.['user-agent'],
       source: 'reconsent',
+    });
+  }
+
+  @Get('marketing')
+  @ApiOperation({ summary: 'Stato del consenso facoltativo marketing' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard)
+  marketing(@Req() req: { user?: { id: string } }) {
+    return this.consents.marketingStatus(req.user?.id ?? '');
+  }
+
+  @Put('marketing')
+  @ApiOperation({ summary: 'Concede o revoca il consenso marketing' })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard)
+  setMarketing(
+    @Req()
+    req: {
+      user?: { id: string };
+      ip?: string;
+      headers?: { 'user-agent'?: string };
+    },
+    @Body() body: MarketingConsentDto,
+  ) {
+    const userId = req.user?.id ?? '';
+    if (!userId) throw new BadRequestException('Utente mancante');
+    return this.consents.updateMarketing(userId, body.granted, {
+      ipAddress: req.ip,
+      userAgent: req.headers?.['user-agent'],
+      source: 'profile',
     });
   }
 

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { AiProposalProviderService } from '../ai-orchestrator/proposal-provider.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { assertTrainingAllowed } from '../discovery/calibration/calibration-config';
+import { assertProgramAllowed } from '../discovery/calibration/calibration-config';
 import {
   generateSpecialistQuestions,
   getQuestionnaire,
@@ -75,7 +75,7 @@ export class OnboardingService {
     goalTextInput: string,
     answers: OnboardingAnswer[],
   ) {
-    await assertTrainingAllowed(this.prisma, actor.id);
+    await assertProgramAllowed(this.prisma, actor.id);
     return submit(this.prisma, actor, goalTextInput, answers);
   }
 

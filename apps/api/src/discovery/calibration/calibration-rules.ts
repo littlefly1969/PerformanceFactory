@@ -16,7 +16,7 @@ export type CalibrationSettings = {
   driversPerRound: number;
   minHoursBetweenRounds: number;
   /** Decisione 13 aperta: il Blueprint (A4.6) non dà programmi prima del paywall. */
-  trainingDuringCalibration: boolean;
+  programBeforePaywall: boolean;
 };
 
 export const DEFAULT_CALIBRATION_SETTINGS: CalibrationSettings = {
@@ -27,7 +27,7 @@ export const DEFAULT_CALIBRATION_SETTINGS: CalibrationSettings = {
   questionsPerDriver: 2,
   driversPerRound: 2,
   minHoursBetweenRounds: 20,
-  trainingDuringCalibration: false,
+  programBeforePaywall: false,
 };
 
 export type EvaluatedDriver = {

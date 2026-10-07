@@ -140,20 +140,12 @@ export class AthleteJourneyService {
         id: a.areaId,
         name: driverName(a.area.name),
         current: a.realR,
-        potential: a.potentialP,
-        gap: a.potentialP - a.realR,
       })) ?? [];
     results.sort(
       (a, b) => orderedAreas.indexOf(a.id) - orderedAreas.indexOf(b.id),
     );
-    const potential = results.length
-      ? Math.round(
-          results.reduce((sum, d) => sum + d.potential, 0) / results.length,
-        )
-      : 0;
-    const priority = [...results].sort(
-      (a, b) => b.gap - a.gap || a.current - b.current,
-    )[0];
+    // Priorità dal driver più basso: il gap verso P non è esposto all'atleta.
+    const priority = [...results].sort((a, b) => a.current - b.current)[0];
     return {
       phase,
       nextStep: phase,
@@ -194,8 +186,6 @@ export class AthleteJourneyService {
         ? {
             snapshotId: snapshot.id,
             current: snapshot.rankingGlobal,
-            potential,
-            gap: potential - snapshot.rankingGlobal,
             drivers: results,
             priority,
           }

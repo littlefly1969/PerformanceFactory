@@ -13,6 +13,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { AcceptedDocumentDto } from '../../consents/dto/consent-acceptance.dto';
+import { AttributionDto } from '../../partners/dto/attribution.dto';
 
 export class RegisterAthleteDto {
   @ApiProperty({ type: Object })
@@ -41,6 +42,18 @@ export class RegisterAthleteDto {
   @MinLength(8)
   @MaxLength(200)
   password: string;
+
+  @ApiProperty({
+    description: 'Dichiarazione di avere almeno 18 anni (MVP solo 18+)',
+  })
+  @IsBoolean()
+  adultConfirmed: boolean;
+
+  @ApiProperty({ required: false, type: AttributionDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => AttributionDto)
+  attribution?: AttributionDto;
 
   @ApiProperty({ required: false })
   @IsOptional()

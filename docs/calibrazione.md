@@ -52,7 +52,7 @@ Tutte in `apps/api/src/discovery/calibration/calibration-rules.ts`, senza I/O:
   paywall non c'è programma. Finché la calibrazione non è `CALIBRATION_COMPLETED`,
   `POST /athlete-journey/submit` e `POST /onboarding/submit` (che creano la baseline
   da cui parte il piano) rispondono 409 `CALIBRATION_IN_PROGRESS`. La decisione 13 è
-  aperta, quindi la regola è il parametro `trainingDuringCalibration` (spento di
+  aperta, quindi la regola è il parametro `programBeforePaywall` (spento di
   default): acceso, il flusso precedente torna disponibile. Gli atleti senza
   valutazione AI (flusso precedente a #8) non sono toccati.
 - **Chiusura pigra**: non c'è uno scheduler. Il round di chiusura si propone alla

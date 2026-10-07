@@ -2,6 +2,7 @@
 import { GoogleRegistrationButton } from "./google-registration";
 import { useRef, useState } from "react";
 import { API_BASE } from "../lib/api";
+import { clearAttribution, currentAttribution } from "../lib/attribution";
 import type { DiscoveryDraft } from "./discovery-types";
 import { DRAFT_KEY, journeyHref } from "./discovery-state";
 
@@ -42,7 +43,9 @@ export function Registration({
               lastName: data.get("lastName"),
               email: data.get("email"),
               password: data.get("password"),
+              adultConfirmed: data.get("adultConfirmed") === "on",
               discovery: draft,
+              attribution: currentAttribution(),
             }),
           });
           const result = await response.json();
@@ -53,6 +56,7 @@ export function Registration({
                 : result.message || "Registrazione non riuscita",
             );
           const href = journeyHref(result.journey?.nextStep);
+          clearAttribution();
           try {
             sessionStorage.removeItem(DRAFT_KEY);
             sessionStorage.removeItem("pf.accessToken");
@@ -138,6 +142,10 @@ export function Registration({
           />
         </label>
       </div>
+      <label className="pf4-check">
+        <input type="checkbox" name="adultConfirmed" required /> Dichiaro di
+        avere almeno 18 anni
+      </label>
       <p className="pf4-note">
         Dopo la registrazione potrai leggere e scegliere i consensi del tuo
         percorso.

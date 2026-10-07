@@ -12,11 +12,11 @@ type Settings = {
   questionsPerDriver: number;
   driversPerRound: number;
   minHoursBetweenRounds: number;
-  trainingDuringCalibration: boolean;
+  programBeforePaywall: boolean;
 };
 
 /** Campi modificabili: valori provvisori finché A4-D01 non è deciso. */
-type NumericKey = Exclude<keyof Settings, "trainingDuringCalibration">;
+type NumericKey = Exclude<keyof Settings, "programBeforePaywall">;
 
 const FIELDS: { key: NumericKey; label: string; hint: string }[] = [
   {
@@ -127,11 +127,11 @@ export default function AdminCalibrationPage() {
               <span>
                 <input
                   type="checkbox"
-                  checked={settings.trainingDuringCalibration}
+                  checked={settings.programBeforePaywall}
                   onChange={(event) =>
                     setSettings({
                       ...settings,
-                      trainingDuringCalibration: event.target.checked,
+                      programBeforePaywall: event.target.checked,
                     })
                   }
                 />{" "}

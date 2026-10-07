@@ -42,10 +42,8 @@ const home: Home = {
     snapshotId: "s",
     date: "2026-09-19",
     current: 68,
-    potential: 79,
-    gap: 11,
     drivers: [
-      { id: "a", name: "Tecnica", current: 68, potential: 79, gap: 11 },
+      { id: "a", name: "Tecnica", current: 68 },
     ],
   },
   program: {
@@ -452,8 +450,10 @@ describe("PF4 athlete experience", () => {
     );
     render(<ProgressPage />);
     expect(
-      await screen.findByRole("img", { name: /Confronto tra performance/ }),
+      await screen.findByRole("img", { name: "Performance attuale per driver" }),
     ).toBeInTheDocument();
+    // La P a passo fisso non si mostra all'atleta.
+    expect(screen.queryByText(/otenziale/)).not.toBeInTheDocument();
     expect(screen.getByText("01 · Tecnica")).toBeInTheDocument();
   });
 });

@@ -56,7 +56,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
-  assertTrainingAllowed,
+  assertProgramAllowed,
   loadCalibrationSettings,
   updateCalibrationSettings,
 } from '../../src/discovery/calibration/calibration-config';
@@ -235,6 +235,7 @@ describe('PF4 discovery to authenticated journey', () => {
         lastName: 'Rossi',
         email,
         password: 'test-password-123',
+        adultConfirmed: true,
         discovery,
       },
     });
@@ -830,18 +831,18 @@ describe('PF4 discovery to authenticated journey', () => {
     expect(blocked.json()).toMatchObject({ code: 'CALIBRATION_IN_PROGRESS' });
     await updateCalibrationSettings(
       prisma,
-      { trainingDuringCalibration: true },
+      { programBeforePaywall: true },
       userId,
     );
     await expect(
-      assertTrainingAllowed(prisma, userId),
+      assertProgramAllowed(prisma, userId),
     ).resolves.toBeUndefined();
     await updateCalibrationSettings(
       prisma,
-      { trainingDuringCalibration: false },
+      { programBeforePaywall: false },
       userId,
     );
-    await expect(assertTrainingAllowed(prisma, userId)).rejects.toThrow(
+    await expect(assertProgramAllowed(prisma, userId)).rejects.toThrow(
       'calibrazione completata',
     );
 
