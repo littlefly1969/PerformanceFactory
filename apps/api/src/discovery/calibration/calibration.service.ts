@@ -32,6 +32,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 type RoundKind = 'ADAPTIVE' | 'CLOSING';
 type Answers = Record<string, string>;
 
+/** Annulla la transazione quando il round risulta già valutato da un'altra richiesta. */
+class RoundAlreadyEvaluated extends Error {}
+
 /**
  * Calibrazione gratuita dopo la prima valutazione: round di domande scritte
  * dall'AI sui driver meno affidabili, nuova valutazione a ogni round, chiusura
@@ -154,7 +157,7 @@ export class CalibrationService {
       throw new ConflictException('La calibrazione è già completata');
     const settings = await loadCalibrationSettings(this.prisma);
     await requireAiConsent(this.prisma, userId);
-    await this.claim(userId);
+    const lease = await this.claim(userId);
     try {
       const rounds = await this.prisma.calibrationRound.findMany({
         where: { userId },
@@ -219,7 +222,7 @@ export class CalibrationService {
         },
       });
     } finally {
-      await this.release(userId);
+      await this.release(userId, lease);
     }
   }
 
@@ -242,7 +245,7 @@ export class CalibrationService {
     if (invalid || Object.keys(answers).length !== questions.length)
       throw new BadRequestException('Rispondi a tutte le domande del round');
     await requireAiConsent(this.prisma, userId);
-    await this.claim(userId);
+    const lease = await this.claim(userId);
     try {
       const claimed = await this.prisma.calibrationRound.updateMany({
         where: { id: roundId, status: { in: ['OPEN', 'EVALUATING'] } },
@@ -256,6 +259,8 @@ export class CalibrationService {
       try {
         await this.evaluateRound(userId, roundId, now);
       } catch (error) {
+        // Un'altra richiesta ha già chiuso il round: vale la sua valutazione.
+        if (error instanceof RoundAlreadyEvaluated) return;
         // Le risposte restano salvate: l'atleta può riprovare la valutazione.
         await this.prisma.calibrationRound.updateMany({
           where: { id: roundId, status: 'EVALUATING' },
@@ -264,7 +269,7 @@ export class CalibrationService {
         throw error;
       }
     } finally {
-      await this.release(userId);
+      await this.release(userId, lease);
     }
   }
 
@@ -302,10 +307,12 @@ export class CalibrationService {
           round.kind === 'CLOSING' ? 'CLOSING_ASSESSMENT' : 'CALIBRATION_ROUND',
         status: completed ? 'CONSOLIDATED' : 'PROVISIONAL',
       });
-      await tx.calibrationRound.update({
-        where: { id: roundId },
+      // Un lease scaduto può far valutare lo stesso round due volte: vince il primo.
+      const linked = await tx.calibrationRound.updateMany({
+        where: { id: roundId, status: 'EVALUATING' },
         data: { status: 'EVALUATED', evaluationId: saved.id },
       });
+      if (!linked.count) throw new RoundAlreadyEvaluated();
       await tx.athleteCalibration.update({
         where: { userId },
         data: {
@@ -408,25 +415,28 @@ export class CalibrationService {
 
   /** Una sola operazione AI alla volta per atleta; un lease scaduto si riprende. */
   private async claim(userId: string) {
+    const lease = new Date();
     const claimed = await this.prisma.athleteCalibration.updateMany({
       where: {
         userId,
         OR: [
           { operationAt: null },
-          { operationAt: { lt: new Date(Date.now() - LEASE_MS) } },
+          { operationAt: { lt: new Date(lease.getTime() - LEASE_MS) } },
         ],
       },
-      data: { operationAt: new Date() },
+      data: { operationAt: lease },
     });
     if (!claimed.count)
       throw new ConflictException(
         'Elaborazione già in corso. Attendi e riprendi il percorso.',
       );
+    return lease;
   }
 
-  private async release(userId: string) {
-    await this.prisma.athleteCalibration.update({
-      where: { userId },
+  /** Rilascia solo il proprio lease: uno scaduto e ripreso da altri resta loro. */
+  private async release(userId: string, lease: Date) {
+    await this.prisma.athleteCalibration.updateMany({
+      where: { userId, operationAt: lease },
       data: { operationAt: null },
     });
   }

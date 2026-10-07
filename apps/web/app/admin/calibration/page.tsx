@@ -12,10 +12,13 @@ type Settings = {
   questionsPerDriver: number;
   driversPerRound: number;
   minHoursBetweenRounds: number;
+  trainingDuringCalibration: boolean;
 };
 
 /** Campi modificabili: valori provvisori finché A4-D01 non è deciso. */
-const FIELDS: { key: keyof Settings; label: string; hint: string }[] = [
+type NumericKey = Exclude<keyof Settings, "trainingDuringCalibration">;
+
+const FIELDS: { key: NumericKey; label: string; hint: string }[] = [
   {
     key: "confidenceThreshold",
     label: "Soglia di confidence per driver",
@@ -120,6 +123,25 @@ export default function AdminCalibrationPage() {
                 <span className="pf-field-hint">{field.hint}</span>
               </label>
             ))}
+            <label className="pf-field">
+              <span>
+                <input
+                  type="checkbox"
+                  checked={settings.trainingDuringCalibration}
+                  onChange={(event) =>
+                    setSettings({
+                      ...settings,
+                      trainingDuringCalibration: event.target.checked,
+                    })
+                  }
+                />{" "}
+                Programma di allenamento durante la calibrazione
+              </span>
+              <span className="pf-field-hint">
+                Spento di default: per il Blueprint (A4.6) il programma si
+                sblocca dopo la calibrazione. Decisione 13 ancora aperta.
+              </span>
+            </label>
             <button
               className="pf-button"
               type="button"

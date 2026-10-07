@@ -54,6 +54,7 @@ CREATE TABLE "CalibrationConfig" (
     "questionsPerDriver" INTEGER NOT NULL DEFAULT 2,
     "driversPerRound" INTEGER NOT NULL DEFAULT 2,
     "minHoursBetweenRounds" INTEGER NOT NULL DEFAULT 20,
+    "trainingDuringCalibration" BOOLEAN NOT NULL DEFAULT false,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "updatedById" TEXT,
 
@@ -83,3 +84,6 @@ ALTER TABLE "CalibrationRound" ADD CONSTRAINT "CalibrationRound_userId_fkey" FOR
 
 -- AddForeignKey
 ALTER TABLE "CalibrationRound" ADD CONSTRAINT "CalibrationRound_evaluationId_fkey" FOREIGN KEY ("evaluationId") REFERENCES "AssessmentEvaluation"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "CalibrationConfig" ADD CONSTRAINT "CalibrationConfig_updatedById_fkey" FOREIGN KEY ("updatedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;

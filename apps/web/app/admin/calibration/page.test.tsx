@@ -31,6 +31,7 @@ const settings = {
   questionsPerDriver: 2,
   driversPerRound: 2,
   minHoursBetweenRounds: 20,
+  trainingDuringCalibration: false,
 };
 
 afterEach(() => {
@@ -39,7 +40,7 @@ afterEach(() => {
 });
 
 it("saves the calibration parameters and shows the server's refusal", async () => {
-  const puts: Record<string, number>[] = [];
+  const puts: Record<string, number | boolean>[] = [];
   vi.stubGlobal(
     "fetch",
     vi.fn(async (_url: string, init?: RequestInit) => {
@@ -67,7 +68,11 @@ it("saves the calibration parameters and shows the server's refusal", async () =
   await userEvent.click(
     screen.getByRole("button", { name: "Salva parametri" }),
   );
-  expect(puts[0]).toMatchObject({ confidenceThreshold: 80, maxDays: 30 });
+  expect(puts[0]).toMatchObject({
+    confidenceThreshold: 80,
+    maxDays: 30,
+    trainingDuringCalibration: false,
+  });
   expect(await screen.findByText(/Parametri salvati/)).toBeVisible();
 
   const closing = screen.getByLabelText(/Giorno dell'assessment di chiusura/);
@@ -81,4 +86,27 @@ it("saves the calibration parameters and shows the server's refusal", async () =
       "Il giorno di chiusura non può superare la durata massima",
     ),
   ).toBeVisible();
+});
+
+it("turns on training during calibration only when the admin ticks it", async () => {
+  const puts: Record<string, unknown>[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.method !== "PUT") return new Response(JSON.stringify(settings));
+      const body = JSON.parse(String(init.body));
+      puts.push(body);
+      return new Response(JSON.stringify(body));
+    }),
+  );
+  render(<Page />);
+  const toggle = await screen.findByLabelText(
+    /Programma di allenamento durante la calibrazione/,
+  );
+  expect(toggle).not.toBeChecked();
+  await userEvent.click(toggle);
+  await userEvent.click(
+    screen.getByRole("button", { name: "Salva parametri" }),
+  );
+  expect(puts[0]).toMatchObject({ trainingDuringCalibration: true });
 });

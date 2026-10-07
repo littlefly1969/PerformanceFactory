@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsObject, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsUUID,
+  Max,
+  Min,
+} from 'class-validator';
 
 export class CalibrationAnswersDto {
   @ApiProperty()
@@ -61,4 +69,9 @@ export class UpdateCalibrationConfigDto {
   @Min(0)
   @Max(168)
   minHoursBetweenRounds?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  trainingDuringCalibration?: boolean;
 }

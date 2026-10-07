@@ -56,6 +56,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
+  assertTrainingAllowed,
   loadCalibrationSettings,
   updateCalibrationSettings,
 } from '../../src/discovery/calibration/calibration-config';
@@ -822,6 +823,27 @@ describe('PF4 discovery to authenticated journey', () => {
     const input = JSON.stringify(second.inputJson);
     expect(input).toContain('CALIBRATION');
     expect(input).toContain('previous');
+
+    // Nessun programma durante la calibrazione, salvo il parametro di back office.
+    const blocked = await post('submit');
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json()).toMatchObject({ code: 'CALIBRATION_IN_PROGRESS' });
+    await updateCalibrationSettings(
+      prisma,
+      { trainingDuringCalibration: true },
+      userId,
+    );
+    await expect(
+      assertTrainingAllowed(prisma, userId),
+    ).resolves.toBeUndefined();
+    await updateCalibrationSettings(
+      prisma,
+      { trainingDuringCalibration: false },
+      userId,
+    );
+    await expect(assertTrainingAllowed(prisma, userId)).rejects.toThrow(
+      'calibrazione completata',
+    );
 
     // Il prossimo round rispetta l'intervallo minimo.
     const waiting = (await calibration()).calibration;
