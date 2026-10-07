@@ -135,11 +135,13 @@ export default function AdminCalibrationPage() {
                     })
                   }
                 />{" "}
-                Programma di allenamento durante la calibrazione
+                Programma prima del paywall
               </span>
               <span className="pf-field-hint">
                 Spento di default: per il Blueprint (A4.6) il programma si
-                sblocca dopo la calibrazione. Decisione 13 ancora aperta.
+                sblocca dopo scenari, scelta del percorso e abbonamento. Acceso,
+                chi è in calibrazione può ottenerlo dal flusso precedente.
+                Decisione 13 ancora aperta.
               </span>
             </label>
             <button

@@ -117,7 +117,9 @@ export function CalibrationPanel({
         <p>
           {c.completionReason === "CONFIDENCE_REACHED"
             ? `Ogni driver ha raggiunto un'affidabilità di almeno ${c.confidenceThreshold} su 100.`
-            : "Abbiamo chiuso con l'assessment finale: i driver ancora poco affidabili restano indicati come tali, senza valori inventati."}{" "}
+            : c.completionReason === "DEADLINE_REACHED"
+              ? `Sono passati ${c.maxDays} giorni: abbiamo consolidato con le risposte che hai dato. I driver ancora poco affidabili restano indicati come tali, senza valori inventati.`
+              : "Abbiamo chiuso con l'assessment finale: i driver ancora poco affidabili restano indicati come tali, senza valori inventati."}{" "}
           Il prossimo passo sono i tuoi scenari a 3, 6 e 12 mesi.
         </p>
       ) : c.round ? (

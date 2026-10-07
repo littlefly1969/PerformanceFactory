@@ -123,4 +123,14 @@ describe("free calibration panel", () => {
     expect(screen.getByText(/senza valori inventati/)).toBeVisible();
     expect(screen.queryByRole("button")).toBeNull();
   });
+
+  it("explains a closing at the deadline with the available answers", () => {
+    renderPanel({
+      ...base,
+      status: "CALIBRATION_COMPLETED",
+      completionReason: "DEADLINE_REACHED",
+    });
+    expect(screen.getByText(/Sono passati 30 giorni/)).toBeVisible();
+    expect(screen.queryByRole("button")).toBeNull();
+  });
 });

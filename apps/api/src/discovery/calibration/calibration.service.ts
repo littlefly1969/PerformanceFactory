@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { AiProposalProviderService } from '../../ai-orchestrator/proposal-provider.service';
 import { loadActiveAssessmentPrompt } from '../../ai-orchestrator/assessment-prompts';
 import { CalibrationQuestion } from '../../ai-orchestrator/calibration-questions';
@@ -17,6 +18,7 @@ import {
 import { loadSpecialistQuestionRecords } from '../../onboarding/onboarding-questions';
 import { PrismaService } from '../../prisma/prisma.service';
 import { loadCalibrationSettings } from './calibration-config';
+import { closeAtDeadline, completeCalibration } from './calibration-completion';
 import {
   CalibrationStatus,
   dayOf,
@@ -32,8 +34,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 type RoundKind = 'ADAPTIVE' | 'CLOSING';
 type Answers = Record<string, string>;
 
-/** Annulla la transazione quando il round risulta già valutato da un'altra richiesta. */
-class RoundAlreadyEvaluated extends Error {}
+/** Annulla la transazione quando il round non è più di questa richiesta. */
+class RoundNotOwned extends Error {}
 
 /**
  * Calibrazione gratuita dopo la prima valutazione: round di domande scritte
@@ -69,47 +71,69 @@ export class CalibrationService {
       settings,
       'INITIAL',
     );
-    await this.prisma.athleteCalibration.createMany({
-      data: [
-        {
+    await this.prisma.$transaction(async (tx) => {
+      const created = await tx.athleteCalibration.createMany({
+        data: [
+          {
+            userId,
+            startedAt: first.createdAt,
+            deadlineAt: new Date(
+              first.createdAt.getTime() + settings.maxDays * DAY_MS,
+            ),
+            status: next.completionReason ? 'FREE_CALIBRATING' : next.status,
+            levelEstimatedAt: next.levelEstimated ? first.createdAt : null,
+          },
+        ],
+        skipDuplicates: true,
+      });
+      if (!created.count) return;
+      // Prima valutazione già sopra soglia: si chiude e si consolida subito.
+      if (next.completionReason)
+        await completeCalibration(
+          tx,
           userId,
-          startedAt: first.createdAt,
-          deadlineAt: new Date(
-            first.createdAt.getTime() + settings.maxDays * DAY_MS,
-          ),
-          status: next.status,
-          levelEstimatedAt: next.levelEstimated ? first.createdAt : null,
-          completedAt:
-            next.status === 'CALIBRATION_COMPLETED' ? first.createdAt : null,
-          completionReason: next.completionReason ?? null,
-        },
-      ],
-      skipDuplicates: true,
+          next.completionReason,
+          first.createdAt,
+        );
     });
     return this.prisma.athleteCalibration.findUnique({ where: { userId } });
   }
 
   /** Stato mostrato all'atleta: giorno, soglia, round aperto senza punteggi. */
   async view(userId: string, now = new Date()) {
-    const calibration = await this.ensureStarted(userId);
+    let calibration = await this.ensureStarted(userId);
     if (!calibration) return null;
+    if (
+      calibration.status !== 'CALIBRATION_COMPLETED' &&
+      calibration.deadlineAt <= now
+    ) {
+      // Se un'altra operazione ha il lease, chiuderà lei alla prossima visita.
+      const lease = await this.tryClaim(userId);
+      if (lease)
+        try {
+          await this.prisma.$transaction((tx) =>
+            closeAtDeadline(tx, userId, now),
+          );
+        } finally {
+          await this.release(userId, lease);
+        }
+      calibration = await this.prisma.athleteCalibration.findUniqueOrThrow({
+        where: { userId },
+      });
+    }
     const settings = await loadCalibrationSettings(this.prisma);
     const [open, last, evaluations] = await Promise.all([
       this.prisma.calibrationRound.findFirst({
         where: { userId, status: { in: ['OPEN', 'EVALUATING'] } },
         orderBy: { sequence: 'desc' },
       }),
-      this.prisma.calibrationRound.findFirst({
-        where: { userId },
-        orderBy: { sequence: 'desc' },
-        select: { createdAt: true },
-      }),
+      this.lastEvaluatedAt(userId),
       this.prisma.calibrationRound.count({
         where: { userId, status: 'EVALUATED' },
       }),
     ]);
     const completed = calibration.status === 'CALIBRATION_COMPLETED';
-    const available = nextRoundAt(last?.createdAt ?? null, settings);
+    const available = nextRoundAt(last, settings);
     return {
       status: calibration.status as CalibrationStatus,
       startedAt: calibration.startedAt,
@@ -159,13 +183,23 @@ export class CalibrationService {
     await requireAiConsent(this.prisma, userId);
     const lease = await this.claim(userId);
     try {
+      // Tetto dei giorni: alla scadenza nessun nuovo round, si consolida.
+      if (
+        await this.prisma.$transaction((tx) => closeAtDeadline(tx, userId, now))
+      )
+        return;
       const rounds = await this.prisma.calibrationRound.findMany({
         where: { userId },
         orderBy: { sequence: 'asc' },
       });
       // Un round già aperto vale per tutte le richieste concorrenti.
-      if (rounds.some((r) => r.status !== 'EVALUATED')) return;
-      const available = nextRoundAt(rounds.at(-1)?.createdAt ?? null, settings);
+      if (rounds.some((r) => r.status === 'OPEN' || r.status === 'EVALUATING'))
+        return;
+      // L'intervallo parte dalla valutazione del round precedente, non dalla sua apertura.
+      const available = nextRoundAt(
+        await this.lastEvaluatedAt(userId),
+        settings,
+      );
       if (available && available > now)
         throw new ConflictException({
           code: 'CALIBRATION_ROUND_NOT_YET',
@@ -188,7 +222,9 @@ export class CalibrationService {
       const targets = roundTargets(drivers, kind, settings);
       // Nessun driver sotto soglia: la valutazione corrente chiude già la calibrazione.
       if (!targets.length) {
-        await this.complete(userId, 'CONFIDENCE_REACHED', now);
+        await this.prisma.$transaction((tx) =>
+          completeCalibration(tx, userId, 'CONFIDENCE_REACHED', now),
+        );
         return;
       }
       const asked = await this.askedQuestions(userId, rounds);
@@ -196,7 +232,10 @@ export class CalibrationService {
         this.prisma,
         'CALIBRATION',
       );
-      const input = await this.evaluationInput(userId, rounds);
+      const input = await this.evaluationInput(
+        userId,
+        rounds.filter((r) => r.status === 'EVALUATED'),
+      );
       const result = await this.ai.generateCalibrationQuestions({
         basePrompt: prompt.basePrompt,
         promptVersionId: prompt.promptVersionId,
@@ -226,7 +265,11 @@ export class CalibrationService {
     }
   }
 
-  /** Salva le risposte del round e rivaluta R e confidence di tutti i driver. */
+  /**
+   * Salva le risposte del round e rivaluta R e confidence di tutti i driver.
+   * Le risposte si fissano una sola volta, nel passaggio OPEN → EVALUATING; chi
+   * riprende un round già in valutazione (lease scaduto) valuta quelle salvate.
+   */
   async answerRound(
     userId: string,
     roundId: string,
@@ -238,6 +281,8 @@ export class CalibrationService {
     });
     if (!round) throw new NotFoundException('Round non trovato');
     if (round.status === 'EVALUATED') return;
+    if (round.status === 'EXPIRED')
+      throw new ConflictException('La calibrazione è scaduta');
     const questions = round.questionsJson as CalibrationQuestion[];
     const invalid = questions.some(
       (q) => !q.options.some((o) => o.value === answers[q.id]),
@@ -247,24 +292,39 @@ export class CalibrationService {
     await requireAiConsent(this.prisma, userId);
     const lease = await this.claim(userId);
     try {
-      const claimed = await this.prisma.calibrationRound.updateMany({
-        where: { id: roundId, status: { in: ['OPEN', 'EVALUATING'] } },
+      if (
+        await this.prisma.$transaction((tx) => closeAtDeadline(tx, userId, now))
+      )
+        throw new ConflictException('La calibrazione è scaduta');
+      const token = randomUUID();
+      const fixed = await this.prisma.calibrationRound.updateMany({
+        where: { id: roundId, status: 'OPEN' },
         data: {
           status: 'EVALUATING',
           answersJson: answers,
           answeredAt: now,
+          evaluationToken: token,
         },
       });
-      if (!claimed.count) return;
+      // Già in valutazione: si prende in carico senza toccare le risposte.
+      const owned =
+        fixed.count ||
+        (
+          await this.prisma.calibrationRound.updateMany({
+            where: { id: roundId, status: 'EVALUATING' },
+            data: { evaluationToken: token },
+          })
+        ).count;
+      if (!owned) return;
       try {
-        await this.evaluateRound(userId, roundId, now);
+        await this.evaluateRound(userId, roundId, token);
       } catch (error) {
-        // Un'altra richiesta ha già chiuso il round: vale la sua valutazione.
-        if (error instanceof RoundAlreadyEvaluated) return;
-        // Le risposte restano salvate: l'atleta può riprovare la valutazione.
+        // Il round è passato a un'altra richiesta: vale il suo esito.
+        if (error instanceof RoundNotOwned) return;
+        // Solo il proprietario riapre il round; le risposte restano per riprovare.
         await this.prisma.calibrationRound.updateMany({
-          where: { id: roundId, status: 'EVALUATING' },
-          data: { status: 'OPEN' },
+          where: { id: roundId, status: 'EVALUATING', evaluationToken: token },
+          data: { status: 'OPEN', evaluationToken: null },
         });
         throw error;
       }
@@ -273,29 +333,35 @@ export class CalibrationService {
     }
   }
 
-  private async evaluateRound(userId: string, roundId: string, now: Date) {
+  private async evaluateRound(userId: string, roundId: string, token: string) {
     const rounds = await this.prisma.calibrationRound.findMany({
       where: { userId },
       orderBy: { sequence: 'asc' },
     });
     const round = rounds.find((r) => r.id === roundId)!;
-    const input = await this.evaluationInput(userId, rounds);
+    const input = await this.evaluationInput(
+      userId,
+      rounds.filter((r) => r.status === 'EVALUATED' || r.id === roundId),
+    );
     const result = await this.ai.evaluateAssessment(input);
     const settings = await loadCalibrationSettings(this.prisma);
-    const calibration = await this.prisma.athleteCalibration.findUniqueOrThrow({
-      where: { userId },
-    });
-    const next = statusAfterEvaluation(
-      calibration.status as CalibrationStatus,
-      {
-        levelConfidence: result.output.levelConfidence,
-        drivers: result.output.drivers,
-      },
-      settings,
-      round.kind as RoundKind,
-    );
-    const completed = next.status === 'CALIBRATION_COMPLETED';
+    const now = new Date();
     await this.prisma.$transaction(async (tx) => {
+      const calibration = await tx.athleteCalibration.findUniqueOrThrow({
+        where: { userId },
+      });
+      // Chiusa nel frattempo (scadenza): nessuna valutazione oltre quella consolidata.
+      if (calibration.status === 'CALIBRATION_COMPLETED')
+        throw new RoundNotOwned();
+      const next = statusAfterEvaluation(
+        calibration.status as CalibrationStatus,
+        {
+          levelConfidence: result.output.levelConfidence,
+          drivers: result.output.drivers,
+        },
+        settings,
+        round.kind as RoundKind,
+      );
       const last = await tx.assessmentEvaluation.findFirstOrThrow({
         where: { userId },
         orderBy: { sequence: 'desc' },
@@ -305,30 +371,36 @@ export class CalibrationService {
         sequence: last.sequence + 1,
         source:
           round.kind === 'CLOSING' ? 'CLOSING_ASSESSMENT' : 'CALIBRATION_ROUND',
-        status: completed ? 'CONSOLIDATED' : 'PROVISIONAL',
       });
-      // Un lease scaduto può far valutare lo stesso round due volte: vince il primo.
+      // Collega solo il proprietario attuale: chi ha perso il round annulla tutto.
       const linked = await tx.calibrationRound.updateMany({
-        where: { id: roundId, status: 'EVALUATING' },
-        data: { status: 'EVALUATED', evaluationId: saved.id },
-      });
-      if (!linked.count) throw new RoundAlreadyEvaluated();
-      await tx.athleteCalibration.update({
-        where: { userId },
+        where: { id: roundId, status: 'EVALUATING', evaluationToken: token },
         data: {
-          status: next.status,
-          ...(next.levelEstimated ? { levelEstimatedAt: now } : {}),
-          ...(completed
-            ? { completedAt: now, completionReason: next.completionReason }
-            : {}),
+          status: 'EVALUATED',
+          evaluationId: saved.id,
+          evaluatedAt: now,
+          evaluationToken: null,
         },
       });
+      if (!linked.count) throw new RoundNotOwned();
+      const reason =
+        next.completionReason ??
+        (calibration.deadlineAt <= now ? 'DEADLINE_REACHED' : undefined);
+      if (reason) await completeCalibration(tx, userId, reason, now);
+      else
+        await tx.athleteCalibration.update({
+          where: { userId },
+          data: {
+            status: next.status,
+            ...(next.levelEstimated ? { levelEstimatedAt: now } : {}),
+          },
+        });
     });
   }
 
   /**
-   * Input completo per la rivalutazione: primo set, risposte di tutti i round
-   * valutati o in valutazione, stima precedente per driver.
+   * Input completo per la rivalutazione: primo set, risposte dei round passati
+   * (valutati più quello in valutazione), stima precedente per driver.
    */
   private async evaluationInput(
     userId: string,
@@ -359,7 +431,7 @@ export class CalibrationService {
           confidence: previous.confidence,
         };
     }
-    for (const round of rounds.filter((r) => r.status !== 'OPEN')) {
+    for (const round of rounds) {
       const answers = round.answersJson as Answers;
       for (const q of round.questionsJson as CalibrationQuestion[]) {
         const driver = input.drivers.find((d) => d.areaId === q.areaId);
@@ -398,23 +470,27 @@ export class CalibrationService {
     return asked;
   }
 
-  private async complete(
-    userId: string,
-    reason: 'CONFIDENCE_REACHED' | 'CLOSING_ASSESSMENT',
-    now: Date,
-  ) {
-    await this.prisma.athleteCalibration.updateMany({
-      where: { userId, status: { not: 'CALIBRATION_COMPLETED' } },
-      data: {
-        status: 'CALIBRATION_COMPLETED',
-        completedAt: now,
-        completionReason: reason,
-      },
+  /** Fine dell'ultima valutazione di un round: da qui parte l'intervallo minimo. */
+  private async lastEvaluatedAt(userId: string) {
+    const last = await this.prisma.calibrationRound.findFirst({
+      where: { userId, status: 'EVALUATED' },
+      orderBy: { sequence: 'desc' },
+      select: { evaluatedAt: true, answeredAt: true },
     });
+    return last ? (last.evaluatedAt ?? last.answeredAt) : null;
   }
 
   /** Una sola operazione AI alla volta per atleta; un lease scaduto si riprende. */
   private async claim(userId: string) {
+    const lease = await this.tryClaim(userId);
+    if (!lease)
+      throw new ConflictException(
+        'Elaborazione già in corso. Attendi e riprendi il percorso.',
+      );
+    return lease;
+  }
+
+  private async tryClaim(userId: string) {
     const lease = new Date();
     const claimed = await this.prisma.athleteCalibration.updateMany({
       where: {
@@ -426,11 +502,7 @@ export class CalibrationService {
       },
       data: { operationAt: lease },
     });
-    if (!claimed.count)
-      throw new ConflictException(
-        'Elaborazione già in corso. Attendi e riprendi il percorso.',
-      );
-    return lease;
+    return claimed.count ? lease : null;
   }
 
   /** Rilascia solo il proprio lease: uno scaduto e ripreso da altri resta loro. */

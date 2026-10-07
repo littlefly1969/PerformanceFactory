@@ -100,9 +100,7 @@ it("turns on training during calibration only when the admin ticks it", async ()
     }),
   );
   render(<Page />);
-  const toggle = await screen.findByLabelText(
-    /Programma di allenamento durante la calibrazione/,
-  );
+  const toggle = await screen.findByLabelText(/Programma prima del paywall/);
   expect(toggle).not.toBeChecked();
   await userEvent.click(toggle);
   await userEvent.click(

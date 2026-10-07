@@ -41,7 +41,11 @@ export type Calibration = {
   day: number;
   maxDays: number;
   confidenceThreshold: number;
-  completionReason: "CONFIDENCE_REACHED" | "CLOSING_ASSESSMENT" | null;
+  completionReason:
+    | "CONFIDENCE_REACHED"
+    | "CLOSING_ASSESSMENT"
+    | "DEADLINE_REACHED"
+    | null;
   roundsCompleted: number;
   nextRoundKind: "ADAPTIVE" | "CLOSING" | null;
   nextRoundAt: string | null;
