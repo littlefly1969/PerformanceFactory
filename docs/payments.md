@@ -19,7 +19,8 @@ Backend dei pagamenti allineato al Product Blueprint (A4 Offerta gratuita/pagame
 | `PAYMENT_GRACE` | sì, fino a `graceEndsAt` | rinnovo fallito, 6 giorni di tolleranza (`PAYMENTS_GRACE_DAYS`) |
 | `PAUSED` | no | sospensione dal provider; la regola esatta è ancora aperta (A5-D03) |
 | `EXPIRED` | no | abbonamento terminato: stato read-only secondo A4 |
-| `CHECKOUT_EXPIRED` | no | checkout abbandonato o scaduto |
+| `CHECKOUT_EXPIRED` | no | checkout abbandonato, scaduto o sostituito da una scelta diversa |
+| `CHECKOUT_FAILED` | no | il provider non ha creato il checkout, o la preparazione si è interrotta |
 
 `SubscriptionsService.hasActiveEntitlement(userId)` è il punto unico da usare per il paywall di piano, coaching e calendario. In questa slice non è ancora applicato alle rotte esistenti.
 
@@ -44,7 +45,15 @@ Ogni provider implementa `PaymentProviderAdapter` (`apps/api/src/payments/provid
 | `PUT` | `/api/admin/payments/prices/:billingCycle` `{ amountCents, currency? }` | `ADMIN` |
 | `PUT` | `/api/admin/payments/options/:horizon/:billingCycle` `{ isActive }` | `ADMIN` |
 
-Il checkout è rifiutato se la combinazione non è attiva o se l'utente ha già un abbonamento attivo, in grace o in pausa. L'API legge il corpo grezzo delle richieste (`rawBody: true` in `main.ts`) per verificare le firme dei webhook.
+Il checkout è rifiutato se la combinazione non è attiva o se l'utente ha già un abbonamento attivo, in grace o in pausa.
+
+## Concorrenza e ordine degli eventi
+
+- **Un solo abbonamento non terminale per utente** (`CHECKOUT_PENDING`, `ACTIVE`, `PAYMENT_GRACE`, `PAUSED`): lo garantisce l'indice parziale `Subscription_one_open_per_user_key` nella migrazione, indipendente dall'entitlement.
+- **Creazione del checkout serializzata per utente** con un advisory lock PostgreSQL. Un doppio click riceve lo stesso checkout; una scelta diversa chiude prima il checkout precedente presso il provider (se risulta già pagato la richiesta è rifiutata) e poi ne apre uno nuovo. Il checkout scade dopo `PAYMENTS_CHECKOUT_TTL_MINUTES` (30 di default, minimo Stripe).
+- **Nessun record orfano**: se il provider fallisce l'abbonamento passa a `CHECKOUT_FAILED` e l'utente può riprovare; una preparazione interrotta da un crash viene chiusa dopo 60 secondi.
+- **Webhook**: l'evento viene registrato e applicato nella stessa transazione, con lock della riga `Subscription`, quindi eventi diversi sullo stesso abbonamento non si sovrappongono. Ogni evento conserva la data del provider (`providerCreatedAt`); un evento più vecchio dell'ultimo applicato (`lastProviderEventAt`) è registrato con esito `STALE` e non cambia lo stato. Un periodo più vecchio non accorcia mai l'accesso. La grace parte dalla data dell'evento di pagamento fallito, non da quella di consegna.
+- I test su PostgreSQL reale (`test/db/payments*.integration-spec.ts`) coprono doppio click, cambio di scelta, provider in errore, indice di unicità, riconsegne concorrenti, eventi diversi simultanei e consegna fuori ordine. L'API legge il corpo grezzo delle richieste (`rawBody: true` in `main.ts`) per verificare le firme dei webhook.
 
 ## Configurazione
 
@@ -53,6 +62,7 @@ Il checkout è rifiutato se la combinazione non è attiva o se l'utente ha già 
 | `PAYMENTS_PROVIDER` | `stub` fuori produzione | `stub` o `stripe`; obbligatoria in produzione |
 | `PAYMENTS_GRACE_DAYS` | `6` | A5.8 |
 | `PAYMENTS_CANCEL_NOTICE_HOURS` | `24` | A5.5: disdetta entro il giorno precedente la scadenza |
+| `PAYMENTS_CHECKOUT_TTL_MINUTES` | `30` | durata del checkout ospitato, tra 30 e 1440 |
 | `PAYMENTS_SUCCESS_URL` / `PAYMENTS_CANCEL_URL` | `WEB_ORIGIN/abbonamento?checkout=…` | ritorno dal checkout |
 | `PAYMENTS_STUB_WEBHOOK_SECRET` | vuoto | se presente, i webhook stub richiedono l'header `x-pf-stub-signature` (HMAC-SHA256 del corpo) |
 | `STRIPE_SECRET_KEY` | vuoto | solo `sk_test_…`; una chiave live è rifiutata salvo `STRIPE_ALLOW_LIVE_KEYS=true` |

@@ -16,6 +16,8 @@ export type CheckoutRequest = {
   customerId: string | null;
   successUrl: string;
   cancelUrl: string;
+  /** Oltre questa data il checkout non e piu pagabile. */
+  expiresAt: Date;
 };
 
 export type CheckoutResult = {
@@ -40,6 +42,8 @@ type EventBase = {
   eventId: string;
   rawType: string;
   payload: unknown;
+  /** Momento in cui il provider ha generato l'evento: serve a scartare eventi obsoleti. */
+  occurredAt: Date;
   /** Id interno PF trasmesso al provider come metadata, se presente. */
   localSubscriptionId: string | null;
 };
@@ -75,6 +79,11 @@ export interface PaymentProviderAdapter {
   readonly kind: PaymentProviderKind;
   createCheckout(request: CheckoutRequest): Promise<CheckoutResult>;
   setCancelAtPeriodEnd(subscriptionRef: string, cancel: boolean): Promise<void>;
+  /**
+   * Chiude un checkout ancora aperto. Restituisce COMPLETED se nel frattempo e
+   * stato pagato: in quel caso non va invalidato.
+   */
+  expireCheckout(checkoutId: string): Promise<'EXPIRED' | 'COMPLETED'>;
   /** Verifica la firma e normalizza l'evento. Lancia se la firma non e valida. */
   parseWebhook(
     rawBody: Buffer,

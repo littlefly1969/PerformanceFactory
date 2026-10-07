@@ -49,7 +49,13 @@ function setup() {
 }
 
 function stripeEvent(type: string, object: object) {
-  return { id: `evt_${type}`, object: 'event', type, data: { object } };
+  return {
+    id: `evt_${type}`,
+    object: 'event',
+    type,
+    created: 1_791_367_000,
+    data: { object },
+  };
 }
 
 describe('StripePaymentProvider', () => {
@@ -67,6 +73,7 @@ describe('StripePaymentProvider', () => {
       customerId: null,
       successUrl: 'https://pf.example/ok',
       cancelUrl: 'https://pf.example/ko',
+      expiresAt: new Date('2026-10-07T10:30:00.000Z'),
     });
     expect(result).toEqual({
       checkoutId: 'cs_test_1',
@@ -76,6 +83,7 @@ describe('StripePaymentProvider', () => {
     expect(params).toMatchObject({
       mode: 'subscription',
       client_reference_id: 'pf-sub-1',
+      expires_at: 1_791_369_000,
       customer_email: 'athlete@example.com',
       line_items: [
         {
@@ -98,6 +106,21 @@ describe('StripePaymentProvider', () => {
     expect(options).toEqual({ idempotencyKey: 'pf-checkout-pf-sub-1' });
   });
 
+  it('expires an open checkout but never one that was already paid', async () => {
+    const { stripe, provider } = setup();
+    const retrieve = jest.spyOn(stripe.checkout.sessions, 'retrieve');
+    const expire = jest
+      .spyOn(stripe.checkout.sessions, 'expire')
+      .mockResolvedValue({ status: 'expired' } as never);
+    retrieve.mockResolvedValueOnce({ status: 'open' } as never);
+    await expect(provider.expireCheckout('cs_open')).resolves.toBe('EXPIRED');
+    expect(expire).toHaveBeenCalledWith('cs_open');
+
+    retrieve.mockResolvedValueOnce({ status: 'complete' } as never);
+    await expect(provider.expireCheckout('cs_paid')).resolves.toBe('COMPLETED');
+    expect(expire).toHaveBeenCalledTimes(1);
+  });
+
   it('normalizes a signed checkout.session.completed with the subscription period', async () => {
     const { provider, sign } = setup();
     const { body, headers } = sign(
@@ -115,6 +138,7 @@ describe('StripePaymentProvider', () => {
     await expect(provider.parseWebhook(body, headers)).resolves.toMatchObject({
       kind: 'CHECKOUT_COMPLETED',
       checkoutId: 'cs_test_1',
+      occurredAt: new Date(1_791_367_000 * 1000),
       subscriptionRef: 'sub_123',
       customerRef: 'cus_123',
       localSubscriptionId: 'pf-sub-1',

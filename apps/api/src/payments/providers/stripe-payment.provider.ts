@@ -118,6 +118,7 @@ export class StripePaymentProvider implements PaymentProviderAdapter {
         ],
         metadata,
         subscription_data: { metadata },
+        expires_at: Math.floor(request.expiresAt.getTime() / 1000),
         success_url: request.successUrl,
         cancel_url: request.cancelUrl,
       },
@@ -133,6 +134,20 @@ export class StripePaymentProvider implements PaymentProviderAdapter {
     await this.stripe.subscriptions.update(subscriptionRef, {
       cancel_at_period_end: cancel,
     });
+  }
+
+  async expireCheckout(checkoutId: string) {
+    const session = await this.stripe.checkout.sessions.retrieve(checkoutId);
+    if (session.status === 'complete') {
+      return 'COMPLETED' as const;
+    }
+    if (session.status === 'open') {
+      const expired = await this.stripe.checkout.sessions.expire(checkoutId);
+      if (expired.status === 'complete') {
+        return 'COMPLETED' as const;
+      }
+    }
+    return 'EXPIRED' as const;
   }
 
   async parseWebhook(
@@ -165,6 +180,7 @@ export class StripePaymentProvider implements PaymentProviderAdapter {
       eventId: event.id,
       rawType: event.type,
       payload: event,
+      occurredAt: new Date(event.created * 1000),
       localSubscriptionId: null as string | null,
     };
 

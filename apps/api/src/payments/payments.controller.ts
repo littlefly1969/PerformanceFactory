@@ -20,6 +20,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { BillingCatalogService } from './billing-catalog.service';
+import { CheckoutService } from './checkout.service';
 import { StartCheckoutDto } from './dto/payments.dto';
 import { PaymentWebhooksService } from './payment-webhooks.service';
 import { WebhookHeaders } from './providers/payment-provider';
@@ -40,6 +41,7 @@ function requireUser(req: AuthenticatedRequest) {
 export class PaymentsController {
   constructor(
     private readonly catalog: BillingCatalogService,
+    private readonly checkouts: CheckoutService,
     private readonly subscriptions: SubscriptionsService,
     private readonly webhooks: PaymentWebhooksService,
   ) {}
@@ -62,7 +64,7 @@ export class PaymentsController {
     if (!user.email) {
       throw new BadRequestException('Email utente mancante');
     }
-    return this.subscriptions.startCheckout(
+    return this.checkouts.start(
       { id: user.id, email: user.email },
       body.horizon,
       body.billingCycle,

@@ -11,6 +11,7 @@ const base = {
   eventId: 'evt',
   rawType: 'test',
   payload: {},
+  occurredAt: now,
   localSubscriptionId: null,
 };
 
@@ -23,6 +24,7 @@ function snapshot(overrides: Partial<SubscriptionSnapshot> = {}) {
     graceEndsAt: null,
     programStartedAt: null,
     programEndsAt: null,
+    lastProviderEventAt: null,
     ...overrides,
   } as SubscriptionSnapshot;
 }
@@ -211,6 +213,73 @@ describe('transitionSubscription', () => {
       6,
     );
     expect(result.outcome).toBe('NO_CHANGE');
+  });
+});
+
+describe('out-of-order delivery', () => {
+  const later = new Date('2026-10-07T11:00:00.000Z');
+  const applied = { ...active, lastProviderEventAt: later };
+
+  it('ignores an older failure delivered after a newer state', () => {
+    const result = transitionSubscription(
+      applied,
+      event({ kind: 'PAYMENT_FAILED', subscriptionRef: 'sub' }),
+      now,
+      6,
+    );
+    expect(result).toEqual({ outcome: 'STALE', patch: {} });
+  });
+
+  it('never shortens access with an older billing period', () => {
+    const result = transitionSubscription(
+      active,
+      event({
+        kind: 'SUBSCRIPTION_UPDATED',
+        subscriptionRef: 'sub',
+        state: 'ACTIVE',
+        occurredAt: later,
+        period: {
+          currentPeriodStart: new Date('2026-09-07T10:00:00.000Z'),
+          currentPeriodEnd: new Date('2026-10-07T10:00:00.000Z'),
+          cancelAtPeriodEnd: false,
+        },
+      }),
+      now,
+      6,
+    );
+    expect(result.patch.entitlementEndAt).toBeUndefined();
+    expect(result.patch.lastProviderEventAt).toEqual(later);
+  });
+
+  it('still activates a pending checkout from an older payment event', () => {
+    const result = transitionSubscription(
+      snapshot({ lastProviderEventAt: later }),
+      event({
+        kind: 'PAYMENT_SUCCEEDED',
+        subscriptionRef: 'sub',
+        periodEnd: null,
+      }),
+      now,
+      6,
+    );
+    expect(result.outcome).toBe('ACTIVATED');
+    expect(result.patch.lastProviderEventAt).toBeUndefined();
+  });
+
+  it('dates the grace period from the provider event, not from delivery', () => {
+    const result = transitionSubscription(
+      active,
+      event({
+        kind: 'PAYMENT_FAILED',
+        subscriptionRef: 'sub',
+        occurredAt: new Date('2026-10-05T10:00:00.000Z'),
+      }),
+      now,
+      6,
+    );
+    expect(result.patch.graceEndsAt).toEqual(
+      new Date('2026-10-11T10:00:00.000Z'),
+    );
   });
 });
 

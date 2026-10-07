@@ -102,3 +102,11 @@ export function stripeWebhookSecret(env: Env = process.env) {
   }
   return secret;
 }
+
+/** Durata del checkout ospitato: Stripe accetta tra 30 minuti e 24 ore. */
+export function checkoutTtlMinutes(env: Env = process.env) {
+  return Math.min(
+    1440,
+    Math.max(30, positiveNumber(env.PAYMENTS_CHECKOUT_TTL_MINUTES, 30)),
+  );
+}

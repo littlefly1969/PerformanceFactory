@@ -1308,6 +1308,7 @@ enum PurchaseChannel {
 enum SubscriptionStatus {
   CHECKOUT_PENDING
   CHECKOUT_EXPIRED
+  CHECKOUT_FAILED
   ACTIVE
   PAYMENT_GRACE
   PAUSED
@@ -1357,6 +1358,8 @@ model Subscription {
   amountCents            Int
   currency               String
   providerCheckoutId     String?
+  checkoutUrl            String?
+  checkoutExpiresAt      DateTime?
   providerSubscriptionId String?
   providerCustomerId     String?
   currentPeriodStart     DateTime?
@@ -1367,6 +1370,8 @@ model Subscription {
   programStartedAt       DateTime?
   programEndsAt          DateTime?
   endedAt                DateTime?
+  // created dell'ultimo evento applicato: gli eventi piu vecchi sono scartati.
+  lastProviderEventAt    DateTime?
   createdAt              DateTime            @default(now())
   updatedAt              DateTime            @updatedAt
 
@@ -1375,20 +1380,23 @@ model Subscription {
 
   @@unique([provider, providerCheckoutId])
   @@unique([provider, providerSubscriptionId])
+  // Invariante in migrazione (indice parziale, non esprimibile in Prisma):
+  // al massimo un abbonamento non terminale per utente.
   @@index([userId, status])
 }
 
 // Registro idempotente e auditabile degli eventi ricevuti dal provider.
 model PaymentEvent {
-  id              String              @id @default(uuid())
-  provider        PaymentProviderKind
-  providerEventId String
-  type            String
-  // Esito sul modello PF: ACTIVATED, RENEWED, PAYMENT_RECOVERED, PAYMENT_GRACE_STARTED...
-  outcome         String?
-  subscriptionId  String?
-  payloadJson     Json
-  receivedAt      DateTime            @default(now())
+  id                String              @id @default(uuid())
+  provider          PaymentProviderKind
+  providerEventId   String
+  type              String
+  // Esito sul modello PF: ACTIVATED, RENEWED, PAYMENT_RECOVERED, STALE...
+  outcome           String?
+  subscriptionId    String?
+  payloadJson       Json
+  providerCreatedAt DateTime?
+  receivedAt        DateTime            @default(now())
 
   subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
 

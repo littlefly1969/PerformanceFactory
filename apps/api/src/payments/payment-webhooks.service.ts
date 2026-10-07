@@ -106,10 +106,16 @@ export class PaymentWebhooksService {
         provider,
         providerEventId: event.eventId,
         type: event.rawType,
+        providerCreatedAt: event.occurredAt,
         payloadJson: (event.payload ?? {}) as Prisma.InputJsonValue,
       },
     });
-    const subscription = await this.findTarget(tx, provider, event);
+    const target = await this.findTarget(tx, provider, event);
+    // Lock di riga: eventi diversi sullo stesso abbonamento sono applicati uno alla volta,
+    // sempre sullo stato appena riletto.
+    const subscription = target
+      ? await this.lockSubscription(tx, target.id)
+      : null;
     if (!subscription) {
       if (event.kind !== 'IGNORED') {
         this.logger.warn(
@@ -157,6 +163,11 @@ export class PaymentWebhooksService {
       data: { subscriptionId: subscription.id, outcome: transition.outcome },
     });
     return transition.outcome;
+  }
+
+  private async lockSubscription(tx: Tx, id: string) {
+    await tx.$queryRaw`SELECT "id" FROM "Subscription" WHERE "id" = ${id} FOR UPDATE`;
+    return tx.subscription.findUnique({ where: { id } });
   }
 
   private async findTarget(

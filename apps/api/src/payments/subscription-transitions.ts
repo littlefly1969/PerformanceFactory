@@ -22,6 +22,7 @@ export type SubscriptionSnapshot = {
   graceEndsAt: Date | null;
   programStartedAt: Date | null;
   programEndsAt: Date | null;
+  lastProviderEventAt: Date | null;
 };
 
 export type SubscriptionPatch = {
@@ -34,6 +35,7 @@ export type SubscriptionPatch = {
   programStartedAt?: Date;
   programEndsAt?: Date;
   endedAt?: Date;
+  lastProviderEventAt?: Date;
 };
 
 export type TransitionOutcome =
@@ -46,6 +48,7 @@ export type TransitionOutcome =
   | 'RESUMED'
   | 'EXPIRED'
   | 'CHECKOUT_EXPIRED'
+  | 'STALE'
   | 'NO_CHANGE';
 
 export type Transition = {
@@ -57,10 +60,19 @@ const NO_CHANGE: Transition = { outcome: 'NO_CHANGE', patch: {} };
 const CLOSED: SubscriptionStatus[] = [
   SubscriptionStatus.EXPIRED,
   SubscriptionStatus.CHECKOUT_EXPIRED,
+  SubscriptionStatus.CHECKOUT_FAILED,
 ];
 
-function periodPatch(period: SubscriptionPeriod): SubscriptionPatch {
-  if (!period.currentPeriodEnd) {
+/** I periodi sono monotoni: uno snapshot con periodo precedente non accorcia l'accesso. */
+function periodPatch(
+  current: SubscriptionSnapshot,
+  period: SubscriptionPeriod,
+): SubscriptionPatch {
+  const obsolete =
+    !!period.currentPeriodEnd &&
+    !!current.entitlementEndAt &&
+    period.currentPeriodEnd < current.entitlementEndAt;
+  if (!period.currentPeriodEnd || obsolete) {
     return { cancelAtPeriodEnd: period.cancelAtPeriodEnd };
   }
   return {
@@ -122,6 +134,7 @@ function onSubscriptionUpdated(
   now: Date,
   graceDays: number,
 ): Transition {
+  const at = event.occurredAt;
   const { state, period } = event;
   if (state === 'ENDED') {
     if (current.status === SubscriptionStatus.CHECKOUT_PENDING) {
@@ -134,7 +147,7 @@ function onSubscriptionUpdated(
       outcome: 'EXPIRED',
       patch: {
         status: SubscriptionStatus.EXPIRED,
-        endedAt: now,
+        endedAt: at,
         nextChargeAt: null,
         graceEndsAt: null,
         cancelAtPeriodEnd: period.cancelAtPeriodEnd,
@@ -145,10 +158,10 @@ function onSubscriptionUpdated(
     return NO_CHANGE;
   }
   if (state === 'PAST_DUE') {
-    const grace = startGrace(current, now, graceDays);
+    const grace = startGrace(current, at, graceDays);
     return {
       outcome: grace.outcome,
-      patch: { ...periodPatch(period), ...grace.patch },
+      patch: { ...periodPatch(current, period), ...grace.patch },
     };
   }
   if (state === 'PAUSED') {
@@ -159,7 +172,7 @@ function onSubscriptionUpdated(
       outcome:
         current.status === SubscriptionStatus.PAUSED ? 'UPDATED' : 'PAUSED',
       patch: {
-        ...periodPatch(period),
+        ...periodPatch(current, period),
         status: SubscriptionStatus.PAUSED,
         nextChargeAt: null,
         graceEndsAt: null,
@@ -175,7 +188,7 @@ function onSubscriptionUpdated(
       return {
         outcome: 'PAYMENT_RECOVERED',
         patch: {
-          ...periodPatch(period),
+          ...periodPatch(current, period),
           status: SubscriptionStatus.ACTIVE,
           graceEndsAt: null,
         },
@@ -183,7 +196,10 @@ function onSubscriptionUpdated(
     case SubscriptionStatus.PAUSED:
       return {
         outcome: 'RESUMED',
-        patch: { ...periodPatch(period), status: SubscriptionStatus.ACTIVE },
+        patch: {
+          ...periodPatch(current, period),
+          status: SubscriptionStatus.ACTIVE,
+        },
       };
     default: {
       const renewed =
@@ -192,7 +208,7 @@ function onSubscriptionUpdated(
         period.currentPeriodEnd > current.entitlementEndAt;
       return {
         outcome: renewed ? 'RENEWED' : 'UPDATED',
-        patch: periodPatch(period),
+        patch: periodPatch(current, period),
       };
     }
   }
@@ -232,16 +248,12 @@ function onPaymentSucceeded(
   return NO_CHANGE;
 }
 
-/** Applica un evento normalizzato allo stato PF. Funzione pura, senza I/O. */
-export function transitionSubscription(
+function decide(
   current: SubscriptionSnapshot,
   event: NormalizedPaymentEvent,
   now: Date,
   graceDays: number,
 ): Transition {
-  if (CLOSED.includes(current.status)) {
-    return NO_CHANGE;
-  }
   switch (event.kind) {
     case 'CHECKOUT_COMPLETED':
       return current.status === SubscriptionStatus.CHECKOUT_PENDING &&
@@ -260,10 +272,51 @@ export function transitionSubscription(
     case 'PAYMENT_SUCCEEDED':
       return onPaymentSucceeded(current, event.periodEnd, now);
     case 'PAYMENT_FAILED':
-      return startGrace(current, now, graceDays);
+      return startGrace(current, event.occurredAt, graceDays);
     default:
       return NO_CHANGE;
   }
+}
+
+/**
+ * Un evento piu vecchio dell'ultimo applicato non puo riportare indietro lo stato
+ * (consegna fuori ordine). Fa eccezione la sola attivazione di un checkout in attesa.
+ */
+function isStale(current: SubscriptionSnapshot, event: NormalizedPaymentEvent) {
+  if (
+    !current.lastProviderEventAt ||
+    event.occurredAt >= current.lastProviderEventAt
+  ) {
+    return false;
+  }
+  const activates =
+    event.kind === 'CHECKOUT_COMPLETED' || event.kind === 'PAYMENT_SUCCEEDED';
+  return !(activates && current.status === SubscriptionStatus.CHECKOUT_PENDING);
+}
+
+/** Applica un evento normalizzato allo stato PF. Funzione pura, senza I/O. */
+export function transitionSubscription(
+  current: SubscriptionSnapshot,
+  event: NormalizedPaymentEvent,
+  now: Date,
+  graceDays: number,
+): Transition {
+  if (CLOSED.includes(current.status)) {
+    return NO_CHANGE;
+  }
+  if (isStale(current, event)) {
+    return { outcome: 'STALE', patch: {} };
+  }
+  const transition = decide(current, event, now, graceDays);
+  const newer =
+    !current.lastProviderEventAt ||
+    event.occurredAt > current.lastProviderEventAt;
+  return newer
+    ? {
+        outcome: transition.outcome,
+        patch: { ...transition.patch, lastProviderEventAt: event.occurredAt },
+      }
+    : transition;
 }
 
 export type EntitlementInput = {

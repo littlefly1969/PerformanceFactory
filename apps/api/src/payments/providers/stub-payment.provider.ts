@@ -75,6 +75,10 @@ export class StubPaymentProvider implements PaymentProviderAdapter {
     return Promise.resolve();
   }
 
+  expireCheckout(): Promise<'EXPIRED' | 'COMPLETED'> {
+    return Promise.resolve('EXPIRED');
+  }
+
   // eslint-disable-next-line @typescript-eslint/require-await
   async parseWebhook(
     rawBody: Buffer,
@@ -119,6 +123,7 @@ export class StubPaymentProvider implements PaymentProviderAdapter {
       eventId,
       rawType,
       payload: body,
+      occurredAt: date(data, 'occurredAt') ?? new Date(),
       localSubscriptionId: text(data, 'localSubscriptionId'),
     };
 

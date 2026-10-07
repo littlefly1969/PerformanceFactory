@@ -13,7 +13,7 @@ CREATE TYPE "PaymentProviderKind" AS ENUM ('STUB', 'STRIPE');
 CREATE TYPE "PurchaseChannel" AS ENUM ('WEB', 'IOS', 'ANDROID');
 
 -- CreateEnum
-CREATE TYPE "SubscriptionStatus" AS ENUM ('CHECKOUT_PENDING', 'CHECKOUT_EXPIRED', 'ACTIVE', 'PAYMENT_GRACE', 'PAUSED', 'EXPIRED');
+CREATE TYPE "SubscriptionStatus" AS ENUM ('CHECKOUT_PENDING', 'CHECKOUT_EXPIRED', 'CHECKOUT_FAILED', 'ACTIVE', 'PAYMENT_GRACE', 'PAUSED', 'EXPIRED');
 
 -- CreateTable
 CREATE TABLE "BillingCyclePrice" (
@@ -58,6 +58,8 @@ CREATE TABLE "Subscription" (
     "amountCents" INTEGER NOT NULL,
     "currency" TEXT NOT NULL,
     "providerCheckoutId" TEXT,
+    "checkoutUrl" TEXT,
+    "checkoutExpiresAt" TIMESTAMP(3),
     "providerSubscriptionId" TEXT,
     "providerCustomerId" TEXT,
     "currentPeriodStart" TIMESTAMP(3),
@@ -68,6 +70,7 @@ CREATE TABLE "Subscription" (
     "programStartedAt" TIMESTAMP(3),
     "programEndsAt" TIMESTAMP(3),
     "endedAt" TIMESTAMP(3),
+    "lastProviderEventAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -83,6 +86,7 @@ CREATE TABLE "PaymentEvent" (
     "outcome" TEXT,
     "subscriptionId" TEXT,
     "payloadJson" JSONB NOT NULL,
+    "providerCreatedAt" TIMESTAMP(3),
     "receivedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "PaymentEvent_pkey" PRIMARY KEY ("id")
@@ -117,6 +121,11 @@ ALTER TABLE "Subscription" ADD CONSTRAINT "Subscription_userId_fkey" FOREIGN KEY
 
 -- AddForeignKey
 ALTER TABLE "PaymentEvent" ADD CONSTRAINT "PaymentEvent_subscriptionId_fkey" FOREIGN KEY ("subscriptionId") REFERENCES "Subscription"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- Invariante: al massimo un abbonamento non terminale per utente (doppio click,
+-- checkout concorrenti). Indice parziale, non esprimibile nello schema Prisma.
+CREATE UNIQUE INDEX "Subscription_one_open_per_user_key" ON "Subscription"("userId")
+WHERE "status" IN ('CHECKOUT_PENDING', 'ACTIVE', 'PAYMENT_GRACE', 'PAUSED');
 
 -- Configurazione iniziale da back office. Prezzi = ipotesi A5-D01, ancora da validare.
 INSERT INTO "BillingCyclePrice" ("billingCycle","amountCents","currency","updatedAt") VALUES
