@@ -23,6 +23,7 @@ import { CyclesModule } from './cycles/cycles.module';
 import { InspectModule } from './inspect/inspect.module';
 import { OnboardingModule } from './onboarding/onboarding.module';
 import { AiTuningModule } from './ai-tuning/ai-tuning.module';
+import { PaymentsModule } from './payments/payments.module';
 
 function buildThrottlerStorage() {
   const redisUrl = process.env.REDIS_URL;
@@ -74,6 +75,7 @@ function buildThrottlerStorage() {
     InspectModule,
     OnboardingModule,
     AiTuningModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

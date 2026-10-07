@@ -120,6 +120,8 @@ model User {
   createdAiEvaluationRuns     AiEvaluationRun[]            @relation("AiEvaluationRunCreatedBy")
   aiReplayFeedbacks           AiReplayFeedback[]           @relation("AiReplayFeedbackCreatedBy")
   ratedAiEvaluationResults    AiEvaluationResult[]         @relation("AiEvaluationResultRatedBy")
+  subscriptions               Subscription[]
+  paymentCustomers            PaymentCustomer[]
 }
 
 model AuthIdentity {
@@ -1349,4 +1351,128 @@ model AssessmentEvaluationArea {
 
   @@unique([evaluationId, areaId])
   @@index([areaId])
+}
+
+// Pagamenti (Blueprint A4/A5): PROGRAM_HORIZON e BILLING_CYCLE sono proprieta distinte.
+enum ProgramHorizon {
+  PROGRAM_3M
+  PROGRAM_6M
+  PROGRAM_12M
+}
+
+enum BillingCycle {
+  MONTHLY
+  QUARTERLY
+  SEMIANNUAL
+  ANNUAL
+}
+
+enum PaymentProviderKind {
+  STUB
+  STRIPE
+}
+
+enum PurchaseChannel {
+  WEB
+  IOS
+  ANDROID
+}
+
+enum SubscriptionStatus {
+  CHECKOUT_PENDING
+  CHECKOUT_EXPIRED
+  CHECKOUT_FAILED
+  ACTIVE
+  PAYMENT_GRACE
+  PAUSED
+  EXPIRED
+}
+
+// Prezzo della cadenza di pagamento, non di un livello di servizio (A5.1-A5.4).
+// Parametrico da back office: i valori seminati sono le ipotesi A5-D01.
+model BillingCyclePrice {
+  billingCycle BillingCycle @id
+  amountCents  Int
+  currency     String       @default("eur")
+  updatedAt    DateTime     @updatedAt
+}
+
+// Matrice PROGRAM_HORIZON x BILLING_CYCLE: quali combinazioni sono offerte (A5-D02).
+model ProgramBillingOption {
+  horizon      ProgramHorizon
+  billingCycle BillingCycle
+  isActive     Boolean        @default(true)
+  updatedAt    DateTime       @updatedAt
+
+  @@id([horizon, billingCycle])
+}
+
+model PaymentCustomer {
+  id                 String              @id @default(uuid())
+  userId             String
+  provider           PaymentProviderKind
+  providerCustomerId String
+  createdAt          DateTime            @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@unique([provider, providerCustomerId])
+}
+
+model Subscription {
+  id                     String              @id @default(uuid())
+  userId                 String
+  horizon                ProgramHorizon
+  billingCycle           BillingCycle
+  status                 SubscriptionStatus  @default(CHECKOUT_PENDING)
+  provider               PaymentProviderKind
+  purchaseChannel        PurchaseChannel     @default(WEB)
+  amountCents            Int
+  currency               String
+  providerCheckoutId     String?
+  checkoutUrl            String?
+  checkoutExpiresAt      DateTime?
+  providerSubscriptionId String?
+  providerCustomerId     String?
+  currentPeriodStart     DateTime?
+  entitlementEndAt       DateTime?
+  nextChargeAt           DateTime?
+  cancelAtPeriodEnd      Boolean             @default(false)
+  graceEndsAt            DateTime?
+  programStartedAt       DateTime?
+  programEndsAt          DateTime?
+  endedAt                DateTime?
+  // created dell'ultimo evento applicato: gli eventi piu vecchi sono scartati.
+  lastProviderEventAt    DateTime?
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  events PaymentEvent[]
+
+  @@unique([provider, providerCheckoutId])
+  @@unique([provider, providerSubscriptionId])
+  // Invariante in migrazione (indice parziale, non esprimibile in Prisma):
+  // al massimo un abbonamento non terminale per utente.
+  @@index([userId, status])
+}
+
+// Registro idempotente e auditabile degli eventi ricevuti dal provider.
+model PaymentEvent {
+  id                String              @id @default(uuid())
+  provider          PaymentProviderKind
+  providerEventId   String
+  type              String
+  // Esito sul modello PF: ACTIVATED, RENEWED, PAYMENT_RECOVERED, STALE...
+  outcome           String?
+  subscriptionId    String?
+  payloadJson       Json
+  providerCreatedAt DateTime?
+  receivedAt        DateTime            @default(now())
+
+  subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, providerEventId])
+  @@index([subscriptionId])
 }
