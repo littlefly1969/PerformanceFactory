@@ -10,8 +10,6 @@ export type Driver = {
   id: string;
   name: string;
   current: number;
-  potential: number;
-  gap: number;
 };
 /** Prima valutazione AI: R provvisoria per driver, score e confidence separati. */
 export type Evaluation = {
@@ -69,8 +67,6 @@ export type Journey = {
   result: {
     snapshotId: string;
     current: number;
-    potential: number;
-    gap: number;
     drivers: Driver[];
     priority: Driver;
   } | null;

@@ -42,10 +42,8 @@ const home: Home = {
     snapshotId: "s",
     date: "2026-09-19",
     current: 68,
-    potential: 79,
-    gap: 11,
     drivers: [
-      { id: "a", name: "Tecnica", current: 68, potential: 79, gap: 11 },
+      { id: "a", name: "Tecnica", current: 68 },
     ],
   },
   program: {

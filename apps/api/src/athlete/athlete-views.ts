@@ -113,8 +113,6 @@ export function performanceView(
     id: a.areaId,
     name: performanceDriverName(a.area.name),
     current: a.realR,
-    potential: a.potentialP,
-    gap: a.potentialP - a.realR,
   }));
   drivers.sort((a, b) => {
     const position = (id: string) => {
@@ -127,17 +125,11 @@ export function performanceView(
       a.id.localeCompare(b.id)
     );
   });
-  const potential = drivers.length
-    ? Math.round(
-        drivers.reduce((sum, d) => sum + d.potential, 0) / drivers.length,
-      )
-    : null;
+  // Solo R: il potenziale P non è esposto all'atleta (Blueprint A4.4).
   return {
     snapshotId: snapshot.id,
     date: snapshot.createdAt,
     current: snapshot.rankingGlobal,
-    potential,
-    gap: potential === null ? null : potential - snapshot.rankingGlobal,
     drivers,
   };
 }

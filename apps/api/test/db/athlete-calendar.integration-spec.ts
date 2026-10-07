@@ -312,11 +312,11 @@ describe('PF4 athlete calendar with real PostgreSQL and authenticated HTTP', () 
         },
       });
     const progress = await service.progress(userId);
-    expect(progress.current).toMatchObject({
-      current: 62,
-      potential: 78,
-      gap: 16,
-    });
+    expect(progress.current).toMatchObject({ current: 62 });
+    // Il potenziale P non è esposto all'atleta, nemmeno nel payload.
+    expect(progress.current).not.toHaveProperty('potential');
+    expect(progress.current).not.toHaveProperty('gap');
+    expect(progress.current!.drivers[0]).not.toHaveProperty('potential');
     expect(progress.history.map((s) => s.current)).toEqual([62, 48]);
     expect((await service.home(userId)).performance).toEqual(progress.current);
     expect((await service.progress(foreignId)).history).toEqual([]);

@@ -19,7 +19,6 @@ type Area = { id: string; name: string };
 type SnapshotArea = {
   areaId: string;
   realR: number;
-  potentialP: number;
   area?: Area;
 };
 
@@ -82,7 +81,7 @@ export default function UserAreaDetailPage() {
     () =>
       snapshot?.areas.find((area) => area.areaId === areaId) ??
       (areas.find((area) => area.id === areaId)
-        ? { areaId, realR: 0, potentialP: 0, area: areas.find((area) => area.id === areaId) }
+        ? { areaId, realR: 0, area: areas.find((area) => area.id === areaId) }
         : undefined),
     [areaId, areas, snapshot],
   );

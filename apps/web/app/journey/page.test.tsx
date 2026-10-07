@@ -45,12 +45,10 @@ const base = {
   result: {
     snapshotId: "real-snapshot",
     current: 37,
-    potential: 52,
-    gap: 15,
     drivers: [
-      { id: "a", name: "Tecnica", current: 37, potential: 52, gap: 15 },
+      { id: "a", name: "Tecnica", current: 37 },
     ],
-    priority: { id: "a", name: "Tecnica", current: 37, potential: 52, gap: 15 },
+    priority: { id: "a", name: "Tecnica", current: 37 },
   },
 };
 afterEach(() => {
