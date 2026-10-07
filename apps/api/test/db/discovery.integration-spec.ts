@@ -1,5 +1,14 @@
 import { validateDiscovery } from '../../src/discovery/discovery-validation';
 import { deleteOnboardingTemplate } from '../../src/admin/admin-onboarding';
+import {
+  loadActiveAssessmentPrompt,
+  upsertAssessmentPromptConfig,
+} from '../../src/ai-orchestrator/assessment-prompts';
+import { AiProposalProviderService } from '../../src/ai-orchestrator/proposal-provider.service';
+import { runAssessmentEvaluation } from '../../src/discovery/assessment-evaluation';
+import { loadSpecialistQuestionRecords } from '../../src/onboarding/onboarding-questions';
+import { testAssessmentPrompt } from '../../src/ai-tuning/assessment-prompt-test';
+import { SYNTHETIC_ASSESSMENT_CASE } from '../../src/ai-tuning/assessment-synthetic-case';
 type JourneyResponse = {
   phase: string;
   count: number;
@@ -11,6 +20,16 @@ type JourneyResponse = {
   trial: { days: number; daysLeft: number };
   currentQuestion: number;
   programDurationWeeks: number;
+  evaluation: {
+    id: string;
+    status: string;
+    drivers: Array<{
+      id: string;
+      score: number;
+      confidence: number;
+      rationale: string;
+    }>;
+  } | null;
   questions: Array<{
     id: string;
     kind: string;
@@ -634,6 +653,236 @@ describe('PF4 discovery to authenticated journey', () => {
       (await post('answer', { questionId: q.id, value: q.options[1].value }))
         .statusCode,
     ).toBe(201);
+  });
+
+  it('evaluates the answers once with the AI and shows a provisional R per driver', async () => {
+    const before = await state();
+    expect(before).toMatchObject({
+      phase: 'ASSESSMENT',
+      assessmentComplete: true,
+      evaluation: null,
+    });
+    // Doppio click: una richiesta valuta, l'altra trova il lease o la valutazione.
+    const responses = await Promise.all([post('evaluate'), post('evaluate')]);
+    expect(responses.map((r) => r.statusCode).sort()).toEqual(
+      expect.arrayContaining([201]),
+    );
+    expect(responses.every((r) => [201, 409].includes(r.statusCode))).toBe(
+      true,
+    );
+    const response = responses.find((r) => r.statusCode === 201)!;
+    const evaluated = response.json<JourneyResponse>();
+    expect(evaluated.phase).toBe('EVALUATION');
+    expect(evaluated.evaluation).toMatchObject({
+      status: 'PROVISIONAL',
+      source: 'SELF_ASSESSMENT',
+      scale: { min: 0, max: 100 },
+    });
+    // Un asse per driver dell'assessment, nello stesso ordine, con score e confidence separati.
+    const drivers = evaluated.evaluation!.drivers;
+    expect(drivers.map((d) => d.id)).toEqual([
+      ...new Set(before.questions.filter((q) => q.areaId).map((q) => q.areaId)),
+    ]);
+    for (const d of drivers) {
+      expect(d.score).toBeGreaterThanOrEqual(0);
+      expect(d.score).toBeLessThanOrEqual(100);
+      expect(d.confidence).toBeLessThanOrEqual(40);
+      expect(d.rationale).toBeTruthy();
+      expect(d).not.toHaveProperty('potential');
+    }
+    const saved = await prisma.assessmentEvaluation.findFirstOrThrow({
+      where: { userId },
+      include: { areas: true, promptVersion: true },
+    });
+    expect(saved).toMatchObject({
+      provider: 'stub',
+      model: 'deterministic-stub',
+    });
+    expect(saved.areas).toHaveLength(6);
+    expect(saved.promptVersion?.promptType).toBe('ASSESSMENT_EVALUATION');
+    const active = await prisma.aiAssessmentPromptConfig.findFirstOrThrow({
+      where: { isActive: true },
+    });
+    expect(saved.promptVersionId).toBe(active.activePromptVersionId);
+    expect(JSON.stringify(saved.inputJson)).not.toContain(email);
+    expect(
+      (saved.inputJson as { prompt: { system: string } }).prompt.system,
+    ).toContain(active.basePrompt);
+
+    // Una sola valutazione: le risposte sono bloccate.
+    expect(
+      (await post('evaluate')).json<JourneyResponse>().evaluation!.id,
+    ).toBe(saved.id);
+    expect(await prisma.assessmentEvaluation.count({ where: { userId } })).toBe(
+      1,
+    );
+    // Anche scavalcando lease e controlli, il database tiene una sola prima valutazione.
+    const replay = await runAssessmentEvaluation(
+      prisma,
+      app.get(AiProposalProviderService),
+      userId,
+      await loadSpecialistQuestionRecords(prisma, userId),
+      {},
+    ).catch((error: Error) => error);
+    expect(replay).toEqual({ id: saved.id });
+    expect(await prisma.assessmentEvaluation.count({ where: { userId } })).toBe(
+      1,
+    );
+    expect((await post('back')).statusCode).toBe(409);
+    const q = before.questions[0];
+    expect(
+      (await post('answer', { questionId: q.id, value: q.options[0].value }))
+        .statusCode,
+    ).toBe(409);
+    expect((await state()).phase).toBe('EVALUATION');
+  });
+
+  it('versions an edited assessment prompt and makes it the only active one', async () => {
+    const tuner = await prisma.user.create({
+      data: {
+        email: `tuner-${randomUUID()}@example.test`,
+        password: 'x',
+        role: 'AI_TUNER',
+      },
+    });
+    const previous = await prisma.aiAssessmentPromptConfig.findFirstOrThrow({
+      where: { isActive: true },
+    });
+    try {
+      const draft = await upsertAssessmentPromptConfig(
+        prisma,
+        { name: `bozza ${randomUUID()}`, basePrompt: 'Nuovo metodo.' },
+        tuner.id,
+      );
+      expect(draft.isActive).toBe(false);
+      expect((await loadActiveAssessmentPrompt(prisma)).basePrompt).toBe(
+        previous.basePrompt,
+      );
+      const activated = await upsertAssessmentPromptConfig(
+        prisma,
+        { ...draft, basePrompt: 'Nuovo metodo, v2.', isActive: true },
+        tuner.id,
+      );
+      expect(activated.version).toBe(2);
+      expect(await loadActiveAssessmentPrompt(prisma)).toEqual({
+        basePrompt: 'Nuovo metodo, v2.',
+        promptVersionId: activated.activePromptVersionId,
+      });
+      expect(
+        await prisma.aiAssessmentPromptConfig.count({
+          where: { isActive: true },
+        }),
+      ).toBe(1);
+      expect(
+        await prisma.aiPromptVersion.count({
+          where: { assessmentPromptConfigId: draft.id },
+        }),
+      ).toBe(2);
+    } finally {
+      await upsertAssessmentPromptConfig(
+        prisma,
+        { ...previous, isActive: true },
+        tuner.id,
+      );
+      await prisma.user.delete({ where: { id: tuner.id } });
+    }
+  });
+
+  it('keeps exactly one active prompt when two drafts are activated at once', async () => {
+    const tuner = await prisma.user.create({
+      data: {
+        email: `tuner-${randomUUID()}@example.test`,
+        password: 'x',
+        role: 'AI_TUNER',
+      },
+    });
+    const previous = await prisma.aiAssessmentPromptConfig.findFirstOrThrow({
+      where: { isActive: true },
+    });
+    try {
+      const drafts = await Promise.all(
+        ['a', 'b'].map((key) =>
+          upsertAssessmentPromptConfig(
+            prisma,
+            { name: `concorrente ${key} ${randomUUID()}`, basePrompt: key },
+            tuner.id,
+          ),
+        ),
+      );
+      await Promise.all(
+        drafts.map((draft) =>
+          upsertAssessmentPromptConfig(
+            prisma,
+            { ...draft, isActive: true },
+            tuner.id,
+          ),
+        ),
+      );
+      expect(
+        await prisma.aiAssessmentPromptConfig.count({
+          where: { isActive: true },
+        }),
+      ).toBe(1);
+    } finally {
+      await upsertAssessmentPromptConfig(
+        prisma,
+        { ...previous, isActive: true },
+        tuner.id,
+      );
+      await prisma.user.delete({ where: { id: tuner.id } });
+    }
+  });
+
+  it('tests a tuner draft on the synthetic case and never sends a selected evaluation without consent', async () => {
+    const ai = app.get(AiProposalProviderService);
+    const synthetic = await testAssessmentPrompt(prisma, ai, 'Bozza di prova.');
+    expect(synthetic.caseEvaluationId).toBeNull();
+    expect(synthetic.output.drivers.map((d) => d.areaId)).toEqual(
+      SYNTHETIC_ASSESSMENT_CASE.drivers.map((d) => d.areaId),
+    );
+    const real = await prisma.assessmentEvaluation.findFirstOrThrow({
+      where: { userId },
+    });
+    const outsider = await prisma.user.create({
+      data: {
+        email: `no-consent-${randomUUID()}@example.test`,
+        password: 'x',
+        role: 'USER',
+      },
+    });
+    const selected = await prisma.assessmentEvaluation.create({
+      data: {
+        userId: outsider.id,
+        summary: real.summary,
+        overallConfidence: real.overallConfidence,
+        minScore: real.minScore,
+        maxScore: real.maxScore,
+        provider: real.provider,
+        model: real.model,
+        promptHash: real.promptHash,
+        inputJson: real.inputJson as object,
+        outputJson: real.outputJson as object,
+      },
+    });
+    const evaluate = jest.spyOn(ai, 'evaluateAssessment');
+    const provider = process.env.AI_PROVIDER;
+    try {
+      // Con lo stub nulla esce dal sistema: la valutazione scelta si può provare.
+      expect(
+        (await testAssessmentPrompt(prisma, ai, 'Bozza.', selected.id))
+          .caseEvaluationId,
+      ).toBe(selected.id);
+      evaluate.mockClear();
+      process.env.AI_PROVIDER = 'openai';
+      await expect(
+        testAssessmentPrompt(prisma, ai, 'Bozza.', selected.id),
+      ).rejects.toThrow('consenso');
+      expect(evaluate).not.toHaveBeenCalled();
+    } finally {
+      process.env.AI_PROVIDER = provider;
+      evaluate.mockRestore();
+      await prisma.user.delete({ where: { id: outsider.id } });
+    }
   });
 
   it('submits a real baseline once and derives result exclusively from its persisted areas', async () => {

@@ -51,6 +51,13 @@ export class AthleteJourneyController {
   back(@Req() req: { user: { id: string } }) {
     return this.journey.back(req.user.id);
   }
+  @ApiOperation({
+    summary: 'Valuta le risposte con l AI e salva la R provvisoria per driver',
+  })
+  @Post('evaluate')
+  evaluate(@Req() req: { user: { id: string } }) {
+    return this.journey.evaluate(req.user.id);
+  }
   @ApiOperation({ summary: 'Valida obiettivo e crea baseline' })
   @Post('submit')
   submit(@Req() req: { user: { id: string } }, @Body() body: SubmitDto) {
