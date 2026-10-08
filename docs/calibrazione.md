@@ -5,70 +5,89 @@
 Dopo la prima valutazione AI (vedi `assessment-ai-evaluation.md`) l'atleta entra
 nella fase gratuita. Niente programma: solo round di domande scritte dall'AI sui
 driver con la confidence più bassa. Ogni round rivaluta R e confidence con il prompt
-di valutazione, salvando una nuova valutazione versionata, finché ogni driver
-raggiunge la soglia, arriva l'assessment di chiusura o scade il tetto dei giorni.
+di valutazione, salvando una nuova valutazione versionata, finché la **regola di
+consolidamento** in vigore è soddisfatta. Nessuna attesa fra i round e nessuna
+chiusura a tempo (specifica PF-FS-PREPAYWALL §4.3 e §7.2).
 
 ```
 EVALUATION ──► FREE_CALIBRATING ──► FREE_LEVEL_ESTIMATED ──► CALIBRATION_COMPLETED
-                 round adattivi       livello stimato          soglia raggiunta
-                                                               assessment di chiusura
-                                                               o scadenza
+                 round adattivi       livello stimato          regola di consolidamento
+                                                               soddisfatta
 ```
 
 Dopo `CALIBRATION_COMPLETED` arrivano gli scenari P3/P6/P12 e la scelta del
 percorso, che porta a `PAYWALL_READY` (vedi `scenari-orizzonte.md`).
 `PAYWALL_READY` conta come calibrazione chiusa: niente più round.
 
-Riferimenti del Product Blueprint: A4.3 (stati del percorso), A4.4 (R con
-confidence, Spider «flebile → consolidato»), A4.6 (AI_ASSESSMENT), A2.2 (~30
-giorni). La soglia definitiva è ancora aperta (A4-D01): i valori sono parametri di
-back office.
+Riferimenti: specifica PF-FS-PREPAYWALL v1.0 (§4.3, §6.4, §7.1, §7.2), Product
+Blueprint A4.3 (stati del percorso), A4.4 (R con confidence, Spider «flebile →
+consolidato»), A4.6 (AI_ASSESSMENT). Le soglie definitive sono ancora aperte
+(A4-D01, OP-02, OP-03): sono regole versionate di back office.
+
+## Regole di confidence
+
+Due regole distinte, in `ConfidencePolicy` (`confidence-policy.ts`):
+
+| Regola | Serve a |
+|---|---|
+| `R_CONSOLIDATION` | consolidare R e generare P3/P6/P12 |
+| `LESSON_ELIGIBILITY` | rendere l'atleta eleggibile alla lezione gratuita (usata dalla slice successiva) |
+
+Ogni regola combina in AND confidence complessiva minima, confidence minima per area
+e numero di aree che devono raggiungerla (vuoto = tutte); un criterio vuoto non si
+applica, almeno uno è obbligatorio. Le righe non si modificano: ogni cambio dal back
+office è una nuova versione, quella in vigore è la più alta. Ogni valutazione salva
+in `consolidationPolicyId` la versione applicata e la calibrazione chiusa la
+versione che l'ha consolidata.
+
+Versione iniziale, provvisoria e da approvare: consolidamento con confidence
+complessiva ≥ 70 e tutte le aree ≥ 70 (la soglia precedente); lezione con
+confidence complessiva ≥ 50.
 
 ## Regole
 
 Tutte in `apps/api/src/discovery/calibration/calibration-rules.ts`, senza I/O:
 
 - **Inizio**: alla prima visita dopo la valutazione nasce `AthleteCalibration`, con
-  inizio pari alla data della prima valutazione e scadenza dopo `maxDays` giorni.
-- **Driver del round**: quelli sotto `confidenceThreshold`, dal meno affidabile. Un
-  round normale (`ADAPTIVE`) ne prende `driversPerRound`; l'assessment di chiusura
-  (`CLOSING`, dal giorno `closingDay`) tutti quelli ancora sotto soglia.
+  inizio pari alla data della prima valutazione. `deadlineAt` (inizio + `maxDays`)
+  resta come riferimento indicativo: non chiude e non consolida R.
+- **Driver del round**: quelli sotto la soglia per area di `R_CONSOLIDATION`, dal
+  meno affidabile, fino a `driversPerRound`. Se manca solo la confidence
+  complessiva (o la regola non ha soglia per area) si approfondiscono i driver
+  meno affidabili. I round sono tutti `ADAPTIVE`.
 - **Domande**: l'AI scrive `questionsPerDriver` domande per driver partendo dalle
   lacune (`evidenceGaps`) dell'ultima valutazione. Il formato è validato
   (`calibration-questions.ts`): da 3 a 5 opzioni, score nella scala attiva, nessuna
   etichetta duplicata. All'atleta gli score delle opzioni non arrivano mai.
-- **Ritmo**: un nuovo round si apre solo `minHoursBetweenRounds` ore dopo la fine
-  della valutazione del precedente (`CalibrationRound.evaluatedAt`), non dalla sua
-  apertura; prima risponde 409 `CALIBRATION_ROUND_NOT_YET` con
-  `availableAt`.
+- **Ritmo**: nessuno. Il round successivo si apre appena il precedente è valutato;
+  restano solo il lease tecnico per atleta e il rate limit dell'API, mai mostrati
+  come attese (§4.3, OP-09).
 - **Rivalutazione**: le risposte dell'assessment (`source: ASSESSMENT`) e di tutti i
   round (`source: CALIBRATION`) tornano all'AI insieme a score e confidence
   precedenti di ogni driver. La nuova valutazione ha `sequence` successiva e
-  `source = CALIBRATION_ROUND` o `CLOSING_ASSESSMENT`.
+  `source = CALIBRATION_ROUND`.
 - **Stato dopo la valutazione**:
-  - tutti i driver ≥ soglia → `CALIBRATION_COMPLETED`, motivo `CONFIDENCE_REACHED`;
-  - round di chiusura → `CALIBRATION_COMPLETED`, motivo `CLOSING_ASSESSMENT`: i
-    driver ancora sotto soglia restano con la loro confidence reale, senza valori
-    inventati;
+  - regola di consolidamento soddisfatta e nessuna lezione in attesa →
+    `CALIBRATION_COMPLETED`, motivo `CONFIDENCE_REACHED`;
   - altrimenti `FREE_LEVEL_ESTIMATED` appena la confidence del livello supera
-    `levelConfidenceThreshold`.
-  - con un posto assegnato alla lezione gratuita la calibrazione è
-    `FREE_LESSON_VALIDATION`: la soglia non chiude finché il feedback del coach
-    non è valutato; assessment di chiusura e scadenza chiudono comunque (vedi
-    `lezione-gratuita.md`).
-  Ogni chiusura, qualunque sia il motivo, consolida l'ultima valutazione nella
-  stessa transazione (`calibration-completion.ts`): `CALIBRATION_COMPLETED` e
+    `levelConfidenceThreshold`;
+  - con un posto richiesto o assegnato alla lezione gratuita, o un feedback del
+    coach non ancora valutato, lo stato è `FREE_LESSON_VALIDATION` e R non si
+    consolida: è la lezione a chiudere R e P con affidabilità, quindi il paywall
+    arriva solo dopo il feedback. Se la regola è già soddisfatta, un nuovo round
+    risponde `409 CALIBRATION_WAITING_LESSON`.
+  La chiusura consolida l'ultima valutazione nella stessa transazione
+  (`calibration-completion.ts`): `CALIBRATION_COMPLETED` e
   `AssessmentEvaluation.status = CONSOLIDATED` non divergono mai, anche quando la
-  prima valutazione è già sopra soglia o la soglia viene abbassata dal back office
-  (la chiusura avviene al round successivo richiesto dall'atleta). Le altre
+  prima valutazione soddisfa già la regola o la regola viene abbassata dal back
+  office (la chiusura avviene al round successivo richiesto dall'atleta). Le altre
   valutazioni restano `PROVISIONAL`.
-- **Scadenza** (`deadlineAt` = inizio + `maxDays`): è un invariante. Alla scadenza
-  non si aprono né si valutano round: quelli `OPEN` o `EVALUATING` passano a
-  `EXPIRED` e la calibrazione si chiude con motivo `DEADLINE_REACHED`, consolidando
-  i dati disponibili (driver sotto soglia con la loro confidence reale). Una
-  valutazione partita prima della scadenza e finita dopo chiude con lo stesso
-  motivo. Il controllo avviene alla prima richiesta dell'atleta dopo la scadenza
-  (anche la sola lettura del percorso); il tetto si regola con `maxDays`.
+- **Tempo e fine dei round non consolidano** (§7.2, AT-27): passati i giorni
+  indicativi R resta provvisoria e il percorso continua; P non viene mostrata come
+  affidabile. I motivi `CLOSING_ASSESSMENT` e `DEADLINE_REACHED`, i round `CLOSING`
+  ed `EXPIRED` restano solo nello storico. La migrazione
+  `20261011090000_confidence_policies` riapre le calibrazioni chiuse così con
+  evidenze sotto la regola (senza abbonamento attivo): R torna provvisoria.
 - **Programma prima del paywall**: per il Blueprint (A4.6, A3.9, A4.7) il programma
   arriva dopo calibrazione → P3/P6/P12 → Program Horizon → paywall. Per chi ha una
   valutazione AI, `POST /athlete-journey/submit` e `POST /onboarding/submit` (che
@@ -78,8 +97,6 @@ Tutte in `apps/api/src/discovery/calibration/calibration-rules.ts`, senza I/O:
   decisione 13 è aperta, quindi il parametro `programBeforePaywall` (spento di
   default) riapre il flusso precedente. Gli atleti senza valutazione AI (flusso
   precedente a #8) non sono toccati: li chiude il paywall (gap 1.10).
-- **Chiusura pigra**: non c'è uno scheduler. Il round di chiusura si propone alla
-  prima visita dell'atleta dal giorno `closingDay`; nessuna notifica in questa slice.
 
 ## Livello e commitment
 
@@ -94,7 +111,7 @@ Il livello si mostra all'atleta solo da `FREE_LEVEL_ESTIMATED` in poi.
 ## Concorrenza
 
 - Apertura e risposta passano da un lease su `AthleteCalibration.operationAt` (10
-  minuti): due richieste simultanee non creano due round. Il valore del lease fa da
+  minuti, protezione tecnica e non cadenza di prodotto): due richieste simultanee non creano due round. Il valore del lease fa da
   token: chi lo rilascia azzera solo il proprio, quindi una richiesta lenta con il
   lease scaduto non libera quello ripreso da un'altra.
 - Le risposte di un round si fissano una sola volta, nel passaggio
@@ -116,14 +133,17 @@ Il livello si mostra all'atleta solo da `FREE_LEVEL_ESTIMATED` in poi.
 
 | Tabella | Contenuto |
 |---|---|
-| `AthleteCalibration` | stato, inizio, scadenza, `levelEstimatedAt`, `completedAt`, `completionReason`, lease |
+| `AthleteCalibration` | stato, inizio, scadenza indicativa, `levelEstimatedAt`, `completedAt`, `completionReason`, `consolidationPolicyId`, lease |
 | `CalibrationRound` | `sequence`, `kind` (`ADAPTIVE`/`CLOSING`), stato (`OPEN`/`EVALUATING`/`EVALUATED`/`EXPIRED`), domande e risposte, `evaluationToken`, `evaluatedAt`, provider, modello, versione e hash del prompt, valutazione prodotta |
-| `CalibrationConfig` | riga `default` con i parametri, `updatedById` con FK su `User` |
+| `CalibrationConfig` | riga `default` con i parametri dei round, `updatedById` con FK su `User` |
+| `ConfidencePolicy` | regole versionate `R_CONSOLIDATION` e `LESSON_ELIGIBILITY`, autore e nota |
 | `AssessmentEvaluation` | nuovi campi `level`, `levelConfidence` |
 | `AssessmentEvaluationArea` | nuovo campo `commitment` |
 | `AiAssessmentPromptConfig` | nuovo campo `kind` (`EVALUATION`/`CALIBRATION`) |
 
-Migrazione: `20261008090000_calibration_rounds`.
+Migrazioni: `20261008090000_calibration_rounds`,
+`20261011090000_confidence_policies` (regole, rimozione di soglia, giorno di chiusura
+e ore fra round da `CalibrationConfig`, riapertura delle chiusure a tempo deboli).
 
 ## API
 
@@ -132,16 +152,19 @@ Migrazione: `20261008090000_calibration_rounds`.
 | `POST /athlete-journey/calibration/round` | atleta | apre il prossimo round (o restituisce quello aperto) |
 | `POST /athlete-journey/calibration/answers` | atleta | `{ roundId, answers }`, tutte le domande, poi rivalutazione |
 | `GET /admin/calibration-config` | `ADMIN` | parametri attuali |
-| `PUT /admin/calibration-config` | `ADMIN` | modifica parziale; 400 se `closingDay > maxDays` |
+| `PUT /admin/calibration-config` | `ADMIN` | modifica parziale dei parametri dei round |
+| `GET /admin/confidence-policies` | `ADMIN` | regole in vigore e storico delle versioni |
+| `POST /admin/confidence-policies/:kind` | `ADMIN` | `{ minOverallConfidence, minAreaConfidence, minAreasAtConfidence, note? }`: nuova versione |
 
-`GET /auth/journey` aggiunge `calibration` (stato, giorno, round aperto senza score,
-prossimo round) durante la fase `EVALUATION`.
+`GET /auth/journey` aggiunge `calibration` (stato, regola di consolidamento in
+vigore, round aperto senza score) durante la fase `EVALUATION`.
 
 ## Back office e AI Tuner
 
-- `/admin/calibration`: parametri della fase gratuita. Default: soglia 70, soglia
-  livello 50, 30 giorni, chiusura dal giorno 25, 2 driver per round, 2 domande per
-  driver, 20 ore tra due round, programma prima del paywall spento.
+- `/admin/calibration`: le due regole di confidence (pubblica nuova versione,
+  storico) e i parametri dei round. Default: soglia livello 50, 30 giorni
+  indicativi, 2 driver per round, 2 domande per driver, programma prima del
+  paywall spento.
 - `/ai-tuner/prompts/calibrazione`: prompt delle domande, con le stesse regole di
   bozza, attivazione e versione del prompt di valutazione (`promptType =
   CALIBRATION_QUESTIONS`). **Prova la bozza** usa un caso sintetico con due driver a
@@ -154,7 +177,8 @@ prossimo round) durante la fase `EVALUATION`.
 
 Con `AI_PROVIDER=stub` le domande sono deterministiche e la confidence cresce di 15
 per risposta fino a 90, quindi un driver supera la soglia di default dopo qualche
-round. Test: `calibration-rules.spec.ts`, `calibration-questions.spec.ts`,
+round. Test (casi di accettazione della specifica: AT-10, AT-11, AT-18, AT-19,
+AT-25, AT-27): `calibration-rules.spec.ts`, `confidence-policy.spec.ts`, `calibration-questions.spec.ts`,
 `test/db/discovery.integration-spec.ts`, `app/journey/calibration-panel.test.tsx`,
 `app/admin/calibration/page.test.tsx`, `app/ai-tuner/prompts/calibrazione/page.test.tsx`.
 
@@ -162,7 +186,10 @@ round. Test: `calibration-rules.spec.ts`, `calibration-questions.spec.ts`,
 
 - **Feature flag**: i flag della slice Ingresso (#10) sono su main; mettere la
   calibrazione dietro un flag è un passo successivo, non in questa PR.
-- **Soglia definitiva** (A4-D01): oggi è il parametro di back office.
+- **Soglie definitive** (A4-D01, OP-02, OP-03): oggi regole versionate con valori
+  provvisori.
+- **Fase gratuita oltre i giorni indicativi con confidence bassa** (§7.2): R resta
+  provvisoria e il percorso continua; la regola UX definitiva va formalizzata.
 - **Training nella fase gratuita** (decisione 13): solo round di domande; i
   micro-test si possono aggiungere come nuovo `kind` di round.
 - **Eventi analytics** della calibrazione: il tracciamento della slice Ingresso è

@@ -61,6 +61,10 @@ import {
   loadCalibrationSettings,
   updateCalibrationSettings,
 } from '../../src/discovery/calibration/calibration-config';
+import {
+  loadActivePolicy,
+  publishPolicy,
+} from '../../src/discovery/calibration/confidence-policy';
 import { testGoogleRegistration } from './google-journey-test-helper';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from '../../src/auth/auth.module';
@@ -200,6 +204,10 @@ describe('PF4 discovery to authenticated journey', () => {
     delete process.env.PF4_SPORT_KEY;
     delete process.env.PF4_SPECIALIZATION_KEY;
     if (prisma) {
+      // Il flusso precedente riaperto dai test non resta acceso per i run successivi.
+      await prisma.calibrationConfig.updateMany({
+        data: { programBeforePaywall: false },
+      });
       const cleanupIds = [userId, ...googleUsers].filter(Boolean);
       for (const userId of cleanupIds) {
         await prisma.performanceProfileSnapshotArea.deleteMany({
@@ -744,12 +752,11 @@ describe('PF4 discovery to authenticated journey', () => {
     expect((await state()).phase).toBe('EVALUATION');
   });
 
-  it('calibrates with AI rounds on the least reliable drivers until the closing assessment', async () => {
+  it('calibrates with AI rounds on the least reliable drivers, with no wait and no closing by time', async () => {
     type Calibration = {
       status: string;
       day: number;
       nextRoundKind: string | null;
-      nextRoundAt: string | null;
       completionReason: string | null;
       round: {
         id: string;
@@ -880,6 +887,11 @@ describe('PF4 discovery to authenticated journey', () => {
     expect(new Set(evaluated)).toEqual(new Set(['Sempre']));
 
     // Nessun programma durante la calibrazione, salvo il parametro di back office.
+    await updateCalibrationSettings(
+      prisma,
+      { programBeforePaywall: false },
+      userId,
+    );
     const blocked = await post('submit');
     expect(blocked.statusCode).toBe(409);
     expect(blocked.json()).toMatchObject({
@@ -900,209 +912,194 @@ describe('PF4 discovery to authenticated journey', () => {
       'abbonamento',
     );
 
-    // Il prossimo round rispetta l'intervallo minimo.
-    const waiting = (await calibration()).calibration;
-    expect(waiting.nextRoundAt).toBeTruthy();
-    const early = await post('calibration/round');
-    expect(early.statusCode).toBe(409);
-    expect(early.json()).toMatchObject({ code: 'CALIBRATION_ROUND_NOT_YET' });
-    // L'intervallo parte dalla valutazione, non dall'apertura del round.
-    await prisma.calibrationRound.updateMany({
-      where: { userId },
-      data: { createdAt: new Date(Date.now() - 2 * 86400000) },
-    });
-    expect((await post('calibration/round')).statusCode).toBe(409);
+    // AT-10: nessuna attesa fra i round, il prossimo si apre subito.
+    expect((await calibration()).calibration).not.toHaveProperty('nextRoundAt');
+    expect((await post('calibration/round')).statusCode).toBe(201);
+    const next = (await calibration()).calibration.round!;
+    expect(next.kind).toBe('ADAPTIVE');
+    // Il round va sui driver ancora sotto la soglia per area della regola.
+    expect(next.questions.every((q) => !targeted.has(q.areaId))).toBe(true);
 
-    // Giorno 26: il round è l'assessment di chiusura su tutti i driver sotto soglia.
+    // AT-19/AT-27: il tempo trascorso non cambia il tipo di round né chiude R.
     const past = (days: number) => new Date(Date.now() - days * 86400000);
     await prisma.athleteCalibration.update({
       where: { userId },
-      data: { startedAt: past(25) },
+      data: { startedAt: past(40), deadlineAt: past(10) },
     });
-    await prisma.calibrationRound.updateMany({
-      where: { userId },
-      data: { evaluatedAt: past(1) },
-    });
-    expect((await post('calibration/round')).statusCode).toBe(201);
-    const closing = (await calibration()).calibration.round!;
-    expect(closing.kind).toBe('CLOSING');
-    expect(new Set(closing.questions.map((q) => q.areaId)).size).toBe(6);
-    // Variante: A fallisce mentre B, che ha ripreso il round, lo sta valutando.
-    // Il catch di A non riapre un round che non è più suo.
+    // Variante AT-25: A fallisce mentre B, che ha ripreso il round, lo sta
+    // valutando. Il catch di A non riapre un round che non è più suo.
     const failing = jest
       .spyOn(ai, 'evaluateAssessment')
       .mockImplementationOnce(async () => {
         await expireLease();
-        await service.answerRound(userId, closing.id, pick(closing, 0));
+        await service.answerRound(userId, next.id, pick(next, 0));
         throw new Error('provider non raggiungibile');
       });
     try {
       await expect(
-        service.answerRound(userId, closing.id, pick(closing, -1)),
+        service.answerRound(userId, next.id, pick(next, -1)),
       ).rejects.toThrow('provider non raggiungibile');
     } finally {
       failing.mockRestore();
     }
     expect(
       await prisma.calibrationRound.findUniqueOrThrow({
-        where: { id: closing.id },
+        where: { id: next.id },
       }),
-    ).toMatchObject({ status: 'EVALUATED', answersJson: pick(closing, -1) });
-    const done = (await calibration()).calibration;
-    expect(done).toMatchObject({
-      status: 'CALIBRATION_COMPLETED',
-      completionReason: 'CLOSING_ASSESSMENT',
-      nextRoundKind: null,
-      round: null,
+    ).toMatchObject({ status: 'EVALUATED', answersJson: pick(next, -1) });
+    const stillOpen = (await calibration()).calibration;
+    expect(stillOpen).toMatchObject({
+      status: 'FREE_CALIBRATING',
+      completionReason: null,
+      nextRoundKind: 'ADAPTIVE',
     });
+    const third = await prisma.assessmentEvaluation.findFirstOrThrow({
+      where: { userId, sequence: 3 },
+    });
+    const rule = await loadActivePolicy(prisma, 'R_CONSOLIDATION');
+    expect(third).toMatchObject({
+      source: 'CALIBRATION_ROUND',
+      status: 'PROVISIONAL',
+      consolidationPolicyId: rule.id,
+    });
+    // Anche dopo la durata indicativa la conoscenza dell'atleta prosegue.
+    expect((await post('calibration/round')).statusCode).toBe(201);
     expect(
-      await prisma.assessmentEvaluation.findFirstOrThrow({
-        where: { userId, sequence: 3 },
+      await prisma.calibrationRound.count({
+        where: { userId, status: 'OPEN' },
       }),
-    ).toMatchObject({ source: 'CLOSING_ASSESSMENT', status: 'CONSOLIDATED' });
-    expect((await post('calibration/round')).statusCode).toBe(409);
-    // Anche a calibrazione completata il programma aspetta scenari e paywall.
+    ).toBe(1);
     expect((await post('submit')).json()).toMatchObject({
       code: 'PROGRAM_LOCKED_BEFORE_PAYWALL',
     });
   });
 
-  it('closes at the deadline with the available data and keeps status and evaluation aligned', async () => {
+  it('consolidates only when the versioned rule is met and records the version used', async () => {
     const latest = () =>
       prisma.assessmentEvaluation.findFirstOrThrow({
         where: { userId },
         orderBy: { sequence: 'desc' },
       });
-    const reopen = async (deadlineAt: Date) => {
-      await prisma.athleteCalibration.update({
-        where: { userId },
-        data: {
-          status: 'FREE_CALIBRATING',
-          completedAt: null,
-          completionReason: null,
-          deadlineAt,
-        },
-      });
-      await prisma.assessmentEvaluation.update({
-        where: { id: (await latest()).id },
-        data: { status: 'PROVISIONAL' },
-      });
-    };
-    const day = 86400000;
+    const before = await loadActivePolicy(prisma, 'R_CONSOLIDATION');
+    const calibration = () =>
+      prisma.athleteCalibration.findUniqueOrThrow({ where: { userId } });
+    expect((await calibration()).status).not.toBe('CALIBRATION_COMPLETED');
+    expect((await latest()).status).toBe('PROVISIONAL');
     try {
-      // Soglia abbassata dal back office: chiusura e consolidamento insieme.
-      await reopen(new Date(Date.now() + day));
-      await updateCalibrationSettings(
+      // Regola abbassata dal back office: al prossimo round richiesto la
+      // valutazione corrente la soddisfa, si chiude e si consolida insieme.
+      const lowered = await publishPolicy(
         prisma,
-        { confidenceThreshold: 1 },
+        'R_CONSOLIDATION',
+        {
+          minOverallConfidence: 1,
+          minAreaConfidence: 1,
+          minAreasAtConfidence: null,
+        },
+        'test',
         userId,
       );
-      await prisma.calibrationRound.updateMany({
-        where: { userId },
-        data: { evaluatedAt: new Date(Date.now() - 2 * day) },
+      expect(lowered.version).toBe(before.version + 1);
+      await prisma.calibrationRound.deleteMany({
+        where: { userId, status: 'OPEN' },
       });
       expect((await post('calibration/round')).statusCode).toBe(201);
-      expect(
-        await prisma.athleteCalibration.findUniqueOrThrow({
-          where: { userId },
-        }),
-      ).toMatchObject({
+      expect(await calibration()).toMatchObject({
         status: 'CALIBRATION_COMPLETED',
         completionReason: 'CONFIDENCE_REACHED',
+        consolidationPolicyId: lowered.id,
       });
-      expect((await latest()).status).toBe('CONSOLIDATED');
+      expect(await latest()).toMatchObject({
+        status: 'CONSOLIDATED',
+        consolidationPolicyId: lowered.id,
+      });
+      // La versione precedente resta nello storico.
+      expect(
+        await prisma.confidencePolicy.count({
+          where: { kind: 'R_CONSOLIDATION' },
+        }),
+      ).toBe(before.version + 1);
+      expect((await post('calibration/round')).statusCode).toBe(409);
     } finally {
-      await updateCalibrationSettings(
+      await publishPolicy(
         prisma,
-        { confidenceThreshold: 70 },
+        'R_CONSOLIDATION',
+        {
+          minOverallConfidence: before.minOverallConfidence,
+          minAreaConfidence: before.minAreaConfidence,
+          minAreasAtConfidence: before.minAreasAtConfidence,
+        },
+        'ripristino dopo il test',
         userId,
       );
     }
-
-    // Scadenza superata con un round aperto: il round scade, si consolida.
-    await reopen(new Date(Date.now() - 1000));
-    const lastRound = await prisma.calibrationRound.findFirstOrThrow({
-      where: { userId },
-      orderBy: { sequence: 'desc' },
-    });
-    const pending = await prisma.calibrationRound.create({
-      data: {
-        userId,
-        sequence: lastRound.sequence + 1,
-        kind: 'CLOSING',
-        questionsJson: lastRound.questionsJson as object,
-        provider: 'stub',
-        model: 'stub',
-        promptHash: 'test',
-      },
-    });
-    const view = (
-      (await state()) as unknown as {
-        calibration: {
-          status: string;
-          completionReason: string;
-          round: unknown;
-        };
-      }
-    ).calibration;
-    expect(view).toMatchObject({
-      status: 'CALIBRATION_COMPLETED',
-      completionReason: 'DEADLINE_REACHED',
-      round: null,
-    });
-    expect(
-      (
-        await prisma.calibrationRound.findUniqueOrThrow({
-          where: { id: pending.id },
-        })
-      ).status,
-    ).toBe('EXPIRED');
-    expect((await latest()).status).toBe('CONSOLIDATED');
-    const questions = pending.questionsJson as Array<{
-      id: string;
-      options: Array<{ value: string }>;
-    }>;
-    const late = await post('calibration/answers', {
-      roundId: pending.id,
-      answers: Object.fromEntries(
-        questions.map((q) => [q.id, q.options[0].value]),
-      ),
-    });
-    expect(late.statusCode).toBe(409);
-    expect((await post('calibration/round')).statusCode).toBe(409);
   });
 
-  it('keeps calibration parameters consistent and reserved to admins', async () => {
-    expect(await loadCalibrationSettings(prisma)).toMatchObject({
-      confidenceThreshold: 70,
+  it('keeps calibration parameters and confidence rules consistent and reserved to admins', async () => {
+    const settings = await loadCalibrationSettings(prisma);
+    expect(settings).toMatchObject({
+      levelConfidenceThreshold: 50,
       maxDays: 30,
-      closingDay: 25,
     });
+    for (const removed of [
+      'confidenceThreshold',
+      'closingDay',
+      'minHoursBetweenRounds',
+    ])
+      expect(settings).not.toHaveProperty(removed);
     await expect(
-      updateCalibrationSettings(prisma, { closingDay: 40 }, userId),
-    ).rejects.toThrow('Il giorno di chiusura');
-    expect(
-      await updateCalibrationSettings(
+      updateCalibrationSettings(
         prisma,
-        { confidenceThreshold: 75 },
+        { levelConfidenceThreshold: 0 },
         userId,
       ),
-    ).toMatchObject({ confidenceThreshold: 75, closingDay: 25 });
-    await updateCalibrationSettings(
-      prisma,
-      { confidenceThreshold: 70 },
-      userId,
-    );
+    ).rejects.toThrow('soglia del livello');
     const athlete = await app.inject({
       method: 'PUT',
       url: '/api/admin/calibration-config',
       headers: { cookie, authorization: `Bearer ${token}` },
-      payload: { confidenceThreshold: 10 },
+      payload: { levelConfidenceThreshold: 10 },
     });
     expect(athlete.statusCode).toBe(403);
-    expect((await loadCalibrationSettings(prisma)).confidenceThreshold).toBe(
-      70,
-    );
+    expect(
+      (await loadCalibrationSettings(prisma)).levelConfidenceThreshold,
+    ).toBe(50);
+
+    // Regole: solo admin, versioni consecutive anche in parallelo, mai vuote.
+    const forbidden = await app.inject({
+      method: 'POST',
+      url: '/api/admin/confidence-policies/LESSON_ELIGIBILITY',
+      headers: { cookie, authorization: `Bearer ${token}` },
+      payload: { minOverallConfidence: 1 },
+    });
+    expect(forbidden.statusCode).toBe(403);
+    const lesson = await loadActivePolicy(prisma, 'LESSON_ELIGIBILITY');
+    const rule = {
+      minOverallConfidence: lesson.minOverallConfidence,
+      minAreaConfidence: lesson.minAreaConfidence,
+      minAreasAtConfidence: lesson.minAreasAtConfidence,
+    };
+    const published = await Promise.all([
+      publishPolicy(prisma, 'LESSON_ELIGIBILITY', rule, null, userId),
+      publishPolicy(prisma, 'LESSON_ELIGIBILITY', rule, null, userId),
+    ]);
+    expect(published.map((p) => p.version).sort()).toEqual([
+      lesson.version + 1,
+      lesson.version + 2,
+    ]);
+    await expect(
+      publishPolicy(
+        prisma,
+        'LESSON_ELIGIBILITY',
+        {
+          minOverallConfidence: null,
+          minAreaConfidence: null,
+          minAreasAtConfidence: null,
+        },
+        null,
+        userId,
+      ),
+    ).rejects.toThrow('almeno una soglia');
   });
 
   it('versions an edited assessment prompt and makes it the only active one', async () => {

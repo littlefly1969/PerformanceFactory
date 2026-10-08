@@ -21,12 +21,15 @@ const evaluation: Evaluation = {
 const base: Calibration = {
   status: "FREE_CALIBRATING",
   day: 3,
-  maxDays: 30,
-  confidenceThreshold: 70,
+  consolidationRule: {
+    version: 1,
+    minOverallConfidence: 70,
+    minAreaConfidence: 70,
+    minAreasAtConfidence: null,
+  },
   completionReason: null,
   roundsCompleted: 0,
   nextRoundKind: "ADAPTIVE",
-  nextRoundAt: null,
   round: null,
 };
 
@@ -77,7 +80,9 @@ afterEach(cleanup);
 describe("free calibration panel", () => {
   it("asks for a new round and hides the level until it is estimated", async () => {
     const { onOpenRound } = renderPanel(base);
-    expect(screen.getByText("Calibrazione · giorno 3 di 30")).toBeVisible();
+    // Nessun conto alla rovescia né contatore di giorni.
+    expect(screen.getByText("Calibrazione")).toBeVisible();
+    expect(screen.queryByText(/giorno|di 30/)).toBeNull();
     expect(screen.queryByText(/Livello stimato/)).toBeNull();
     await userEvent.click(
       screen.getByRole("button", { name: "Nuove domande →" }),
@@ -100,37 +105,42 @@ describe("free calibration panel", () => {
     expect(onAnswer).toHaveBeenCalledWith("r1", { q1: "1", q2: "1" });
   });
 
-  it("waits for the next round and offers the closing assessment near the deadline", () => {
-    renderPanel({ ...base, nextRoundAt: "2026-10-08T08:00:00.000Z" });
-    expect(screen.getByRole("status")).toHaveTextContent(
-      "Le prossime domande saranno pronte",
-    );
-    expect(screen.queryByRole("button")).toBeNull();
-    cleanup();
-    renderPanel({ ...base, day: 26, nextRoundKind: "CLOSING" });
+  it("AT-10: offers the next round right away, without waiting", () => {
+    renderPanel({ ...base, day: 26, roundsCompleted: 6 });
+    expect(screen.queryByText(/saranno pronte/)).toBeNull();
     expect(
-      screen.getByRole("button", { name: "Inizia l'assessment di chiusura →" }),
+      screen.getByRole("button", { name: "Nuove domande →" }),
     ).toBeEnabled();
   });
 
-  it("explains a closing without full confidence", () => {
+  it("explains a consolidation reached by confidence", () => {
     renderPanel({
       ...base,
       status: "CALIBRATION_COMPLETED",
-      completionReason: "CLOSING_ASSESSMENT",
+      completionReason: "CONFIDENCE_REACHED",
     });
     expect(screen.getByText("La tua R è consolidata.")).toBeVisible();
-    expect(screen.getByText(/senza valori inventati/)).toBeVisible();
+    expect(screen.getByText(/coerenti e complete/)).toBeVisible();
     expect(screen.queryByRole("button")).toBeNull();
   });
 
-  it("explains a closing at the deadline with the available answers", () => {
+  it("keeps historic closings honest about the weaker drivers", () => {
     renderPanel({
       ...base,
       status: "CALIBRATION_COMPLETED",
       completionReason: "DEADLINE_REACHED",
     });
-    expect(screen.getByText(/Sono passati 30 giorni/)).toBeVisible();
+    expect(screen.getByText(/senza valori inventati/)).toBeVisible();
     expect(screen.queryByRole("button")).toBeNull();
+  });
+
+  it("tells the athlete that R closes after the coach feedback", () => {
+    renderPanel({ ...base, status: "FREE_LESSON_VALIDATION" });
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "si chiudono dopo il feedback del coach",
+    );
+    expect(
+      screen.getByRole("button", { name: "Nuove domande →" }),
+    ).toBeEnabled();
   });
 });

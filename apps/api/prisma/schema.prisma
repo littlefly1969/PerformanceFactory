@@ -57,6 +57,7 @@ model User {
   calibrationRounds     CalibrationRound[]
   potentialScenarios    PotentialScenario[]
   calibrationConfigUpdates CalibrationConfig[] @relation("CalibrationConfigUpdatedBy")
+  confidencePolicies       ConfidencePolicy[]  @relation("ConfidencePolicyCreatedBy")
   interactionCredits       InteractionCreditEntry[]
   microTestCompletions     MicroTestCompletion[]
   personalMicroTests       MicroTest[]
@@ -1366,10 +1367,13 @@ model AssessmentEvaluation {
   inputJson         Json
   outputJson        Json
   latencyMs         Int?
+  /// Versione della regola di consolidamento applicata dopo questa valutazione.
+  consolidationPolicyId String?
   createdAt         DateTime @default(now())
 
   user          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
   promptVersion AiPromptVersion?           @relation(fields: [promptVersionId], references: [id], onDelete: SetNull)
+  consolidationPolicy ConfidencePolicy?    @relation(fields: [consolidationPolicyId], references: [id], onDelete: Restrict)
   areas         AssessmentEvaluationArea[]
   round         CalibrationRound?
   scenarios     PotentialScenario[]
@@ -1654,7 +1658,8 @@ model BetaTesterChange {
 }
 
 /// Calibrazione gratuita (A4.3, A4.6): dopo la prima valutazione R e confidence si
-/// affinano a round fino alla soglia di confidence o all'assessment di chiusura.
+/// affinano a round finché la regola di consolidamento è soddisfatta. Scadenza e
+/// fine dei round non consolidano R (PF-FS-PREPAYWALL §7.2).
 /// Stato del percorso, separato da abbonamento ed engagement.
 model AthleteCalibration {
   userId           String    @id
@@ -1664,18 +1669,45 @@ model AthleteCalibration {
   deadlineAt       DateTime
   levelEstimatedAt DateTime?
   completedAt      DateTime?
-  /// CONFIDENCE_REACHED, CLOSING_ASSESSMENT oppure DEADLINE_REACHED
+  /// CONFIDENCE_REACHED; CLOSING_ASSESSMENT e DEADLINE_REACHED solo nello storico
   completionReason String?
+  /// Versione della regola di consolidamento che ha chiuso la calibrazione.
+  consolidationPolicyId String?
   /// Lease di un'operazione in corso (generazione domande o valutazione).
   operationAt      DateTime?
   updatedAt        DateTime  @updatedAt
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  consolidationPolicy ConfidencePolicy? @relation(fields: [consolidationPolicyId], references: [id], onDelete: Restrict)
 
   @@index([status, deadlineAt])
 }
 
+/// Regola di confidence versionata (PF-FS-PREPAYWALL §7.1, OP-02, OP-03):
+/// R_CONSOLIDATION per consolidare R e generare P, LESSON_ELIGIBILITY per la
+/// lezione gratuita. Le righe non si modificano: ogni cambio è una nuova
+/// versione e quella in vigore è la più alta per tipo.
+model ConfidencePolicy {
+  id                   String   @id @default(uuid())
+  kind                 String
+  version              Int
+  minOverallConfidence Int?
+  minAreaConfidence    Int?
+  /// Aree che devono raggiungere minAreaConfidence; nullo = tutte.
+  minAreasAtConfidence Int?
+  note                 String?
+  createdById          String?
+  createdAt            DateTime @default(now())
+
+  createdBy    User?                  @relation("ConfidencePolicyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  evaluations  AssessmentEvaluation[]
+  calibrations AthleteCalibration[]
+
+  @@unique([kind, version])
+}
+
 /// Un round di domande scritte dall'AI sui driver con confidence più bassa.
+/// CLOSING ed EXPIRED restano solo nello storico: non si creano più.
 /// Le risposte producono una nuova AssessmentEvaluation (sequence successiva).
 model CalibrationRound {
   id              String    @id @default(uuid())
@@ -1708,13 +1740,11 @@ model CalibrationRound {
 /// Parametri di back office della calibrazione (A4-D01 aperto): una sola riga.
 model CalibrationConfig {
   id                       String   @id @default("default")
-  confidenceThreshold      Int      @default(70)
   levelConfidenceThreshold Int      @default(50)
+  /// Durata indicativa della fase gratuita: non chiude né consolida R.
   maxDays                  Int      @default(30)
-  closingDay               Int      @default(25)
   questionsPerDriver       Int      @default(2)
   driversPerRound          Int      @default(2)
-  minHoursBetweenRounds    Int      @default(20)
   /// Programma (baseline e piano) prima del paywall per chi è in calibrazione.
   /// Decisione 13 aperta; Blueprint A4.6: no, quindi spento di default.
   programBeforePaywall     Boolean  @default(false)

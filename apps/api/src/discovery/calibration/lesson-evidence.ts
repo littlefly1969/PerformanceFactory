@@ -50,16 +50,19 @@ export async function lockCalibration(
 }
 
 /**
- * La lezione è in attesa finché il posto è assegnato o il feedback del coach
- * non è ancora entrato in una valutazione: in quel tempo R non si chiude per
- * soglia (A4.8, «R_NOT_FINAL»).
+ * La lezione è in attesa finché il posto è richiesto o assegnato, o il
+ * feedback del coach non è ancora entrato in una valutazione: in quel tempo R
+ * non si consolida e il paywall resta chiuso, perché è la lezione a chiudere
+ * R e P con affidabilità (A4.8, «R_NOT_FINAL»).
  */
 export async function isLessonPending(db: Db, userId: string) {
-  const [assigned, unevaluated] = await Promise.all([
-    db.freeLessonSeat.count({ where: { userId, status: 'ASSIGNED' } }),
+  const [seats, unevaluated] = await Promise.all([
+    db.freeLessonSeat.count({
+      where: { userId, status: { in: ['REQUESTED', 'ASSIGNED'] } },
+    }),
     db.coachLessonFeedback.count({ where: { userId, evaluationId: null } }),
   ]);
-  return assigned + unevaluated > 0;
+  return seats + unevaluated > 0;
 }
 
 /**
