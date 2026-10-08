@@ -16,6 +16,7 @@ import {
 import { performanceDriverName as driverName } from '../performance/performance-display';
 import { PrismaService } from '../prisma/prisma.service';
 import { OCCUPYING_SEATS } from './free-lesson-rules';
+import { settleCalibration } from '../discovery/calibration/lesson-gate';
 import { lockLesson, releaseCalibration } from './lesson-hold';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -239,6 +240,8 @@ export class CoachLessonService {
         data: { status: 'NO_SHOW' },
       });
       await releaseCalibration(tx, userId);
+      // Il beneficio è usato: da qui basta la regola di confidence (AT-18).
+      await settleCalibration(tx, userId, now);
       await this.completeIfDone(tx, lessonId);
     });
   }

@@ -11,11 +11,7 @@ import { lockCalibration } from '../discovery/calibration/lesson-evidence';
 import { performanceDriverName as driverName } from '../performance/performance-display';
 import { PrismaService } from '../prisma/prisma.service';
 import { loadFreeLessonSettings } from './free-lesson-config';
-import {
-  OCCUPYING_SEATS,
-  fitsCalibration,
-  microTestOptionProblems,
-} from './free-lesson-rules';
+import { OCCUPYING_SEATS, microTestOptionProblems } from './free-lesson-rules';
 import { holdCalibration, lockLesson, releaseCalibration } from './lesson-hold';
 
 type Option = { value: string; label: string; score: number };
@@ -243,11 +239,11 @@ export class FreeLessonAdminService {
 
   /**
    * Assegna un posto a un atleta che l'ha richiesto. Sotto lock della lezione
-   * (capienza) e della calibrazione (R ancora aperta, livello stimato): da qui
-   * R non si chiude per soglia fino al feedback del coach.
+   * (capienza) e della calibrazione (R ancora aperta, livello stimato): R
+   * non si consolida fino al feedback del coach. Il tempo trascorso non chiude
+   * più R, quindi la data della lezione non ha vincoli di scadenza.
    */
   async assign(lessonId: string, userId: string, now = new Date()) {
-    const settings = await loadFreeLessonSettings(this.prisma);
     await this.prisma.$transaction(async (tx) => {
       await lockLesson(tx, lessonId);
       await lockCalibration(tx, userId);
@@ -275,10 +271,6 @@ export class FreeLessonAdminService {
       )
         throw new ConflictException(
           'Serve il livello stimato con la calibrazione ancora aperta',
-        );
-      if (!fitsCalibration(lesson.startsAt, calibration.deadlineAt, settings))
-        throw new ConflictException(
-          'La lezione è troppo vicina alla scadenza della calibrazione',
         );
       await tx.freeLessonSeat.update({
         where: { userId },

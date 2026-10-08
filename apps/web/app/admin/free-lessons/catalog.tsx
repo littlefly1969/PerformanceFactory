@@ -10,8 +10,8 @@ type Run = (action: () => Promise<unknown>, done: string) => Promise<boolean>;
 const SETTINGS: { key: keyof Settings; label: string; hint: string }[] = [
   {
     key: "creditsToUnlock",
-    label: "Crediti per sbloccare la lezione",
-    hint: "0 lascia solo le condizioni del Blueprint: livello stimato e R aperta.",
+    label: "Traguardo visivo dei crediti",
+    hint: "Solo la barra di progresso dell'atleta: la lezione si sblocca con la regola di eleggibilità in Calibrazione.",
   },
   {
     key: "creditsInitialAssessment",
@@ -32,11 +32,6 @@ const SETTINGS: { key: keyof Settings; label: string; hint: string }[] = [
     key: "microTestsPerDay",
     label: "Micro-test nelle 24 ore",
     hint: "0 li spegne.",
-  },
-  {
-    key: "minDaysBeforeDeadline",
-    label: "Giorni minimi prima della scadenza",
-    hint: "La lezione lascia al coach il tempo di dare il feedback prima che R si chiuda.",
   },
 ];
 

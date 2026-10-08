@@ -15,11 +15,8 @@ import { FeatureFlagsService } from '../../src/features/feature-flags.service';
 import { CalibrationService } from '../../src/discovery/calibration/calibration.service';
 import { AiProposalProviderService } from '../../src/ai-orchestrator/proposal-provider.service';
 import { AssessmentEvaluationInput } from '../../src/ai-orchestrator/assessment-evaluation-model';
-import {
-  loadFreeLessonSettings,
-  updateFreeLessonSettings,
-} from '../../src/free-lessons/free-lesson-config';
-import { DEFAULT_FREE_LESSON_SETTINGS } from '../../src/free-lessons/free-lesson-rules';
+import { loadFreeLessonSettings } from '../../src/free-lessons/free-lesson-config';
+import { loadActivePolicy } from '../../src/discovery/calibration/confidence-policy';
 import { getRequiredTestDatabaseUrl } from '../utils/db-test-guard';
 import { ensureTestDatabaseExists } from '../utils/ensure-test-database';
 
@@ -293,8 +290,9 @@ describe('Free lesson with PostgreSQL', () => {
       await prisma.interactionCreditEntry.count({ where: { userId: id } }),
     ).toBe(3);
     const first = views[0];
+    // AT-14: la regola di eleggibilità non è soddisfatta; i crediti non contano.
     expect(first.enabled && first.phase).toBe('LOCKED');
-    expect(first.enabled && first.missing).toEqual(['CREDITS']);
+    expect(first.enabled && first.missing).toEqual(['CONFIDENCE']);
 
     for (const n of [1, 2, 3]) {
       const test = await admin.createMicroTest({
@@ -325,7 +323,11 @@ describe('Free lesson with PostgreSQL', () => {
     expect(after.enabled && after.credits.balance).toBe(90);
     expect(after.enabled && after.microTestsLeft).toBe(0);
 
-    await updateFreeLessonSettings(prisma, { creditsToUnlock: 90 }, adminId);
+    // Profilo più attendibile: la regola di eleggibilità in vigore è soddisfatta.
+    await prisma.assessmentEvaluation.updateMany({
+      where: { userId: id },
+      data: { overallConfidence: 60 },
+    });
     const eligible = await Promise.all([
       athletes.view(id),
       athletes.view(id),
@@ -353,11 +355,23 @@ describe('Free lesson with PostgreSQL', () => {
       (await prisma.freeLessonSeat.findUniqueOrThrow({ where: { userId: id } }))
         .status,
     ).toBe('ASSIGNED');
-    await updateFreeLessonSettings(
-      prisma,
-      { creditsToUnlock: DEFAULT_FREE_LESSON_SETTINGS.creditsToUnlock },
-      adminId,
-    );
+    // La richiesta registra la regola e la valutazione su cui si è decisa
+    // l'eleggibilità (§10.3) e l'evento lesson_requested.
+    expect(seat).toMatchObject({
+      eligibilityPolicyId: (
+        await loadActivePolicy(prisma, 'LESSON_ELIGIBILITY')
+      ).id,
+      eligibilityEvaluationId: (
+        await prisma.assessmentEvaluation.findFirstOrThrow({
+          where: { userId: id },
+        })
+      ).id,
+    });
+    expect(
+      await prisma.analyticsEvent.count({
+        where: { userId: id, name: 'lesson_requested' },
+      }),
+    ).toBe(1);
   });
 
   it('never fills a lesson beyond its capacity under concurrent assignments, and cancel keeps the request pending', async () => {
@@ -397,16 +411,16 @@ describe('Free lesson with PostgreSQL', () => {
     }
   });
 
-  it('refuses a lesson too close to the calibration deadline or with R already closed', async () => {
+  it('assigns a lesson whatever the calibration deadline, never with R already closed', async () => {
+    // Il tempo non chiude più R: la scadenza indicativa non limita la data.
     const late = await requested([40, 50]);
     await prisma.athleteCalibration.update({
       where: { userId: late },
-      data: { deadlineAt: new Date(Date.now() + 4 * DAY_MS) },
+      data: { deadlineAt: new Date(Date.now() + DAY_MS) },
     });
     const lessonId = await lesson();
-    await expect(admin.assign(lessonId, late)).rejects.toThrow(
-      'troppo vicina alla scadenza',
-    );
+    await admin.assign(lessonId, late);
+    expect(await status(late)).toBe('FREE_LESSON_VALIDATION');
     const closed = await requested([40, 50]);
     await prisma.athleteCalibration.update({
       where: { userId: closed },
@@ -526,9 +540,10 @@ describe('Free lesson with PostgreSQL', () => {
       }),
     ).toBe(1);
 
-    // Assenza: il beneficio è consumato e R torna a poter chiudersi.
+    // Assenza: il beneficio è consumato e, con la regola già soddisfatta, R
+    // si consolida subito (AT-18).
     await coaches.markNoShow(coachId, lessonId, roundAthlete);
-    expect(await status(roundAthlete)).toBe('FREE_LEVEL_ESTIMATED');
+    expect(await status(roundAthlete)).toBe('CALIBRATION_COMPLETED');
     expect(
       (await prisma.freeLesson.findUniqueOrThrow({ where: { id: lessonId } }))
         .status,
@@ -559,6 +574,69 @@ describe('Free lesson with PostgreSQL', () => {
         where: { lessonId, status: 'ASSIGNED' },
       }),
     ).toBe(1);
+  });
+
+  it('AT-15/AT-16/AT-18: with a lesson possible R waits for it or for an explicit decline', async () => {
+    // Regola di consolidamento soddisfatta, livello stimato, circolo che offre
+    // la lezione: è la lezione a chiudere R, il paywall aspetta.
+    const id = await athlete([80, 90]);
+    await expect(calibration.openRound(id)).rejects.toMatchObject({
+      response: { code: 'CALIBRATION_LESSON_CHOICE' },
+    });
+    expect(await status(id)).toBe('FREE_LEVEL_ESTIMATED');
+    expect(await athletes.view(id)).toMatchObject({ phase: 'ELIGIBLE' });
+    // Rinuncia esplicita: R si consolida con la sola regola di confidence.
+    expect(await athletes.decline(id)).toMatchObject({ phase: 'CLOSED' });
+    expect(await status(id)).toBe('CALIBRATION_COMPLETED');
+    expect(
+      await prisma.analyticsEvent.count({
+        where: { userId: id, name: 'lesson_declined' },
+      }),
+    ).toBe(1);
+    await expect(athletes.decline(id)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+
+    // Una rinuncia con R ancora da consolidare si può ritirare richiedendo il posto.
+    const undecided = await athlete([60, 50]);
+    expect(await athletes.decline(undecided)).toMatchObject({
+      phase: 'DECLINED',
+    });
+    expect(await status(undecided)).toBe('FREE_LEVEL_ESTIMATED');
+    expect(await athletes.request(undecided, partnerId, true)).toMatchObject({
+      phase: 'REQUESTED',
+    });
+    expect(
+      (
+        await prisma.athleteCalibration.findUniqueOrThrow({
+          where: { userId: undecided },
+        })
+      ).lessonDeclinedAt,
+    ).toBeNull();
+
+    // AT-16: territorio non servito, nessuna promessa e basta la regola.
+    await prisma.partner.update({
+      where: { id: partnerId },
+      data: { freeLessonsEnabled: false },
+    });
+    try {
+      expect(
+        await prisma.partner.count({
+          where: { isActive: true, freeLessonsEnabled: true },
+        }),
+      ).toBe(0);
+      const unserved = await athlete([80, 90]);
+      expect(await athletes.view(unserved)).toMatchObject({
+        phase: 'UNAVAILABLE',
+      });
+      await calibration.openRound(unserved);
+      expect(await status(unserved)).toBe('CALIBRATION_COMPLETED');
+    } finally {
+      await prisma.partner.update({
+        where: { id: partnerId },
+        data: { freeLessonsEnabled: true },
+      });
+    }
   });
 
   it('hides everything while the feature flag is off', async () => {

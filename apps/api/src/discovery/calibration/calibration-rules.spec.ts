@@ -1,5 +1,6 @@
 import {
   DEFAULT_CALIBRATION_SETTINGS as settings,
+  NO_LESSON,
   dayOf,
   roundTargets,
   settingsProblems,
@@ -103,6 +104,7 @@ describe('calibration rules', () => {
   });
 
   it('a pending free lesson holds R until the coach feedback is evaluated', () => {
+    const pending = { pending: true, available: false };
     // La regola è soddisfatta, ma è la lezione a chiudere R e P.
     expect(
       statusAfterEvaluation(
@@ -110,7 +112,7 @@ describe('calibration rules', () => {
         evaluation(80, 80, 75, 90),
         settings,
         rule,
-        true,
+        pending,
       ),
     ).toEqual({ status: 'FREE_LESSON_VALIDATION', levelEstimated: false });
     expect(
@@ -119,7 +121,7 @@ describe('calibration rules', () => {
         evaluation(80, 80, 75, 90),
         settings,
         rule,
-        false,
+        NO_LESSON,
       ),
     ).toMatchObject({
       status: 'CALIBRATION_COMPLETED',
@@ -131,9 +133,53 @@ describe('calibration rules', () => {
         evaluation(60, 80, 40, 90),
         settings,
         rule,
-        false,
+        NO_LESSON,
       ),
     ).toEqual({ status: 'FREE_LEVEL_ESTIMATED', levelEstimated: false });
+  });
+
+  it('holds R while a lesson can still be booked, and not without one (AT-15/AT-16)', () => {
+    const available = { pending: false, available: true };
+    // Lezione possibile con il livello stimato: R aspetta la lezione o la rinuncia.
+    expect(
+      statusAfterEvaluation(
+        'FREE_LEVEL_ESTIMATED',
+        evaluation(80, 80, 75, 90),
+        settings,
+        rule,
+        available,
+      ),
+    ).toEqual({ status: 'FREE_LEVEL_ESTIMATED', levelEstimated: false });
+    // Livello stimato da questa stessa valutazione: vale già la lezione.
+    expect(
+      statusAfterEvaluation(
+        'FREE_CALIBRATING',
+        evaluation(80, 80, 75, 90),
+        settings,
+        rule,
+        available,
+      ),
+    ).toEqual({ status: 'FREE_LEVEL_ESTIMATED', levelEstimated: true });
+    // Senza livello non si compone un gruppo: la lezione non è possibile.
+    expect(
+      statusAfterEvaluation(
+        'FREE_CALIBRATING',
+        evaluation(80, 10, 75, 90),
+        settings,
+        rule,
+        available,
+      ),
+    ).toMatchObject({ status: 'CALIBRATION_COMPLETED' });
+    // Territorio non servito o rinuncia: basta la regola di confidence.
+    expect(
+      statusAfterEvaluation(
+        'FREE_LEVEL_ESTIMATED',
+        evaluation(80, 80, 75, 90),
+        settings,
+        rule,
+        NO_LESSON,
+      ),
+    ).toMatchObject({ status: 'CALIBRATION_COMPLETED' });
   });
 
   it('never reopens a completed calibration', () => {

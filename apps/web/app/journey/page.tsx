@@ -129,7 +129,9 @@ export default function JourneyPage() {
               disabled={busy}
               onClick={() => void action("evaluate")}
             >
-              {busy ? "Analizziamo le tue risposte…" : "Analizza le mie risposte →"}
+              {busy
+                ? "Analizziamo le tue risposte…"
+                : "Analizza le mie risposte →"}
             </button>
           </section>
         )}
@@ -150,6 +152,7 @@ export default function JourneyPage() {
             {j.calibration && (
               <FreeLessonPanel
                 refreshKey={`${j.evaluation.id}:${j.calibration.status}:${j.calibration.roundsCompleted}`}
+                onChanged={() => void refresh()}
               />
             )}
             {j.scenarios && (

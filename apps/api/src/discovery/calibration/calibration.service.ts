@@ -19,11 +19,7 @@ import { loadSpecialistQuestionRecords } from '../../onboarding/onboarding-quest
 import { PrismaService } from '../../prisma/prisma.service';
 import { loadCalibrationSettings } from './calibration-config';
 import { completeCalibration } from './calibration-completion';
-import {
-  addLessonEvidence,
-  isLessonPending,
-  lockCalibration,
-} from './lesson-evidence';
+import { addLessonEvidence, lockCalibration } from './lesson-evidence';
 import { evaluatePendingFeedback, linkFeedback } from './lesson-feedback';
 import {
   CalibrationStatus,
@@ -33,6 +29,7 @@ import {
   statusAfterEvaluation,
 } from './calibration-rules';
 import { loadActivePolicy } from './confidence-policy';
+import { lessonGate, settleCalibration } from './lesson-gate';
 
 const LEASE_MS = 10 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -74,15 +71,17 @@ export class CalibrationService {
       loadCalibrationSettings(this.prisma),
       loadActivePolicy(this.prisma, 'R_CONSOLIDATION'),
     ]);
+    const evaluation = {
+      overallConfidence: first.overallConfidence,
+      levelConfidence: first.levelConfidence,
+      drivers: first.areas,
+    };
     const next = statusAfterEvaluation(
       'FREE_CALIBRATING',
-      {
-        overallConfidence: first.overallConfidence,
-        levelConfidence: first.levelConfidence,
-        drivers: first.areas,
-      },
+      evaluation,
       settings,
       policy,
+      await lessonGate(this.prisma, userId, evaluation),
     );
     await this.prisma.$transaction(async (tx) => {
       const created = await tx.athleteCalibration.createMany({
@@ -216,15 +215,25 @@ export class CalibrationService {
       // La valutazione corrente soddisfa la regola in vigore (per esempio
       // abbassata dal back office): si consolida senza nuove domande.
       if (!targets.length) {
-        if (await isLessonPending(this.prisma, userId))
+        const { gate, completed } = await this.prisma.$transaction(
+          async (tx) => {
+            await lockCalibration(tx, userId);
+            return settleCalibration(tx, userId, now);
+          },
+        );
+        if (completed) return;
+        if (gate.pending)
           throw new ConflictException({
             code: 'CALIBRATION_WAITING_LESSON',
             message:
               'La tua R si chiude dopo la lezione con il coach del circolo.',
           });
-        await this.prisma.$transaction((tx) =>
-          completeCalibration(tx, userId, 'CONFIDENCE_REACHED', now, policy.id),
-        );
+        if (gate.available)
+          throw new ConflictException({
+            code: 'CALIBRATION_LESSON_CHOICE',
+            message:
+              'La tua R si chiude con la lezione gratuita al circolo: richiedila, oppure dicci che preferisci non farla.',
+          });
         return;
       }
       const asked = await this.askedQuestions(userId, rounds);
@@ -382,7 +391,7 @@ export class CalibrationService {
         result.output,
         settings,
         policy,
-        await isLessonPending(tx, userId),
+        await lessonGate(tx, userId, result.output),
       );
       if (next.completionReason)
         await completeCalibration(

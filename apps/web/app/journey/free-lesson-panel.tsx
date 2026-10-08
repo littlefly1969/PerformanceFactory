@@ -13,12 +13,13 @@ export type FreeLessonView =
         | "UNAVAILABLE"
         | "LOCKED"
         | "ELIGIBLE"
+        | "DECLINED"
         | "REQUESTED"
         | "ASSIGNED"
         | "ATTENDED"
         | "NO_SHOW"
         | "CLOSED";
-      missing: Array<"LEVEL" | "CREDITS" | "CLUB">;
+      missing: Array<"LEVEL" | "CONFIDENCE">;
       credits: { balance: number; toUnlock: number };
       earn: {
         initialAssessment: number;
@@ -60,14 +61,23 @@ const when = (iso: string) =>
 const MISSING: Record<string, string> = {
   LEVEL:
     "Serve un livello stimato: rispondi ai round di calibrazione per formare gruppi omogenei.",
-  CLUB: "Nessun circolo partner offre ancora la lezione: ti avvisiamo quando c'è.",
+  CONFIDENCE:
+    "Continua con domande e micro-test: quando il tuo profilo è abbastanza attendibile, la lezione si sblocca.",
 };
 
 /**
- * La lezione gratuita come obiettivo della prova: i crediti crescono con le
- * interazioni che rendono la valutazione più affidabile, e la sbloccano.
+ * La lezione gratuita come premio per l'interesse dimostrato: si sblocca con
+ * un profilo attendibile (regola di eleggibilità), e il feedback del coach
+ * chiude R e potenziale. I crediti mostrano solo il percorso fatto (OP-01).
+ * `onChanged` avvisa il percorso quando una scelta può chiudere R.
  */
-export function FreeLessonPanel({ refreshKey }: { refreshKey: string }) {
+export function FreeLessonPanel({
+  refreshKey,
+  onChanged,
+}: {
+  refreshKey: string;
+  onChanged?: () => void;
+}) {
   const [view, setView] = useState<FreeLessonView>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -99,9 +109,10 @@ export function FreeLessonPanel({ refreshKey }: { refreshKey: string }) {
           ? data.message.join(". ")
           : (data.message ?? "Operazione non riuscita."),
       );
-      return;
+      return false;
     }
     setView(data as FreeLessonView);
+    return true;
   }, []);
 
   useEffect(() => {
@@ -148,10 +159,12 @@ export function FreeLessonPanel({ refreshKey }: { refreshKey: string }) {
       {(view.phase === "LOCKED" || view.phase === "ELIGIBLE") && (
         <>
           <p>
-            Il coach ti vede giocare e il suo giudizio rende la tua valutazione
-            più precisa. La sblocchi con i crediti: +{earn.initialAssessment}{" "}
-            con la prima valutazione, +{earn.calibrationRound} per ogni round di
-            domande, +{earn.microTest} per ogni micro-test.
+            Il coach ti vede giocare e il suo giudizio chiude la tua R e il tuo
+            potenziale. La sblocchi con un profilo attendibile: risposte
+            coerenti e micro-test. I crediti segnano il percorso fatto: +
+            {earn.initialAssessment} con la prima valutazione, +
+            {earn.calibrationRound} per ogni round di domande, +{earn.microTest}{" "}
+            per ogni micro-test.
           </p>
           <div
             className="pf4-credits"
@@ -168,14 +181,18 @@ export function FreeLessonPanel({ refreshKey }: { refreshKey: string }) {
               {credits.balance} di {credits.toUnlock} crediti
             </strong>
           </p>
-          {view.missing
-            .filter((m) => m !== "CREDITS")
-            .map((m) => (
-              <p key={m}>{MISSING[m]}</p>
-            ))}
+          {view.missing.map((m) => (
+            <p key={m}>{MISSING[m]}</p>
+          ))}
         </>
       )}
-      {view.phase === "ELIGIBLE" && (
+      {view.phase === "DECLINED" && (
+        <p>
+          Hai scelto di non fare la lezione: la tua R si chiude con le tue
+          risposte. Se cambi idea, puoi ancora richiedere il posto.
+        </p>
+      )}
+      {(view.phase === "ELIGIBLE" || view.phase === "DECLINED") && (
         <form
           className="pf4-free-lesson-request"
           onSubmit={(event) => {
@@ -214,6 +231,24 @@ export function FreeLessonPanel({ refreshKey }: { refreshKey: string }) {
           </button>
         </form>
       )}
+      {view.phase === "ELIGIBLE" && (
+        <>
+          <p>
+            La tua R e il tuo potenziale si chiudono dopo la lezione. Se
+            preferisci non farla, si chiudono con le tue risposte.
+          </p>
+          <button
+            className="pf4-link"
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              void call("/decline", {}).then((ok) => ok && onChanged?.())
+            }
+          >
+            Preferisco non fare la lezione
+          </button>
+        </>
+      )}
       {view.phase === "REQUESTED" && (
         <p>
           Richiesta inviata a {where}. Il circolo compone gruppi di livello
@@ -232,7 +267,9 @@ export function FreeLessonPanel({ refreshKey }: { refreshKey: string }) {
           className="pf4-link"
           type="button"
           disabled={busy}
-          onClick={() => void call("/withdraw", {})}
+          onClick={() =>
+            void call("/withdraw", {}).then((ok) => ok && onChanged?.())
+          }
         >
           Rinuncia al posto
         </button>

@@ -71,13 +71,6 @@ export class UpdateFreeLessonConfigDto {
   @Min(0)
   @Max(10)
   microTestsPerDay?: number;
-
-  @ApiPropertyOptional({ minimum: 0, maximum: 30 })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(30)
-  minDaysBeforeDeadline?: number;
 }
 
 export class SetClubFreeLessonsDto {

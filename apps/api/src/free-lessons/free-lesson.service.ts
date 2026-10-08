@@ -6,10 +6,19 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { AnalyticsService } from '../analytics/analytics.service';
+import { Prisma } from '@prisma/client';
+import {
+  checkRule,
+  loadActivePolicy,
+} from '../discovery/calibration/confidence-policy';
 import {
   isCalibrationOpen,
   lockCalibration,
 } from '../discovery/calibration/lesson-evidence';
+import {
+  lessonClubs,
+  settleCalibration,
+} from '../discovery/calibration/lesson-gate';
 import { FeatureFlagsService } from '../features/feature-flags.service';
 import { performanceDriverName as driverName } from '../performance/performance-display';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,6 +28,53 @@ import { holdCalibration, releaseCalibration } from './lesson-hold';
 import { MicroTestGenerationService } from './micro-test-generation.service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+type Db = PrismaService | Prisma.TransactionClient;
+
+/**
+ * Le due verifiche della lezione (PF-FS-PREPAYWALL §6.2) sull'ultima
+ * valutazione: regola di eleggibilità in vigore, livello, circoli. Restituisce
+ * anche la versione della regola e la valutazione usate, da registrare.
+ */
+async function checkLesson(db: Db, userId: string) {
+  const [calibration, seat, clubs, policy, latest] = await Promise.all([
+    db.athleteCalibration.findUnique({
+      where: { userId },
+      select: { status: true, lessonDeclinedAt: true },
+    }),
+    db.freeLessonSeat.findUnique({ where: { userId } }),
+    lessonClubs(db),
+    loadActivePolicy(db, 'LESSON_ELIGIBILITY'),
+    db.assessmentEvaluation.findFirst({
+      where: { userId },
+      orderBy: { sequence: 'desc' },
+      select: {
+        id: true,
+        overallConfidence: true,
+        areas: { select: { areaId: true, confidence: true } },
+      },
+    }),
+  ]);
+  const eligibilityMet =
+    !!latest &&
+    checkRule(policy, {
+      overallConfidence: latest.overallConfidence,
+      drivers: latest.areas,
+    }).met;
+  return {
+    seat,
+    clubs,
+    policy,
+    evaluationId: latest?.id ?? null,
+    ...lessonEligibility({
+      calibrationStatus: calibration?.status ?? null,
+      eligibilityMet,
+      clubs: clubs.length,
+      seatStatus: seat?.status ?? null,
+      declined: !!calibration?.lessonDeclinedAt,
+    }),
+  };
+}
 
 type Option = { value: string; label: string; score: number };
 
@@ -46,34 +102,27 @@ export class FreeLessonService {
       return { enabled: false as const };
     const settings = await loadFreeLessonSettings(this.prisma);
     const credits = await syncCredits(this.prisma, userId, settings);
-    const [calibration, seat, clubs, attribution] = await Promise.all([
-      this.prisma.athleteCalibration.findUnique({ where: { userId } }),
-      this.prisma.freeLessonSeat.findUnique({
+    const [calibration, attribution, check] = await Promise.all([
+      this.prisma.athleteCalibration.findUnique({
         where: { userId },
-        include: {
-          partner: { select: { name: true, city: true } },
-          lesson: {
-            select: { startsAt: true, durationMinutes: true, status: true },
-          },
-        },
-      }),
-      this.prisma.partner.findMany({
-        where: { isActive: true, freeLessonsEnabled: true },
-        select: { id: true, name: true, city: true },
-        orderBy: { name: 'asc' },
+        select: { status: true },
       }),
       this.prisma.userAttribution.findUnique({
         where: { userId },
         select: { partnerId: true },
       }),
+      checkLesson(this.prisma, userId),
     ]);
-    const { phase, missing } = lessonEligibility({
-      calibrationStatus: calibration?.status ?? null,
-      credits,
-      creditsToUnlock: settings.creditsToUnlock,
-      clubs: clubs.length,
-      seatStatus: seat?.status ?? null,
-    });
+    const { phase, missing, clubs } = check;
+    const seat = check.seat
+      ? await this.prisma.freeLessonSeat.findUniqueOrThrow({
+          where: { userId },
+          include: {
+            partner: { select: { name: true, city: true } },
+            lesson: { select: { startsAt: true, durationMinutes: true } },
+          },
+        })
+      : null;
     const clubId = clubs.some((c) => c.id === attribution?.partnerId)
       ? attribution!.partnerId
       : null;
@@ -81,12 +130,16 @@ export class FreeLessonService {
       await this.analytics.trackServerOnce('lesson_eligible', {
         userId,
         onceKey: userId,
-        properties: { club_id: clubId ?? '' },
+        properties: {
+          club_id: clubId ?? '',
+          eligibility_policy_version: check.policy.version,
+        },
       });
     return {
       enabled: true as const,
       phase,
       missing,
+      // Solo progresso visivo: i crediti non sbloccano la lezione (OP-01).
       credits: { balance: credits, toUnlock: settings.creditsToUnlock },
       earn: {
         initialAssessment: settings.creditsInitialAssessment,
@@ -285,33 +338,21 @@ export class FreeLessonService {
       select: { id: true },
     });
     if (!club) throw new BadRequestException('Circolo non disponibile');
-    const settings = await loadFreeLessonSettings(this.prisma);
-    const credits = await syncCredits(this.prisma, userId, settings);
     await this.prisma.$transaction(async (tx) => {
       await lockCalibration(tx, userId);
-      const [calibration, seat] = await Promise.all([
-        tx.athleteCalibration.findUnique({
-          where: { userId },
-          select: { status: true },
-        }),
-        tx.freeLessonSeat.findUnique({ where: { userId } }),
-      ]);
+      const { seat, phase, missing, policy, evaluationId } = await checkLesson(
+        tx,
+        userId,
+      );
       if (seat?.status === 'REQUESTED' && seat.partnerId === partnerId) return;
-      const { phase, missing } = lessonEligibility({
-        calibrationStatus: calibration?.status ?? null,
-        credits,
-        creditsToUnlock: settings.creditsToUnlock,
-        clubs: 1,
-        seatStatus:
-          seat?.status === 'WITHDRAWN' ? null : (seat?.status ?? null),
-      });
       if (phase === 'REQUESTED')
         // Cambio di circolo finché il posto non è assegnato.
         return void (await tx.freeLessonSeat.update({
           where: { userId },
           data: { partnerId },
         }));
-      if (phase !== 'ELIGIBLE')
+      // Dopo un ritiro o una rinuncia l'atleta può ancora cambiare idea.
+      if (phase !== 'ELIGIBLE' && phase !== 'DECLINED')
         throw new ConflictException({
           code: 'FREE_LESSON_NOT_ELIGIBLE',
           message: 'La lezione gratuita non è ancora disponibile.',
@@ -325,14 +366,31 @@ export class FreeLessonService {
         assignedAt: null,
         coachSharingAcceptedAt: new Date(),
         requestedAt: new Date(),
+        eligibilityPolicyId: policy.id,
+        eligibilityEvaluationId: evaluationId,
       };
       await tx.freeLessonSeat.upsert({
         where: { userId },
         create: { userId, ...data },
         update: data,
       });
+      await tx.athleteCalibration.update({
+        where: { userId },
+        data: { lessonDeclinedAt: null },
+      });
       // Dalla richiesta la lezione è il passaggio che chiude R e P.
       await holdCalibration(tx, userId);
+      await this.analytics.trackServer(
+        'lesson_requested',
+        {
+          userId,
+          properties: {
+            club_id: partnerId,
+            eligibility_policy_version: policy.version,
+          },
+        },
+        tx,
+      );
     });
     return this.view(userId);
   }
@@ -356,6 +414,35 @@ export class FreeLessonService {
         data: { status: 'WITHDRAWN', lessonId: null, assignedAt: null },
       });
       await releaseCalibration(tx, userId);
+      // Senza lezione basta la regola di confidence: R può consolidarsi ora.
+      await settleCalibration(tx, userId, now);
+    });
+    return this.view(userId);
+  }
+
+  /**
+   * L'atleta eleggibile sceglie di non fare la lezione (AT-18): R si consolida
+   * con la sola regola di confidence e il percorso verso il paywall prosegue.
+   * Reversibile con una richiesta finché R è aperta.
+   */
+  async decline(userId: string, now = new Date()) {
+    await this.requireEnabled(userId);
+    await this.prisma.$transaction(async (tx) => {
+      await lockCalibration(tx, userId);
+      const { phase } = await checkLesson(tx, userId);
+      if (phase === 'DECLINED') return;
+      if (phase !== 'ELIGIBLE')
+        throw new ConflictException({
+          code: 'FREE_LESSON_NOT_ELIGIBLE',
+          message: "Non c'è una lezione gratuita da rifiutare.",
+          phase,
+        });
+      await tx.athleteCalibration.update({
+        where: { userId },
+        data: { lessonDeclinedAt: now },
+      });
+      await this.analytics.trackServer('lesson_declined', { userId }, tx);
+      await settleCalibration(tx, userId, now);
     });
     return this.view(userId);
   }
