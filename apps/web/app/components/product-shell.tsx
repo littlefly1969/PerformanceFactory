@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { API_BASE, clearAccessToken, secureFetch } from "@/app/lib/api";
+import { API_BASE, secureFetch, signOut } from "@/app/lib/api";
 
 type NavItem = {
   href: string;
@@ -375,12 +375,7 @@ export function ProductShell({
 
   const logout = async () => {
     setLoggingOut(true);
-    await secureFetch(`${API_BASE}/auth/logout`, {
-      method: "POST",
-      credentials: "include",
-    });
-    clearAccessToken();
-    window.location.href = "/login";
+    await signOut();
   };
 
   return (

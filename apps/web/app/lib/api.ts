@@ -109,6 +109,18 @@ export async function secureFetch(input: RequestInfo | URL, init: RequestInit = 
   return response;
 }
 
+// Chiude la sessione lato server, rimuove il token locale e torna al login.
+// Il redirect avviene comunque: un errore API non deve lasciare l'utente
+// bloccato in una sessione che non puo chiudere.
+export async function signOut() {
+  try {
+    await secureFetch(`${API_BASE}/auth/logout`, { method: 'POST' });
+  } finally {
+    clearAccessToken();
+    window.location.href = '/login';
+  }
+}
+
 export async function redirectIfOnboardingRequired() {
   const response = await secureFetch(`${API_BASE}/auth/me`);
   if (!response.ok) {

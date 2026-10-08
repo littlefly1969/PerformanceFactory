@@ -12,6 +12,7 @@ import { DRAFT_KEY } from "../start/discovery-state";
 vi.mock("../lib/api", () => ({
   API_BASE: "/api",
   secureFetch: (input: RequestInfo, init?: RequestInit) => fetch(input, init),
+  signOut: () => fetch("/api/auth/logout", { method: "POST" }),
 }));
 const document = {
   type: "PRIVACY",
@@ -58,6 +59,19 @@ afterEach(() => {
   window.history.replaceState(null, "", "/journey");
 });
 describe("PF4 authenticated journey functions", () => {
+  it("lets the athlete log out during the journey", async () => {
+    const requests: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        requests.push(url);
+        return new Response(JSON.stringify(base));
+      }),
+    );
+    render(<JourneyPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Esci" }));
+    expect(requests).toContain("/api/auth/logout");
+  });
   it("renders server questions and stops after the last answer without submitting", async () => {
     let state = { ...base };
     const requests: { url: string; body: Record<string, unknown> }[] = [];

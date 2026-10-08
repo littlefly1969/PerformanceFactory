@@ -27,6 +27,14 @@
   align-items: center;
   gap: 12px;
 }
+.pf4-athlete-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.pf4-athlete-header .pf4-logout {
+  font-size: 10px;
+}
 .pf4-athlete-header b {
   font-size: 23px;
   letter-spacing: -2px;

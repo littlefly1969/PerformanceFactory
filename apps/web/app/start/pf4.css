@@ -100,6 +100,28 @@
   font-size: 18px;
   text-align: left;
 }
+.pf4-header-with-logout {
+  grid-template-columns: 56px 1fr 56px;
+}
+.pf4-logout {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: #0b0b0c;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.pf4-header .pf4-logout {
+  font-size: 10px;
+  text-align: right;
+}
+.pf4-logout:disabled {
+  color: #8a8a8f;
+  cursor: default;
+}
 .pf4-progress {
   display: flex;
   gap: 4px;
