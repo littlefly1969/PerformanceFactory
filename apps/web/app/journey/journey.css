@@ -272,6 +272,58 @@
   line-height: 24px;
   margin-bottom: 12px;
 }
+.pf4 .pf4-free-lesson {
+  border-top: 1px solid #eaeae7;
+}
+.pf4-credits {
+  height: 8px;
+  border-radius: 4px;
+  background: #eaeae7;
+  overflow: hidden;
+  margin-top: 16px;
+}
+.pf4-credits span {
+  display: block;
+  height: 100%;
+  background: #1f1f1c;
+}
+.pf4-free-lesson-request {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+.pf4-free-lesson-request label {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  line-height: 20px;
+}
+.pf4-free-lesson-request select {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #d6d6d1;
+  border-radius: 8px;
+  background: #fff;
+  font: inherit;
+}
+.pf4-free-lesson .pf4-link {
+  margin-top: 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.pf4-micro-tests fieldset {
+  border: 0;
+  padding: 0;
+  margin: 24px 0 0;
+}
+.pf4-micro-tests legend {
+  font-size: 16px;
+  line-height: 24px;
+}
 
 .pf4 .pf4-scenario-grid {
   display: grid;

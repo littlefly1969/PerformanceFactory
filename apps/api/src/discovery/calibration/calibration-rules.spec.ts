@@ -88,4 +88,45 @@ describe('calibration rules', () => {
   it('refuses a closing day after the deadline', () => {
     expect(settingsProblems({ ...settings, closingDay: 31 })).toHaveLength(1);
   });
+
+  it('keeps R open while the free lesson is pending, except at the closing assessment', () => {
+    const above = { levelConfidence: 80, drivers: drivers(75, 90) };
+    expect(
+      statusAfterEvaluation(
+        'FREE_LESSON_VALIDATION',
+        above,
+        settings,
+        'ADAPTIVE',
+        true,
+      ),
+    ).toEqual({ status: 'FREE_LESSON_VALIDATION', levelEstimated: false });
+    expect(
+      statusAfterEvaluation(
+        'FREE_LESSON_VALIDATION',
+        above,
+        settings,
+        'CLOSING',
+        true,
+      ).status,
+    ).toBe('CALIBRATION_COMPLETED');
+    // Feedback valutato: la soglia torna a chiudere.
+    expect(
+      statusAfterEvaluation(
+        'FREE_LESSON_VALIDATION',
+        above,
+        settings,
+        'ADAPTIVE',
+        false,
+      ).completionReason,
+    ).toBe('CONFIDENCE_REACHED');
+    expect(
+      statusAfterEvaluation(
+        'FREE_LESSON_VALIDATION',
+        { levelConfidence: 80, drivers: drivers(40, 90) },
+        settings,
+        'ADAPTIVE',
+        false,
+      ),
+    ).toEqual({ status: 'FREE_LEVEL_ESTIMATED', levelEstimated: false });
+  });
 });

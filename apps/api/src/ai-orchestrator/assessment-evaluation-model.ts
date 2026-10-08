@@ -41,8 +41,12 @@ export type AssessmentEvaluationDriver = {
     AssessmentEvaluationAnswer & {
       optionScore: number | null;
       optionScoreRange: { min: number; max: number } | null;
-      /** ASSESSMENT per il primo set, CALIBRATION per i round successivi. */
-      source?: 'ASSESSMENT' | 'CALIBRATION';
+      /**
+       * ASSESSMENT per il primo set, CALIBRATION per i round successivi,
+       * MICRO_TEST per gli esiti riportati dall'atleta, COACH_LESSON per il
+       * feedback del coach dopo la lezione gratuita.
+       */
+      source?: 'ASSESSMENT' | 'CALIBRATION' | 'MICRO_TEST' | 'COACH_LESSON';
     }
   >;
   /** Stima precedente del driver, presente dalla seconda valutazione. */
@@ -104,7 +108,18 @@ export function assessmentFormatRules(input: AssessmentEvaluationInput) {
     `- summary: massimo ${ASSESSMENT_LIMITS.summary} caratteri; overallConfidence: intero tra 0 e 100.`,
     `- level: uno tra ${ATHLETE_LEVELS.join(', ')}; levelConfidence: intero tra 0 e 100.`,
     `- commitment: per ogni driver uno tra ${COMMITMENT_LEVELS.join(', ')}.`,
+    ...(hasSource(input, 'MICRO_TEST', 'COACH_LESSON')
+      ? [
+          'FONTI DELLE EVIDENZE (fisso): source MICRO_TEST è l’esito di un esercizio breve riportato dall’atleta, più oggettivo di un’autovalutazione. source COACH_LESSON è il giudizio di un coach che ha visto l’atleta giocare: è la fonte più autorevole per il suo driver e può alzarne la confidenza più delle altre, ma non cancella le risposte dell’atleta.',
+        ]
+      : []),
   ].join('\n');
+}
+
+function hasSource(input: AssessmentEvaluationInput, ...sources: string[]) {
+  return input.drivers.some((d) =>
+    d.answers.some((a) => a.source && sources.includes(a.source)),
+  );
 }
 
 export function buildAssessmentJsonSchema() {

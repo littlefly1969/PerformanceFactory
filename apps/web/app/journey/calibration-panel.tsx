@@ -114,6 +114,12 @@ export function CalibrationPanel({
           {confidenceLabel(evaluation.levelConfidence ?? 0)}).
         </p>
       )}
+      {c.status === "FREE_LESSON_VALIDATION" && (
+        <p role="status">
+          Hai un posto nella lezione gratuita: la tua R si chiude dopo il
+          feedback del coach del circolo.
+        </p>
+      )}
       {completed ? (
         <p>
           {c.completionReason === "CONFIDENCE_REACHED"

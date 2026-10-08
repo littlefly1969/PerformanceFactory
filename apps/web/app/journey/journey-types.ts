@@ -58,6 +58,7 @@ export type Calibration = {
   status:
     | "FREE_CALIBRATING"
     | "FREE_LEVEL_ESTIMATED"
+    | "FREE_LESSON_VALIDATION"
     | "CALIBRATION_COMPLETED"
     | "PAYWALL_READY";
   day: number;

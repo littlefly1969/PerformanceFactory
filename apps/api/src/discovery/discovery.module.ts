@@ -35,6 +35,10 @@ import { CalibrationAdminController } from './calibration/calibration-admin.cont
     CalibrationService,
     ScenariosService,
   ],
-  exports: [AthleteRegistrationService, AthleteJourneyService],
+  exports: [
+    AthleteRegistrationService,
+    AthleteJourneyService,
+    CalibrationService,
+  ],
 })
 export class DiscoveryModule {}

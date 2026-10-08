@@ -5,6 +5,8 @@
 export type CalibrationStatus =
   | 'FREE_CALIBRATING'
   | 'FREE_LEVEL_ESTIMATED'
+  /** Posto assegnato alla lezione gratuita: R resta aperta fino al feedback del coach (A4.8). */
+  | 'FREE_LESSON_VALIDATION'
   | 'CALIBRATION_COMPLETED'
   /** Orizzonte scelto dopo il reveal di P3/P6/P12: pronto per l'offerta. */
   | 'PAYWALL_READY';
@@ -91,12 +93,16 @@ export function nextRoundAt(
  * Stato dopo una valutazione. Si chiude quando tutti i driver raggiungono la
  * soglia, oppure con l'assessment di chiusura anche se la soglia manca: in
  * quel caso R resta con la sua confidence reale, nessun valore viene inventato.
+ * Con la lezione gratuita in attesa (posto assegnato o feedback del coach non
+ * ancora valutato) la soglia non chiude: il coach deve poter pesare su R.
+ * L'assessment di chiusura e la scadenza restano il tetto.
  */
 export function statusAfterEvaluation(
   current: CalibrationStatus,
   evaluation: { levelConfidence: number | null; drivers: EvaluatedDriver[] },
   settings: CalibrationSettings,
   roundKind: 'INITIAL' | 'ADAPTIVE' | 'CLOSING',
+  lessonPending = false,
 ): {
   status: CalibrationStatus;
   completionReason?: 'CONFIDENCE_REACHED' | 'CLOSING_ASSESSMENT';
@@ -112,7 +118,7 @@ export function statusAfterEvaluation(
     evaluation.drivers.every(
       (d) => d.confidence >= settings.confidenceThreshold,
     );
-  if (reached)
+  if (reached && !lessonPending)
     return {
       status: 'CALIBRATION_COMPLETED',
       completionReason: 'CONFIDENCE_REACHED',
@@ -125,9 +131,21 @@ export function statusAfterEvaluation(
       levelEstimated,
     };
   return {
-    status: levelEstimated ? 'FREE_LEVEL_ESTIMATED' : current,
+    status: openStatus(current, levelEstimated, lessonPending),
     levelEstimated,
   };
+}
+
+/** Stato aperto: la validazione della lezione prevale, poi il livello stimato. */
+export function openStatus(
+  current: CalibrationStatus,
+  levelEstimated: boolean,
+  lessonPending: boolean,
+): CalibrationStatus {
+  if (lessonPending) return 'FREE_LESSON_VALIDATION';
+  if (levelEstimated || current === 'FREE_LESSON_VALIDATION')
+    return 'FREE_LEVEL_ESTIMATED';
+  return current;
 }
 
 /** Parametri coerenti: chiusura prima della scadenza, soglie in 0-100. */

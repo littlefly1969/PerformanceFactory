@@ -20,6 +20,12 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { loadCalibrationSettings } from './calibration-config';
 import { closeAtDeadline, completeCalibration } from './calibration-completion';
 import {
+  addLessonEvidence,
+  isLessonPending,
+  lockCalibration,
+} from './lesson-evidence';
+import { evaluatePendingFeedback, linkFeedback } from './lesson-feedback';
+import {
   CalibrationStatus,
   dayOf,
   isCalibrationClosed,
@@ -196,6 +202,8 @@ export class CalibrationService {
       // Un round già aperto vale per tutte le richieste concorrenti.
       if (rounds.some((r) => r.status === 'OPEN' || r.status === 'EVALUATING'))
         return;
+      // Il feedback del coach non ancora valutato passa prima di nuove domande.
+      if (await this.evaluatePendingFeedback(userId)) return;
       // L'intervallo parte dalla valutazione del round precedente, non dalla sua apertura.
       const available = nextRoundAt(
         await this.lastEvaluatedAt(userId),
@@ -221,8 +229,15 @@ export class CalibrationService {
         evidenceGaps: a.evidenceGaps as string[],
       }));
       const targets = roundTargets(drivers, kind, settings);
-      // Nessun driver sotto soglia: la valutazione corrente chiude già la calibrazione.
+      // Nessun driver sotto soglia: la valutazione corrente chiude già la
+      // calibrazione, salvo che la lezione gratuita sia ancora in attesa.
       if (!targets.length) {
+        if (await isLessonPending(this.prisma, userId))
+          throw new ConflictException({
+            code: 'CALIBRATION_WAITING_LESSON',
+            message:
+              'La tua R si chiude dopo la lezione con il coach del circolo.',
+          });
         await this.prisma.$transaction((tx) =>
           completeCalibration(tx, userId, 'CONFIDENCE_REACHED', now),
         );
@@ -344,24 +359,18 @@ export class CalibrationService {
       userId,
       rounds.filter((r) => r.status === 'EVALUATED' || r.id === roundId),
     );
+    const feedbackIds = await addLessonEvidence(this.prisma, userId, input);
     const result = await this.ai.evaluateAssessment(input);
     const settings = await loadCalibrationSettings(this.prisma);
     const now = new Date();
     await this.prisma.$transaction(async (tx) => {
+      // Lock della riga: un posto assegnato in questo momento sospende la chiusura.
+      await lockCalibration(tx, userId);
       const calibration = await tx.athleteCalibration.findUniqueOrThrow({
         where: { userId },
       });
       // Chiusa nel frattempo (scadenza): nessuna valutazione oltre quella consolidata.
       if (isCalibrationClosed(calibration.status)) throw new RoundNotOwned();
-      const next = statusAfterEvaluation(
-        calibration.status as CalibrationStatus,
-        {
-          levelConfidence: result.output.levelConfidence,
-          drivers: result.output.drivers,
-        },
-        settings,
-        round.kind as RoundKind,
-      );
       const last = await tx.assessmentEvaluation.findFirstOrThrow({
         where: { userId },
         orderBy: { sequence: 'desc' },
@@ -383,6 +392,17 @@ export class CalibrationService {
         },
       });
       if (!linked.count) throw new RoundNotOwned();
+      await linkFeedback(tx, feedbackIds, saved.id);
+      const next = statusAfterEvaluation(
+        calibration.status as CalibrationStatus,
+        {
+          levelConfidence: result.output.levelConfidence,
+          drivers: result.output.drivers,
+        },
+        settings,
+        round.kind as RoundKind,
+        await isLessonPending(tx, userId),
+      );
       const reason =
         next.completionReason ??
         (calibration.deadlineAt <= now ? 'DEADLINE_REACHED' : undefined);
@@ -396,6 +416,30 @@ export class CalibrationService {
           },
         });
     });
+  }
+
+  /**
+   * Valuta il feedback del coach appena arrivato, senza aspettare un round:
+   * è la fonte che la lezione gratuita deve far pesare su R prima della
+   * chiusura. Se l'atleta ha un'operazione in corso si riprova al prossimo
+   * round; l'attesa della lezione resta finché il feedback non è valutato.
+   */
+  async evaluateLessonFeedback(userId: string) {
+    const lease = await this.tryClaim(userId);
+    if (!lease) return false;
+    try {
+      await requireAiConsent(this.prisma, userId);
+      return await this.evaluatePendingFeedback(userId);
+    } finally {
+      await this.release(userId, lease);
+    }
+  }
+
+  /** Va chiamata sotto il lease dell'atleta. */
+  private evaluatePendingFeedback(userId: string) {
+    return evaluatePendingFeedback(this.prisma, this.ai, userId, (rounds) =>
+      this.evaluationInput(userId, rounds),
+    );
   }
 
   /**

@@ -14,6 +14,11 @@ export const CLIENT_EVENTS = [
 export const SERVER_EVENTS = [
   'registration_completed',
   'program_horizon_selected',
+  // Lezione gratuita (event map A7).
+  'lesson_eligible',
+  'lesson_booked',
+  'lesson_completed',
+  'coach_feedback_submitted',
 ] as const;
 
 export type ClientEventName = (typeof CLIENT_EVENTS)[number];
