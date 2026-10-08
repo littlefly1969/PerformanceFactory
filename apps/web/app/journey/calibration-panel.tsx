@@ -32,10 +32,14 @@ function RoundForm({
         if (complete) onSubmit(answers);
       }}
     >
+      {round.action === "REQUEST_CLARIFICATION" && (
+        <p className="pf4-kicker">Un chiarimento</p>
+      )}
       {round.questions.map((q, index) => (
         <fieldset key={q.id}>
           <legend>
-            {index + 1}. {q.text}
+            {round.questions.length > 1 ? `${index + 1}. ` : ""}
+            {q.text}
           </legend>
           <div className="pf4-options">
             {q.options.map((o) => (
@@ -55,7 +59,11 @@ function RoundForm({
         </fieldset>
       ))}
       <button className="pf4-cta" disabled={busy || !complete}>
-        {busy ? "Aggiorniamo la tua valutazione…" : "Invia le risposte →"}
+        {busy
+          ? "Aggiorniamo la tua valutazione…"
+          : round.questions.length > 1
+            ? "Invia le risposte →"
+            : "Invia la risposta →"}
       </button>
     </form>
   );

@@ -27,8 +27,6 @@ export type CalibrationSettings = {
   levelConfidenceThreshold: number;
   /** Durata indicativa della fase gratuita: non chiude né consolida R. */
   maxDays: number;
-  questionsPerDriver: number;
-  driversPerRound: number;
   /** Decisione 13 aperta: il Blueprint (A4.6) non dà programmi prima del paywall. */
   programBeforePaywall: boolean;
 };
@@ -36,8 +34,6 @@ export type CalibrationSettings = {
 export const DEFAULT_CALIBRATION_SETTINGS: CalibrationSettings = {
   levelConfidenceThreshold: 50,
   maxDays: 30,
-  questionsPerDriver: 2,
-  driversPerRound: 2,
   programBeforePaywall: false,
 };
 
@@ -70,15 +66,15 @@ export const dayOf = (startedAt: Date, now: Date) =>
   Math.max(1, Math.floor((now.getTime() - startedAt.getTime()) / DAY_MS) + 1);
 
 /**
- * Driver da approfondire: quelli sotto la soglia per area della regola di
- * consolidamento, dal meno affidabile. Se la regola manca solo per la
- * confidence complessiva (o non ha soglia per area) si approfondiscono i
- * driver meno affidabili. Regola soddisfatta: nessun driver.
+ * Driver in focus per il prossimo passo: quelli sotto la soglia per area
+ * della regola di consolidamento, dal meno affidabile. Se la regola manca solo
+ * per la confidence complessiva (o non ha soglia per area) sono in focus tutti.
+ * Quanti e quali approfondire lo decide l'AI (§4.2); regola soddisfatta:
+ * nessun driver.
  */
-export function roundTargets<T extends EvaluatedDriver>(
+export function focusDrivers<T extends EvaluatedDriver>(
   evaluation: { overallConfidence: number; drivers: T[] },
   rule: ConfidenceRule,
-  settings: CalibrationSettings,
 ): T[] {
   const check = checkRule(rule, evaluation);
   if (check.met) return [];
@@ -86,10 +82,7 @@ export function roundTargets<T extends EvaluatedDriver>(
     (a, b) => a.confidence - b.confidence,
   );
   const below = byConfidence.filter((d) => check.belowAreas.includes(d.areaId));
-  return (below.length ? below : byConfidence).slice(
-    0,
-    settings.driversPerRound,
-  );
+  return below.length ? below : byConfidence;
 }
 
 /**

@@ -761,6 +761,7 @@ describe('PF4 discovery to authenticated journey', () => {
       round: {
         id: string;
         kind: string;
+        action: string | null;
         questions: Array<{
           id: string;
           areaId: string;
@@ -778,7 +779,8 @@ describe('PF4 discovery to authenticated journey', () => {
       round: null,
     });
 
-    // Doppio click: un solo round, con domande sui due driver meno affidabili.
+    // Doppio click: un solo passo. L'AI (stub) sceglie un gruppo con una
+    // domanda per driver in focus, senza quote fisse per driver (AT-07/AT-09).
     const opened = await Promise.all([
       post('calibration/round'),
       post('calibration/round'),
@@ -786,9 +788,17 @@ describe('PF4 discovery to authenticated journey', () => {
     expect(opened.every((r) => [201, 409].includes(r.statusCode))).toBe(true);
     expect(await prisma.calibrationRound.count({ where: { userId } })).toBe(1);
     const round = (await calibration()).calibration.round!;
-    expect(round.kind).toBe('ADAPTIVE');
-    expect(round.questions).toHaveLength(4);
-    expect(new Set(round.questions.map((q) => q.areaId)).size).toBe(2);
+    expect(round).toMatchObject({ kind: 'ADAPTIVE', action: 'ASK_GROUP' });
+    const areas = new Set(round.questions.map((q) => q.areaId));
+    expect(areas.size).toBe(round.questions.length);
+    // La decisione del passo resta registrata con aree e motivo (§10.2).
+    expect(
+      await prisma.calibrationRound.findFirstOrThrow({ where: { userId } }),
+    ).toMatchObject({ action: 'ASK_GROUP', targetAreas: [...areas] });
+    expect(
+      (await prisma.calibrationRound.findFirstOrThrow({ where: { userId } }))
+        .rationale,
+    ).toBeTruthy();
     // Lo score delle opzioni non arriva all'atleta.
     for (const q of round.questions)
       for (const o of q.options) expect(o).not.toHaveProperty('score');
@@ -862,7 +872,7 @@ describe('PF4 discovery to authenticated journey', () => {
     expect(second.level).toBeTruthy();
     const targeted = new Set(round.questions.map((q) => q.areaId));
     for (const area of second.areas)
-      expect(area.confidence).toBe(targeted.has(area.areaId) ? 60 : 30);
+      expect(area.confidence).toBe(targeted.has(area.areaId) ? 45 : 30);
     expect(await prisma.assessmentEvaluation.count({ where: { userId } })).toBe(
       2,
     );
@@ -883,7 +893,7 @@ describe('PF4 discovery to authenticated journey', () => {
     ).prompt.user.drivers.flatMap((d) =>
       d.answers.filter((x) => x.source === 'CALIBRATION').map((x) => x.answer),
     );
-    expect(evaluated).toHaveLength(4);
+    expect(evaluated).toHaveLength(round.questions.length);
     expect(new Set(evaluated)).toEqual(new Set(['Sempre']));
 
     // Nessun programma durante la calibrazione, salvo il parametro di back office.
@@ -917,8 +927,17 @@ describe('PF4 discovery to authenticated journey', () => {
     expect((await post('calibration/round')).statusCode).toBe(201);
     const next = (await calibration()).calibration.round!;
     expect(next.kind).toBe('ADAPTIVE');
-    // Il round va sui driver ancora sotto la soglia per area della regola.
-    expect(next.questions.every((q) => !targeted.has(q.areaId))).toBe(true);
+    // Il passo va solo sui driver ancora sotto la soglia per area della regola.
+    const consolidation = await loadActivePolicy(prisma, 'R_CONSOLIDATION');
+    const confidence = new Map(
+      second.areas.map((a) => [a.areaId, a.confidence]),
+    );
+    expect(next.questions.length).toBeGreaterThan(0);
+    expect(
+      next.questions.every(
+        (q) => confidence.get(q.areaId)! < consolidation.minAreaConfidence!,
+      ),
+    ).toBe(true);
 
     // AT-19/AT-27: il tempo trascorso non cambia il tipo di round né chiude R.
     const past = (days: number) => new Date(Date.now() - days * 86400000);
@@ -948,8 +967,11 @@ describe('PF4 discovery to authenticated journey', () => {
       }),
     ).toMatchObject({ status: 'EVALUATED', answersJson: pick(next, -1) });
     const stillOpen = (await calibration()).calibration;
+    // Aperta: livello eventualmente stimato, R non consolidata.
+    expect(['FREE_CALIBRATING', 'FREE_LEVEL_ESTIMATED']).toContain(
+      stillOpen.status,
+    );
     expect(stillOpen).toMatchObject({
-      status: 'FREE_CALIBRATING',
       completionReason: null,
       nextRoundKind: 'ADAPTIVE',
     });

@@ -8,8 +8,6 @@ import { ConfidencePolicies } from "./confidence-policies";
 type Settings = {
   levelConfidenceThreshold: number;
   maxDays: number;
-  questionsPerDriver: number;
-  driversPerRound: number;
   programBeforePaywall: boolean;
 };
 
@@ -26,16 +24,6 @@ const FIELDS: { key: NumericKey; label: string; hint: string }[] = [
     key: "maxDays",
     label: "Durata indicativa in giorni",
     hint: "Riferimento dei ~30 giorni del Blueprint: non chiude e non consolida R.",
-  },
-  {
-    key: "driversPerRound",
-    label: "Driver per round",
-    hint: "Quanti driver meno affidabili approfondire in ogni round normale.",
-  },
-  {
-    key: "questionsPerDriver",
-    label: "Domande per driver",
-    hint: "Domande scritte dall'AI per ogni driver del round.",
   },
 ];
 

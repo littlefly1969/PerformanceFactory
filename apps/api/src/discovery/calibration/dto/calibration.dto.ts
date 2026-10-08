@@ -39,20 +39,6 @@ export class UpdateCalibrationConfigDto {
   @Max(90)
   maxDays?: number;
 
-  @ApiPropertyOptional({ minimum: 1, maximum: 4 })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(4)
-  questionsPerDriver?: number;
-
-  @ApiPropertyOptional({ minimum: 1, maximum: 6 })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(6)
-  driversPerRound?: number;
-
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()

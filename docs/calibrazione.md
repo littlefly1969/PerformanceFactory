@@ -51,14 +51,22 @@ Tutte in `apps/api/src/discovery/calibration/calibration-rules.ts`, senza I/O:
 - **Inizio**: alla prima visita dopo la valutazione nasce `AthleteCalibration`, con
   inizio pari alla data della prima valutazione. `deadlineAt` (inizio + `maxDays`)
   resta come riferimento indicativo: non chiude e non consolida R.
-- **Driver del round**: quelli sotto la soglia per area di `R_CONSOLIDATION`, dal
-  meno affidabile, fino a `driversPerRound`. Se manca solo la confidence
-  complessiva (o la regola non ha soglia per area) si approfondiscono i driver
-  meno affidabili. I round sono tutti `ADAPTIVE`.
-- **Domande**: l'AI scrive `questionsPerDriver` domande per driver partendo dalle
-  lacune (`evidenceGaps`) dell'ultima valutazione. Il formato è validato
-  (`calibration-questions.ts`): da 3 a 5 opzioni, score nella scala attiva, nessuna
-  etichetta duplicata. All'atleta gli score delle opzioni non arrivano mai.
+- **Driver in focus** (`focusDrivers`): quelli sotto la soglia per area di
+  `R_CONSOLIDATION`, dal meno affidabile; se manca solo la confidence complessiva
+  (o la regola non ha soglia per area) sono in focus tutti. L'AI riceve tutti i
+  driver con il loro focus e chiede solo su quelli in focus: un driver con
+  evidenze sufficienti non riceve domande (AT-07). I round sono tutti `ADAPTIVE`.
+- **Prossimo passo deciso dall'AI** (§4.2, scelta C; `calibration-questions.ts`):
+  `ASK_SINGLE` (1 domanda, quando la risposta cambierà la successiva), `ASK_GROUP`
+  (da 2 a 6 domande indipendenti) o `REQUEST_CLARIFICATION` (1 domanda neutra su
+  una contraddizione), con un motivo sintetico. Nessun numero di domande per
+  driver; 6 è solo il limite di un passo a schermo. Il backend valida azione,
+  numero di domande coerente con l'azione, driver in focus, da 3 a 5 opzioni con
+  score nella scala attiva, nessuna domanda già fatta. Azione, aree e motivo
+  restano sul round (`action`, `targetAreas`, `rationale`, §10.2). Prontezza al
+  reveal e alla lezione restano del server (regole versionate), micro-test come
+  passo con la slice 4. All'atleta gli score delle opzioni e il motivo non
+  arrivano mai.
 - **Ritmo**: nessuno. Il round successivo si apre appena il precedente è valutato;
   restano solo il lease tecnico per atleta e il rate limit dell'API, mai mostrati
   come attese (§4.3, OP-09).
@@ -139,7 +147,7 @@ Il livello si mostra all'atleta solo da `FREE_LEVEL_ESTIMATED` in poi.
 | Tabella | Contenuto |
 |---|---|
 | `AthleteCalibration` | stato, inizio, scadenza indicativa, `levelEstimatedAt`, `completedAt`, `completionReason`, `consolidationPolicyId`, lease |
-| `CalibrationRound` | `sequence`, `kind` (`ADAPTIVE`/`CLOSING`), stato (`OPEN`/`EVALUATING`/`EVALUATED`/`EXPIRED`), domande e risposte, `evaluationToken`, `evaluatedAt`, provider, modello, versione e hash del prompt, valutazione prodotta |
+| `CalibrationRound` | `sequence`, `kind` (`ADAPTIVE`/`CLOSING`), `action`, `targetAreas`, `rationale`, stato (`OPEN`/`EVALUATING`/`EVALUATED`/`EXPIRED`), domande e risposte, `evaluationToken`, `evaluatedAt`, provider, modello, versione e hash del prompt, valutazione prodotta |
 | `CalibrationConfig` | riga `default` con i parametri dei round, `updatedById` con FK su `User` |
 | `ConfidencePolicy` | regole versionate `R_CONSOLIDATION` e `LESSON_ELIGIBILITY`, autore e nota |
 | `AssessmentEvaluation` | nuovi campi `level`, `levelConfidence` |
@@ -148,7 +156,9 @@ Il livello si mostra all'atleta solo da `FREE_LEVEL_ESTIMATED` in poi.
 
 Migrazioni: `20261008090000_calibration_rounds`,
 `20261011090000_confidence_policies` (regole, rimozione di soglia, giorno di chiusura
-e ore fra round da `CalibrationConfig`, riapertura delle chiusure a tempo deboli).
+e ore fra round da `CalibrationConfig`, riapertura delle chiusure a tempo deboli),
+`20261013090000_calibration_next_step` (decisione del passo sul round, via driver e
+domande per round).
 
 ## API
 
@@ -167,9 +177,9 @@ vigore, round aperto senza score) durante la fase `EVALUATION`.
 ## Back office e AI Tuner
 
 - `/admin/calibration`: le due regole di confidence (pubblica nuova versione,
-  storico) e i parametri dei round. Default: soglia livello 50, 30 giorni
-  indicativi, 2 driver per round, 2 domande per driver, programma prima del
-  paywall spento.
+  storico) e i parametri della calibrazione. Default: soglia livello 50, 30 giorni
+  indicativi, programma prima del paywall spento. Quanti driver e quante domande
+  per passo lo decide l'AI.
 - `/ai-tuner/prompts/calibrazione`: prompt delle domande, con le stesse regole di
   bozza, attivazione e versione del prompt di valutazione (`promptType =
   CALIBRATION_QUESTIONS`). **Prova la bozza** usa un caso sintetico con due driver a

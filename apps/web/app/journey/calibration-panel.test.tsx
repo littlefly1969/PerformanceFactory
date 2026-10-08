@@ -36,6 +36,7 @@ const base: Calibration = {
 const round: NonNullable<Calibration["round"]> = {
   id: "r1",
   kind: "ADAPTIVE",
+  action: "ASK_GROUP",
   status: "OPEN",
   questions: [
     {
@@ -103,6 +104,25 @@ describe("free calibration panel", () => {
     await userEvent.click(screen.getByRole("button", { name: "Sì" }));
     await userEvent.click(send);
     expect(onAnswer).toHaveBeenCalledWith("r1", { q1: "1", q2: "1" });
+  });
+
+  it("AT-08: shows a single question or a clarification without numbering", async () => {
+    const { onAnswer } = renderPanel({
+      ...base,
+      round: {
+        ...round,
+        action: "REQUEST_CLARIFICATION",
+        questions: [round.questions[0]],
+      },
+    });
+    expect(screen.getByText("Un chiarimento")).toBeVisible();
+    expect(screen.getByText("Quante volte giochi a settimana?")).toBeVisible();
+    expect(screen.queryByText(/^1\./)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Una" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Invia la risposta →" }),
+    );
+    expect(onAnswer).toHaveBeenCalledWith("r1", { q1: "0" });
   });
 
   it("AT-10: offers the next round right away, without waiting", () => {

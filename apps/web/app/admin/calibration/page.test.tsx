@@ -26,8 +26,6 @@ vi.mock("@/app/lib/api", () => ({
 const settings = {
   levelConfidenceThreshold: 50,
   maxDays: 30,
-  questionsPerDriver: 2,
-  driversPerRound: 2,
   programBeforePaywall: false,
 };
 
