@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   areaOptionsOf,
-  EXPECTED_AREA_QUESTIONS,
+  MAX_AREA_QUESTIONS,
   loadPf4AssessmentConfiguration,
   semanticRoleOf,
 } from '../discovery/assessment-configuration';
@@ -22,8 +22,8 @@ import {
   UpdateAssessmentTemplateDto,
 } from './dto/assessment-template.dto';
 
-const TOO_FEW = `Ogni driver attivo deve avere esattamente ${EXPECTED_AREA_QUESTIONS} domande. Disattiva il driver oppure configura una domanda sostitutiva.`;
-const TOO_MANY = `Il driver può avere esattamente ${EXPECTED_AREA_QUESTIONS} domande attive.`;
+const TOO_FEW = 'L’anamnesi deve avere almeno una domanda di driver attiva.';
+const TOO_MANY = `Il driver può avere al massimo ${MAX_AREA_QUESTIONS} domande attive.`;
 const LOCKED =
   'Domanda di sistema: alimenta direttamente la programmazione degli allenamenti e non si modifica.';
 
@@ -59,7 +59,7 @@ export async function listAssessmentTemplates(prisma: PrismaService) {
   ]);
   return {
     sportKey: config.sportKey,
-    expectedPerArea: EXPECTED_AREA_QUESTIONS,
+    maxPerArea: MAX_AREA_QUESTIONS,
     operational: operational
       .filter((t) => semanticRoleOf(t))
       .map((t) => ({ ...view(t), semanticRole: semanticRoleOf(t)! })),
@@ -111,31 +111,30 @@ async function editableTemplate(prisma: PrismaService, id: string) {
 }
 
 /**
- * Nessuna operazione lascia un driver con un numero diverso di domande attive.
- * Se la configurazione e gia invalida, sono ammesse solo modifiche che la
- * avvicinano al numero previsto.
+ * Nessuna operazione porta un driver oltre il massimo di domande attive o
+ * lascia l'anamnesi senza domande di driver. Se la configurazione è già
+ * invalida, sono ammesse le modifiche che la avvicinano a una valida.
  */
 async function assertActiveCount(
   prisma: PrismaService,
-  sportKey: string,
+  config: { sportKey: string; areas: { id: string }[] },
   areaId: string,
   delta: number,
 ) {
   if (!delta) return;
-  const active = await prisma.onboardingQuestionTemplate.count({
-    where: {
-      scope: OnboardingQuestionScope.AREA,
-      areaId,
-      isActive: true,
-      optionsJson: { path: ['sportKey'], equals: sportKey },
-    },
-  });
-  const after = active + delta;
-  const distance = (n: number) => Math.abs(n - EXPECTED_AREA_QUESTIONS);
-  if (after !== EXPECTED_AREA_QUESTIONS && distance(after) >= distance(active))
-    throw new BadRequestException(
-      after > EXPECTED_AREA_QUESTIONS ? TOO_MANY : TOO_FEW,
-    );
+  const active = (areaIds: string[]) =>
+    prisma.onboardingQuestionTemplate.count({
+      where: {
+        scope: OnboardingQuestionScope.AREA,
+        areaId: { in: areaIds },
+        isActive: true,
+        optionsJson: { path: ['sportKey'], equals: config.sportKey },
+      },
+    });
+  if (delta > 0 && (await active([areaId])) + delta > MAX_AREA_QUESTIONS)
+    throw new BadRequestException(TOO_MANY);
+  if (delta < 0 && (await active(config.areas.map((a) => a.id))) + delta < 1)
+    throw new BadRequestException(TOO_FEW);
 }
 
 export async function createAssessmentTemplate(
@@ -147,8 +146,7 @@ export async function createAssessmentTemplate(
   if (!config.areas.some((a) => a.id === body.areaId))
     throw new BadRequestException('Il driver non è attivo per lo sport PF4');
   const isActive = body.isActive ?? true;
-  if (isActive)
-    await assertActiveCount(prisma, config.sportKey, body.areaId, 1);
+  if (isActive) await assertActiveCount(prisma, config, body.areaId, 1);
   const last = await prisma.onboardingQuestionTemplate.aggregate({
     where: {
       scope: OnboardingQuestionScope.AREA,
@@ -190,7 +188,7 @@ export async function updateAssessmentTemplate(
   if (body.isActive !== undefined && body.isActive !== template.isActive)
     await assertActiveCount(
       prisma,
-      config.sportKey,
+      config,
       template.areaId!,
       body.isActive ? 1 : -1,
     );
@@ -224,7 +222,7 @@ export async function deleteAssessmentTemplate(
 ) {
   const { template, config } = await editableTemplate(prisma, id);
   if (template.isActive)
-    await assertActiveCount(prisma, config.sportKey, template.areaId!, -1);
+    await assertActiveCount(prisma, config, template.areaId!, -1);
   await prisma.onboardingQuestionTemplate.delete({ where: { id } });
   return { id, deleted: true };
 }

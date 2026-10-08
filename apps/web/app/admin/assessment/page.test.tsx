@@ -37,7 +37,7 @@ const options = [
 ];
 const list = (): AssessmentList => ({
   sportKey: "PADEL",
-  expectedPerArea: 2,
+  maxPerArea: 4,
   operational: [
     {
       id: "days",
@@ -127,7 +127,9 @@ describe("Admin assessment editor", () => {
     );
     expect(within(row).queryByRole("button")).not.toBeInTheDocument();
     expect(screen.getByText("Totale assessment: 14")).toBeInTheDocument();
-    expect(screen.getByText("2 / 2 domande attive")).toBeInTheDocument();
+    expect(
+      screen.getByText("2 / 4 domande attive (massimo)"),
+    ).toBeInTheDocument();
   });
 
   it("edits text and scores of a driver question", async () => {
@@ -152,13 +154,13 @@ describe("Admin assessment editor", () => {
     });
   });
 
-  it("shows the backend message when a third active question is refused", async () => {
+  it("shows the backend message when a fifth active question is refused", async () => {
     await open();
-    failure = "Il driver può avere esattamente 2 domande attive.";
+    failure = "Il driver può avere al massimo 4 domande attive.";
     await userEvent.click(
       screen.getByRole("button", { name: "Aggiungi domanda Nutrizione" }),
     );
-    await userEvent.type(screen.getByLabelText("Testo"), "Terza");
+    await userEvent.type(screen.getByLabelText("Testo"), "Quinta");
     const labels = screen.getAllByLabelText("Etichetta");
     const scores = screen.getAllByLabelText("Punteggio");
     for (const [i, label] of ["Sì", "No"].entries()) {
@@ -175,8 +177,7 @@ describe("Admin assessment editor", () => {
 
   it("explains why a driver question cannot be deactivated", async () => {
     await open();
-    failure =
-      "Ogni driver attivo deve avere esattamente 2 domande. Disattiva il driver oppure configura una domanda sostitutiva.";
+    failure = "L’anamnesi deve avere almeno una domanda di driver attiva.";
     await userEvent.click(
       screen.getByRole("button", { name: "Disattiva Prima domanda" }),
     );

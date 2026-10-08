@@ -135,9 +135,11 @@ export class AthleteJourneyService {
         name: driverName(a.area.name),
         current: a.realR,
       })) ?? [];
-    results.sort(
-      (a, b) => orderedAreas.indexOf(a.id) - orderedAreas.indexOf(b.id),
-    );
+    const position = (id: string) => {
+      const index = orderedAreas.indexOf(id);
+      return index < 0 ? Number.MAX_SAFE_INTEGER : index;
+    };
+    results.sort((a, b) => position(a.id) - position(b.id));
     // Priorità dal driver più basso: il gap verso P non è esposto all'atleta.
     const priority = [...results].sort((a, b) => a.current - b.current)[0];
     return {
@@ -295,12 +297,17 @@ export class AthleteJourneyService {
           questions.some((q) => !this.valid(q, stored[q.id]))
         )
           throw new BadRequestException('Completa tutte le domande');
+        const { areas } = await loadAssessmentConfiguration(
+          this.prisma,
+          userId,
+        );
         await runAssessmentEvaluation(
           this.prisma,
           this.ai,
           userId,
           questions,
           stored,
+          areas,
         );
       }
     } finally {

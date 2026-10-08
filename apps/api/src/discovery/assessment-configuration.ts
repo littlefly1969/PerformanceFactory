@@ -11,8 +11,12 @@ import {
   requireSportContext,
 } from '../onboarding/onboarding-sports';
 
-/** Domande per driver attivo: un numero esatto, non un minimo. */
-export const EXPECTED_AREA_QUESTIONS = 2;
+/**
+ * Anamnesi iniziale senza numero fisso per driver: da 0 a un massimo che tiene
+ * corto il questionario. Un driver senza domande entra comunque nella prima
+ * valutazione, con confidence bassa, e i round di calibrazione lo approfondiscono.
+ */
+export const MAX_AREA_QUESTIONS = 4;
 
 /**
  * Domande operative: ruolo applicativo e chiave di profilo letta da
@@ -113,11 +117,18 @@ export function assessmentProblems(
         `Domanda operativa ${role}: expected 1 active question, found ${found}`,
       );
   }
+  if (
+    areas.length &&
+    !areas.some((a) => areaTemplates.some((t) => t.areaId === a.id))
+  )
+    problems.push(
+      'Anamnesi: expected at least 1 active driver question, found 0',
+    );
   for (const area of areas) {
     const templates = areaTemplates.filter((t) => t.areaId === area.id);
-    if (templates.length !== EXPECTED_AREA_QUESTIONS)
+    if (templates.length > MAX_AREA_QUESTIONS)
       problems.push(
-        `Area "${area.name}": expected ${EXPECTED_AREA_QUESTIONS} active questions, found ${templates.length}`,
+        `Area "${area.name}": expected at most ${MAX_AREA_QUESTIONS} active questions, found ${templates.length}`,
       );
     for (const t of templates) {
       const options = areaOptionsOf(t);

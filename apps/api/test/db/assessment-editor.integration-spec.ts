@@ -165,23 +165,35 @@ describe('Assessment editor with PostgreSQL', () => {
     ).rejects.toThrow(/valore univoco/);
   });
 
-  it('keeps exactly two active questions per driver', async () => {
+  it('allows from zero to four active questions per driver', async () => {
     const area = await nutrition();
-    const [first] = area.templates;
-    await expect(
-      updateAssessmentTemplate(prisma, first.id, { isActive: false }, admin),
-    ).rejects.toThrow('Ogni driver attivo deve avere esattamente 2 domande');
-    await expect(deleteAssessmentTemplate(prisma, first.id)).rejects.toThrow(
-      'Ogni driver attivo deve avere esattamente 2 domande',
+    const [first, second] = area.templates;
+    // Un driver può restare senza anamnesi: lo approfondisce la calibrazione.
+    await updateAssessmentTemplate(
+      prisma,
+      first.id,
+      { isActive: false },
+      admin,
     );
+    await deleteAssessmentTemplate(prisma, second.id);
+    let list = await listAssessmentTemplates(prisma);
+    expect(list.problems).toEqual([]);
+    expect(list.stats.count).toBe(12);
+    await updateAssessmentTemplate(prisma, first.id, { isActive: true }, admin);
+    for (const label of ['Seconda', 'Terza', 'Quarta'])
+      await createAssessmentTemplate(
+        prisma,
+        { areaId: area.id, label, options },
+        admin,
+      );
     await expect(
       createAssessmentTemplate(
         prisma,
-        { areaId: area.id, label: 'Terza', options },
+        { areaId: area.id, label: 'Quinta', options },
         admin,
       ),
-    ).rejects.toThrow('Il driver può avere esattamente 2 domande attive.');
-    // Una bozza disattivata e ammessa ma non puo diventare la terza attiva.
+    ).rejects.toThrow('Il driver può avere al massimo 4 domande attive.');
+    // Una bozza disattivata è ammessa ma non può diventare la quinta attiva.
     const draft = await createAssessmentTemplate(
       prisma,
       { areaId: area.id, label: 'Bozza', options, isActive: false },
@@ -189,10 +201,29 @@ describe('Assessment editor with PostgreSQL', () => {
     );
     await expect(
       updateAssessmentTemplate(prisma, draft.id, { isActive: true }, admin),
-    ).rejects.toThrow('Il driver può avere esattamente 2 domande attive.');
-    expect((await listAssessmentTemplates(prisma)).stats.count).toBe(14);
-    await deleteAssessmentTemplate(prisma, draft.id);
-    expect((await nutrition()).templates).toHaveLength(2);
+    ).rejects.toThrow('Il driver può avere al massimo 4 domande attive.');
+    list = await listAssessmentTemplates(prisma);
+    expect(list.maxPerArea).toBe(4);
+    expect(list.stats.count).toBe(16);
+    expect(list.problems).toEqual([]);
+  });
+
+  it('never leaves the anamnesis without a driver question', async () => {
+    const list = await listAssessmentTemplates(prisma);
+    const active = list.areas.flatMap((a) =>
+      a.templates.filter((t) => t.isActive),
+    );
+    const last = active.pop()!;
+    for (const t of active)
+      await updateAssessmentTemplate(prisma, t.id, { isActive: false }, admin);
+    await expect(
+      updateAssessmentTemplate(prisma, last.id, { isActive: false }, admin),
+    ).rejects.toThrow(
+      'L’anamnesi deve avere almeno una domanda di driver attiva.',
+    );
+    await expect(deleteAssessmentTemplate(prisma, last.id)).rejects.toThrow(
+      'L’anamnesi deve avere almeno una domanda di driver attiva.',
+    );
   });
 
   it('reorders questions inside a driver without moving the driver', async () => {
