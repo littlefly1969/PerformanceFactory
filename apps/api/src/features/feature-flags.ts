@@ -16,6 +16,11 @@ export const FEATURE_FLAG_REGISTRY = [
     description:
       'Lezione gratuita al circolo con crediti di interazione e micro-test durante la calibrazione (A4.8, A7.2).',
   },
+  {
+    key: 'potential_scenarios',
+    description:
+      'A calibrazione chiusa mostra P3/P6/P12 e la scelta del percorso di 3, 6 o 12 mesi (1.8-1.9).',
+  },
 ] as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAG_REGISTRY)[number]['key'];

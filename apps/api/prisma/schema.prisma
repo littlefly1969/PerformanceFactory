@@ -55,6 +55,7 @@ model User {
   assessmentEvaluations AssessmentEvaluation[]
   calibration           AthleteCalibration?
   calibrationRounds     CalibrationRound[]
+  potentialScenarios    PotentialScenario[]
   calibrationConfigUpdates CalibrationConfig[] @relation("CalibrationConfigUpdatedBy")
   interactionCredits       InteractionCreditEntry[]
   microTestCompletions     MicroTestCompletion[]
@@ -488,6 +489,7 @@ model Area {
   assessmentEvaluationAreas   AssessmentEvaluationArea[]
   microTests                  MicroTest[]
   lessonFeedback              CoachLessonFeedback[]
+  potentialScenarios          PotentialScenario[]
 }
 
 model FeedbackEntry {
@@ -1285,6 +1287,9 @@ model AthleteDiscovery {
   baselineId String?
   programDurationWeeks Int?
   durationSelectedAt DateTime?
+  /// Orizzonte scelto dopo il reveal di P3/P6/P12 (Blueprint A5): 3, 6 o 12 mesi.
+  programHorizon ProgramHorizon?
+  horizonSelectedAt DateTime?
   createdAt DateTime @default(now())
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -1365,9 +1370,39 @@ model AssessmentEvaluation {
   promptVersion AiPromptVersion?           @relation(fields: [promptVersionId], references: [id], onDelete: SetNull)
   areas         AssessmentEvaluationArea[]
   round         CalibrationRound?
+  scenarios     PotentialScenario[]
 
   @@unique([userId, sequence])
   @@index([userId, createdAt])
+}
+
+/// Scenario di potenziale P3/P6/P12 per driver, calcolato da un motore
+/// sostituibile sulla valutazione consolidata. Un nuovo calcolo (nuova
+/// valutazione o nuovo motore) crea nuove righe: le precedenti restano.
+model PotentialScenario {
+  id            String         @id @default(uuid())
+  userId        String
+  evaluationId  String
+  areaId        String
+  horizon       ProgramHorizon
+  /// R di partenza, nella scala della valutazione.
+  current       Float
+  value         Float
+  confidence    Int
+  assumptions   Json
+  engine        String
+  engineVersion String
+  /// true finché il motore non è quello definitivo della Parte C.
+  provisional   Boolean
+  computedAt    DateTime       @default(now())
+
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  evaluation AssessmentEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  area       Area                 @relation(fields: [areaId], references: [id])
+
+  @@unique([evaluationId, engine, engineVersion, horizon, areaId])
+  @@index([userId, computedAt])
+  @@index([areaId])
 }
 
 model AssessmentEvaluationArea {

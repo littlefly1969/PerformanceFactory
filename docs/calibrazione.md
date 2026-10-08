@@ -15,8 +15,9 @@ EVALUATION ──► FREE_CALIBRATING ──► FREE_LEVEL_ESTIMATED ──► C
                                                                o scadenza
 ```
 
-Il percorso in questa slice si ferma a `CALIBRATION_COMPLETED`: scenari P3/P6/P12,
-Program Horizon e `PAYWALL_READY` arrivano con la slice 3.
+Dopo `CALIBRATION_COMPLETED` arrivano gli scenari P3/P6/P12 e la scelta del
+percorso, che porta a `PAYWALL_READY` (vedi `scenari-orizzonte.md`).
+`PAYWALL_READY` conta come calibrazione chiusa: niente più round.
 
 Riferimenti del Product Blueprint: A4.3 (stati del percorso), A4.4 (R con
 confidence, Spider «flebile → consolidato»), A4.6 (AI_ASSESSMENT), A2.2 (~30
@@ -72,8 +73,8 @@ Tutte in `apps/api/src/discovery/calibration/calibration-rules.ts`, senza I/O:
   arriva dopo calibrazione → P3/P6/P12 → Program Horizon → paywall. Per chi ha una
   valutazione AI, `POST /athlete-journey/submit` e `POST /onboarding/submit` (che
   creano la baseline da cui parte il piano) rispondono 409
-  `PROGRAM_LOCKED_BEFORE_PAYWALL`, anche a calibrazione completata, finché le
-  slice successive non introducono lo stato o l'entitlement che li sblocca. La
+  `PROGRAM_LOCKED_BEFORE_PAYWALL`, anche a calibrazione completata e a
+  `PAYWALL_READY`, finché l'atleta non ha un abbonamento con entitlement attivo. La
   decisione 13 è aperta, quindi il parametro `programBeforePaywall` (spento di
   default) riapre il flusso precedente. Gli atleti senza valutazione AI (flusso
   precedente a #8) non sono toccati: li chiude il paywall (gap 1.10).
@@ -156,9 +157,6 @@ round. Test: `calibration-rules.spec.ts`, `calibration-questions.spec.ts`,
 
 ## Aperto
 
-- **`PAYWALL_READY`**: lo stato arriva con la slice 3, dopo il reveal di P3/P6/P12
-  e la scelta del Program Horizon; qui il percorso si ferma a
-  `CALIBRATION_COMPLETED`.
 - **Feature flag**: i flag della slice Ingresso (#10) sono su main; mettere la
   calibrazione dietro un flag è un passo successivo, non in questa PR.
 - **Soglia definitiva** (A4-D01): oggi è il parametro di back office.

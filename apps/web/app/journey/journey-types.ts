@@ -35,13 +35,32 @@ export type Evaluation = {
     commitment?: string | null;
   }[];
 };
+export type ProgramHorizon = "PROGRAM_3M" | "PROGRAM_6M" | "PROGRAM_12M";
+/** Scenari P3/P6/P12 a calibrazione chiusa, dal motore di P (provvisorio finché manca la Parte C). */
+export type Scenarios = {
+  engine: { key: string; version: string; provisional: boolean };
+  scale: { min: number; max: number };
+  selectedHorizon: ProgramHorizon | null;
+  horizons: {
+    horizon: ProgramHorizon;
+    months: number;
+    drivers: {
+      id: string;
+      name: string;
+      current: number;
+      potential: number;
+      confidence: number;
+    }[];
+  }[];
+};
 /** Calibrazione gratuita dopo la prima valutazione (A4.3): round di domande AI. */
 export type Calibration = {
   status:
     | "FREE_CALIBRATING"
     | "FREE_LEVEL_ESTIMATED"
     | "FREE_LESSON_VALIDATION"
-    | "CALIBRATION_COMPLETED";
+    | "CALIBRATION_COMPLETED"
+    | "PAYWALL_READY";
   day: number;
   maxDays: number;
   confidenceThreshold: number;
@@ -86,6 +105,7 @@ export type Journey = {
   assessmentComplete?: boolean;
   evaluation?: Evaluation | null;
   calibration?: Calibration | null;
+  scenarios?: Scenarios | null;
   /** Totale prodotto dal backend: la UI non conosce aree ne formula. */
   count: number;
   estimatedMinutes: number;

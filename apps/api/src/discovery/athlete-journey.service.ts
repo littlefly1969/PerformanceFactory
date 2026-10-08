@@ -30,20 +30,9 @@ import {
   runAssessmentEvaluation,
 } from './assessment-evaluation';
 import { CalibrationService } from './calibration/calibration.service';
+import { ScenariosService } from './scenarios/scenarios.service';
 
-export const PROGRAM_DURATIONS = [
-  {
-    weeks: 4,
-    label: '4 settimane',
-    description: 'Un primo blocco per costruire continuità.',
-  },
-  {
-    weeks: 12,
-    label: '12 settimane',
-    description: 'Un ciclo completo per lavorare sui tuoi driver.',
-  },
-  { weeks: 52, label: '12 mesi', description: 'Un percorso di lungo periodo.' },
-];
+import { PROGRAM_DURATIONS, horizonForWeeks } from './program-horizon';
 const LEASE_MS = 10 * 60 * 1000;
 /** Prova mostrata all'atleta: solo visualizzazione, nessun blocco a scadenza. */
 const TRIAL_DAYS = 7;
@@ -57,6 +46,7 @@ export class AthleteJourneyService {
     private readonly onboarding: OnboardingService,
     private readonly ai: AiProposalProviderService,
     private readonly calibration: CalibrationService,
+    private readonly scenarios: ScenariosService,
   ) {}
 
   async state(userId: string) {
@@ -114,6 +104,10 @@ export class AthleteJourneyService {
       evaluation && !saved.baselineId
         ? await this.calibration.view(userId)
         : null;
+    // P3/P6/P12 solo a calibrazione chiusa e con la funzione attiva (A3.9).
+    const scenarios = calibration
+      ? await this.scenarios.view(userId, orderedAreas)
+      : null;
     const phase = saved.baselineId
       ? saved.programDurationWeeks
         ? 'COMPLETE'
@@ -163,6 +157,7 @@ export class AthleteJourneyService {
       assessmentComplete: started && saved.currentQuestion >= questions.length,
       evaluation,
       calibration,
+      scenarios,
       answers,
       questions: questions.map((q) => ({
         id: q.id,
@@ -314,6 +309,12 @@ export class AthleteJourneyService {
     return this.state(userId);
   }
 
+  async horizon(userId: string, horizon: unknown) {
+    await this.allowed(userId);
+    await this.scenarios.select(userId, horizon);
+    return this.state(userId);
+  }
+
   async calibrationRound(userId: string) {
     await this.allowed(userId);
     await this.calibration.openRound(userId);
@@ -382,6 +383,7 @@ export class AthleteJourneyService {
             : {
                 phase: 'COMPLETE',
                 programDurationWeeks: weeks,
+                programHorizon: horizonForWeeks(weeks),
                 durationSelectedAt: new Date(),
               },
       });

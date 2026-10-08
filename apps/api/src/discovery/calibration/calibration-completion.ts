@@ -1,4 +1,8 @@
 import { Prisma } from '@prisma/client';
+import {
+  CLOSED_CALIBRATION_STATUSES,
+  isCalibrationClosed,
+} from './calibration-rules';
 
 export type CompletionReason =
   | 'CONFIDENCE_REACHED'
@@ -18,7 +22,7 @@ export async function completeCalibration(
   now: Date,
 ) {
   const closed = await tx.athleteCalibration.updateMany({
-    where: { userId, status: { not: 'CALIBRATION_COMPLETED' } },
+    where: { userId, status: { notIn: [...CLOSED_CALIBRATION_STATUSES] } },
     data: {
       status: 'CALIBRATION_COMPLETED',
       completedAt: now,
@@ -54,7 +58,7 @@ export async function closeAtDeadline(
   });
   if (
     !calibration ||
-    calibration.status === 'CALIBRATION_COMPLETED' ||
+    isCalibrationClosed(calibration.status) ||
     calibration.deadlineAt > now
   )
     return false;

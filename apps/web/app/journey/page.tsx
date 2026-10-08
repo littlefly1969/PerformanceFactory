@@ -6,6 +6,7 @@ import { ConsentStep } from "./consent-step";
 import { ProvisionalEvaluation } from "./provisional-evaluation";
 import { CalibrationPanel } from "./calibration-panel";
 import { FreeLessonPanel } from "./free-lesson-panel";
+import { ScenariosReveal } from "./scenarios-reveal";
 import { DurationStep, PerformanceResult } from "./performance-result";
 import { useJourney } from "./use-journey";
 import "./journey.css";
@@ -148,6 +149,13 @@ export default function JourneyPage() {
             {j.calibration && (
               <FreeLessonPanel
                 refreshKey={`${j.evaluation.id}:${j.calibration.status}:${j.calibration.roundsCompleted}`}
+              />
+            )}
+            {j.scenarios && (
+              <ScenariosReveal
+                scenarios={j.scenarios}
+                busy={busy}
+                onSelect={(horizon) => void action("horizon", { horizon })}
               />
             )}
           </>

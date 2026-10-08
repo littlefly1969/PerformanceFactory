@@ -1,3 +1,5 @@
+import { FeaturesModule } from '../features/features.module';
+import { ScenariosService } from './scenarios/scenarios.service';
 import { OnboardingModule } from '../onboarding/onboarding.module';
 import { AthleteJourneyService } from './athlete-journey.service';
 import { AthleteJourneyController } from './athlete-journey.controller';
@@ -19,6 +21,7 @@ import { CalibrationAdminController } from './calibration/calibration-admin.cont
     OnboardingModule,
     PartnersModule,
     AnalyticsModule,
+    FeaturesModule,
   ],
   controllers: [
     DiscoveryController,
@@ -30,6 +33,7 @@ import { CalibrationAdminController } from './calibration/calibration-admin.cont
     AthleteRegistrationService,
     AthleteJourneyService,
     CalibrationService,
+    ScenariosService,
   ],
   exports: [
     AthleteRegistrationService,

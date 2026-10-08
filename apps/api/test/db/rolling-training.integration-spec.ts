@@ -109,7 +109,7 @@ describe('Rolling calendar and athlete availability with PostgreSQL', () => {
     });
     expect(response.json<{ daysPerWeek: number }>().daysPerWeek).toBe(4);
   });
-  it.each([4, 12, 52])(
+  it.each([12, 26, 52])(
     'preserves the selected %s-week program in discovery, context and home',
     async (weeks) => {
       const athlete = await f.user();

@@ -104,4 +104,4 @@ curl -X POST localhost:4000/api/payments/webhooks/stub -H 'content-type: applica
 - Cambio di cadenza o di orizzonte e prorata (A5-D04): non implementati.
 - Rimborsi monetari vs credito in Token PF (A5-D07): non implementati; il wallet Token PF resta separato dal billing.
 - Acquisti in-app iOS/Android: il modello registra `purchaseChannel`, gli adapter degli store non esistono ancora.
-- Il checkout non verifica ancora lo stato `PAYWALL_READY` (fine calibrazione), che oggi non esiste nel codice.
+- Il checkout non verifica ancora lo stato `PAYWALL_READY` né che l'orizzonte pagato sia quello scelto (`AthleteDiscovery.programHorizon`, vedi `scenari-orizzonte.md`).

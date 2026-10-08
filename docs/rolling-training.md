@@ -1,6 +1,6 @@
 # Programmi con finestre adattive di 14 giorni
 
-Il programma scelto dall'atleta resta di **4, 12 o 52 settimane**. Ogni release nuova copre 14 giorni: rispettivamente 2, 6 o 26 finestre per macroblocco. Al termine del macroblocco il percorso continua con un nuovo blocco della stessa durata, ricalcolando dal contesto aggiornato. Non vengono generati mesi di allenamenti in anticipo.
+Il programma scelto dall'atleta è di **3, 6 o 12 mesi**, cioè 12, 26 o 52 settimane (prima 4, 12 o 52: vedi `scenari-orizzonte.md`). Ogni release nuova copre 14 giorni: rispettivamente 6, 13 o 26 finestre per macroblocco. Al termine del macroblocco il percorso continua con un nuovo blocco della stessa durata, ricalcolando dal contesto aggiornato. Non vengono generati mesi di allenamenti in anticipo.
 
 ## Disponibilità e vincoli
 
@@ -48,7 +48,7 @@ Restano un'unica pipeline AUTO/MANUAL, assegnazione coach, retry persistenti, pr
 
 Test principali:
 
-- `training-proposal.spec.ts`: frequenza/aderenza, 4/12/52 settimane, DST, avanzamento macroblocco, schema e output OpenAI/Gemini, sette sessioni, validazioni e separazione AREA;
+- `training-proposal.spec.ts`: frequenza/aderenza, 12/26/52 settimane, DST, avanzamento macroblocco, schema e output OpenAI/Gemini, sette sessioni, validazioni e separazione AREA;
 - `training-lifecycle.integration-spec.ts`: richieste concorrenti, esecuzione/check-in anticipati senza rinnovo, sweep a fine finestra, seconda AI con feedback, AUTO/MANUAL, retry;
 - `rolling-training.integration-spec.ts`: disponibilità mancante e recupero via HTTP, ownership, durata macro invariata, sette date reali fino al giorno 13, metadata e idempotenza del calendario;
 - test discovery: i nuovi dati arrivano davvero nel profilo dopo l'onboarding;

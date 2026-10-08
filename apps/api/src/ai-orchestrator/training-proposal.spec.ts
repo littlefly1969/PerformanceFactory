@@ -150,7 +150,7 @@ describe('Rolling training constraints and contract', () => {
       }).maxSessionsPerWeek,
     ).toBe(3);
   });
-  it.each([4, 12, 52])(
+  it.each([12, 26, 52])(
     'keeps %s weeks as strategic horizon and rolls into the next macroblock',
     (weeks) => {
       const first = trainingWindow(
