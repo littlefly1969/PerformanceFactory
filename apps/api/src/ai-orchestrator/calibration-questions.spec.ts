@@ -1,6 +1,7 @@
 import { BadGatewayException, Logger } from '@nestjs/common';
 import {
   CalibrationQuestionsInput,
+  DEFAULT_CALIBRATION_PROMPT,
   buildCalibrationPrompt,
   generateCalibrationQuestions,
   stubCalibrationQuestions,
@@ -46,6 +47,18 @@ describe('calibration questions', () => {
   afterEach(() => {
     process.env.AI_PROVIDER = previous;
     jest.mocked(requestStructuredProposal).mockReset();
+  });
+
+  it('keeps micro-tests out of the round questions, whatever the stored prompt says', () => {
+    expect(DEFAULT_CALIBRATION_PROMPT).not.toMatch(/micro-test/i);
+    const { system } = buildCalibrationPrompt({
+      ...input,
+      basePrompt: 'Puoi chiedere un micro-test pratico.',
+    });
+    expect(system).toContain('niente micro-test, esercizi o prove da svolgere');
+    expect(system.indexOf('niente micro-test')).toBeGreaterThan(
+      system.indexOf('FORMATO DI RISPOSTA'),
+    );
   });
 
   it('keeps option scores and numbers questions and options', () => {
