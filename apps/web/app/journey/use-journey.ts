@@ -31,7 +31,9 @@ export function useJourney() {
       return;
     }
     if (response.status === 404) {
-      throw new Error("Il tuo percorso non è disponibile. Contatta l’assistenza.");
+      throw new Error(
+        "Il tuo percorso non è disponibile. Contatta l’assistenza.",
+      );
     }
     setJourney(await read(response));
   }, []);

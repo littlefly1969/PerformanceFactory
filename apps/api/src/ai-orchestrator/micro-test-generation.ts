@@ -9,10 +9,11 @@ import { AssessmentEvaluationAnswer } from './assessment-evaluation-model';
 export const MICRO_TEST_PROMPT_TYPE = 'MICRO_TESTS';
 
 export const DEFAULT_MICRO_TEST_PROMPT = [
-  'Sei il preparatore di Performance Factory e scrivi micro-test pratici per un atleta amatoriale maggiorenne nel periodo di prova. Ricevi il suo profilo, la scala dei punteggi, i driver su cui la valutazione è meno affidabile (score R provvisorio, confidenza, lacune di evidenza e risposte già date, ciascuna con la sua fonte) e i micro-test già proposti.',
+  'Sei il preparatore di Performance Factory e scrivi micro-test pratici per un atleta amatoriale maggiorenne durante l’assessment. Il motore di calibrazione ha deciso che su un driver serve un’evidenza diversa dall’autodichiarazione: ricevi il profilo dell’atleta, la scala dei punteggi, il driver (score R provvisorio, confidenza, lacune di evidenza e risposte già date, ciascuna con la sua fonte), il motivo del passo, le limitazioni dichiarate e i micro-test già proposti.',
   'Scopo: ogni micro-test produce l’evidenza che manca alla valutazione di quel driver. Parti dalle lacune indicate e dalle risposte già date; verifica con un esercizio ciò che l’atleta ha dichiarato e che la valutazione non sa ancora confermare. Non chiedere di nuovo ciò che è già chiaro.',
   'Forma: un esercizio da 5-10 minuti che l’atleta svolge da solo o con un compagno, in campo o a casa, con un risultato che può contare (quante riuscite su 10, quanti secondi, quante volte di fila, quanti punti su 5 scambi). Per i driver non tecnici (preparazione, mental, nutrizione) usa una prova osservabile o un diario di un giorno con un conteggio preciso, non un’autovalutazione generica.',
-  'Su misura: adatta difficoltà, contesto e soglie a ciò che sai dell’atleta (esperienza, frequenza di gioco, obiettivo, limiti dichiarati). Un principiante non riceve esercizi da agonista; chi gioca spesso riceve soglie più alte. Se il profilo segnala dolori o limitazioni, scegli un test tecnico a basso impatto.',
+  'Su misura: adatta difficoltà, contesto e soglie a ciò che sai dell’atleta (esperienza, frequenza di gioco, obiettivo, limiti dichiarati). Un principiante non riceve esercizi da agonista; chi gioca spesso riceve soglie più alte. Se l’atleta ha dichiarato dolori o limitazioni, scegli una prova senza carico fisico o a basso impatto.',
+  'Obiettivo informativo: dichiara in una frase quale lacuna del driver il test chiude. Indica la durata solo se si può stimare con buon senso.',
   'Istruzioni: cosa preparare, cosa fare passo per passo, cosa contare. Solo racchetta, palline, un muro o un campo, un cronometro: niente attrezzi particolari, niente salti ripetuti, carichi, sprint massimali o altri rischi.',
   'Esiti: fasce del risultato contato, mutuamente esclusive, in ordine crescente, che coprono tutti i casi. Lo score di ogni esito è il livello reale che quella fascia indica sulla scala ricevuta, dal più basso al più alto: non premiare l’esito descritto meglio.',
   'Non ripetere micro-test già proposti né esercizi equivalenti.',
@@ -22,6 +23,9 @@ export const DEFAULT_MICRO_TEST_PROMPT = [
 export const MICRO_TEST_LIMITS = {
   title: 80,
   instructions: 500,
+  informationGoal: 200,
+  safetyNotes: 200,
+  maxDurationMinutes: 30,
   option: 100,
   minOptions: 3,
   maxOptions: 5,
@@ -43,14 +47,47 @@ export type MicroTestInput = {
   athleteContext: AssessmentEvaluationAnswer[];
   targets: MicroTestTarget[];
   proposedTitles: string[];
+  /** Perché il motore chiede un micro-test, senza dati personali. */
+  reason?: string;
+  /** Risposte del profilo che dichiarano dolori, infortuni o limitazioni. */
+  declaredLimitations?: AssessmentEvaluationAnswer[];
 };
+
+/** Impegno fisico dichiarato dall'AI: mai alto, mai moderato con limitazioni. */
+export const PHYSICAL_LOADS = ['NONE', 'LOW', 'MODERATE'] as const;
+export type PhysicalLoad = (typeof PHYSICAL_LOADS)[number];
 
 export type GeneratedMicroTest = {
   areaId: string;
   title: string;
   instructions: string;
+  informationGoal: string;
+  durationMinutes: number | null;
+  physicalLoad: PhysicalLoad;
+  safetyNotes: string;
   options: { value: string; label: string; score: number }[];
 };
+
+/**
+ * Contenuti che un micro-test non può contenere: diagnosi, terapie, farmaci,
+ * prescrizioni alimentari e prove massimali. Il controllo è sul testo
+ * generato, prima che arrivi all'atleta (PF-FS-PREPAYWALL §4.4).
+ */
+export const UNSAFE_MICRO_TEST_TERMS = [
+  'diagnos',
+  'terapi',
+  'farmac',
+  'integrator',
+  'prescri',
+  'digiun',
+  'dieta ipocalorica',
+  'massimal',
+  'esaurimento',
+  'cedimento',
+  'salti ripetuti',
+  'sprint',
+  'dolore come',
+];
 
 export type MicroTestResult = {
   provider: AiProvider;
@@ -66,7 +103,11 @@ function formatRules(input: MicroTestInput) {
     'FORMATO DI RISPOSTA (fisso): rispondi solo con JSON conforme allo schema.',
     `- tests: esattamente un micro-test per ciascuno dei ${input.targets.length} driver ricevuti, con lo stesso areaId.`,
     `- title: massimo ${l.title} caratteri, diverso dai micro-test già proposti.`,
-    `- instructions: massimo ${l.instructions} caratteri.`,
+    `- instructions: massimo ${l.instructions} caratteri; informationGoal: la lacuna che il test chiude, massimo ${l.informationGoal} caratteri.`,
+    `- durationMinutes: intero da 1 a ${l.maxDurationMinutes}, oppure null se non stimabile.`,
+    `- physicalLoad: NONE, LOW oppure MODERATE${input.declaredLimitations?.length ? '; con le limitazioni dichiarate solo NONE o LOW' : ''}. safetyNotes: condizioni di sicurezza in massimo ${l.safetyNotes} caratteri, obbligatorie se physicalLoad non è NONE, altrimenti stringa vuota.`,
+    '- niente diagnosi, terapie, farmaci, integratori, diete, prove massimali, sprint o salti ripetuti. Questa regola prevale sulle istruzioni sopra.',
+    '- l’esito lo riporta l’atleta: descrivi fasce che può contare da solo, senza strumenti di misura.',
     `- options: da ${l.minOptions} a ${l.maxOptions} esiti in ordine crescente, label di massimo ${l.option} caratteri, score crescenti tra ${input.scale.minScore} e ${input.scale.maxScore}.`,
   ].join('\n');
 }
@@ -81,11 +122,24 @@ const schema = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['areaId', 'title', 'instructions', 'options'],
+        required: [
+          'areaId',
+          'title',
+          'instructions',
+          'informationGoal',
+          'durationMinutes',
+          'physicalLoad',
+          'safetyNotes',
+          'options',
+        ],
         properties: {
           areaId: { type: 'string' },
           title: { type: 'string' },
           instructions: { type: 'string' },
+          informationGoal: { type: 'string' },
+          durationMinutes: { type: ['integer', 'null'] },
+          physicalLoad: { type: 'string', enum: [...PHYSICAL_LOADS] },
+          safetyNotes: { type: 'string' },
           options: {
             type: 'array',
             items: {
@@ -109,8 +163,10 @@ export function buildMicroTestPrompt(input: MicroTestInput) {
     system: `${input.basePrompt.trim()}\n\n${formatRules(input)}`,
     user: {
       task: 'Un micro-test su misura per ciascun driver ricevuto.',
+      reason: input.reason ?? null,
       scale: input.scale,
       athleteContext: input.athleteContext,
+      declaredLimitations: input.declaredLimitations ?? [],
       drivers: input.targets,
       proposedTitles: input.proposedTitles,
     },
@@ -173,6 +229,10 @@ export function stubMicroTests(input: MicroTestInput) {
       areaId: target.areaId,
       title: `${target.name}: prova ${input.proposedTitles.length + 1}`,
       instructions: `Ripeti 10 volte l'esercizio su ${target.name.toLowerCase()} e conta quante riescono.`,
+      informationGoal: `Confermare con un conteggio il livello dichiarato su ${target.name.toLowerCase()}.`,
+      durationMinutes: 10,
+      physicalLoad: 'LOW',
+      safetyNotes: 'Fermati se senti fastidio.',
       options: ['0-3', '4-6', '7-8', '9-10'].map((label, k) => ({
         label: `${label} su 10`,
         score: Math.round(minScore + step * k),
@@ -182,9 +242,11 @@ export function stubMicroTests(input: MicroTestInput) {
 }
 
 /**
- * Contratto rigido: un test per driver, testi entro i limiti, esiti distinti
- * con score crescenti nella scala, titoli nuovi. Un output che non lo rispetta
- * non arriva all'atleta.
+ * Contratto rigido: un test per driver, testi entro i limiti, obiettivo
+ * informativo, durata plausibile o assente, impegno fisico compatibile con le
+ * limitazioni dichiarate e condizioni di sicurezza, nessun contenuto sanitario
+ * o massimale, esiti distinti con score crescenti nella scala, titoli nuovi.
+ * Un output che non lo rispetta non arriva all'atleta.
  */
 export function validateMicroTests(
   raw: unknown,
@@ -212,10 +274,37 @@ export function validateMicroTests(
     seen.add(areaId);
     const title = clean(entry.title, l.title);
     const instructions = clean(entry.instructions, l.instructions);
+    const informationGoal = clean(entry.informationGoal, l.informationGoal);
     if (!title) problems.push(`titolo non valido (${n})`);
     else if (titles.has(normalize(title)))
       problems.push(`micro-test già proposto (${n})`);
     if (!instructions) problems.push(`istruzioni non valide (${n})`);
+    if (!informationGoal)
+      problems.push(`obiettivo informativo mancante (${n})`);
+    const duration = entry.durationMinutes;
+    if (
+      duration !== null &&
+      (typeof duration !== 'number' ||
+        !Number.isInteger(duration) ||
+        duration < 1 ||
+        duration > l.maxDurationMinutes)
+    )
+      problems.push(`durata non valida (${n})`);
+    const physicalLoad = PHYSICAL_LOADS.find((p) => p === entry.physicalLoad);
+    const safetyNotes =
+      typeof entry.safetyNotes === 'string' ? entry.safetyNotes.trim() : '';
+    if (!physicalLoad) problems.push(`impegno fisico non valido (${n})`);
+    else if (physicalLoad === 'MODERATE' && input.declaredLimitations?.length)
+      problems.push(`impegno fisico non adatto alle limitazioni (${n})`);
+    if (physicalLoad && physicalLoad !== 'NONE' && !safetyNotes)
+      problems.push(`condizioni di sicurezza mancanti (${n})`);
+    if (safetyNotes.length > l.safetyNotes)
+      problems.push(`condizioni di sicurezza troppo lunghe (${n})`);
+    const text = normalize(
+      [title, instructions, informationGoal, safetyNotes].join(' '),
+    );
+    const unsafe = UNSAFE_MICRO_TEST_TERMS.find((term) => text.includes(term));
+    if (unsafe) problems.push(`contenuto non sicuro: ${unsafe} (${n})`);
     const options = Array.isArray(entry.options) ? entry.options : [];
     if (options.length < l.minOptions || options.length > l.maxOptions)
       problems.push(`numero di esiti non valido (${n})`);
@@ -241,6 +330,10 @@ export function validateMicroTests(
       areaId,
       title: title ?? '',
       instructions: instructions ?? '',
+      informationGoal: informationGoal ?? '',
+      durationMinutes: typeof duration === 'number' ? duration : null,
+      physicalLoad: physicalLoad ?? 'NONE',
+      safetyNotes,
       options: parsed,
     });
   });

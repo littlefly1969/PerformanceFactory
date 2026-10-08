@@ -41,6 +41,10 @@ const test = (extra: object = {}) => ({
   title: 'Volée a muro',
   instructions:
     'A due metri dal muro, 10 volée di dritto: conta quante tornano.',
+  informationGoal: 'Capire se a rete controlli la direzione.',
+  durationMinutes: 10,
+  physicalLoad: 'LOW',
+  safetyNotes: 'Scaldati prima e fermati se senti fastidio.',
   options: [
     { label: '0-3 su 10', score: 20 },
     { label: '4-7 su 10', score: 50 },
@@ -73,6 +77,10 @@ describe('micro-test generation', () => {
         areaId: 'tecnica',
         title: 'Volée a muro',
         instructions: test().instructions,
+        informationGoal: 'Capire se a rete controlli la direzione.',
+        durationMinutes: 10,
+        physicalLoad: 'LOW',
+        safetyNotes: 'Scaldati prima e fermati se senti fastidio.',
         options: [
           { value: 'o1', label: '0-3 su 10', score: 20 },
           { value: 'o2', label: '4-7 su 10', score: 50 },
@@ -133,9 +141,61 @@ describe('micro-test generation', () => {
         ],
       },
     ],
+    ['a missing information goal', { tests: [test({ informationGoal: '' })] }],
+    ['an implausible duration', { tests: [test({ durationMinutes: 90 })] }],
+    ['a high physical load', { tests: [test({ physicalLoad: 'HIGH' })] }],
+    [
+      'a physical test without safety notes',
+      { tests: [test({ safetyNotes: ' ' })] },
+    ],
+    [
+      'a maximal test',
+      {
+        tests: [
+          test({ instructions: 'Fai 10 sprint massimali e conta i secondi.' }),
+        ],
+      },
+    ],
+    [
+      'a health prescription',
+      { tests: [test({ safetyNotes: 'Prendi un integratore prima.' })] },
+    ],
     ['malformed output', null],
   ])('rejects %s', (_, raw) => {
     expect(validateMicroTests(raw, input)).toBeNull();
+  });
+
+  it('accepts a test without physical load, duration or safety notes', () => {
+    const [ok] = validateMicroTests(
+      {
+        tests: [
+          test({
+            physicalLoad: 'NONE',
+            durationMinutes: null,
+            safetyNotes: '',
+          }),
+        ],
+      },
+      input,
+    )!;
+    expect(ok).toMatchObject({ physicalLoad: 'NONE', durationMinutes: null });
+  });
+
+  it('refuses a moderate physical load when the athlete declared limitations', () => {
+    const limited = {
+      ...input,
+      declaredLimitations: [
+        { question: 'Hai dolori o infortuni?', answer: 'Mal di schiena' },
+      ],
+    };
+    expect(
+      validateMicroTests(
+        { tests: [test({ physicalLoad: 'MODERATE' })] },
+        limited,
+      ),
+    ).toBeNull();
+    expect(validateMicroTests({ tests: [test()] }, limited)).toHaveLength(1);
+    expect(buildMicroTestPrompt(limited).system).toContain('solo NONE o LOW');
   });
 
   it('produces valid stub tests', () => {

@@ -24,7 +24,7 @@ export const FEATURE_FLAG_REGISTRY = [
   {
     key: 'ai_micro_tests',
     description:
-      'Micro-test della lezione gratuita scritti dall’AI sulla storia dell’atleta; spento, solo il catalogo del back office.',
+      'Micro-test scritti dall’AI come passo della calibrazione; spento, il motore propone solo domande. Il catalogo del back office non li sostituisce.',
   },
 ] as const;
 

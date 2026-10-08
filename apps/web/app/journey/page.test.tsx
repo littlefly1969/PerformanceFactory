@@ -46,9 +46,7 @@ const base = {
   result: {
     snapshotId: "real-snapshot",
     current: 37,
-    drivers: [
-      { id: "a", name: "Tecnica", current: 37 },
-    ],
+    drivers: [{ id: "a", name: "Tecnica", current: 37 }],
     priority: { id: "a", name: "Tecnica", current: 37 },
   },
 };
@@ -384,7 +382,9 @@ describe("PF5 assessment intro and questions", () => {
     expect(requests.filter((url) => url.endsWith("/evaluate"))).toHaveLength(1);
     expect(screen.getByText("Prima valutazione · provvisoria")).toBeVisible();
     expect(screen.getByText("Gestisci bene la rete.")).toBeVisible();
-    expect(screen.getByText("Per affinare: Un video di una partita.")).toBeVisible();
+    expect(
+      screen.getByText("Per affinare: Un video di una partita."),
+    ).toBeVisible();
     expect(screen.getByText("affidabilità bassa")).toBeVisible();
     expect(screen.getByText("affidabilità alta")).toBeVisible();
     // Confidence bassa: tratto tenue e tratteggiato, nessun potenziale mostrato.
@@ -410,9 +410,10 @@ describe("PF5 assessment intro and questions", () => {
 });
 
 it("shows an error for a missing journey without redirecting back to the home page", async () => {
-  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
-    new Response("{}", { status: 404 }),
-  ));
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue(new Response("{}", { status: 404 })),
+  );
   render(<JourneyPage />);
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Il tuo percorso non è disponibile. Contatta l’assistenza.",

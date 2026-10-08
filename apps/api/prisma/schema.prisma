@@ -1720,12 +1720,13 @@ model CalibrationRound {
   sequence        Int
   /// ADAPTIVE oppure CLOSING
   kind            String    @default("ADAPTIVE")
-  /// OPEN, EVALUATING, EVALUATED oppure EXPIRED (scadenza della calibrazione)
+  /// OPEN, EVALUATING, EVALUATED, SKIPPED (micro-test non svolto) oppure
+  /// EXPIRED (scadenza della calibrazione)
   status          String    @default("OPEN")
   questionsJson   Json
   answersJson     Json      @default("{}")
   /// Decisione del motore (PF-FS-PREPAYWALL §4.2, §10.2): ASK_SINGLE,
-  /// ASK_GROUP o REQUEST_CLARIFICATION; nullo nei round storici.
+  /// ASK_GROUP, REQUEST_CLARIFICATION o PROPOSE_MICRO_TEST; nullo nei round storici.
   action          String?
   /// Aree su cui il passo cerca evidenze e motivo sintetico, senza dati personali.
   targetAreas     String[]  @default([])
@@ -1771,7 +1772,6 @@ model FreeLessonConfig {
   creditsInitialAssessment Int      @default(30)
   creditsCalibrationRound  Int      @default(20)
   creditsMicroTest         Int      @default(10)
-  microTestsPerDay         Int      @default(2)
   updatedAt                DateTime @updatedAt
   updatedById              String?
 
@@ -1807,7 +1807,8 @@ model MicroTest {
   optionsJson  Json
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
-  /// Atleta per cui l'AI ha scritto il test; nullo per il catalogo del back office.
+  /// Atleta per cui l'AI ha scritto il test (passo della calibrazione o lotto
+  /// storico); nullo per il catalogo del back office.
   userId       String?
   generationId String?
 
@@ -1821,8 +1822,8 @@ model MicroTest {
   @@index([generationId])
 }
 
-/// Un lotto di micro-test AI per atleta e valutazione: chi lo prende in carico
-/// chiama l'AI una volta sola (token e lease), gli altri aspettano o ripiegano sul catalogo.
+/// Storico: lotti di micro-test AI del vecchio pannello della lezione. I nuovi
+/// micro-test nascono come passo della calibrazione (CalibrationRound).
 model MicroTestGeneration {
   id              String    @id @default(uuid())
   userId          String

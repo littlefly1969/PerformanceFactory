@@ -14,6 +14,11 @@ export const CLIENT_EVENTS = [
 export const SERVER_EVENTS = [
   'registration_completed',
   'program_horizon_selected',
+  // Motore dell'assessment (PF-FS-PREPAYWALL §11): mai testi nelle proprietà.
+  'ai_question_presented',
+  'ai_question_answered',
+  'ai_micro_test_presented',
+  'ai_micro_test_completed',
   // Lezione gratuita (event map A7).
   'lesson_eligible',
   'lesson_requested',

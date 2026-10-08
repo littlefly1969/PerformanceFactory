@@ -58,15 +58,37 @@ Tutte in `apps/api/src/discovery/calibration/calibration-rules.ts`, senza I/O:
   evidenze sufficienti non riceve domande (AT-07). I round sono tutti `ADAPTIVE`.
 - **Prossimo passo deciso dall'AI** (§4.2, scelta C; `calibration-questions.ts`):
   `ASK_SINGLE` (1 domanda, quando la risposta cambierà la successiva), `ASK_GROUP`
-  (da 2 a 6 domande indipendenti) o `REQUEST_CLARIFICATION` (1 domanda neutra su
-  una contraddizione), con un motivo sintetico. Nessun numero di domande per
+  (da 2 a 6 domande indipendenti), `REQUEST_CLARIFICATION` (1 domanda neutra su
+  una contraddizione) o `PROPOSE_MICRO_TEST` (una prova pratica su un driver in
+  focus, vedi sotto), con un motivo sintetico. Nessun numero di domande per
   driver; 6 è solo il limite di un passo a schermo. Il backend valida azione,
   numero di domande coerente con l'azione, driver in focus, da 3 a 5 opzioni con
   score nella scala attiva, nessuna domanda già fatta. Azione, aree e motivo
   restano sul round (`action`, `targetAreas`, `rationale`, §10.2). Prontezza al
-  reveal e alla lezione restano del server (regole versionate), micro-test come
-  passo con la slice 4. All'atleta gli score delle opzioni e il motivo non
-  arrivano mai.
+  reveal e alla lezione restano del server (regole versionate). All'atleta gli
+  score delle opzioni e il motivo non arrivano mai.
+- **Micro-test come passo del motore** (§4.4, AT-12, AT-13; flag `ai_micro_tests`,
+  spento: il motore propone solo domande). Il motore sceglie il driver; il test lo
+  scrive il generatore dedicato (`micro-test-generation.ts`, prompt `MICRO_TEST`)
+  con il motivo del passo, la storia del driver, i titoli già proposti e le
+  risposte del profilo che dichiarano dolori o limitazioni. Il backend valida:
+  obiettivo informativo, istruzioni, durata da 1 a 30 minuti o assente, impegno
+  fisico `NONE`/`LOW`/`MODERATE` (mai moderato con limitazioni dichiarate) con
+  condizioni di sicurezza quando non è `NONE`, nessun contenuto sanitario o
+  massimale (diagnosi, terapie, farmaci, integratori, diete, sprint, salti
+  ripetuti), da 3 a 5 esiti crescenti nella scala, titolo mai proposto. Un test
+  rifiutato non arriva all'atleta: il passo fallisce con «Riprova», senza
+  catalogo di riserva. Il test validato diventa un `MicroTest` dell'atleta e
+  l'unica voce del round, con provenienza (provider, modello, versione e hash del
+  prompt). L'atleta vede istruzioni, durata e sicurezza e riporta l'esito; nella
+  rivalutazione l'esito entra con `source: MICRO_TEST` e la dicitura «esito
+  riportato dall'atleta» (self-report, non misura). «Non posso farlo ora»
+  (`POST /athlete-journey/calibration/skip`) chiude il passo come `SKIPPED`,
+  senza evidenza né confidence; il motore lo vede come «(saltato)» e sceglie un
+  altro passo. Nessun limite giornaliero.
+- **Eventi** (§11, senza testi): `ai_question_presented` e `ai_question_answered`
+  (azione, numero di domande, sequenza del round), `ai_micro_test_presented`
+  (area) e `ai_micro_test_completed`.
 - **Ritmo**: nessuno. Il round successivo si apre appena il precedente è valutato;
   restano solo il lease tecnico per atleta e il rate limit dell'API, mai mostrati
   come attese (§4.3, OP-09).
@@ -184,17 +206,18 @@ vigore, round aperto senza score) durante la fase `EVALUATION`.
   bozza, attivazione e versione del prompt di valutazione (`promptType =
   CALIBRATION_QUESTIONS`). **Prova la bozza** usa un caso sintetico con due driver a
   confidence bassa.
-- `/ai-tuner/prompts/micro-test`: prompt dei micro-test su misura della lezione
-  gratuita (`promptType = MICRO_TESTS`), stesso ciclo di vita; vedi
-  `docs/lezione-gratuita.md`.
+- `/ai-tuner/prompts/micro-test`: prompt del generatore dei micro-test proposti dal
+  motore (`promptType = MICRO_TESTS`), stesso ciclo di vita; le regole di formato
+  e sicurezza restano fisse.
 
 ## Sviluppo e test
 
 Con `AI_PROVIDER=stub` le domande sono deterministiche e la confidence cresce di 15
 per risposta fino a 90, quindi un driver supera la soglia di default dopo qualche
-round. Test (casi di accettazione della specifica: AT-10, AT-11, AT-18, AT-19,
+round. Test (casi di accettazione della specifica: AT-10, AT-11, AT-12, AT-13, AT-18, AT-19,
 AT-25, AT-27): `calibration-rules.spec.ts`, `confidence-policy.spec.ts`, `calibration-questions.spec.ts`,
-`test/db/discovery.integration-spec.ts`, `app/journey/calibration-panel.test.tsx`,
+`micro-test-generation.spec.ts`, `test/db/discovery.integration-spec.ts`,
+`test/db/micro-test-step.integration-spec.ts`, `app/journey/calibration-panel.test.tsx`,
 `app/admin/calibration/page.test.tsx`, `app/ai-tuner/prompts/calibrazione/page.test.tsx`.
 
 ## Aperto
@@ -205,8 +228,8 @@ AT-25, AT-27): `calibration-rules.spec.ts`, `confidence-policy.spec.ts`, `calibr
   provvisori.
 - **Fase gratuita oltre i giorni indicativi con confidence bassa** (§7.2): R resta
   provvisoria e il percorso continua; la regola UX definitiva va formalizzata.
-- **Training nella fase gratuita** (decisione 13): solo round di domande; i
-  micro-test si possono aggiungere come nuovo `kind` di round.
-- **Eventi analytics** della calibrazione: il tracciamento della slice Ingresso è
-  su main; gli eventi dei round sono un passo successivo.
+- **Training nella fase gratuita** (decisione 13): solo domande e micro-test.
+- **Controllo di sicurezza dei micro-test**: lessico e impegno fisico dichiarato,
+  non una revisione clinica; le limitazioni si riconoscono dalle risposte del
+  profilo che parlano di dolori, infortuni o limitazioni.
 - **Notifiche** per round disponibili e scadenza.

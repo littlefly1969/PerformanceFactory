@@ -24,6 +24,12 @@ export class CalibrationAnswersDto {
   answers: Record<string, string>;
 }
 
+export class CalibrationRoundDto {
+  @ApiProperty()
+  @IsUUID()
+  roundId: string;
+}
+
 export class UpdateCalibrationConfigDto {
   @ApiPropertyOptional({ minimum: 1, maximum: 100 })
   @IsOptional()

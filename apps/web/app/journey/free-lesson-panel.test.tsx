@@ -13,25 +13,10 @@ const base: Extract<FreeLessonView, { enabled: true }> = {
   phase: "LOCKED",
   missing: ["CONFIDENCE"],
   credits: { balance: 70, toUnlock: 100 },
-  earn: { initialAssessment: 30, calibrationRound: 20, microTest: 10 },
+  earn: { initialAssessment: 30, calibrationRound: 20 },
   clubs: [{ id: "c1", name: "Padel Roma Nord", city: "Roma" }],
   attributedClubId: "c1",
   seat: null,
-  microTests: [
-    {
-      id: "m1",
-      title: "Bandeja",
-      instructions: "Dieci bandeje: quante finiscono in campo?",
-      areaName: "Tecnico-tattico",
-      personal: false,
-      options: [
-        { value: "low", label: "Meno di 5" },
-        { value: "high", label: "5 o più" },
-      ],
-    },
-  ],
-  microTestsLeft: 1,
-  generateMicroTests: false,
 };
 
 const serve = (...views: FreeLessonView[]) => {
@@ -64,35 +49,30 @@ describe("FreeLessonPanel", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("shows the credits towards the lesson and reports a micro-test", async () => {
-    const calls = serve(base, {
-      ...base,
-      credits: { balance: 80, toUnlock: 100 },
-      microTests: [],
-      microTestsLeft: 0,
-    });
+  it("shows the credits towards the lesson, with no micro-tests of its own", async () => {
+    const calls = serve(base);
     render(<FreeLessonPanel refreshKey="a" />);
     expect(await screen.findByText("70 di 100 crediti")).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toHaveAttribute(
       "aria-valuenow",
       "70",
     );
-    await userEvent.click(screen.getByRole("button", { name: /5 o più/ }));
-    expect(await screen.findByText("80 di 100 crediti")).toBeInTheDocument();
-    expect(calls[1]).toEqual({
-      url: "/api/athlete-journey/free-lesson/micro-tests/m1",
-      body: { value: "high" },
-    });
+    // I micro-test sono passi della calibrazione: il pannello non li propone.
+    expect(
+      screen.getByText(/per ogni passo della calibrazione/),
+    ).toBeInTheDocument();
+    expect(calls.map((c) => c.url)).toEqual([
+      "/api/athlete-journey/free-lesson",
+    ]);
   });
 
   it("asks for the coach sharing consent before requesting the seat", async () => {
     const calls = serve(
-      { ...base, phase: "ELIGIBLE", missing: [], microTests: [] },
+      { ...base, phase: "ELIGIBLE", missing: [] },
       {
         ...base,
         phase: "REQUESTED",
         missing: [],
-        microTests: [],
         seat: {
           status: "REQUESTED",
           club: { name: "Padel Roma Nord", city: "Roma" },
@@ -114,7 +94,7 @@ describe("FreeLessonPanel", () => {
   });
 
   it("AT-14: explains what unlocks the lesson, never the credits", async () => {
-    serve({ ...base, microTests: [] });
+    serve(base);
     render(<FreeLessonPanel refreshKey="a" />);
     expect(
       await screen.findByText(/quando il tuo profilo è abbastanza attendibile/),
@@ -125,8 +105,8 @@ describe("FreeLessonPanel", () => {
   it("AT-18: lets an eligible athlete decline, then change their mind", async () => {
     const onChanged = vi.fn();
     const calls = serve(
-      { ...base, phase: "ELIGIBLE", missing: [], microTests: [] },
-      { ...base, phase: "DECLINED", missing: [], microTests: [] },
+      { ...base, phase: "ELIGIBLE", missing: [] },
+      { ...base, phase: "DECLINED", missing: [] },
     );
     render(<FreeLessonPanel refreshKey="a" onChanged={onChanged} />);
     expect(
@@ -147,32 +127,5 @@ describe("FreeLessonPanel", () => {
     expect(
       screen.queryByRole("button", { name: "Preferisco non fare la lezione" }),
     ).toBeNull();
-  });
-
-  it("asks once for the micro-tests written for the athlete", async () => {
-    const calls = serve(
-      { ...base, microTests: [], generateMicroTests: true },
-      {
-        ...base,
-        microTests: [
-          {
-            ...base.microTests[0],
-            id: "m2",
-            title: "Uscita dalla parete",
-            personal: true,
-          },
-        ],
-      },
-    );
-    render(<FreeLessonPanel refreshKey="a" />);
-    expect(
-      await screen.findByText(
-        /Uscita dalla parete · Tecnico-tattico · su misura/,
-      ),
-    ).toBeInTheDocument();
-    expect(calls.map((c) => c.url)).toEqual([
-      "/api/athlete-journey/free-lesson",
-      "/api/athlete-journey/free-lesson/micro-tests/generate",
-    ]);
   });
 });

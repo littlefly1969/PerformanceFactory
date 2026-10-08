@@ -14,7 +14,10 @@ function ProvisionalRadar({ evaluation }: { evaluation: Evaluation }) {
     scale.max > scale.min ? (score - scale.min) / (scale.max - scale.min) : 0;
   const point = (value: number, i: number) => {
     const angle = (i * Math.PI * 2) / drivers.length - Math.PI / 2;
-    return [150 + Math.cos(angle) * value * 105, 150 + Math.sin(angle) * value * 105];
+    return [
+      150 + Math.cos(angle) * value * 105,
+      150 + Math.sin(angle) * value * 105,
+    ];
   };
   return (
     <svg
@@ -33,7 +36,9 @@ function ProvisionalRadar({ evaluation }: { evaluation: Evaluation }) {
       ))}
       <polygon
         data-testid="provisional-r"
-        points={drivers.map((d, i) => point(ratio(d.score), i).join(",")).join(" ")}
+        points={drivers
+          .map((d, i) => point(ratio(d.score), i).join(","))
+          .join(" ")}
         fill="#0b0b0c"
         fillOpacity={0.15 + (0.6 * evaluation.overallConfidence) / 100}
         stroke="#0b0b0c"
@@ -44,7 +49,13 @@ function ProvisionalRadar({ evaluation }: { evaluation: Evaluation }) {
         const [lx, ly] = point(1.24, i);
         return (
           <g key={d.id}>
-            <circle cx={x} cy={y} r="4" fill="#0b0b0c" opacity={0.3 + (0.7 * d.confidence) / 100} />
+            <circle
+              cx={x}
+              cy={y}
+              r="4"
+              fill="#0b0b0c"
+              opacity={0.3 + (0.7 * d.confidence) / 100}
+            />
             <text x={lx} y={ly} textAnchor="middle" fontSize="10">
               {i + 1}
             </text>
@@ -55,7 +66,11 @@ function ProvisionalRadar({ evaluation }: { evaluation: Evaluation }) {
   );
 }
 
-export function ProvisionalEvaluation({ evaluation }: { evaluation: Evaluation }) {
+export function ProvisionalEvaluation({
+  evaluation,
+}: {
+  evaluation: Evaluation;
+}) {
   return (
     <section className="pf4-body pf4-performance">
       <span className="pf4-kicker">
@@ -69,9 +84,9 @@ export function ProvisionalEvaluation({ evaluation }: { evaluation: Evaluation }
       <p>{evaluation.summary}</p>
       <ProvisionalRadar evaluation={evaluation} />
       <p className="pf4-confidence-note">
-        Affidabilità complessiva {confidenceLabel(evaluation.overallConfidence)} (
-        {evaluation.overallConfidence}/100). Più il tratto è pieno, più la stima è
-        solida.
+        Affidabilità complessiva {confidenceLabel(evaluation.overallConfidence)}{" "}
+        ({evaluation.overallConfidence}/100). Più il tratto è pieno, più la
+        stima è solida.
       </p>
       <div className="pf4-driver-scores pf4-evaluation-drivers">
         {evaluation.drivers.map((d, i) => (
@@ -94,7 +109,9 @@ export function ProvisionalEvaluation({ evaluation }: { evaluation: Evaluation }
             </div>
             <p>{d.rationale}</p>
             {d.evidenceGaps.length > 0 && (
-              <p className="pf4-gaps">Per affinare: {d.evidenceGaps.join(" ")}</p>
+              <p className="pf4-gaps">
+                Per affinare: {d.evidenceGaps.join(" ")}
+              </p>
             )}
           </div>
         ))}

@@ -80,14 +80,25 @@ export type Calibration = {
   round: {
     id: string;
     kind: "ADAPTIVE" | "CLOSING";
-    /** Decisione dell'AI: una domanda, un gruppo o un chiarimento; nullo nei round storici. */
-    action: "ASK_SINGLE" | "ASK_GROUP" | "REQUEST_CLARIFICATION" | null;
+    /** Decisione dell'AI: una domanda, un gruppo, un chiarimento o un micro-test; nullo nei round storici. */
+    action:
+      | "ASK_SINGLE"
+      | "ASK_GROUP"
+      | "REQUEST_CLARIFICATION"
+      | "PROPOSE_MICRO_TEST"
+      | null;
     status: string;
     questions: {
       id: string;
       areaId: string;
       text: string;
       options: { value: string; label: string }[];
+      /** Solo nel micro-test: l'esito lo riporta l'atleta. */
+      microTest?: {
+        instructions: string;
+        durationMinutes: number | null;
+        safetyNotes: string;
+      };
     }[];
     answers: Record<string, string>;
   } | null;

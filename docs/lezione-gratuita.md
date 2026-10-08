@@ -41,9 +41,9 @@ progetto `notes/slice4-lezione-gratuita.md`.
   comprano, non si spendono e non sbloccano nulla, mostrano il percorso fatto. Il wallet Token PF
   (A4.11) resta separato e non è toccato.
 - **Micro-test, non allenamenti.** In calibrazione l'atleta riporta l'esito di
-  esercizi brevi (A4.6): scritti dall'AI sulla sua storia con il flag
-  `ai_micro_tests`, altrimenti dal catalogo del back office. Il programma resta
-  dietro `programBeforePaywall` (decisione 13 aperta).
+  esercizi brevi (A4.6) che l'AI propone come passo del motore, con il flag
+  `ai_micro_tests`. Il programma resta dietro `programBeforePaywall` (decisione
+  13 aperta).
 - **Due verifiche distinte (§6.2).** Eleggibilità dell'atleta: livello stimato con
   R aperta e regola `LESSON_ELIGIBILITY` soddisfatta sull'ultima valutazione.
   Erogabilità: almeno un circolo attivo con `freeLessonsEnabled`; il posto e la
@@ -73,9 +73,6 @@ In `apps/api/src/free-lessons/free-lesson-rules.ts`, senza I/O:
   (`assessment:<id>`, `round:<id>`, `micro-test:<id>`). Il ledger si allinea a ogni
   lettura; i punti sono quelli in vigore quando la voce nasce, una modifica del
   back office non riscrive le voci già registrate. Una voce a 0 punti non si crea.
-- **Micro-test**: proposti sui driver con la confidence più bassa, uno per test, al
-  massimo `microTestsPerDay` nelle ultime 24 ore, solo a calibrazione aperta. Quelli
-  su misura vengono prima, il catalogo completa.
 - **Fasi** (`lessonEligibility`): `LOCKED` con i requisiti mancanti (`LEVEL`,
   `CONFIDENCE`), `UNAVAILABLE` (nessun circolo, o nessuna calibrazione),
   `ELIGIBLE`, `DECLINED` (rinuncia o ritiro), `REQUESTED`, `ASSIGNED`, `ATTENDED`,
@@ -93,36 +90,18 @@ In `apps/api/src/free-lessons/free-lesson-rules.ts`, senza I/O:
   le risposte dell'atleta restano com'erano. La nuova valutazione ha `source =
   COACH_LESSON`.
 
-## Micro-test su misura
+## Micro-test
 
-Con il flag `ai_micro_tests` (spento di default) l'AI scrive i micro-test per il
-singolo atleta, a ogni nuova valutazione: uno per ciascuno dei 3 driver con la
-confidence più bassa.
+I micro-test dell'assessment sono un passo della calibrazione, non del pannello
+della lezione: li propone il motore e li scrive l'AI (`docs/calibrazione.md`,
+«Micro-test come passo del motore»). Il pannello non propone più micro-test e
+non c'è limite giornaliero (PF-FS-PREPAYWALL §4.3, §4.4).
 
-- **Storia dell'atleta**: profilo dell'assessment, scala, per ogni driver score,
-  confidence, lacune indicate dalla valutazione e le ultime 12 evidenze con la
-  loro fonte (assessment, round, micro-test, coach), più i titoli già proposti.
-  Nessun nome, email o id.
-- **Prompt modificabile**: famiglia `MICRO_TEST` dei prompt dell'assessment
-  (`promptType = MICRO_TESTS`), con bozze, prova sul caso sintetico, attivazione e
-  versioni come valutazione e calibrazione, in `/ai-tuner/prompts/micro-test`
-  (ruolo `AI_TUNER`). Il prompt iniziale è `DEFAULT_MICRO_TEST_PROMPT` in
-  `apps/api/src/ai-orchestrator/micro-test-generation.ts`; le regole di formato
-  restano fisse e fuori dalla parte modificabile.
-- **Validazione**: un test per driver richiesto, titolo e istruzioni entro i
-  limiti, da 3 a 5 esiti distinti con score crescenti nella scala attiva, titolo
-  mai proposto prima. Un output che non rispetta il contratto non arriva
-  all'atleta. Nessuna approvazione manuale: i test sono del singolo atleta.
-- **Quando**: il pannello lo chiede (`generateMicroTests` nella risposta) e chiama
-  `POST /athlete-journey/free-lesson/micro-tests/generate`; serve il consenso AI
-  quando il provider è esterno.
-- **Una chiamata per lotto**: riga `MicroTestGeneration` unica per atleta e
-  valutazione; chi la prende in carico (token, lease di 2 minuti) chiama l'AI, le
-  richieste parallele non fanno nulla. L'esito si salva solo se il token è ancora
-  quello del lotto. Un fallimento resta `FAILED` e si riprova dopo 10 minuti, al
-  massimo 3 tentativi; intanto l'atleta vede il catalogo.
-- **Isolamento**: un test su misura si completa solo dal suo atleta, non compare
-  nel catalogo del back office e segue l'atleta alla cancellazione.
+- **Catalogo del back office**: resta come contenuto amministrativo in
+  `/admin/free-lessons` e non sostituisce mai in automatico i micro-test dell'AI.
+- **Storico**: gli esiti già riportati nel vecchio pannello (`MicroTestCompletion`)
+  restano evidenze `MICRO_TEST` nelle valutazioni e voci di credito; i lotti
+  `MicroTestGeneration` restano come storico e non se ne creano di nuovi.
 
 ## Concorrenza e idempotenza
 
@@ -135,8 +114,6 @@ confidence più bassa.
   valutazione che chiuderebbe per soglia vede sempre un posto appena assegnato.
 - **Crediti**: vincolo unico `(userId, sourceKey)` e `createMany` con
   `skipDuplicates`: letture parallele non duplicano voci.
-- **Micro-test**: vincolo unico `(userId, microTestId)` più advisory lock per atleta
-  sul limite giornaliero.
 - **Feedback**: il passaggio `ASSIGNED → ATTENDED` avviene sotto il lock della
   lezione; un reinvio trova `ATTENDED` e non scrive nulla. Il vincolo unico
   `(lessonId, userId, areaId)` resta la garanzia finale.
@@ -154,10 +131,10 @@ confidence più bassa.
 
 | Tabella | Contenuto |
 |---|---|
-| `FreeLessonConfig` | riga `default`: traguardo visivo dei crediti, punti per azione, micro-test nelle 24 ore |
+| `FreeLessonConfig` | riga `default`: traguardo visivo dei crediti e punti per azione |
 | `InteractionCreditEntry` | ledger append-only: azione, punti, chiave dell'evento sorgente |
-| `MicroTest`, `MicroTestCompletion` | catalogo per driver con esiti e punteggi, o test su misura (`userId`, `generationId`); esito dell'atleta, uno per test |
-| `MicroTestGeneration` | lotto AI per atleta e valutazione: stato, token, tentativi, provider, modello, versione e hash del prompt |
+| `MicroTest`, `MicroTestCompletion` | catalogo per driver con esiti e punteggi, o test su misura dell'atleta (`userId`: passo della calibrazione o lotto storico); esito storico del pannello, uno per test |
+| `MicroTestGeneration` | storico: lotti AI del vecchio pannello della lezione |
 | `FreeLesson` | circolo, coach, inizio, durata, capienza, livello del gruppo, stato |
 | `FreeLessonSeat` | posto dell'atleta, circolo, lezione, stato, consenso alla condivisione col coach, regola di eleggibilità e valutazione della richiesta |
 | `AthleteCalibration` | `lessonDeclinedAt`: rinuncia esplicita alla lezione |
@@ -175,9 +152,7 @@ del catalogo non ha atleta né lotto, uno su misura li ha entrambi),
 
 | Metodo e percorso | Ruolo | Effetto |
 |---|---|---|
-| `GET /athlete-journey/free-lesson` | `USER` | fase, crediti, circoli, posto, micro-test di oggi; `{ enabled: false }` a flag spento |
-| `POST /athlete-journey/free-lesson/micro-tests/generate` | `USER` | prepara i micro-test su misura, una volta per lotto |
-| `POST /athlete-journey/free-lesson/micro-tests/:id` | `USER` | `{ value }`, esito del micro-test |
+| `GET /athlete-journey/free-lesson` | `USER` | fase, crediti, circoli, posto; `{ enabled: false }` a flag spento |
 | `POST /athlete-journey/free-lesson/request` | `USER` | `{ partnerId, shareWithCoach: true }` |
 | `POST /athlete-journey/free-lesson/withdraw` | `USER` | ritira la richiesta o il posto prima della lezione |
 | `POST /athlete-journey/free-lesson/decline` | `USER` | sceglie di non fare la lezione: R si consolida con la regola |
@@ -189,7 +164,7 @@ del catalogo non ha atleta né lotto, uno su misura li ha entrambi),
 | `POST /admin/free-lessons/lessons/:id/seats` | `ADMIN` | assegna un posto |
 | `DELETE /admin/free-lessons/lessons/:id/seats/:userId` | `ADMIN` | toglie dal gruppo, la richiesta resta |
 | `POST /admin/free-lessons/lessons/:id/cancel` | `ADMIN` | annulla, i posti tornano richieste |
-| `POST /admin/free-lessons/micro-tests` | `ADMIN` | nuovo micro-test |
+| `POST /admin/free-lessons/micro-tests` | `ADMIN` | nuovo micro-test del catalogo |
 | `PATCH /admin/free-lessons/micro-tests/:id` | `ADMIN` | attiva o spegne |
 | `GET /professional/lessons` | `PROFESSIONAL` | lezioni del coach con i partecipanti; ogni lettura scrive `DataAccessAudit` |
 | `POST /professional/lessons/:id/feedback` | `PROFESSIONAL` | `{ userId, ratings: [{ areaId, rating }], note? }` |
@@ -202,29 +177,26 @@ della regola di eleggibilità, `lesson_declined`, `lesson_booked`,
 ## Interfaccia
 
 - `/journey`: pannello «Lezione gratuita al circolo» sotto la calibrazione, con
-  barra dei crediti (solo progresso), micro-test di oggi, richiesta del posto,
+  barra dei crediti (solo progresso), richiesta del posto,
   rinuncia e data della lezione.
 - `/admin/free-lessons`: richieste da collocare ordinate per circolo e livello,
   lezioni con posti e coach, circoli che offrono la lezione, parametri dei crediti,
-  catalogo dei micro-test.
+  catalogo amministrativo dei micro-test.
 - `/professional/lessons`: lezioni del coach, feedback per atleta e assenze.
 
 ## Sviluppo e test
 
 Default: traguardo visivo di 100 crediti, 30 per la prima valutazione, 20 per
-round, 10 per micro-test, 2 micro-test nelle 24 ore; eleggibilità con confidence
+passo di calibrazione, 10 per micro-test del catalogo (storico); eleggibilità con confidence
 complessiva ≥ 50 (regola v1, da approvare, in `/admin/calibration`). Per provarla:
-accendere `free_lesson` in `/admin/feature-flags`, attivare un circolo e aggiungere
-un micro-test in `/admin/free-lessons`.
+accendere `free_lesson` in `/admin/feature-flags` e attivare un circolo in
+`/admin/free-lessons`.
 
 Test: `free-lesson-rules.spec.ts`, `calibration-rules.spec.ts`,
-`test/db/free-lesson.integration-spec.ts` (crediti e limite giornaliero in
-parallelo, eleggibilità per regola, capienza con assegnazioni parallele, attesa di
-R e feedback del coach, rinuncia e territorio non servito, ritiro, flag spento), `test/db/ai-micro-tests.integration-spec.ts` (una chiamata
-AI con richieste parallele, test su misura prima del catalogo e solo del loro
-atleta, nuovo lotto a nuova valutazione, fallimento e nuovo tentativo, flag
-spento), `micro-test-generation.spec.ts`, `app/journey/free-lesson-panel.test.tsx`,
-`app/ai-tuner/prompts/micro-test/page.test.tsx`.
+`test/db/free-lesson.integration-spec.ts` (crediti in parallelo, catalogo fuori
+dal pannello, eleggibilità per regola, capienza con assegnazioni parallele, attesa di
+R e feedback del coach, rinuncia e territorio non servito, ritiro, flag spento), `app/journey/free-lesson-panel.test.tsx`. I micro-test sono testati con la
+calibrazione (`docs/calibrazione.md`).
 
 ## Aperto
 

@@ -23,7 +23,7 @@ import { ensureTestDatabaseExists } from '../utils/ensure-test-database';
 const AREAS = ['pf4-driver-0', 'pf4-driver-1'];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Slice 4: crediti, micro-test, posti, attesa della lezione e feedback del coach su PostgreSQL. */
+/** Slice 4: crediti, posti, attesa della lezione e feedback del coach su PostgreSQL. */
 describe('Free lesson with PostgreSQL', () => {
   let prisma: PrismaService;
   let athletes: FreeLessonService;
@@ -261,7 +261,7 @@ describe('Free lesson with PostgreSQL', () => {
     await prisma.$disconnect();
   });
 
-  it('credits each interaction once, also with parallel requests, and caps micro-tests per day', async () => {
+  it('credits each interaction once, also with parallel requests, and keeps the catalog out of the panel', async () => {
     const id = await athlete([40, 50]);
     for (const sequence of [1, 2]) {
       const evaluation = await prisma.assessmentEvaluation.findFirstOrThrow({
@@ -306,22 +306,17 @@ describe('Free lesson with PostgreSQL', () => {
       });
       microTests.push(test.id);
     }
+    // Il catalogo resta contenuto del back office: il pannello non lo propone.
     const shown = await athletes.view(id);
-    expect(shown.enabled && shown.microTests).toHaveLength(2);
-    const results = await Promise.allSettled(
-      microTests.map((testId) =>
-        athletes.completeMicroTest(id, testId, 'high'),
-      ),
-    );
-    expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(2);
-    // Un reinvio dello stesso esito non conta due volte.
-    const done = await prisma.microTestCompletion.findFirstOrThrow({
-      where: { userId: id },
+    expect(shown).not.toHaveProperty('microTests');
+    // Gli esiti storici del vecchio pannello contano ancora nei crediti.
+    await prisma.microTestCompletion.createMany({
+      data: microTests
+        .slice(0, 2)
+        .map((microTestId) => ({ userId: id, microTestId, value: 'high' })),
     });
-    await athletes.completeMicroTest(id, done.microTestId, 'high');
     const after = await athletes.view(id);
     expect(after.enabled && after.credits.balance).toBe(90);
-    expect(after.enabled && after.microTestsLeft).toBe(0);
 
     // Profilo più attendibile: la regola di eleggibilità in vigore è soddisfatta.
     await prisma.assessmentEvaluation.updateMany({

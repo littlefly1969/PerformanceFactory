@@ -20,18 +20,13 @@ const SETTINGS: { key: keyof Settings; label: string; hint: string }[] = [
   },
   {
     key: "creditsCalibrationRound",
-    label: "Crediti per round di calibrazione",
-    hint: "Ogni round di domande risposto e valutato.",
+    label: "Crediti per passo di calibrazione",
+    hint: "Ogni passo risposto e valutato, domande o micro-test dell'AI.",
   },
   {
     key: "creditsMicroTest",
-    label: "Crediti per micro-test",
-    hint: "Ogni esito riportato.",
-  },
-  {
-    key: "microTestsPerDay",
-    label: "Micro-test nelle 24 ore",
-    hint: "0 li spegne.",
+    label: "Crediti per micro-test del catalogo (storico)",
+    hint: "Solo per gli esiti già riportati nel vecchio pannello della lezione.",
   },
 ];
 
@@ -121,8 +116,9 @@ export function MicroTestCatalog({
         <h2>Micro-test</h2>
       </div>
       <p className="pf-muted">
-        Diagnostici, non allenamenti (A4.6): l&apos;atleta riporta un esito e la
-        valutazione successiva lo usa come evidenza del driver.
+        Contenuto amministrativo: l&apos;atleta non li riceve in automatico. I
+        micro-test dell&apos;assessment li propone e li scrive l&apos;AI come
+        passo della calibrazione (flag ai_micro_tests).
       </p>
       <div className="pf-stack">
         {overview.microTests.map((test) => (
