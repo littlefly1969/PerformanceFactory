@@ -7,6 +7,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import { evaluateAssessment } from './assessment-evaluation';
 import { AssessmentEvaluationInput } from './assessment-evaluation-model';
 import {
+  CalibrationQuestionsInput,
+  generateCalibrationQuestions,
+} from './calibration-questions';
+import {
   buildCycleProposalPreview,
   generateCycleProposal,
 } from './proposal-cycle';
@@ -76,6 +80,10 @@ export class AiProposalProviderService {
 
   evaluateAssessment(input: AssessmentEvaluationInput) {
     return evaluateAssessment(this.logger, input);
+  }
+
+  generateCalibrationQuestions(input: CalibrationQuestionsInput) {
+    return generateCalibrationQuestions(this.logger, input);
   }
 
   static requiresUserConsent(provider = process.env.AI_PROVIDER) {

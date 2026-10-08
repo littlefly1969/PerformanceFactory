@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { API_BASE, secureFetch } from "@/app/lib/api";
 import { readError } from "../prompt-management-model";
 
+export type AssessmentPromptKind = "EVALUATION" | "CALIBRATION";
+
 export type AssessmentPrompt = {
   id?: string;
   name: string;
@@ -18,22 +20,34 @@ export type AssessmentTestCase = {
   provider: string;
 };
 
+export type CalibrationTestOutput = {
+  questions: {
+    id: string;
+    areaId: string;
+    name?: string;
+    text: string;
+    options: { value: string; label: string; score: number }[];
+  }[];
+};
+
 export type AssessmentTestResult = {
   provider: string;
   model: string;
   latencyMs: number;
-  output: {
-    summary: string;
-    overallConfidence: number;
-    drivers: {
-      areaId: string;
-      name?: string;
-      score: number;
-      confidence: number;
-      rationale: string;
-      evidenceGaps: string[];
-    }[];
-  };
+  output:
+    | CalibrationTestOutput
+    | {
+        summary: string;
+        overallConfidence: number;
+        drivers: {
+          areaId: string;
+          name?: string;
+          score: number;
+          confidence: number;
+          rationale: string;
+          evidenceGaps: string[];
+        }[];
+      };
 };
 
 const post = (path: string, body: unknown) =>
@@ -45,7 +59,9 @@ const post = (path: string, body: unknown) =>
   });
 
 /** Stesso flusso del prompt obiettivo: modificare il prompt in uso crea una bozza. */
-export function useAssessmentPrompts() {
+export function useAssessmentPrompts(
+  kind: AssessmentPromptKind = "EVALUATION",
+) {
   const [prompts, setPrompts] = useState<AssessmentPrompt[]>([]);
   const [draft, setDraft] = useState<AssessmentPrompt | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -56,9 +72,10 @@ export function useAssessmentPrompts() {
   const [testCaseId, setTestCaseId] = useState("");
 
   const load = useCallback(async () => {
-    const response = await secureFetch(`${API_BASE}/ai-tuning/assessment-prompts`, {
-      credentials: "include",
-    });
+    const response = await secureFetch(
+      `${API_BASE}/ai-tuning/assessment-prompts?kind=${kind}`,
+      { credentials: "include" },
+    );
     if (!response.ok) {
       setMessage(`Caricamento non riuscito: ${await readError(response)}`);
       return [];
@@ -66,16 +83,18 @@ export function useAssessmentPrompts() {
     const items = (await response.json()) as AssessmentPrompt[];
     setPrompts(items);
     return items;
-  }, []);
+  }, [kind]);
 
   useEffect(() => {
+    // Le domande di calibrazione si provano solo sul caso sintetico.
+    if (kind !== "EVALUATION") return;
     void secureFetch(`${API_BASE}/ai-tuning/assessment-prompt/test-cases`, {
       credentials: "include",
     })
       .then((response) => (response.ok ? response.json() : []))
       .then((items: AssessmentTestCase[]) => setTestCases(items))
       .catch(() => setTestCases([]));
-  }, []);
+  }, [kind]);
 
   useEffect(() => {
     void load().then((items) =>
@@ -97,7 +116,7 @@ export function useAssessmentPrompts() {
     // Il prompt in uso non si sovrascrive: le modifiche diventano una nuova bozza.
     const asNewDraft = !draft.id || draft.isActive;
     const response = await post("assessment-prompt", {
-      ...(asNewDraft ? {} : { id: draft.id }),
+      ...(asNewDraft ? { kind } : { id: draft.id }),
       name: asNewDraft
         ? `${draft.name.replace(/ bozza.*$/, "")} bozza ${new Date().toISOString().slice(0, 16).replace("T", " ")}`
         : draft.name,
@@ -133,7 +152,11 @@ export function useAssessmentPrompts() {
     const saved = (await response.json()) as AssessmentPrompt;
     await load();
     setDraft(saved);
-    setMessage("Prompt attivato: le prossime valutazioni useranno questa versione.");
+    setMessage(
+      kind === "EVALUATION"
+        ? "Prompt attivato: le prossime valutazioni useranno questa versione."
+        : "Prompt attivato: i prossimi round di domande useranno questa versione.",
+    );
   }
 
   async function runTest() {
@@ -142,6 +165,7 @@ export function useAssessmentPrompts() {
     setMessage(null);
     setTest(null);
     const response = await post("assessment-prompt/test", {
+      kind,
       basePrompt: draft.basePrompt,
       ...(testCaseId ? { evaluationId: testCaseId } : {}),
     });

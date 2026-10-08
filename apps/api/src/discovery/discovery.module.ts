@@ -9,6 +9,8 @@ import { AnalyticsModule } from '../analytics/analytics.module';
 import { DiscoveryController } from './discovery.controller';
 import { DiscoveryService } from './discovery.service';
 import { AthleteRegistrationService } from './athlete-registration.service';
+import { CalibrationService } from './calibration/calibration.service';
+import { CalibrationAdminController } from './calibration/calibration-admin.controller';
 
 @Module({
   imports: [
@@ -18,11 +20,16 @@ import { AthleteRegistrationService } from './athlete-registration.service';
     PartnersModule,
     AnalyticsModule,
   ],
-  controllers: [DiscoveryController, AthleteJourneyController],
+  controllers: [
+    DiscoveryController,
+    AthleteJourneyController,
+    CalibrationAdminController,
+  ],
   providers: [
     DiscoveryService,
     AthleteRegistrationService,
     AthleteJourneyService,
+    CalibrationService,
   ],
   exports: [AthleteRegistrationService, AthleteJourneyService],
 })

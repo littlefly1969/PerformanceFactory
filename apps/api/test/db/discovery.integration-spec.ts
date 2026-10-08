@@ -46,6 +46,7 @@ import { ConsentsService } from '../../src/consents/consents.service';
 import { Test } from '@nestjs/testing';
 import { ConflictException, ValidationPipe } from '@nestjs/common';
 import { AthleteJourneyService } from '../../src/discovery/athlete-journey.service';
+import { CalibrationService } from '../../src/discovery/calibration/calibration.service';
 import { OnboardingService } from '../../src/onboarding/onboarding.service';
 import {
   FastifyAdapter,
@@ -55,6 +56,11 @@ import session from 'express-session';
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import {
+  assertProgramAllowed,
+  loadCalibrationSettings,
+  updateCalibrationSettings,
+} from '../../src/discovery/calibration/calibration-config';
 import { testGoogleRegistration } from './google-journey-test-helper';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from '../../src/auth/auth.module';
@@ -702,7 +708,7 @@ describe('PF4 discovery to authenticated journey', () => {
     expect(saved.areas).toHaveLength(6);
     expect(saved.promptVersion?.promptType).toBe('ASSESSMENT_EVALUATION');
     const active = await prisma.aiAssessmentPromptConfig.findFirstOrThrow({
-      where: { isActive: true },
+      where: { isActive: true, kind: 'EVALUATION' },
     });
     expect(saved.promptVersionId).toBe(active.activePromptVersionId);
     expect(JSON.stringify(saved.inputJson)).not.toContain(email);
@@ -738,6 +744,367 @@ describe('PF4 discovery to authenticated journey', () => {
     expect((await state()).phase).toBe('EVALUATION');
   });
 
+  it('calibrates with AI rounds on the least reliable drivers until the closing assessment', async () => {
+    type Calibration = {
+      status: string;
+      day: number;
+      nextRoundKind: string | null;
+      nextRoundAt: string | null;
+      completionReason: string | null;
+      round: {
+        id: string;
+        kind: string;
+        questions: Array<{
+          id: string;
+          areaId: string;
+          options: Array<Record<string, unknown>>;
+        }>;
+      } | null;
+    };
+    const calibration = async () =>
+      (await state()) as unknown as { calibration: Calibration };
+    const initial = (await calibration()).calibration;
+    expect(initial).toMatchObject({
+      status: 'FREE_CALIBRATING',
+      day: 1,
+      nextRoundKind: 'ADAPTIVE',
+      round: null,
+    });
+
+    // Doppio click: un solo round, con domande sui due driver meno affidabili.
+    const opened = await Promise.all([
+      post('calibration/round'),
+      post('calibration/round'),
+    ]);
+    expect(opened.every((r) => [201, 409].includes(r.statusCode))).toBe(true);
+    expect(await prisma.calibrationRound.count({ where: { userId } })).toBe(1);
+    const round = (await calibration()).calibration.round!;
+    expect(round.kind).toBe('ADAPTIVE');
+    expect(round.questions).toHaveLength(4);
+    expect(new Set(round.questions.map((q) => q.areaId)).size).toBe(2);
+    // Lo score delle opzioni non arriva all'atleta.
+    for (const q of round.questions)
+      for (const o of q.options) expect(o).not.toHaveProperty('score');
+    expect((await post('calibration/round')).statusCode).toBe(201);
+    expect(await prisma.calibrationRound.count({ where: { userId } })).toBe(1);
+
+    const answerAll = (r: NonNullable<Calibration['round']>) =>
+      post('calibration/answers', {
+        roundId: r.id,
+        answers: Object.fromEntries(
+          r.questions.map((q) => [q.id, q.options.at(-1)!.value]),
+        ),
+      });
+    expect(
+      (
+        await post('calibration/answers', {
+          roundId: round.id,
+          answers: { [round.questions[0].id]: '0' },
+        })
+      ).statusCode,
+    ).toBe(400);
+    // Lease scaduto durante una chiamata AI lenta: B riprende il round mentre A
+    // aspetta l'AI. B non riscrive le risposte e valuta quelle fissate da A; A
+    // finisce dopo e non collega più la sua valutazione.
+    const service = app.get(CalibrationService);
+    const ai = app.get(AiProposalProviderService);
+    const original = ai.evaluateAssessment.bind(ai);
+    const pick = (r: NonNullable<Calibration['round']>, at: 0 | -1) =>
+      Object.fromEntries(
+        r.questions.map((q) => [q.id, String(q.options.at(at)!.value)]),
+      );
+    const expireLease = () =>
+      prisma.athleteCalibration.update({
+        where: { userId },
+        data: { operationAt: new Date(Date.now() - 11 * 60 * 1000) },
+      });
+    const slow = jest
+      .spyOn(ai, 'evaluateAssessment')
+      .mockImplementationOnce(async (input) => {
+        await expireLease();
+        await service.answerRound(userId, round.id, pick(round, 0));
+        return original(input);
+      });
+    try {
+      await expect(
+        service.answerRound(userId, round.id, pick(round, -1)),
+      ).resolves.toBeUndefined();
+    } finally {
+      slow.mockRestore();
+    }
+    const fixedRound = await prisma.calibrationRound.findUniqueOrThrow({
+      where: { id: round.id },
+    });
+    expect(fixedRound).toMatchObject({
+      status: 'EVALUATED',
+      answersJson: pick(round, -1),
+      evaluationToken: null,
+    });
+    expect(fixedRound.evaluatedAt).toBeTruthy();
+    // Replay della stessa risposta: nessuna nuova valutazione.
+    expect((await answerAll(round)).statusCode).toBe(201);
+    const second = await prisma.assessmentEvaluation.findFirstOrThrow({
+      where: { userId, sequence: 2 },
+      include: { areas: true, round: true },
+    });
+    expect(second).toMatchObject({
+      source: 'CALIBRATION_ROUND',
+      status: 'PROVISIONAL',
+      round: { id: round.id, status: 'EVALUATED' },
+    });
+    expect(second.level).toBeTruthy();
+    const targeted = new Set(round.questions.map((q) => q.areaId));
+    for (const area of second.areas)
+      expect(area.confidence).toBe(targeted.has(area.areaId) ? 60 : 30);
+    expect(await prisma.assessmentEvaluation.count({ where: { userId } })).toBe(
+      2,
+    );
+    const input = JSON.stringify(second.inputJson);
+    expect(input).toContain('CALIBRATION');
+    expect(input).toContain('previous');
+    // La valutazione usa le risposte fissate per prime (A), non quelle di B.
+    const evaluated = (
+      second.inputJson as {
+        prompt: {
+          user: {
+            drivers: Array<{
+              answers: Array<{ answer: string; source: string }>;
+            }>;
+          };
+        };
+      }
+    ).prompt.user.drivers.flatMap((d) =>
+      d.answers.filter((x) => x.source === 'CALIBRATION').map((x) => x.answer),
+    );
+    expect(evaluated).toHaveLength(4);
+    expect(new Set(evaluated)).toEqual(new Set(['Sempre']));
+
+    // Nessun programma durante la calibrazione, salvo il parametro di back office.
+    const blocked = await post('submit');
+    expect(blocked.statusCode).toBe(409);
+    expect(blocked.json()).toMatchObject({
+      code: 'PROGRAM_LOCKED_BEFORE_PAYWALL',
+    });
+    await updateCalibrationSettings(
+      prisma,
+      { programBeforePaywall: true },
+      userId,
+    );
+    await expect(assertProgramAllowed(prisma, userId)).resolves.toBeUndefined();
+    await updateCalibrationSettings(
+      prisma,
+      { programBeforePaywall: false },
+      userId,
+    );
+    await expect(assertProgramAllowed(prisma, userId)).rejects.toThrow(
+      'abbonamento',
+    );
+
+    // Il prossimo round rispetta l'intervallo minimo.
+    const waiting = (await calibration()).calibration;
+    expect(waiting.nextRoundAt).toBeTruthy();
+    const early = await post('calibration/round');
+    expect(early.statusCode).toBe(409);
+    expect(early.json()).toMatchObject({ code: 'CALIBRATION_ROUND_NOT_YET' });
+    // L'intervallo parte dalla valutazione, non dall'apertura del round.
+    await prisma.calibrationRound.updateMany({
+      where: { userId },
+      data: { createdAt: new Date(Date.now() - 2 * 86400000) },
+    });
+    expect((await post('calibration/round')).statusCode).toBe(409);
+
+    // Giorno 26: il round è l'assessment di chiusura su tutti i driver sotto soglia.
+    const past = (days: number) => new Date(Date.now() - days * 86400000);
+    await prisma.athleteCalibration.update({
+      where: { userId },
+      data: { startedAt: past(25) },
+    });
+    await prisma.calibrationRound.updateMany({
+      where: { userId },
+      data: { evaluatedAt: past(1) },
+    });
+    expect((await post('calibration/round')).statusCode).toBe(201);
+    const closing = (await calibration()).calibration.round!;
+    expect(closing.kind).toBe('CLOSING');
+    expect(new Set(closing.questions.map((q) => q.areaId)).size).toBe(6);
+    // Variante: A fallisce mentre B, che ha ripreso il round, lo sta valutando.
+    // Il catch di A non riapre un round che non è più suo.
+    const failing = jest
+      .spyOn(ai, 'evaluateAssessment')
+      .mockImplementationOnce(async () => {
+        await expireLease();
+        await service.answerRound(userId, closing.id, pick(closing, 0));
+        throw new Error('provider non raggiungibile');
+      });
+    try {
+      await expect(
+        service.answerRound(userId, closing.id, pick(closing, -1)),
+      ).rejects.toThrow('provider non raggiungibile');
+    } finally {
+      failing.mockRestore();
+    }
+    expect(
+      await prisma.calibrationRound.findUniqueOrThrow({
+        where: { id: closing.id },
+      }),
+    ).toMatchObject({ status: 'EVALUATED', answersJson: pick(closing, -1) });
+    const done = (await calibration()).calibration;
+    expect(done).toMatchObject({
+      status: 'CALIBRATION_COMPLETED',
+      completionReason: 'CLOSING_ASSESSMENT',
+      nextRoundKind: null,
+      round: null,
+    });
+    expect(
+      await prisma.assessmentEvaluation.findFirstOrThrow({
+        where: { userId, sequence: 3 },
+      }),
+    ).toMatchObject({ source: 'CLOSING_ASSESSMENT', status: 'CONSOLIDATED' });
+    expect((await post('calibration/round')).statusCode).toBe(409);
+    // Anche a calibrazione completata il programma aspetta scenari e paywall.
+    expect((await post('submit')).json()).toMatchObject({
+      code: 'PROGRAM_LOCKED_BEFORE_PAYWALL',
+    });
+  });
+
+  it('closes at the deadline with the available data and keeps status and evaluation aligned', async () => {
+    const latest = () =>
+      prisma.assessmentEvaluation.findFirstOrThrow({
+        where: { userId },
+        orderBy: { sequence: 'desc' },
+      });
+    const reopen = async (deadlineAt: Date) => {
+      await prisma.athleteCalibration.update({
+        where: { userId },
+        data: {
+          status: 'FREE_CALIBRATING',
+          completedAt: null,
+          completionReason: null,
+          deadlineAt,
+        },
+      });
+      await prisma.assessmentEvaluation.update({
+        where: { id: (await latest()).id },
+        data: { status: 'PROVISIONAL' },
+      });
+    };
+    const day = 86400000;
+    try {
+      // Soglia abbassata dal back office: chiusura e consolidamento insieme.
+      await reopen(new Date(Date.now() + day));
+      await updateCalibrationSettings(
+        prisma,
+        { confidenceThreshold: 1 },
+        userId,
+      );
+      await prisma.calibrationRound.updateMany({
+        where: { userId },
+        data: { evaluatedAt: new Date(Date.now() - 2 * day) },
+      });
+      expect((await post('calibration/round')).statusCode).toBe(201);
+      expect(
+        await prisma.athleteCalibration.findUniqueOrThrow({
+          where: { userId },
+        }),
+      ).toMatchObject({
+        status: 'CALIBRATION_COMPLETED',
+        completionReason: 'CONFIDENCE_REACHED',
+      });
+      expect((await latest()).status).toBe('CONSOLIDATED');
+    } finally {
+      await updateCalibrationSettings(
+        prisma,
+        { confidenceThreshold: 70 },
+        userId,
+      );
+    }
+
+    // Scadenza superata con un round aperto: il round scade, si consolida.
+    await reopen(new Date(Date.now() - 1000));
+    const lastRound = await prisma.calibrationRound.findFirstOrThrow({
+      where: { userId },
+      orderBy: { sequence: 'desc' },
+    });
+    const pending = await prisma.calibrationRound.create({
+      data: {
+        userId,
+        sequence: lastRound.sequence + 1,
+        kind: 'CLOSING',
+        questionsJson: lastRound.questionsJson as object,
+        provider: 'stub',
+        model: 'stub',
+        promptHash: 'test',
+      },
+    });
+    const view = (
+      (await state()) as unknown as {
+        calibration: {
+          status: string;
+          completionReason: string;
+          round: unknown;
+        };
+      }
+    ).calibration;
+    expect(view).toMatchObject({
+      status: 'CALIBRATION_COMPLETED',
+      completionReason: 'DEADLINE_REACHED',
+      round: null,
+    });
+    expect(
+      (
+        await prisma.calibrationRound.findUniqueOrThrow({
+          where: { id: pending.id },
+        })
+      ).status,
+    ).toBe('EXPIRED');
+    expect((await latest()).status).toBe('CONSOLIDATED');
+    const questions = pending.questionsJson as Array<{
+      id: string;
+      options: Array<{ value: string }>;
+    }>;
+    const late = await post('calibration/answers', {
+      roundId: pending.id,
+      answers: Object.fromEntries(
+        questions.map((q) => [q.id, q.options[0].value]),
+      ),
+    });
+    expect(late.statusCode).toBe(409);
+    expect((await post('calibration/round')).statusCode).toBe(409);
+  });
+
+  it('keeps calibration parameters consistent and reserved to admins', async () => {
+    expect(await loadCalibrationSettings(prisma)).toMatchObject({
+      confidenceThreshold: 70,
+      maxDays: 30,
+      closingDay: 25,
+    });
+    await expect(
+      updateCalibrationSettings(prisma, { closingDay: 40 }, userId),
+    ).rejects.toThrow('Il giorno di chiusura');
+    expect(
+      await updateCalibrationSettings(
+        prisma,
+        { confidenceThreshold: 75 },
+        userId,
+      ),
+    ).toMatchObject({ confidenceThreshold: 75, closingDay: 25 });
+    await updateCalibrationSettings(
+      prisma,
+      { confidenceThreshold: 70 },
+      userId,
+    );
+    const athlete = await app.inject({
+      method: 'PUT',
+      url: '/api/admin/calibration-config',
+      headers: { cookie, authorization: `Bearer ${token}` },
+      payload: { confidenceThreshold: 10 },
+    });
+    expect(athlete.statusCode).toBe(403);
+    expect((await loadCalibrationSettings(prisma)).confidenceThreshold).toBe(
+      70,
+    );
+  });
+
   it('versions an edited assessment prompt and makes it the only active one', async () => {
     const tuner = await prisma.user.create({
       data: {
@@ -747,7 +1114,7 @@ describe('PF4 discovery to authenticated journey', () => {
       },
     });
     const previous = await prisma.aiAssessmentPromptConfig.findFirstOrThrow({
-      where: { isActive: true },
+      where: { isActive: true, kind: 'EVALUATION' },
     });
     try {
       const draft = await upsertAssessmentPromptConfig(
@@ -771,7 +1138,7 @@ describe('PF4 discovery to authenticated journey', () => {
       });
       expect(
         await prisma.aiAssessmentPromptConfig.count({
-          where: { isActive: true },
+          where: { isActive: true, kind: 'EVALUATION' },
         }),
       ).toBe(1);
       expect(
@@ -798,7 +1165,7 @@ describe('PF4 discovery to authenticated journey', () => {
       },
     });
     const previous = await prisma.aiAssessmentPromptConfig.findFirstOrThrow({
-      where: { isActive: true },
+      where: { isActive: true, kind: 'EVALUATION' },
     });
     try {
       const drafts = await Promise.all(
@@ -821,7 +1188,7 @@ describe('PF4 discovery to authenticated journey', () => {
       );
       expect(
         await prisma.aiAssessmentPromptConfig.count({
-          where: { isActive: true },
+          where: { isActive: true, kind: 'EVALUATION' },
         }),
       ).toBe(1);
     } finally {
@@ -887,6 +1254,12 @@ describe('PF4 discovery to authenticated journey', () => {
   });
 
   it('submits a real baseline once and derives result exclusively from its persisted areas', async () => {
+    // Flusso precedente (baseline e piano) riaperto dal back office per questi test.
+    await updateCalibrationSettings(
+      prisma,
+      { programBeforePaywall: true },
+      userId,
+    );
     const response = await post('submit');
     expect(response.statusCode).toBe(201);
     const result = response.json<JourneyResponse>().result;

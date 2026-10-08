@@ -70,6 +70,7 @@ const roleNav: Record<string, NavItem[]> = {
     { href: "/admin/discovery", label: "Discovery" },
     { href: "/admin/assessment", label: "Assessment" },
     { href: "/admin/consents", label: "Privacy" },
+    { href: "/admin/calibration", label: "Calibrazione" },
     { href: "/admin/partners", label: "Circoli" },
     { href: "/admin/feature-flags", label: "Rilasci" },
   ],
@@ -123,6 +124,7 @@ const pathMatchesRole = (path: string, role?: string) => {
       path.startsWith("/admin/discovery") ||
       path.startsWith("/admin/assessment") ||
       path.startsWith("/admin/consents") ||
+      path.startsWith("/admin/calibration") ||
       path.startsWith("/admin/partners") ||
       path.startsWith("/admin/feature-flags")
     );
@@ -221,6 +223,7 @@ const getLogicalBackHref = (path: string, search: string) => {
 
   if (
     path === "/admin/consents" ||
+    path === "/admin/calibration" ||
     path === "/admin/partners" ||
     path === "/admin/feature-flags"
   ) {

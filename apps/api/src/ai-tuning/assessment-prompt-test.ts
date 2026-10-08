@@ -76,3 +76,41 @@ export async function testAssessmentPrompt(
     previousOutput,
   };
 }
+
+/** Prova le domande di calibrazione sul caso sintetico: due driver a confidence bassa. */
+export async function testCalibrationPrompt(
+  ai: AiProposalProviderService,
+  basePrompt: string,
+) {
+  const input = SYNTHETIC_ASSESSMENT_CASE;
+  const targets = input.drivers.slice(0, 2).map((driver) => ({
+    areaId: driver.areaId,
+    name: driver.name,
+    score: 50,
+    confidence: 30,
+    evidenceGaps: ['Servono esempi concreti di situazioni di gioco.'],
+    askedQuestions: driver.answers.map((a) => a.question),
+  }));
+  const result = await ai.generateCalibrationQuestions({
+    basePrompt,
+    promptVersionId: null,
+    kind: 'ADAPTIVE',
+    questionsPerDriver: 2,
+    scale: input.scale,
+    athleteContext: input.athleteContext,
+    targets,
+  });
+  return {
+    caseEvaluationId: null,
+    provider: result.provider,
+    model: result.model,
+    latencyMs: result.latencyMs,
+    output: {
+      questions: result.questions.map((q) => ({
+        ...q,
+        name: targets.find((t) => t.areaId === q.areaId)?.name,
+      })),
+    },
+    previousOutput: null,
+  };
+}

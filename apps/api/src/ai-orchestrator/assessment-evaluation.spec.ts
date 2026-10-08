@@ -64,11 +64,14 @@ const driver = (areaId: string, extra: object = {}) => ({
   confidence: 30,
   rationale: 'Motivazione breve.',
   evidenceGaps: ['Un micro-test.'],
+  commitment: 'MEDIUM',
   ...extra,
 });
 const valid = (drivers: object[]) => ({
   summary: 'Sintesi provvisoria.',
   overallConfidence: 30,
+  level: 'INTERMEDIATE',
+  levelConfidence: 35,
   drivers,
 });
 
@@ -140,6 +143,16 @@ describe('assessment evaluation', () => {
         driver('mental'),
       ]),
       'evidenceGaps non validi',
+    ],
+    [
+      'an unknown level',
+      { ...valid([driver('tecnica'), driver('mental')]), level: 'EXPERT' },
+      'level non valido',
+    ],
+    [
+      'an unknown commitment',
+      valid([driver('tecnica', { commitment: 'TOTAL' }), driver('mental')]),
+      'commitment non valido',
     ],
     [
       'a missing summary',

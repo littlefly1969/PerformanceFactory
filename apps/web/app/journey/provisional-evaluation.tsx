@@ -58,7 +58,13 @@ function ProvisionalRadar({ evaluation }: { evaluation: Evaluation }) {
 export function ProvisionalEvaluation({ evaluation }: { evaluation: Evaluation }) {
   return (
     <section className="pf4-body pf4-performance">
-      <span className="pf4-kicker">Prima valutazione · provvisoria</span>
+      <span className="pf4-kicker">
+        {evaluation.status === "CONSOLIDATED"
+          ? "Valutazione consolidata"
+          : (evaluation.sequence ?? 1) > 1
+            ? "Valutazione aggiornata · provvisoria"
+            : "Prima valutazione · provvisoria"}
+      </span>
       <h1>Ecco dove sei oggi.</h1>
       <p>{evaluation.summary}</p>
       <ProvisionalRadar evaluation={evaluation} />
@@ -93,11 +99,13 @@ export function ProvisionalEvaluation({ evaluation }: { evaluation: Evaluation }
           </div>
         ))}
       </div>
-      <p>
-        È una stima iniziale basata sulle tue risposte. Diventerà più precisa con le
-        prossime domande; il tuo potenziale verrà calcolato solo quando la
-        valutazione sarà consolidata.
-      </p>
+      {evaluation.status !== "CONSOLIDATED" && (
+        <p>
+          È una stima basata sulle tue risposte. Diventerà più precisa con le
+          prossime domande; il tuo potenziale verrà calcolato solo quando la
+          valutazione sarà consolidata.
+        </p>
+      )}
     </section>
   );
 }

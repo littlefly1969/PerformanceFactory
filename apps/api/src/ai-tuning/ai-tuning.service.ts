@@ -9,12 +9,14 @@ import { TestPromptDto } from './dto/test-prompt.dto';
 import { UpsertGoldenContextDto } from './dto/upsert-golden-context.dto';
 import { exportActivePrompts } from './prompt-export';
 import {
+  AssessmentPromptKind,
   listAssessmentPromptConfigs,
   upsertAssessmentPromptConfig,
 } from '../ai-orchestrator/assessment-prompts';
 import {
   listAssessmentTestCases,
   testAssessmentPrompt,
+  testCalibrationPrompt,
 } from './assessment-prompt-test';
 import { UpsertAssessmentPromptConfigDto } from './dto/upsert-assessment-prompt-config.dto';
 import {
@@ -75,8 +77,8 @@ export class AiTuningService {
     return exportActivePrompts(this.prisma, now);
   }
 
-  listAssessmentPrompts() {
-    return listAssessmentPromptConfigs(this.prisma);
+  listAssessmentPrompts(kind: AssessmentPromptKind = 'EVALUATION') {
+    return listAssessmentPromptConfigs(this.prisma, kind);
   }
 
   upsertAssessmentPrompt(
@@ -88,6 +90,10 @@ export class AiTuningService {
 
   listAssessmentTestCases() {
     return listAssessmentTestCases(this.prisma);
+  }
+
+  testCalibrationPrompt(basePrompt: string) {
+    return testCalibrationPrompt(this.proposalProvider, basePrompt);
   }
 
   testAssessmentPrompt(basePrompt: string, evaluationId?: string) {

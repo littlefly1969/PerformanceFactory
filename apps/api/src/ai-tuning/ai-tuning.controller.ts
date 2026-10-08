@@ -171,10 +171,18 @@ export class AiTuningController {
 
   @Get('assessment-prompts')
   @ApiOperation({
-    summary: 'Prompt di valutazione AI dell assessment (attivo e bozze)',
+    summary:
+      'Prompt AI dell assessment (attivo e bozze): valutazione o domande di calibrazione',
   })
-  listAssessmentPrompts() {
-    return this.tuning.listAssessmentPrompts();
+  @ApiQuery({
+    name: 'kind',
+    required: false,
+    enum: ['EVALUATION', 'CALIBRATION'],
+  })
+  listAssessmentPrompts(@Query('kind') kind?: string) {
+    return this.tuning.listAssessmentPrompts(
+      kind === 'CALIBRATION' ? 'CALIBRATION' : 'EVALUATION',
+    );
   }
 
   @Post('assessment-prompt')
@@ -205,7 +213,9 @@ export class AiTuningController {
   })
   @Roles(UserRole.AI_TUNER)
   testAssessmentPrompt(@Body() body: TestAssessmentPromptDto) {
-    return this.tuning.testAssessmentPrompt(body.basePrompt, body.evaluationId);
+    return body.kind === 'CALIBRATION'
+      ? this.tuning.testCalibrationPrompt(body.basePrompt)
+      : this.tuning.testAssessmentPrompt(body.basePrompt, body.evaluationId);
   }
 
   @Post('sports')

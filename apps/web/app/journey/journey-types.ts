@@ -18,6 +18,11 @@ export type Evaluation = {
   source: string;
   summary: string;
   overallConfidence: number;
+  /** Livello stimato e sua affidabilità; assenti nelle valutazioni precedenti. */
+  level?: string | null;
+  levelConfidence?: number | null;
+  /** 1 = prima valutazione; le successive vengono dai round di calibrazione. */
+  sequence?: number;
   scale: { min: number; max: number };
   createdAt: string;
   drivers: {
@@ -27,7 +32,35 @@ export type Evaluation = {
     confidence: number;
     rationale: string;
     evidenceGaps: string[];
+    commitment?: string | null;
   }[];
+};
+/** Calibrazione gratuita dopo la prima valutazione (A4.3): round di domande AI. */
+export type Calibration = {
+  status: "FREE_CALIBRATING" | "FREE_LEVEL_ESTIMATED" | "CALIBRATION_COMPLETED";
+  day: number;
+  maxDays: number;
+  confidenceThreshold: number;
+  completionReason:
+    | "CONFIDENCE_REACHED"
+    | "CLOSING_ASSESSMENT"
+    | "DEADLINE_REACHED"
+    | null;
+  roundsCompleted: number;
+  nextRoundKind: "ADAPTIVE" | "CLOSING" | null;
+  nextRoundAt: string | null;
+  round: {
+    id: string;
+    kind: "ADAPTIVE" | "CLOSING";
+    status: string;
+    questions: {
+      id: string;
+      areaId: string;
+      text: string;
+      options: { value: string; label: string }[];
+    }[];
+    answers: Record<string, string>;
+  } | null;
 };
 export type Journey = {
   phase:
@@ -48,6 +81,7 @@ export type Journey = {
   /** Tutte le risposte date: confine prima del passo successivo. */
   assessmentComplete?: boolean;
   evaluation?: Evaluation | null;
+  calibration?: Calibration | null;
   /** Totale prodotto dal backend: la UI non conosce aree ne formula. */
   count: number;
   estimatedMinutes: number;

@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsIn,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
 export class TestAssessmentPromptDto {
   @ApiProperty()
@@ -14,4 +20,10 @@ export class TestAssessmentPromptDto {
   @IsString()
   @MaxLength(64)
   evaluationId?: string;
+
+  /** CALIBRATION prova le domande dei round, solo sul caso sintetico. */
+  @ApiPropertyOptional({ enum: ['EVALUATION', 'CALIBRATION'] })
+  @IsOptional()
+  @IsIn(['EVALUATION', 'CALIBRATION'])
+  kind?: 'EVALUATION' | 'CALIBRATION';
 }

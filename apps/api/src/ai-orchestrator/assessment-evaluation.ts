@@ -3,6 +3,10 @@ import { hashJson } from './proposal-audit';
 import { requestStructuredProposal } from './proposal-structured-transport';
 import { resolveModel, resolveProvider } from './provider-config';
 import {
+  ATHLETE_LEVELS,
+  AthleteLevel,
+  COMMITMENT_LEVELS,
+  CommitmentLevel,
   ASSESSMENT_LIMITS,
   AssessmentEvaluationInput,
   AssessmentEvaluationOutput,
@@ -15,7 +19,9 @@ export function buildAssessmentPrompt(input: AssessmentEvaluationInput) {
   return {
     system: `${input.basePrompt.trim()}\n\n${assessmentFormatRules(input)}`,
     user: {
-      task: 'Stima la R provvisoria di ogni driver dal primo set di risposte.',
+      task: input.drivers.some((d) => d.previous)
+        ? 'Aggiorna la R provvisoria di ogni driver con le risposte dei round di calibrazione.'
+        : 'Stima la R provvisoria di ogni driver dal primo set di risposte.',
       scale: input.scale,
       athleteContext: input.athleteContext,
       availability: input.availability,
@@ -88,16 +94,23 @@ export function stubAssessmentEvaluation(
     const ratio = ratios.length
       ? ratios.reduce((sum, value) => sum + value, 0) / ratios.length
       : 0.5;
+    // Ogni risposta in più alza la confidence: 15 per risposta, al massimo 90.
     return {
       areaId: driver.areaId,
       score: Math.round(minScore + ratio * (maxScore - minScore)),
-      confidence: Math.min(40, ratios.length * 15),
+      confidence: Math.min(90, ratios.length * 15),
       rationale: `Stima provvisoria da ${ratios.length} risposte di autovalutazione su ${driver.name}.`,
       evidenceGaps: [
         'Domande di approfondimento o un micro-test per confermare il livello.',
       ],
+      commitment: 'UNKNOWN' as CommitmentLevel,
     };
   });
+  const average = drivers.length
+    ? drivers.reduce((sum, d) => sum + (d.score - minScore), 0) /
+      drivers.length /
+      Math.max(1, maxScore - minScore)
+    : 0;
   return {
     summary:
       'Prima lettura provvisoria delle tue risposte: la confidenza crescerà con le prossime domande.',
@@ -106,6 +119,8 @@ export function stubAssessmentEvaluation(
           drivers.reduce((sum, d) => sum + d.confidence, 0) / drivers.length,
         )
       : 0,
+    level: ATHLETE_LEVELS[Math.min(2, Math.floor(average * 3))],
+    levelConfidence: Math.min(...drivers.map((d) => d.confidence), 100),
     drivers,
   };
 }
@@ -125,6 +140,10 @@ export function validateAssessmentEvaluation(
   if (!summary) problems.push('summary non valido');
   const overallConfidence = percent(record.overallConfidence);
   if (overallConfidence === null) problems.push('overallConfidence non valida');
+  const level = oneOf(record.level, ATHLETE_LEVELS);
+  if (!level) problems.push('level non valido');
+  const levelConfidence = percent(record.levelConfidence);
+  if (levelConfidence === null) problems.push('levelConfidence non valida');
   const expected = new Set(input.drivers.map((d) => d.areaId));
   const seen = new Set<string>();
   const drivers: AssessmentEvaluationOutput['drivers'] = [];
@@ -152,6 +171,8 @@ export function validateAssessmentEvaluation(
       problems.push(`score fuori scala per ${areaId}`);
     if (confidence === null) problems.push(`confidence non valida ${areaId}`);
     if (!rationale) problems.push(`rationale non valida per ${areaId}`);
+    const commitment = oneOf(entry.commitment, COMMITMENT_LEVELS);
+    if (!commitment) problems.push(`commitment non valido per ${areaId}`);
     if (
       !gaps ||
       gaps.length > ASSESSMENT_LIMITS.evidenceGaps ||
@@ -164,6 +185,7 @@ export function validateAssessmentEvaluation(
       confidence: confidence ?? 0,
       rationale: rationale ?? '',
       evidenceGaps: evidenceGaps as string[],
+      commitment: commitment ?? 'UNKNOWN',
     });
   }
   for (const areaId of expected)
@@ -172,7 +194,17 @@ export function validateAssessmentEvaluation(
   // Stesso ordine dei driver ricevuti, indipendente dall'ordine del modello.
   const order = input.drivers.map((d) => d.areaId);
   drivers.sort((a, b) => order.indexOf(a.areaId) - order.indexOf(b.areaId));
-  return { summary: summary!, overallConfidence: overallConfidence!, drivers };
+  return {
+    summary: summary!,
+    overallConfidence: overallConfidence!,
+    level: level as AthleteLevel,
+    levelConfidence: levelConfidence!,
+    drivers,
+  };
+}
+
+function oneOf<T extends string>(value: unknown, allowed: readonly T[]) {
+  return allowed.includes(value as T) ? (value as T) : null;
 }
 
 function text(value: unknown, max: number) {

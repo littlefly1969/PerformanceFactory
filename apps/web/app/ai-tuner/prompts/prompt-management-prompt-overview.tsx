@@ -26,6 +26,20 @@ export function renderPromptOverview(model: PromptManagementModel) {
           </Link>
         </div>
       </section>
+      <section className="pf-panel pf-prompt-current-panel">
+        <div className="pf-panel-header pf-prompt-current-header">
+          <div>
+            <h2>Domande di calibrazione</h2>
+            <p className="pf-muted">
+              Prompt che a ogni round della calibrazione gratuita scrive nuove
+              domande sui driver con la confidenza più bassa.
+            </p>
+          </div>
+          <Link className="pf-button" href="/ai-tuner/prompts/calibrazione">
+            Apri prompt
+          </Link>
+        </div>
+      </section>
     </>
   );
 }
