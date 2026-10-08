@@ -200,27 +200,6 @@ atleta, nuovo lotto a nuova valutazione, fallimento e nuovo tentativo, flag
 spento), `micro-test-generation.spec.ts`, `app/journey/free-lesson-panel.test.tsx`,
 `app/ai-tuner/prompts/micro-test/page.test.tsx`.
 
-## Prova rapida del percorso
-
-Nessun avanzamento del tempo: bastano i parametri del back office, da rimettere
-ai default dopo la prova.
-
-1. `/admin/feature-flags`: accendere `free_lesson`, `potential_scenarios` e, per i
-   micro-test su misura, `ai_micro_tests`.
-2. `/admin/calibration`: `minHoursBetweenRounds` 0 (round uno dopo l'altro),
-   soglia di livello bassa (ad esempio 30) per avere il livello stimato già dalla
-   prima valutazione, soglia di confidence bassa (ad esempio 50) per chiudere R in
-   pochi round. `closingDay` 1 chiude R al primo round, ma salta l'attesa della
-   lezione: va usato solo per provare la chiusura e gli scenari.
-3. `/admin/free-lessons`: `creditsToUnlock` 50 (prima valutazione più un round),
-   `microTestsPerDay` 10, `minDaysBeforeDeadline` 0; attivare un circolo e, se
-   `ai_micro_tests` è spento, aggiungere un micro-test al catalogo.
-4. Atleta: assessment, un round, micro-test, richiesta del posto.
-5. Admin: lezione che inizia tra 2 minuti con un coach (`PROFESSIONAL`), poi
-   assegnazione del posto. Il feedback si apre all'inizio della lezione, in
-   `/professional/lessons`; dopo il feedback R si rivaluta e, sopra soglia, si
-   chiude e mostra gli scenari.
-
 ## Aperto
 
 - **Regole operative** (A4-D04, A7-D01): disponibilità del circolo, booking e
