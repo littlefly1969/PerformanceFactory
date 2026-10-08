@@ -31,7 +31,7 @@ Due regole distinte, in `ConfidencePolicy` (`confidence-policy.ts`):
 | Regola | Serve a |
 |---|---|
 | `R_CONSOLIDATION` | consolidare R e generare P3/P6/P12 |
-| `LESSON_ELIGIBILITY` | rendere l'atleta eleggibile alla lezione gratuita (usata dalla slice successiva) |
+| `LESSON_ELIGIBILITY` | rendere l'atleta eleggibile alla lezione gratuita |
 
 Ogni regola combina in AND confidence complessiva minima, confidence minima per area
 e numero di aree che devono raggiungerla (vuoto = tutte); un criterio vuoto non si
@@ -75,7 +75,12 @@ Tutte in `apps/api/src/discovery/calibration/calibration-rules.ts`, senza I/O:
     coach non ancora valutato, lo stato è `FREE_LESSON_VALIDATION` e R non si
     consolida: è la lezione a chiudere R e P con affidabilità, quindi il paywall
     arriva solo dopo il feedback. Se la regola è già soddisfatta, un nuovo round
-    risponde `409 CALIBRATION_WAITING_LESSON`.
+    risponde `409 CALIBRATION_WAITING_LESSON`;
+  - con il livello stimato e la lezione ancora possibile (regola di eleggibilità
+    soddisfatta, un circolo che la offre, nessuna rinuncia né posto già usato) R
+    aspetta la richiesta o la rinuncia esplicita: `409 CALIBRATION_LESSON_CHOICE`.
+    Senza lezione possibile basta la regola di consolidamento
+    (`lesson-gate.ts`, `docs/lezione-gratuita.md`).
   La chiusura consolida l'ultima valutazione nella stessa transazione
   (`calibration-completion.ts`): `CALIBRATION_COMPLETED` e
   `AssessmentEvaluation.status = CONSOLIDATED` non divergono mai, anche quando la

@@ -52,6 +52,18 @@ export type EvaluationConfidence = {
   drivers: EvaluatedDriver[];
 };
 
+/**
+ * Come la lezione gratuita pesa sul consolidamento di R. `pending`: posto
+ * richiesto o assegnato, o feedback del coach da valutare. `available`: la
+ * lezione si può ancora fare (flag attivo, regola di eleggibilità
+ * soddisfatta, un circolo che la offre, nessun posto già usato o ritirato,
+ * nessuna rinuncia). Finché l'una o l'altra vale, è la lezione a chiudere R e
+ * P e il paywall arriva dopo; senza lezione possibile basta la regola.
+ */
+export type LessonGate = { pending: boolean; available: boolean };
+
+export const NO_LESSON: LessonGate = { pending: false, available: false };
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const dayOf = (startedAt: Date, now: Date) =>
@@ -82,18 +94,18 @@ export function roundTargets<T extends EvaluatedDriver>(
 
 /**
  * Stato dopo una valutazione. La calibrazione si chiude e R si consolida solo
- * quando la regola di consolidamento in vigore è soddisfatta e nessuna
- * lezione gratuita è in attesa: con una lezione richiesta o assegnata è il
- * feedback del coach a chiudere R e P. Tempo trascorso e numero di round non
- * contano (PF-FS-PREPAYWALL §6.4, §7.2). Il livello stimato segue la sua
- * soglia di back office.
+ * quando la regola di consolidamento in vigore è soddisfatta e la lezione
+ * gratuita non la trattiene: con una lezione in attesa o ancora possibile (a
+ * livello stimato) è il feedback del coach a chiudere R e P. Tempo trascorso
+ * e numero di round non contano (PF-FS-PREPAYWALL §6.4, §7.2). Il livello
+ * stimato segue la sua soglia di back office.
  */
 export function statusAfterEvaluation(
   current: CalibrationStatus,
   evaluation: EvaluationConfidence,
   settings: CalibrationSettings,
   rule: ConfidenceRule,
-  lessonPending = false,
+  lesson: LessonGate = NO_LESSON,
 ): {
   status: CalibrationStatus;
   completionReason?: 'CONFIDENCE_REACHED';
@@ -104,14 +116,17 @@ export function statusAfterEvaluation(
   const levelEstimated =
     current === 'FREE_CALIBRATING' &&
     (evaluation.levelConfidence ?? 0) >= settings.levelConfidenceThreshold;
-  if (checkRule(rule, evaluation).met && !lessonPending)
+  const held =
+    lesson.pending ||
+    (lesson.available && (current !== 'FREE_CALIBRATING' || levelEstimated));
+  if (checkRule(rule, evaluation).met && !held)
     return {
       status: 'CALIBRATION_COMPLETED',
       completionReason: 'CONFIDENCE_REACHED',
       levelEstimated,
     };
   return {
-    status: openStatus(current, levelEstimated, lessonPending),
+    status: openStatus(current, levelEstimated, lesson.pending),
     levelEstimated,
   };
 }

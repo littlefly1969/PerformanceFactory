@@ -16,7 +16,6 @@ const select = {
   creditsCalibrationRound: true,
   creditsMicroTest: true,
   microTestsPerDay: true,
-  minDaysBeforeDeadline: true,
 } as const;
 
 type Db = PrismaService | Prisma.TransactionClient;

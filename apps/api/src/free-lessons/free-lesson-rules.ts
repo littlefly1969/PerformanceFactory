@@ -1,6 +1,8 @@
 /**
  * Regole della lezione gratuita e dei crediti di interazione (A4.8, A7.2,
- * A8-D02 aperto), senza I/O. Soglie e pesi arrivano da FreeLessonConfig.
+ * PF-FS-PREPAYWALL §6), senza I/O. L'eleggibilità viene dalla regola di
+ * confidence versionata; i crediti sono solo un elemento visivo di progresso
+ * (OP-01) e i loro pesi arrivano da FreeLessonConfig.
  */
 export type FreeLessonSettings = {
   creditsToUnlock: number;
@@ -8,7 +10,6 @@ export type FreeLessonSettings = {
   creditsCalibrationRound: number;
   creditsMicroTest: number;
   microTestsPerDay: number;
-  minDaysBeforeDeadline: number;
 };
 
 export const DEFAULT_FREE_LESSON_SETTINGS: FreeLessonSettings = {
@@ -17,7 +18,6 @@ export const DEFAULT_FREE_LESSON_SETTINGS: FreeLessonSettings = {
   creditsCalibrationRound: 20,
   creditsMicroTest: 10,
   microTestsPerDay: 2,
-  minDaysBeforeDeadline: 2,
 };
 
 export type CreditAction =
@@ -89,25 +89,29 @@ export type LessonPhase =
   | 'UNAVAILABLE'
   | 'LOCKED'
   | 'ELIGIBLE'
+  | 'DECLINED'
   | 'REQUESTED'
   | 'ASSIGNED'
   | 'ATTENDED'
   | 'NO_SHOW'
   | 'CLOSED';
 
-export type MissingRequirement = 'LEVEL' | 'CREDITS' | 'CLUB';
+export type MissingRequirement = 'LEVEL' | 'CONFIDENCE';
 
 /**
- * Eligibility del Blueprint (LEVEL_ESTIMATED + R_NOT_FINAL) più la soglia dei
- * crediti; con soglia 0 resta solo la regola del Blueprint. Il posto già
- * richiesto o usato decide la fase prima delle condizioni.
+ * Due verifiche distinte (PF-FS-PREPAYWALL §6.2). Eleggibilità dell'atleta:
+ * livello stimato, per comporre il gruppo, e regola di eleggibilità della
+ * lezione soddisfatta. Erogabilità: almeno un circolo che offre la lezione;
+ * il posto si verifica quando l'admin lo assegna. I crediti non contano. Il
+ * posto già richiesto o usato decide la fase prima delle condizioni; ritiro e
+ * rinuncia restano reversibili finché R è aperta.
  */
 export function lessonEligibility(input: {
   calibrationStatus: string | null;
-  credits: number;
-  creditsToUnlock: number;
+  eligibilityMet: boolean;
   clubs: number;
   seatStatus: string | null;
+  declined: boolean;
 }): { phase: LessonPhase; missing: MissingRequirement[] } {
   const { calibrationStatus: status, seatStatus } = input;
   const open =
@@ -123,26 +127,13 @@ export function lessonEligibility(input: {
     return { phase: seatStatus, missing: [] };
   const missing: MissingRequirement[] = [];
   if (status === 'FREE_CALIBRATING') missing.push('LEVEL');
-  if (input.credits < input.creditsToUnlock) missing.push('CREDITS');
-  if (input.clubs === 0) missing.push('CLUB');
-  return { phase: missing.length ? 'LOCKED' : 'ELIGIBLE', missing };
-}
-
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-/**
- * La lezione deve lasciare al coach il tempo di inviare il feedback prima
- * della scadenza della calibrazione, quando R si chiude comunque.
- */
-export function fitsCalibration(
-  startsAt: Date,
-  deadlineAt: Date,
-  settings: Pick<FreeLessonSettings, 'minDaysBeforeDeadline'>,
-) {
-  return (
-    startsAt.getTime() <=
-    deadlineAt.getTime() - settings.minDaysBeforeDeadline * DAY_MS
-  );
+  if (!input.eligibilityMet) missing.push('CONFIDENCE');
+  if (missing.length) return { phase: 'LOCKED', missing };
+  // Territorio non servito: nessuna promessa, R e paywall proseguono (AT-16).
+  if (input.clubs === 0) return { phase: 'UNAVAILABLE', missing: [] };
+  if (input.declined || seatStatus === 'WITHDRAWN')
+    return { phase: 'DECLINED', missing: [] };
+  return { phase: 'ELIGIBLE', missing: [] };
 }
 
 /** Esiti di un micro-test: da 2 a 6, valori unici, punteggi nella scala. */
@@ -174,8 +165,6 @@ export function freeLessonSettingsProblems(s: FreeLessonSettings) {
   const problems: string[] = [];
   if (Object.values(s).some((v) => !Number.isInteger(v) || v < 0))
     problems.push('I parametri devono essere interi non negativi');
-  if (s.minDaysBeforeDeadline > 30)
-    problems.push('I giorni prima della scadenza non possono superare 30');
   return problems;
 }
 

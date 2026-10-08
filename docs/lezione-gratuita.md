@@ -3,18 +3,27 @@
 ## Risultato
 
 Dall'inizio della calibrazione l'atleta vede la lezione gratuita al circolo come
-obiettivo: un'ora di padel in gruppo da 4, con un coach. La sblocca con i crediti
-di interazione, che crescono con le stesse azioni che rendono R più affidabile:
-prima valutazione, round di calibrazione, micro-test. Quando ha il livello stimato
-e i crediti, richiede il posto; l'admin compone i gruppi per livello; il coach dà
-il suo feedback, che entra nella valutazione successiva come fonte distinta.
+obiettivo: un'ora di padel in gruppo da 4, con un coach. È il premio per
+l'interesse dimostrato (PF-FS-PREPAYWALL §6): la sblocca un profilo abbastanza
+attendibile, secondo la regola di eleggibilità `LESSON_ELIGIBILITY` del back
+office, con il livello stimato e almeno un circolo che offre la lezione. I crediti
+di interazione restano solo come barra di progresso (OP-01). L'atleta richiede il
+posto; l'admin compone i gruppi per livello; il coach dà il suo feedback, che entra
+nella valutazione successiva come fonte distinta e chiude R e P.
 
 ```
 FREE_CALIBRATING ──► FREE_LEVEL_ESTIMATED ──► FREE_LESSON_VALIDATION ──► CALIBRATION_COMPLETED
-                      crediti ≥ soglia          posto richiesto o           regola di consolidamento
-                      richiesta del posto       assegnato: R non si         soddisfatta dopo il
-                                                consolida fino al feedback  feedback del coach
+                      lezione possibile:        posto richiesto o           regola di consolidamento
+                      R aspetta la richiesta    assegnato: R non si         soddisfatta dopo il
+                      o la rinuncia             consolida fino al feedback  feedback (o la rinuncia)
 ```
+
+**Quando la lezione chiude R** (decisione di Stefano, 8 ottobre 2026): il paywall
+arriva solo dopo la lezione, che chiude R e P con affidabilità. Se la lezione è
+possibile, R non si consolida finché il feedback non è valutato, o finché l'atleta
+non sceglie esplicitamente di non farla. Se la lezione non è possibile (territorio
+senza circolo, flag spento, livello non stimato, beneficio già usato), basta la
+regola di consolidamento.
 
 Tutto è dietro il feature flag `free_lesson` (spento di default, come
 `referral_share`).
@@ -29,19 +38,29 @@ progetto `notes/slice4-lezione-gratuita.md`.
 ## Scelte
 
 - **Crediti ≠ Token PF.** Un ledger proprio (`InteractionCreditEntry`): non si
-  comprano, non si spendono, servono solo a sbloccare la lezione. Il wallet Token PF
+  comprano, non si spendono e non sbloccano nulla, mostrano il percorso fatto. Il wallet Token PF
   (A4.11) resta separato e non è toccato.
 - **Micro-test, non allenamenti.** In calibrazione l'atleta riporta l'esito di
   esercizi brevi (A4.6): scritti dall'AI sulla sua storia con il flag
   `ai_micro_tests`, altrimenti dal catalogo del back office. Il programma resta
   dietro `programBeforePaywall` (decisione 13 aperta).
-- **Due condizioni insieme.** Livello stimato con R aperta (Blueprint) e crediti
-  sopra soglia. Con soglia 0 resta solo la regola del Blueprint.
-- **R aspetta il coach.** Dalla richiesta del posto fino alla valutazione del
-  feedback la regola di consolidamento non chiude la calibrazione: la lezione è il
-  passaggio che chiude R e P con affidabilità, e il paywall arriva solo dopo. Il
-  tempo trascorso non chiude più R; ritiro, rilascio o assenza la liberano.
-  `minDaysBeforeDeadline` resta finché la slice della lezione non lo rimuove.
+- **Due verifiche distinte (§6.2).** Eleggibilità dell'atleta: livello stimato con
+  R aperta e regola `LESSON_ELIGIBILITY` soddisfatta sull'ultima valutazione.
+  Erogabilità: almeno un circolo attivo con `freeLessonsEnabled`; il posto e la
+  capienza si verificano quando l'admin assegna. La richiesta registra versione
+  della regola e valutazione usate (`eligibilityPolicyId`,
+  `eligibilityEvaluationId`, §10.3).
+- **R aspetta la lezione** (`discovery/calibration/lesson-gate.ts`). Con la lezione
+  possibile o in corso la regola di consolidamento non chiude la calibrazione; un
+  nuovo round a regola soddisfatta risponde `409 CALIBRATION_LESSON_CHOICE` (lezione
+  da richiedere o rifiutare) o `409 CALIBRATION_WAITING_LESSON` (posto in attesa).
+  Rinuncia, ritiro e assenza riesaminano subito la calibrazione
+  (`settleCalibration`): con la regola soddisfatta R si consolida. Il tempo non
+  chiude R e la data della lezione non ha vincoli di scadenza.
+- **Rinuncia reversibile** (`POST /athlete-journey/free-lesson/decline`, AT-18).
+  Solo in fase `ELIGIBLE`; salva `AthleteCalibration.lessonDeclinedAt`. Finché R è
+  aperta l'atleta può ancora richiedere il posto, e la richiesta annulla la
+  rinuncia.
 - **Crediti, confidence ed engagement sono misure diverse.** La confidence resta
   della valutazione AI; lo stato di engagement (A8) non è in questa slice. I
   crediti si alimentano degli stessi eventi.
@@ -58,16 +77,16 @@ In `apps/api/src/free-lessons/free-lesson-rules.ts`, senza I/O:
   massimo `microTestsPerDay` nelle ultime 24 ore, solo a calibrazione aperta. Quelli
   su misura vengono prima, il catalogo completa.
 - **Fasi** (`lessonEligibility`): `LOCKED` con i requisiti mancanti (`LEVEL`,
-  `CREDITS`, `CLUB`), `ELIGIBLE`, `REQUESTED`, `ASSIGNED`, `ATTENDED`, `NO_SHOW`,
-  `CLOSED` (R già chiusa), `UNAVAILABLE` (nessuna calibrazione). Un posto svolto o
-  perso per assenza consuma il beneficio; una rinuncia prima della lezione no.
+  `CONFIDENCE`), `UNAVAILABLE` (nessun circolo, o nessuna calibrazione),
+  `ELIGIBLE`, `DECLINED` (rinuncia o ritiro), `REQUESTED`, `ASSIGNED`, `ATTENDED`,
+  `NO_SHOW`, `CLOSED` (R già chiusa). Un posto svolto o perso per assenza consuma
+  il beneficio; una rinuncia o un ritiro prima della lezione no.
 - **Posto**: uno per atleta (`FreeLessonSeat.userId` è la chiave). Richiesta solo in
   un circolo con `freeLessonsEnabled` e con il consenso a mostrare al coach nome,
   livello stimato e driver (`coachSharingAcceptedAt`). Email e telefono non vanno
   al coach.
 - **Assegnazione**: richiesta nello stesso circolo della lezione, lezione futura e
-  non piena, calibrazione in `FREE_LEVEL_ESTIMATED`, inizio entro
-  `deadlineAt − minDaysBeforeDeadline`.
+  non piena, calibrazione aperta con il livello stimato.
 - **Feedback**: voto 1-5 per driver (almeno uno, il tecnico-tattico in evidenza) e
   una nota facoltativa, solo dal coach della lezione e solo dopo l'inizio. Entra
   nell'input AI con `source: COACH_LESSON` e il voto convertito nella scala attiva;
@@ -135,19 +154,22 @@ confidence più bassa.
 
 | Tabella | Contenuto |
 |---|---|
-| `FreeLessonConfig` | riga `default`: crediti per sbloccare, punti per azione, micro-test nelle 24 ore, giorni minimi prima della scadenza |
+| `FreeLessonConfig` | riga `default`: traguardo visivo dei crediti, punti per azione, micro-test nelle 24 ore |
 | `InteractionCreditEntry` | ledger append-only: azione, punti, chiave dell'evento sorgente |
 | `MicroTest`, `MicroTestCompletion` | catalogo per driver con esiti e punteggi, o test su misura (`userId`, `generationId`); esito dell'atleta, uno per test |
 | `MicroTestGeneration` | lotto AI per atleta e valutazione: stato, token, tentativi, provider, modello, versione e hash del prompt |
 | `FreeLesson` | circolo, coach, inizio, durata, capienza, livello del gruppo, stato |
-| `FreeLessonSeat` | posto dell'atleta, circolo, lezione, stato, consenso alla condivisione col coach |
+| `FreeLessonSeat` | posto dell'atleta, circolo, lezione, stato, consenso alla condivisione col coach, regola di eleggibilità e valutazione della richiesta |
+| `AthleteCalibration` | `lessonDeclinedAt`: rinuncia esplicita alla lezione |
 | `CoachLessonFeedback` | lezione, atleta, coach, driver, voto 1-5, nota, valutazione che lo ha incorporato |
 | `Partner` | nuovo campo `freeLessonsEnabled` |
 
 Vincoli `CHECK` su stati, capienza (1-8) e voto (1-5); un posto assegnato, svolto o
 assente ha sempre una lezione. Le lezioni non si cancellano (si annullano).
 Migrazioni: `20261009120000_free_lesson`, `20261010090000_ai_micro_tests` (un test
-del catalogo non ha atleta né lotto, uno su misura li ha entrambi).
+del catalogo non ha atleta né lotto, uno su misura li ha entrambi),
+`20261012090000_lesson_by_confidence` (rinuncia, eleggibilità sul posto, via
+`minDaysBeforeDeadline`).
 
 ## API
 
@@ -157,7 +179,8 @@ del catalogo non ha atleta né lotto, uno su misura li ha entrambi).
 | `POST /athlete-journey/free-lesson/micro-tests/generate` | `USER` | prepara i micro-test su misura, una volta per lotto |
 | `POST /athlete-journey/free-lesson/micro-tests/:id` | `USER` | `{ value }`, esito del micro-test |
 | `POST /athlete-journey/free-lesson/request` | `USER` | `{ partnerId, shareWithCoach: true }` |
-| `POST /athlete-journey/free-lesson/withdraw` | `USER` | rinuncia prima della lezione |
+| `POST /athlete-journey/free-lesson/withdraw` | `USER` | ritira la richiesta o il posto prima della lezione |
+| `POST /athlete-journey/free-lesson/decline` | `USER` | sceglie di non fare la lezione: R si consolida con la regola |
 | `GET /admin/free-lessons` | `ADMIN` | parametri, circoli, coach, lezioni, richieste, micro-test |
 | `PUT /admin/free-lessons/config` | `ADMIN` | parametri dei crediti |
 | `PATCH /admin/free-lessons/clubs/:id` | `ADMIN` | `{ freeLessonsEnabled }` |
@@ -172,13 +195,15 @@ del catalogo non ha atleta né lotto, uno su misura li ha entrambi).
 | `POST /professional/lessons/:id/feedback` | `PROFESSIONAL` | `{ userId, ratings: [{ areaId, rating }], note? }` |
 | `POST /professional/lessons/:id/no-show` | `PROFESSIONAL` | `{ userId }` |
 
-Eventi (event map A7): `lesson_eligible`, `lesson_booked`, `lesson_completed`,
-`coach_feedback_submitted`.
+Eventi (event map A7, §11): `lesson_eligible` e `lesson_requested` con la versione
+della regola di eleggibilità, `lesson_declined`, `lesson_booked`,
+`lesson_completed`, `coach_feedback_submitted`.
 
 ## Interfaccia
 
 - `/journey`: pannello «Lezione gratuita al circolo» sotto la calibrazione, con
-  barra dei crediti, micro-test di oggi, richiesta del posto e data della lezione.
+  barra dei crediti (solo progresso), micro-test di oggi, richiesta del posto,
+  rinuncia e data della lezione.
 - `/admin/free-lessons`: richieste da collocare ordinate per circolo e livello,
   lezioni con posti e coach, circoli che offrono la lezione, parametri dei crediti,
   catalogo dei micro-test.
@@ -186,15 +211,16 @@ Eventi (event map A7): `lesson_eligible`, `lesson_booked`, `lesson_completed`,
 
 ## Sviluppo e test
 
-Default: 100 crediti per sbloccare, 30 per la prima valutazione, 20 per round, 10
-per micro-test, 2 micro-test nelle 24 ore, 2 giorni minimi prima della scadenza.
-Per provarla: accendere `free_lesson` in `/admin/feature-flags`, attivare un circolo
-e aggiungere un micro-test in `/admin/free-lessons`.
+Default: traguardo visivo di 100 crediti, 30 per la prima valutazione, 20 per
+round, 10 per micro-test, 2 micro-test nelle 24 ore; eleggibilità con confidence
+complessiva ≥ 50 (regola v1, da approvare, in `/admin/calibration`). Per provarla:
+accendere `free_lesson` in `/admin/feature-flags`, attivare un circolo e aggiungere
+un micro-test in `/admin/free-lessons`.
 
 Test: `free-lesson-rules.spec.ts`, `calibration-rules.spec.ts`,
 `test/db/free-lesson.integration-spec.ts` (crediti e limite giornaliero in
-parallelo, capienza con assegnazioni parallele, attesa di R e feedback del coach,
-rinuncia, flag spento), `test/db/ai-micro-tests.integration-spec.ts` (una chiamata
+parallelo, eleggibilità per regola, capienza con assegnazioni parallele, attesa di
+R e feedback del coach, rinuncia e territorio non servito, ritiro, flag spento), `test/db/ai-micro-tests.integration-spec.ts` (una chiamata
 AI con richieste parallele, test su misura prima del catalogo e solo del loro
 atleta, nuovo lotto a nuova valutazione, fallimento e nuovo tentativo, flag
 spento), `micro-test-generation.spec.ts`, `app/journey/free-lesson-panel.test.tsx`,
@@ -205,8 +231,10 @@ spento), `micro-test-generation.spec.ts`, `app/journey/free-lesson-panel.test.ts
 - **Regole operative** (A4-D04, A7-D01): disponibilità del circolo, booking e
   voucher, no-show, chi paga la lezione. Oggi l'admin compone i gruppi a mano e
   il no-show consuma il beneficio.
-- **Gamification** (A8-D02): i crediti sono la prima meccanica; pesi e soglia sono
-  provvisori.
+- **Gamification** (A8-D02, OP-01): i crediti restano come progresso visivo; se
+  mantenerli è da approvare.
+- **Richiesta senza data** (OP-05): una richiesta mai assegnata trattiene R finché
+  l'admin non compone un gruppo o l'atleta non la ritira.
 - **Notifiche**: l'atleta scopre l'assegnazione aprendo il percorso; il
   touchpoint proattivo arriva con la retention (A8).
 - **Contatto del circolo con l'atleta**: non c'è; condividere email o telefono

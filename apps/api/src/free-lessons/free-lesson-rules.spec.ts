@@ -3,7 +3,6 @@ import {
   MICRO_TEST_GENERATION,
   canClaimGeneration,
   creditEntries,
-  fitsCalibration,
   freeLessonSettingsProblems,
   lessonEligibility,
   microTestOptionProblems,
@@ -13,10 +12,10 @@ import { ratingScore } from '../discovery/calibration/lesson-evidence';
 
 const base = {
   calibrationStatus: 'FREE_LEVEL_ESTIMATED',
-  credits: 100,
-  creditsToUnlock: 100,
+  eligibilityMet: true,
   clubs: 1,
   seatStatus: null,
+  declined: false,
 };
 
 describe('free lesson rules', () => {
@@ -47,20 +46,21 @@ describe('free lesson rules', () => {
     ).toEqual(['INITIAL_ASSESSMENT']);
   });
 
-  it('requires the estimated level, the credits and a club, with R still open', () => {
+  it('AT-14/AT-15/AT-16: needs the level and the eligibility rule, then a club, never credits', () => {
     expect(lessonEligibility(base)).toEqual({ phase: 'ELIGIBLE', missing: [] });
+    // AT-14: confidence insufficiente, nessuno sblocco.
     expect(
       lessonEligibility({
         ...base,
         calibrationStatus: 'FREE_CALIBRATING',
-        credits: 40,
-        clubs: 0,
+        eligibilityMet: false,
       }),
-    ).toEqual({ phase: 'LOCKED', missing: ['LEVEL', 'CREDITS', 'CLUB'] });
-    // Soglia 0: resta la sola regola del Blueprint.
-    expect(
-      lessonEligibility({ ...base, credits: 0, creditsToUnlock: 0 }).phase,
-    ).toBe('ELIGIBLE');
+    ).toEqual({ phase: 'LOCKED', missing: ['LEVEL', 'CONFIDENCE'] });
+    // AT-16: eleggibile ma territorio non servito, nessuna promessa.
+    expect(lessonEligibility({ ...base, clubs: 0 })).toEqual({
+      phase: 'UNAVAILABLE',
+      missing: [],
+    });
     expect(
       lessonEligibility({ ...base, calibrationStatus: 'CALIBRATION_COMPLETED' })
         .phase,
@@ -71,6 +71,19 @@ describe('free lesson rules', () => {
     expect(lessonEligibility({ ...base, calibrationStatus: null }).phase).toBe(
       'UNAVAILABLE',
     );
+  });
+
+  it('AT-18: a declined or withdrawn lesson stays a reversible choice', () => {
+    expect(lessonEligibility({ ...base, declined: true }).phase).toBe(
+      'DECLINED',
+    );
+    expect(lessonEligibility({ ...base, seatStatus: 'WITHDRAWN' }).phase).toBe(
+      'DECLINED',
+    );
+    // La rinuncia non scavalca le condizioni mancanti.
+    expect(
+      lessonEligibility({ ...base, declined: true, eligibilityMet: false }),
+    ).toEqual({ phase: 'LOCKED', missing: ['CONFIDENCE'] });
   });
 
   it('lets the seat decide the phase, and a used seat stays used', () => {
@@ -94,16 +107,6 @@ describe('free lesson rules', () => {
     expect(lessonEligibility({ ...base, seatStatus: 'NO_SHOW' }).phase).toBe(
       'NO_SHOW',
     );
-  });
-
-  it('keeps the lesson far enough from the calibration deadline', () => {
-    const deadline = new Date('2026-11-01T00:00:00Z');
-    expect(
-      fitsCalibration(new Date('2026-10-30T00:00:00Z'), deadline, settings),
-    ).toBe(true);
-    expect(
-      fitsCalibration(new Date('2026-10-30T00:00:01Z'), deadline, settings),
-    ).toBe(false);
   });
 
   it('validates micro-test outcomes and settings', () => {

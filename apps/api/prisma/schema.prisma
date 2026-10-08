@@ -1378,6 +1378,7 @@ model AssessmentEvaluation {
   round         CalibrationRound?
   scenarios     PotentialScenario[]
   microTestGenerations MicroTestGeneration[]
+  lessonSeats   FreeLessonSeat[]
 
   @@unique([userId, sequence])
   @@index([userId, createdAt])
@@ -1673,6 +1674,9 @@ model AthleteCalibration {
   completionReason String?
   /// Versione della regola di consolidamento che ha chiuso la calibrazione.
   consolidationPolicyId String?
+  /// L'atleta, eleggibile e con un circolo disponibile, ha scelto di non fare
+  /// la lezione gratuita: R si consolida con la sola regola di confidence.
+  lessonDeclinedAt DateTime?
   /// Lease di un'operazione in corso (generazione domande o valutazione).
   operationAt      DateTime?
   updatedAt        DateTime  @updatedAt
@@ -1702,6 +1706,7 @@ model ConfidencePolicy {
   createdBy    User?                  @relation("ConfidencePolicyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   evaluations  AssessmentEvaluation[]
   calibrations AthleteCalibration[]
+  lessonSeats  FreeLessonSeat[]
 
   @@unique([kind, version])
 }
@@ -1763,9 +1768,6 @@ model FreeLessonConfig {
   creditsCalibrationRound  Int      @default(20)
   creditsMicroTest         Int      @default(10)
   microTestsPerDay         Int      @default(2)
-  /// Giorni minimi tra la lezione e la scadenza della calibrazione: il feedback
-  /// del coach deve arrivare prima che R si chiuda.
-  minDaysBeforeDeadline    Int      @default(2)
   updatedAt                DateTime @updatedAt
   updatedById              String?
 
@@ -1892,11 +1894,17 @@ model FreeLessonSeat {
   coachSharingAcceptedAt DateTime
   requestedAt            DateTime  @default(now())
   assignedAt             DateTime?
+  /// Decisione di eleggibilità al momento della richiesta (PF-FS-PREPAYWALL
+  /// §10.3): versione della regola e valutazione su cui è stata presa.
+  eligibilityPolicyId     String?
+  eligibilityEvaluationId String?
   updatedAt              DateTime  @updatedAt
 
-  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  partner Partner     @relation(fields: [partnerId], references: [id])
-  lesson  FreeLesson? @relation(fields: [lessonId], references: [id], onDelete: Restrict)
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  partner              Partner               @relation(fields: [partnerId], references: [id])
+  lesson               FreeLesson?           @relation(fields: [lessonId], references: [id], onDelete: Restrict)
+  eligibilityPolicy    ConfidencePolicy?     @relation(fields: [eligibilityPolicyId], references: [id], onDelete: Restrict)
+  eligibilityEvaluation AssessmentEvaluation? @relation(fields: [eligibilityEvaluationId], references: [id], onDelete: SetNull)
 
   @@index([lessonId, status])
   @@index([partnerId, status])

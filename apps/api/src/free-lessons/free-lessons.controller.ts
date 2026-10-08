@@ -86,6 +86,15 @@ export class FreeLessonController {
   withdraw(@Req() req: AuthRequest) {
     return this.lessons.withdraw(req.user.id);
   }
+
+  @Post('decline')
+  @ApiOperation({
+    summary:
+      'Sceglie di non fare la lezione gratuita: R si consolida con la regola di confidence',
+  })
+  decline(@Req() req: AuthRequest) {
+    return this.lessons.decline(req.user.id);
+  }
 }
 
 /** Back office: circoli, lezioni, gruppi, micro-test e parametri dei crediti. */

@@ -7,10 +7,10 @@ import { completeCalibration } from './calibration-completion';
 import { loadCalibrationSettings } from './calibration-config';
 import { CalibrationStatus, statusAfterEvaluation } from './calibration-rules';
 import { loadActivePolicy } from './confidence-policy';
+import { lessonGate } from './lesson-gate';
 import {
   addLessonEvidence,
   isCalibrationOpen,
-  isLessonPending,
   lockCalibration,
 } from './lesson-evidence';
 
@@ -88,7 +88,7 @@ export async function evaluatePendingFeedback(
       result.output,
       settings,
       policy,
-      await isLessonPending(tx, userId),
+      await lessonGate(tx, userId, result.output),
     );
     if (next.completionReason)
       await completeCalibration(
