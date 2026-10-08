@@ -117,12 +117,10 @@ export function lessonEligibility(input: {
   if (seatStatus === 'ATTENDED' || seatStatus === 'NO_SHOW')
     return { phase: seatStatus, missing: [] };
   if (!status) return { phase: 'UNAVAILABLE', missing: [] };
-  // Un posto già richiesto o assegnato resta valido anche dopo il
-  // consolidamento di R: la lezione non lo blocca e non ne è bloccata (OP-04).
+  // R chiusa: la lezione non può più pesare sulla calibrazione.
+  if (!open) return { phase: 'CLOSED', missing: [] };
   if (seatStatus === 'ASSIGNED' || seatStatus === 'REQUESTED')
     return { phase: seatStatus, missing: [] };
-  // R chiusa senza posto: nessuna nuova richiesta in questa versione.
-  if (!open) return { phase: 'CLOSED', missing: [] };
   const missing: MissingRequirement[] = [];
   if (status === 'FREE_CALIBRATING') missing.push('LEVEL');
   if (input.credits < input.creditsToUnlock) missing.push('CREDITS');

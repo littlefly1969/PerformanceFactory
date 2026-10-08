@@ -102,7 +102,8 @@ describe('calibration rules', () => {
     ).toEqual({ status: 'FREE_CALIBRATING', levelEstimated: false });
   });
 
-  it('AT-18: a pending free lesson never blocks consolidation', () => {
+  it('a pending free lesson holds R until the coach feedback is evaluated', () => {
+    // La regola è soddisfatta, ma è la lezione a chiudere R e P.
     expect(
       statusAfterEvaluation(
         'FREE_LESSON_VALIDATION',
@@ -110,6 +111,15 @@ describe('calibration rules', () => {
         settings,
         rule,
         true,
+      ),
+    ).toEqual({ status: 'FREE_LESSON_VALIDATION', levelEstimated: false });
+    expect(
+      statusAfterEvaluation(
+        'FREE_LESSON_VALIDATION',
+        evaluation(80, 80, 75, 90),
+        settings,
+        rule,
+        false,
       ),
     ).toMatchObject({
       status: 'CALIBRATION_COMPLETED',

@@ -106,8 +106,8 @@ export function CalibrationPanel({
       )}
       {c.status === "FREE_LESSON_VALIDATION" && (
         <p role="status">
-          Hai un posto nella lezione gratuita: il feedback del coach del circolo
-          renderà la tua R ancora più precisa.
+          Hai chiesto la lezione gratuita: la tua R e il tuo potenziale si
+          chiudono dopo il feedback del coach del circolo.
         </p>
       )}
       {completed ? (

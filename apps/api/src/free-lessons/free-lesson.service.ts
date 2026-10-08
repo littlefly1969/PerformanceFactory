@@ -15,7 +15,7 @@ import { performanceDriverName as driverName } from '../performance/performance-
 import { PrismaService } from '../prisma/prisma.service';
 import { loadFreeLessonSettings, syncCredits } from './free-lesson-config';
 import { lessonEligibility } from './free-lesson-rules';
-import { releaseCalibration } from './lesson-hold';
+import { holdCalibration, releaseCalibration } from './lesson-hold';
 import { MicroTestGenerationService } from './micro-test-generation.service';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -331,6 +331,8 @@ export class FreeLessonService {
         create: { userId, ...data },
         update: data,
       });
+      // Dalla richiesta la lezione è il passaggio che chiude R e P.
+      await holdCalibration(tx, userId);
     });
     return this.view(userId);
   }
@@ -353,7 +355,7 @@ export class FreeLessonService {
         where: { userId },
         data: { status: 'WITHDRAWN', lessonId: null, assignedAt: null },
       });
-      if (seat.status === 'ASSIGNED') await releaseCalibration(tx, userId);
+      await releaseCalibration(tx, userId);
     });
     return this.view(userId);
   }

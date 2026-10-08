@@ -82,9 +82,11 @@ export function roundTargets<T extends EvaluatedDriver>(
 
 /**
  * Stato dopo una valutazione. La calibrazione si chiude e R si consolida solo
- * quando la regola di consolidamento in vigore è soddisfatta: tempo trascorso,
- * fine dei round e lezione gratuita non contano (PF-FS-PREPAYWALL §6.4, §7.2).
- * Il livello stimato segue la sua soglia di back office.
+ * quando la regola di consolidamento in vigore è soddisfatta e nessuna
+ * lezione gratuita è in attesa: con una lezione richiesta o assegnata è il
+ * feedback del coach a chiudere R e P. Tempo trascorso e numero di round non
+ * contano (PF-FS-PREPAYWALL §6.4, §7.2). Il livello stimato segue la sua
+ * soglia di back office.
  */
 export function statusAfterEvaluation(
   current: CalibrationStatus,
@@ -102,7 +104,7 @@ export function statusAfterEvaluation(
   const levelEstimated =
     current === 'FREE_CALIBRATING' &&
     (evaluation.levelConfidence ?? 0) >= settings.levelConfidenceThreshold;
-  if (checkRule(rule, evaluation).met)
+  if (checkRule(rule, evaluation).met && !lessonPending)
     return {
       status: 'CALIBRATION_COMPLETED',
       completionReason: 'CONFIDENCE_REACHED',

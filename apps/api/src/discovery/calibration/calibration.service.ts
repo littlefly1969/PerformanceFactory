@@ -216,6 +216,12 @@ export class CalibrationService {
       // La valutazione corrente soddisfa la regola in vigore (per esempio
       // abbassata dal back office): si consolida senza nuove domande.
       if (!targets.length) {
+        if (await isLessonPending(this.prisma, userId))
+          throw new ConflictException({
+            code: 'CALIBRATION_WAITING_LESSON',
+            message:
+              'La tua R si chiude dopo la lezione con il coach del circolo.',
+          });
         await this.prisma.$transaction((tx) =>
           completeCalibration(tx, userId, 'CONFIDENCE_REACHED', now, policy.id),
         );

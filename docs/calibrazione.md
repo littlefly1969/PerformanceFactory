@@ -67,13 +67,15 @@ Tutte in `apps/api/src/discovery/calibration/calibration-rules.ts`, senza I/O:
   precedenti di ogni driver. La nuova valutazione ha `sequence` successiva e
   `source = CALIBRATION_ROUND`.
 - **Stato dopo la valutazione**:
-  - regola di consolidamento soddisfatta → `CALIBRATION_COMPLETED`, motivo
-    `CONFIDENCE_REACHED`;
+  - regola di consolidamento soddisfatta e nessuna lezione in attesa →
+    `CALIBRATION_COMPLETED`, motivo `CONFIDENCE_REACHED`;
   - altrimenti `FREE_LEVEL_ESTIMATED` appena la confidence del livello supera
     `levelConfidenceThreshold`;
-  - con un posto assegnato alla lezione gratuita lo stato aperto è
-    `FREE_LESSON_VALIDATION`, solo informativo: la lezione non blocca il
-    consolidamento (§6.4) e il posto resta valido dopo (OP-04).
+  - con un posto richiesto o assegnato alla lezione gratuita, o un feedback del
+    coach non ancora valutato, lo stato è `FREE_LESSON_VALIDATION` e R non si
+    consolida: è la lezione a chiudere R e P con affidabilità, quindi il paywall
+    arriva solo dopo il feedback. Se la regola è già soddisfatta, un nuovo round
+    risponde `409 CALIBRATION_WAITING_LESSON`.
   La chiusura consolida l'ultima valutazione nella stessa transazione
   (`calibration-completion.ts`): `CALIBRATION_COMPLETED` e
   `AssessmentEvaluation.status = CONSOLIDATED` non divergono mai, anche quando la

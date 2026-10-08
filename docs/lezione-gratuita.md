@@ -11,9 +11,9 @@ il suo feedback, che entra nella valutazione successiva come fonte distinta.
 
 ```
 FREE_CALIBRATING ──► FREE_LEVEL_ESTIMATED ──► FREE_LESSON_VALIDATION ──► CALIBRATION_COMPLETED
-                      crediti ≥ soglia          posto assegnato          regola di consolidamento
-                      richiesta del posto       (solo informativo)       soddisfatta, con o senza
-                                                                         feedback del coach
+                      crediti ≥ soglia          posto richiesto o           regola di consolidamento
+                      richiesta del posto       assegnato: R non si         soddisfatta dopo il
+                                                consolida fino al feedback  feedback del coach
 ```
 
 Tutto è dietro il feature flag `free_lesson` (spento di default, come
@@ -37,12 +37,11 @@ progetto `notes/slice4-lezione-gratuita.md`.
   dietro `programBeforePaywall` (decisione 13 aperta).
 - **Due condizioni insieme.** Livello stimato con R aperta (Blueprint) e crediti
   sopra soglia. Con soglia 0 resta solo la regola del Blueprint.
-- **R non aspetta il coach** (PF-FS-PREPAYWALL §6.4, AT-18). Il posto assegnato
-  porta la calibrazione a `FREE_LESSON_VALIDATION`, solo informativo: la regola di
-  consolidamento chiude R anche con la lezione in attesa, e il posto resta valido
-  dopo il consolidamento (OP-04). Il feedback arrivato a R aperta entra nella
-  valutazione successiva; quello arrivato dopo il consolidamento resta salvato
-  senza modificare R (la ratifica arriva con la slice della lezione).
+- **R aspetta il coach.** Dalla richiesta del posto fino alla valutazione del
+  feedback la regola di consolidamento non chiude la calibrazione: la lezione è il
+  passaggio che chiude R e P con affidabilità, e il paywall arriva solo dopo. Il
+  tempo trascorso non chiude più R; ritiro, rilascio o assenza la liberano.
+  `minDaysBeforeDeadline` resta finché la slice della lezione non lo rimuove.
 - **Crediti, confidence ed engagement sono misure diverse.** La confidence resta
   della valutazione AI; lo stato di engagement (A8) non è in questa slice. I
   crediti si alimentano degli stessi eventi.

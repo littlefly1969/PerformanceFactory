@@ -134,10 +134,10 @@ describe("free calibration panel", () => {
     expect(screen.queryByRole("button")).toBeNull();
   });
 
-  it("AT-18: a booked lesson does not hold R", () => {
+  it("tells the athlete that R closes after the coach feedback", () => {
     renderPanel({ ...base, status: "FREE_LESSON_VALIDATION" });
     expect(screen.getByRole("status")).toHaveTextContent(
-      "renderà la tua R ancora più precisa",
+      "si chiudono dopo il feedback del coach",
     );
     expect(
       screen.getByRole("button", { name: "Nuove domande →" }),
