@@ -469,14 +469,16 @@ export class CalibrationService {
       this.prisma.assessmentEvaluation.findFirstOrThrow({
         where: { userId },
         orderBy: { sequence: 'desc' },
-        include: { areas: true },
+        include: { areas: { include: { area: { select: { name: true } } } } },
       }),
     ]);
+    // I driver sono quelli dell'ultima valutazione, anche senza anamnesi.
     const input = await buildAssessmentEvaluationInput(
       this.prisma,
       userId,
       [...operational, ...bank],
       discovery.assessmentAnswers as Record<string, unknown>,
+      latest.areas.map((a) => ({ id: a.areaId, name: a.area.name })),
     );
     for (const driver of input.drivers) {
       for (const answer of driver.answers) answer.source = 'ASSESSMENT';

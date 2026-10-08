@@ -108,6 +108,11 @@ export function assessmentFormatRules(input: AssessmentEvaluationInput) {
     `- summary: massimo ${ASSESSMENT_LIMITS.summary} caratteri; overallConfidence: intero tra 0 e 100.`,
     `- level: uno tra ${ATHLETE_LEVELS.join(', ')}; levelConfidence: intero tra 0 e 100.`,
     `- commitment: per ogni driver uno tra ${COMMITMENT_LEVELS.join(', ')}.`,
+    ...(input.drivers.some((d) => !d.answers.length)
+      ? [
+          '- Un driver con answers vuoto non ha ancora evidenze: valutalo comunque, con confidence molto bassa, e indica in evidenceGaps cosa chiedere.',
+        ]
+      : []),
     ...(hasSource(input, 'MICRO_TEST', 'COACH_LESSON')
       ? [
           'FONTI DELLE EVIDENZE (fisso): source MICRO_TEST è l’esito di un esercizio breve riportato dall’atleta, più oggettivo di un’autovalutazione. source COACH_LESSON è il giudizio di un coach che ha visto l’atleta giocare: è la fonte più autorevole per il suo driver e può alzarne la confidenza più delle altre, ma non cancella le risposte dell’atleta.',

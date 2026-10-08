@@ -85,7 +85,7 @@ export default function AdminAssessmentPage() {
   return (
     <ProductShell
       title="Assessment"
-      description={`Le domande operative sono di sistema e restano bloccate. Ogni driver attivo ha esattamente ${list.expectedPerArea} domande; i salvataggi valgono per i nuovi assessment.`}
+      description={`Le domande operative sono di sistema e restano bloccate. Ogni driver ha da 0 a ${list.maxPerArea} domande attive: quelli senza domande li approfondisce la calibrazione. I salvataggi valgono per i nuovi assessment.`}
       stats={[
         { label: "Domande operative", value: list.stats.fixedQuestionCount },
         { label: "Domande driver", value: list.stats.areaQuestionCount },

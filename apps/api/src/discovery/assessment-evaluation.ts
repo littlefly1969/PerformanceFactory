@@ -15,12 +15,17 @@ import { discoveryContext } from './discovery-context';
 
 type Option = { value: unknown; label?: string; score?: unknown };
 
-/** Input AI_ASSESSMENT: risposte leggibili con i punteggi delle opzioni come ancoraggio. */
+/**
+ * Input AI_ASSESSMENT: risposte leggibili con i punteggi delle opzioni come
+ * ancoraggio. Ogni driver attivo è presente anche senza domande di anamnesi:
+ * l'AI lo valuta con confidence bassa e il round successivo lo approfondisce.
+ */
 export async function buildAssessmentEvaluationInput(
   prisma: PrismaService,
   userId: string,
   questions: TemplateRecord[],
   answers: Record<string, unknown>,
+  areas: { id: string; name: string }[],
 ): Promise<AssessmentEvaluationInput> {
   const [prompt, scale, discovery] = await Promise.all([
     loadActiveAssessmentPrompt(prisma),
@@ -35,7 +40,11 @@ export async function buildAssessmentEvaluationInput(
     const option = options.find((o) => String(o.value) === raw(q));
     return { options, option };
   };
-  const drivers: AssessmentEvaluationInput['drivers'] = [];
+  const drivers: AssessmentEvaluationInput['drivers'] = areas.map((a) => ({
+    areaId: a.id,
+    name: driverName(a.name),
+    answers: [],
+  }));
   for (const q of questions.filter((item) => item.areaId)) {
     const { options, option } = chosen(q);
     const scores = options.map((o) => Number(o.score)).filter(Number.isFinite);
@@ -94,6 +103,7 @@ export async function runAssessmentEvaluation(
   userId: string,
   questions: TemplateRecord[],
   answers: Record<string, unknown>,
+  areas: { id: string; name: string }[],
 ) {
   await requireAiConsent(prisma, userId);
   const input = await buildAssessmentEvaluationInput(
@@ -101,6 +111,7 @@ export async function runAssessmentEvaluation(
     userId,
     questions,
     answers,
+    areas,
   );
   const result = await ai.evaluateAssessment(input);
   try {
@@ -187,6 +198,10 @@ export async function loadAssessmentEvaluation(
     include: { areas: { include: { area: { select: { name: true } } } } },
   });
   if (!evaluation) return null;
+  const position = (id: string) => {
+    const index = orderedAreas.indexOf(id);
+    return index < 0 ? Number.MAX_SAFE_INTEGER : index;
+  };
   const drivers = evaluation.areas
     .map((a) => ({
       id: a.areaId,
@@ -197,7 +212,8 @@ export async function loadAssessmentEvaluation(
       evidenceGaps: a.evidenceGaps as string[],
       commitment: a.commitment,
     }))
-    .sort((a, b) => orderedAreas.indexOf(a.id) - orderedAreas.indexOf(b.id));
+    // Un driver senza domande di anamnesi non è nella sequenza: va in fondo.
+    .sort((a, b) => position(a.id) - position(b.id));
   return {
     id: evaluation.id,
     status: evaluation.status,

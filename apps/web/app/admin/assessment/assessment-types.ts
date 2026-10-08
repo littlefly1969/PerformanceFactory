@@ -21,7 +21,7 @@ export type AssessmentArea = {
 /** Risposta di GET /admin/assessment-templates: i conteggi sono del backend. */
 export type AssessmentList = {
   sportKey: string;
-  expectedPerArea: number;
+  maxPerArea: number;
   operational: AssessmentQuestion[];
   areas: AssessmentArea[];
   stats: {

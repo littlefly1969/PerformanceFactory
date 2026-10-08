@@ -120,22 +120,49 @@ describe('buildAssessmentConfiguration', () => {
     },
   );
 
-  it.each([
-    [1, 'found 1'],
-    [3, 'found 3'],
-  ])('rifiuta un driver con %i domande attive', async (n, found) => {
+  it.each([0, 1, 3, 4])(
+    'accetta un driver con %i domande attive: nessun numero fisso',
+    async (n) => {
+      const rows = [
+        ...fixed,
+        ...twoEach(2).filter((q) => q.areaId !== 'area1'),
+        ...Array.from({ length: n }, (_, i) => question('area1', 20 + i)),
+      ];
+      const config = await buildAssessmentConfiguration(
+        prisma(rows),
+        'PADEL',
+        drivers(2),
+      );
+      expect(config.problems).toEqual([]);
+      expect(
+        config.areas.find((a) => a.id === 'area1')!.templates,
+      ).toHaveLength(n);
+    },
+  );
+
+  it('rifiuta un driver oltre il massimo di domande attive', async () => {
     const rows = [
       ...fixed,
-      ...twoEach(2).filter((q) => q.areaId !== 'area1'),
-      ...Array.from({ length: n }, (_, i) => question('area1', 20 + i)),
+      ...Array.from({ length: 5 }, (_, i) => question('area0', i + 1)),
     ];
     const config = await buildAssessmentConfiguration(
       prisma(rows),
       'PADEL',
+      drivers(1),
+    );
+    expect(config.problems).toEqual([
+      'Area "Area 0": expected at most 4 active questions, found 5',
+    ]);
+  });
+
+  it("rifiuta un'anamnesi senza domande di driver", async () => {
+    const config = await buildAssessmentConfiguration(
+      prisma(fixed),
+      'PADEL',
       drivers(2),
     );
     expect(config.problems).toEqual([
-      `Area "Area 1": expected 2 active questions, ${found}`,
+      'Anamnesi: expected at least 1 active driver question, found 0',
     ]);
   });
 

@@ -51,7 +51,7 @@ export function AssessmentList({
             <section key={area.id} className="pf-stack" aria-label={area.name}>
               <h3>{area.name}</h3>
               <p className="pf-muted">
-                {active} / {list.expectedPerArea} domande attive
+                {active} / {list.maxPerArea} domande attive (massimo)
               </p>
               <ol className="pf-stack">
                 {area.templates.map((q, index) => (

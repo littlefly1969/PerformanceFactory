@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { validateDiscovery } from '../../src/discovery/discovery-validation';
 import { deleteOnboardingTemplate } from '../../src/admin/admin-onboarding';
 import {
@@ -5,7 +6,11 @@ import {
   upsertAssessmentPromptConfig,
 } from '../../src/ai-orchestrator/assessment-prompts';
 import { AiProposalProviderService } from '../../src/ai-orchestrator/proposal-provider.service';
-import { runAssessmentEvaluation } from '../../src/discovery/assessment-evaluation';
+import {
+  buildAssessmentEvaluationInput,
+  runAssessmentEvaluation,
+} from '../../src/discovery/assessment-evaluation';
+import { assessmentFormatRules } from '../../src/ai-orchestrator/assessment-evaluation-model';
 import { loadSpecialistQuestionRecords } from '../../src/onboarding/onboarding-questions';
 import { testAssessmentPrompt } from '../../src/ai-tuning/assessment-prompt-test';
 import { SYNTHETIC_ASSESSMENT_CASE } from '../../src/ai-tuning/assessment-synthetic-case';
@@ -473,13 +478,19 @@ describe('PF4 discovery to authenticated journey', () => {
     ).json<JourneyResponse>();
 
   it('does not start an invalid configuration and never falls back to AI questions', async () => {
-    // Una delle due domande del driver Nutrizione dello sport di test.
+    // Una domanda del driver Nutrizione perde i punteggi delle opzioni.
     const nutrition = await prisma.onboardingQuestionTemplate.findFirstOrThrow({
       where: { id: { in: templateIds }, area: { name: 'Nutrizione' } },
     });
+    const optionsJson = nutrition.optionsJson as Prisma.JsonObject;
     await prisma.onboardingQuestionTemplate.update({
       where: { id: nutrition.id },
-      data: { isActive: false },
+      data: {
+        optionsJson: {
+          ...optionsJson,
+          options: [{ value: 'x', label: 'Senza punteggio' }],
+        },
+      },
     });
     try {
       expect((await state()).phase).toBe('ASSESSMENT_UNAVAILABLE');
@@ -494,7 +505,7 @@ describe('PF4 discovery to authenticated journey', () => {
     } finally {
       await prisma.onboardingQuestionTemplate.update({
         where: { id: nutrition.id },
-        data: { isActive: true },
+        data: { optionsJson },
       });
     }
   });
@@ -738,8 +749,17 @@ describe('PF4 discovery to authenticated journey', () => {
       userId,
       await loadSpecialistQuestionRecords(prisma, userId),
       {},
+      [],
     ).catch((error: Error) => error);
     expect(replay).toEqual({ id: saved.id });
+    // Un driver senza domande di anamnesi entra comunque nella valutazione.
+    const empty = await buildAssessmentEvaluationInput(prisma, userId, [], {}, [
+      { id: drivers[0].id, name: 'Driver senza anamnesi' },
+    ]);
+    expect(empty.drivers).toEqual([
+      { areaId: drivers[0].id, name: 'Driver senza anamnesi', answers: [] },
+    ]);
+    expect(assessmentFormatRules(empty)).toContain('answers vuoto');
     expect(await prisma.assessmentEvaluation.count({ where: { userId } })).toBe(
       1,
     );

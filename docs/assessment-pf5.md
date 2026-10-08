@@ -84,19 +84,23 @@ risponde una volta sola, nell'assessment. La frequenza abituale
 ## Domande dei driver (configurabili)
 
 Restano template `scope = AREA` con `areaId` e `optionsJson.sportKey`, e opzioni
-`{ value, label, score }`. Per ogni driver attivo servono **esattamente**
-`EXPECTED_AREA_QUESTIONS` = 2 domande attive, ciascuna con opzioni a punteggio.
+`{ value, label, score }`. L'anamnesi iniziale non ha un numero fisso di domande
+per driver: ogni driver attivo ne ha da 0 a `MAX_AREA_QUESTIONS` = 4, ciascuna
+con opzioni a punteggio, e l'anamnesi ne ha almeno una in tutto. Un driver senza
+domande entra comunque nella prima valutazione AI, con `answers` vuoto e
+confidence bassa; i round di calibrazione lo approfondiscono. Nella vista
+dell'atleta i driver senza domande vengono dopo quelli della sequenza.
 Le risposte continuano a produrre lo score del driver, il `realR` e il
 Performance Index come prima.
 
-Una configurazione diversa è un errore, non un caso da aggiustare:
+Una configurazione fuori da questi limiti è un errore, non un caso da aggiustare:
 
 - `GET /auth/journey` restituisce la fase `ASSESSMENT_UNAVAILABLE` e l'atleta vede
   «Il questionario non è ancora disponibile».
 - `POST /athlete-journey/start` risponde 409 `ASSESSMENT_CONFIGURATION_INVALID` e
   non crea domande.
 - Il log tecnico riporta il dettaglio, per esempio
-  `ASSESSMENT_CONFIGURATION_INVALID Area "Nutrizione": expected 2 active questions, found 1`.
+  `ASSESSMENT_CONFIGURATION_INVALID Area "Nutrizione": expected at most 4 active questions, found 5`.
 
 Il journey PF5 non usa più il fallback storico (`QUESTIONS_PER_AREA` = 3 e
 generazione AI delle domande specialistiche). Quel codice resta per il flusso
@@ -132,11 +136,11 @@ azioni e gli helper.
   Testo, aiuto, opzioni e punteggi si modificano. L'ordine si cambia dentro il
   driver: le domande si scambiano gli indici, così il driver non si sposta.
   Driver e tipo a punteggio restano fissi.
-- **Vincolo di 2.** Disattivare o eliminare una delle due domande attive dà «Ogni
-  driver attivo deve avere esattamente 2 domande. Disattiva il driver oppure
-  configura una domanda sostitutiva.» Aggiungere o attivare una terza dà «Il
-  driver può avere esattamente 2 domande attive.» Una bozza disattivata si può
-  creare.
+- **Limiti.** Aggiungere o attivare una quinta domanda in un driver dà «Il driver
+  può avere al massimo 4 domande attive.» Disattivare o eliminare l'ultima domanda
+  di driver attiva dell'anamnesi dà «L’anamnesi deve avere almeno una domanda di
+  driver attiva.» Un driver può restare senza domande. Una bozza disattivata si
+  può creare. `GET /admin/assessment-templates` espone `maxPerArea`.
 
 API (ruolo `ADMIN`):
 
