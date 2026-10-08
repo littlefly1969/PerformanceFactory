@@ -51,6 +51,10 @@ Tutte in `apps/api/src/discovery/calibration/calibration-rules.ts`, senza I/O:
     inventati;
   - altrimenti `FREE_LEVEL_ESTIMATED` appena la confidence del livello supera
     `levelConfidenceThreshold`.
+  - con un posto assegnato alla lezione gratuita la calibrazione è
+    `FREE_LESSON_VALIDATION`: la soglia non chiude finché il feedback del coach
+    non è valutato; assessment di chiusura e scadenza chiudono comunque (vedi
+    `lezione-gratuita.md`).
   Ogni chiusura, qualunque sia il motivo, consolida l'ultima valutazione nella
   stessa transazione (`calibration-completion.ts`): `CALIBRATION_COMPLETED` e
   `AssessmentEvaluation.status = CONSOLIDATED` non divergono mai, anche quando la

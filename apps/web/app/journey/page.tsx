@@ -5,6 +5,7 @@ import { AssessmentIntro } from "./assessment-intro";
 import { ConsentStep } from "./consent-step";
 import { ProvisionalEvaluation } from "./provisional-evaluation";
 import { CalibrationPanel } from "./calibration-panel";
+import { FreeLessonPanel } from "./free-lesson-panel";
 import { DurationStep, PerformanceResult } from "./performance-result";
 import { useJourney } from "./use-journey";
 import "./journey.css";
@@ -142,6 +143,11 @@ export default function JourneyPage() {
                 onAnswer={(roundId, answers) =>
                   void action("calibration/answers", { roundId, answers })
                 }
+              />
+            )}
+            {j.calibration && (
+              <FreeLessonPanel
+                refreshKey={`${j.evaluation.id}:${j.calibration.status}:${j.calibration.roundsCompleted}`}
               />
             )}
           </>

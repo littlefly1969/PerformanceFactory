@@ -37,7 +37,11 @@ export type Evaluation = {
 };
 /** Calibrazione gratuita dopo la prima valutazione (A4.3): round di domande AI. */
 export type Calibration = {
-  status: "FREE_CALIBRATING" | "FREE_LEVEL_ESTIMATED" | "CALIBRATION_COMPLETED";
+  status:
+    | "FREE_CALIBRATING"
+    | "FREE_LEVEL_ESTIMATED"
+    | "FREE_LESSON_VALIDATION"
+    | "CALIBRATION_COMPLETED";
   day: number;
   maxDays: number;
   confidenceThreshold: number;

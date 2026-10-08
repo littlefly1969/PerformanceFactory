@@ -11,6 +11,11 @@ export const FEATURE_FLAG_REGISTRY = [
     description:
       'Mostra all’atleta il suo link personale per invitare un compagno (A8.19).',
   },
+  {
+    key: 'free_lesson',
+    description:
+      'Lezione gratuita al circolo con crediti di interazione e micro-test durante la calibrazione (A4.8, A7.2).',
+  },
 ] as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAG_REGISTRY)[number]['key'];

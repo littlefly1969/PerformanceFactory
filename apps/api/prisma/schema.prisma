@@ -56,6 +56,13 @@ model User {
   calibration           AthleteCalibration?
   calibrationRounds     CalibrationRound[]
   calibrationConfigUpdates CalibrationConfig[] @relation("CalibrationConfigUpdatedBy")
+  interactionCredits       InteractionCreditEntry[]
+  microTestCompletions     MicroTestCompletion[]
+  freeLessonSeat           FreeLessonSeat?
+  coachedLessons           FreeLesson[]          @relation("FreeLessonCoach")
+  lessonFeedbackReceived   CoachLessonFeedback[] @relation("LessonFeedbackAthlete")
+  lessonFeedbackGiven      CoachLessonFeedback[] @relation("LessonFeedbackCoach")
+  freeLessonConfigUpdates  FreeLessonConfig[]    @relation("FreeLessonConfigUpdatedBy")
   id        String   @id @default(uuid())
   email     String   @unique
   password  String
@@ -479,6 +486,8 @@ model Area {
   userAreaPromptInstructions  UserAreaPromptInstruction[]
   aiGoldenContexts            AiGoldenContext[]                @relation("AiGoldenContextArea")
   assessmentEvaluationAreas   AssessmentEvaluationArea[]
+  microTests                  MicroTest[]
+  lessonFeedback              CoachLessonFeedback[]
 }
 
 model FeedbackEntry {
@@ -1512,10 +1521,14 @@ model Partner {
   name      String
   city      String?
   isActive  Boolean  @default(true)
+  /// Il circolo offre la lezione gratuita di gruppo (A4.8, A7.2); spento di default.
+  freeLessonsEnabled Boolean @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   attributions UserAttribution[]
+  freeLessons  FreeLesson[]
+  lessonSeats  FreeLessonSeat[]
 }
 
 /// Provenienza dell'atleta: prima e ultima sorgente prima della registrazione (A6 ricostruito).
@@ -1671,4 +1684,142 @@ model CalibrationConfig {
   updatedById              String?
 
   updatedBy User? @relation("CalibrationConfigUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+}
+
+/// Parametri di back office della lezione gratuita e dei crediti di interazione
+/// (A4-D04, A8-D02 aperti): una sola riga. I crediti non sono Token PF.
+model FreeLessonConfig {
+  id                       String   @id @default("default")
+  creditsToUnlock          Int      @default(100)
+  creditsInitialAssessment Int      @default(30)
+  creditsCalibrationRound  Int      @default(20)
+  creditsMicroTest         Int      @default(10)
+  microTestsPerDay         Int      @default(2)
+  /// Giorni minimi tra la lezione e la scadenza della calibrazione: il feedback
+  /// del coach deve arrivare prima che R si chiuda.
+  minDaysBeforeDeadline    Int      @default(2)
+  updatedAt                DateTime @updatedAt
+  updatedById              String?
+
+  updatedBy User? @relation("FreeLessonConfigUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+}
+
+/// Ledger append-only dei crediti di interazione: una riga per evento sorgente.
+/// Non si comprano, non si spendono e non sono il wallet Token PF (A4.11).
+model InteractionCreditEntry {
+  id        String   @id @default(uuid())
+  userId    String
+  /// INITIAL_ASSESSMENT, CALIBRATION_ROUND oppure MICRO_TEST
+  action    String
+  points    Int
+  /// Chiave dell'evento sorgente (es. round:<id>): lo stesso evento vale una volta.
+  sourceKey String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, sourceKey])
+  @@index([userId, createdAt])
+}
+
+/// Micro-test diagnostico scritto in back office (A3.9, A4.6): un esercizio
+/// breve con un esito da riportare, non una seduta di programma.
+model MicroTest {
+  id           String   @id @default(uuid())
+  areaId       String
+  title        String
+  instructions String
+  /// Esiti selezionabili: [{ value, label, score }] nella scala della valutazione.
+  optionsJson  Json
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  area        Area                  @relation(fields: [areaId], references: [id])
+  completions MicroTestCompletion[]
+
+  @@index([areaId, isActive])
+}
+
+model MicroTestCompletion {
+  id          String   @id @default(uuid())
+  userId      String
+  microTestId String
+  value       String
+  completedAt DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  microTest MicroTest @relation(fields: [microTestId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, microTestId])
+  @@index([userId, completedAt])
+}
+
+/// Lezione di padel di un'ora in gruppo da 4 presso un circolo partner (A4.8).
+model FreeLesson {
+  id              String   @id @default(uuid())
+  partnerId       String
+  coachId         String?
+  startsAt        DateTime
+  durationMinutes Int      @default(60)
+  capacity        Int      @default(4)
+  /// Livello del gruppo indicato dall'admin (gruppi omogenei).
+  levelLabel      String?
+  /// SCHEDULED, COMPLETED oppure CANCELLED
+  status          String   @default("SCHEDULED")
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  partner  Partner               @relation(fields: [partnerId], references: [id])
+  coach    User?                 @relation("FreeLessonCoach", fields: [coachId], references: [id], onDelete: SetNull)
+  seats    FreeLessonSeat[]
+  feedback CoachLessonFeedback[]
+
+  @@index([partnerId, startsAt])
+  @@index([coachId, startsAt])
+}
+
+/// Il posto dell'atleta: uno per persona (A7.2 «1 seat / user»).
+model FreeLessonSeat {
+  userId                 String    @id
+  partnerId              String
+  lessonId               String?
+  /// REQUESTED, ASSIGNED, ATTENDED, NO_SHOW oppure WITHDRAWN
+  status                 String    @default("REQUESTED")
+  /// L'atleta accetta che il coach della lezione veda nome, livello e driver.
+  coachSharingAcceptedAt DateTime
+  requestedAt            DateTime  @default(now())
+  assignedAt             DateTime?
+  updatedAt              DateTime  @updatedAt
+
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  partner Partner     @relation(fields: [partnerId], references: [id])
+  lesson  FreeLesson? @relation(fields: [lessonId], references: [id], onDelete: Restrict)
+
+  @@index([lessonId, status])
+  @@index([partnerId, status])
+}
+
+/// Feedback del coach: fonte distinta e autorevole che entra nella valutazione
+/// successiva senza sovrascrivere le risposte dell'atleta (A4.8, A7.2).
+model CoachLessonFeedback {
+  id           String   @id @default(uuid())
+  lessonId     String
+  userId       String
+  coachId      String?
+  areaId       String
+  /// 1-5, convertito nella scala della valutazione quando entra nell'input AI.
+  rating       Int
+  note         String?
+  /// Valutazione che lo ha incorporato; null finché è in attesa.
+  evaluationId String?
+  createdAt    DateTime @default(now())
+
+  lesson FreeLesson @relation(fields: [lessonId], references: [id], onDelete: Restrict)
+  user   User       @relation("LessonFeedbackAthlete", fields: [userId], references: [id], onDelete: Cascade)
+  coach  User?      @relation("LessonFeedbackCoach", fields: [coachId], references: [id], onDelete: SetNull)
+  area   Area       @relation(fields: [areaId], references: [id])
+
+  @@unique([lessonId, userId, areaId])
+  @@index([userId, evaluationId])
 }

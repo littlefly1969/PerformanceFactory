@@ -66,6 +66,30 @@ export class AnalyticsService {
   }
 
   /**
+   * Evento del server che vale una volta per chiave (es. la prima volta che
+   * un atleta diventa eleggibile): richieste concorrenti non lo duplicano.
+   */
+  trackServerOnce(
+    name: AnalyticsEventName,
+    input: { userId: string; onceKey: string; properties?: EventProperties },
+    db: Db = this.prisma,
+  ) {
+    return db.analyticsEvent.createMany({
+      data: [
+        {
+          name,
+          occurredAt: new Date(),
+          userId: input.userId,
+          eventId: `${name}:${input.onceKey}`,
+          origin: 'SERVER',
+          properties: input.properties ?? {},
+        },
+      ],
+      skipDuplicates: true,
+    });
+  }
+
+  /**
    * Conteggi per evento nel periodo e per circolo di provenienza: prima base
    * del reporting settimanale finche A10 non fissa formule e dashboard.
    */

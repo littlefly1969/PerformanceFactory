@@ -421,7 +421,7 @@ describe('Entry slice with PostgreSQL', () => {
       });
 
     expect((await asAthlete('/api/admin/feature-flags')).statusCode).toBe(403);
-    expect((await asAthlete('/api/features/me')).json()).toEqual({
+    expect((await asAthlete('/api/features/me')).json()).toMatchObject({
       referral_share: false,
     });
     expect((await asAthlete('/api/athlete/referral')).statusCode).toBe(404);
@@ -435,7 +435,7 @@ describe('Entry slice with PostgreSQL', () => {
         })
       ).statusCode,
     ).toBe(200);
-    expect((await asAthlete('/api/features/me')).json()).toEqual({
+    expect((await asAthlete('/api/features/me')).json()).toMatchObject({
       referral_share: false,
     });
     expect(
@@ -446,7 +446,7 @@ describe('Entry slice with PostgreSQL', () => {
         })
       ).statusCode,
     ).toBe(200);
-    expect((await asAthlete('/api/features/me')).json()).toEqual({
+    expect((await asAthlete('/api/features/me')).json()).toMatchObject({
       referral_share: true,
     });
     // Ripetere la stessa scelta non aggiunge righe al registro.
@@ -472,7 +472,7 @@ describe('Entry slice with PostgreSQL', () => {
 
     expect(
       (await app.inject({ method: 'GET', url: '/api/public/features' })).json(),
-    ).toEqual({
+    ).toMatchObject({
       referral_share: false,
     });
     await admin('PATCH', '/api/admin/feature-flags/referral_share', {
@@ -480,7 +480,7 @@ describe('Entry slice with PostgreSQL', () => {
     });
     expect(
       (await app.inject({ method: 'GET', url: '/api/public/features' })).json(),
-    ).toEqual({
+    ).toMatchObject({
       referral_share: true,
     });
     expect(
