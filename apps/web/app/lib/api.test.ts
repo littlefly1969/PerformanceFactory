@@ -5,6 +5,7 @@ import {
   clearAccessToken,
   getAccessToken,
   secureFetch,
+  signOut,
   storeAccessToken,
 } from "./api";
 
@@ -100,6 +101,43 @@ describe("authenticated requests", () => {
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({
       message: expect.stringContaining("API non raggiungibile"),
+    });
+  });
+
+  describe("signOut", () => {
+    const originalLocation = window.location;
+    beforeEach(() => {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: { href: "/user" },
+      });
+    });
+    afterEach(() => {
+      Object.defineProperty(window, "location", {
+        configurable: true,
+        value: originalLocation,
+      });
+    });
+
+    it("destroys the server session, clears the token and goes to login", async () => {
+      storeAccessToken("stored");
+      const fetch = vi.fn().mockResolvedValue(new Response("{}"));
+      vi.stubGlobal("fetch", fetch);
+      await signOut();
+      expect(fetch).toHaveBeenCalledWith(
+        `${API_BASE}/auth/logout`,
+        expect.objectContaining({ method: "POST", credentials: "include" }),
+      );
+      expect(getAccessToken()).toBeNull();
+      expect(window.location.href).toBe("/login");
+    });
+
+    it("still leaves the session locally when the API is unreachable", async () => {
+      storeAccessToken("stored");
+      vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
+      await signOut();
+      expect(getAccessToken()).toBeNull();
+      expect(window.location.href).toBe("/login");
     });
   });
 });

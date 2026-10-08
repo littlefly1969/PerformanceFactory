@@ -27,6 +27,7 @@ export default function JourneyPage() {
   return (
     <div className={assessment ? "pf4-assessment" : undefined}>
       <PF4Shell
+        showLogout
         label={
           assessment
             ? `Assessment · ${j?.count ?? ""} domande`

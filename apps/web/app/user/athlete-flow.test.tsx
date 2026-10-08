@@ -15,6 +15,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("../lib/api", () => ({
   API_BASE: "/api",
   secureFetch: (path: string, init?: RequestInit) => fetch(path, init),
+  signOut: () => fetch("/api/auth/logout", { method: "POST" }),
 }));
 const session: Session = {
   track: "SPORT",
@@ -78,6 +79,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("PF4 athlete experience", () => {
+  it("lets the athlete log out from every page header", async () => {
+    const fetch = vi.fn(async () => respond(home));
+    vi.stubGlobal("fetch", fetch);
+    render(<HomePage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Esci" }));
+    expect(fetch).toHaveBeenCalledWith("/api/auth/logout", { method: "POST" });
+    expect(screen.getByRole("button", { name: "Uscita..." })).toBeDisabled();
+  });
   it("shows real performance and one prominent session CTA", async () => {
     vi.stubGlobal(
       "fetch",
