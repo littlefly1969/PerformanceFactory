@@ -345,8 +345,14 @@ describe('Free lesson with PostgreSQL', () => {
       where: { userId: id },
     });
     expect(seat.status).toBe('REQUESTED');
-    // Già dalla richiesta la lezione è il passaggio che chiude R e P.
+    // Già dalla richiesta la lezione è il passaggio che chiude R e P, e
+    // l'admin può assegnare il posto.
     expect(await status(id)).toBe('FREE_LESSON_VALIDATION');
+    await admin.assign(await lesson(), id);
+    expect(
+      (await prisma.freeLessonSeat.findUniqueOrThrow({ where: { userId: id } }))
+        .status,
+    ).toBe('ASSIGNED');
     await updateFreeLessonSettings(
       prisma,
       { creditsToUnlock: DEFAULT_FREE_LESSON_SETTINGS.creditsToUnlock },
