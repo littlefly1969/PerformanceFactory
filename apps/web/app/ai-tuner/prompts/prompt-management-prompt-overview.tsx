@@ -40,6 +40,20 @@ export function renderPromptOverview(model: PromptManagementModel) {
           </Link>
         </div>
       </section>
+      <section className="pf-panel pf-prompt-current-panel">
+        <div className="pf-panel-header pf-prompt-current-header">
+          <div>
+            <h2>Micro-test su misura</h2>
+            <p className="pf-muted">
+              Prompt che dopo ogni valutazione scrive per l&apos;atleta un
+              micro-test pratico sui driver meno affidabili.
+            </p>
+          </div>
+          <Link className="pf-button" href="/ai-tuner/prompts/micro-test">
+            Apri prompt
+          </Link>
+        </div>
+      </section>
     </>
   );
 }

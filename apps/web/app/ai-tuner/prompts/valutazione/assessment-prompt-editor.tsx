@@ -9,7 +9,7 @@ import {
   useAssessmentPrompts,
 } from "./use-assessment-prompts";
 
-/** Testi delle due famiglie di prompt: valutazione delle risposte e domande di calibrazione. */
+/** Testi delle tre famiglie di prompt: valutazione, domande di calibrazione, micro-test su misura. */
 const COPY = {
   EVALUATION: {
     title: "Valutazione dell'assessment",
@@ -19,6 +19,7 @@ const COPY = {
     instructions: "Istruzioni di valutazione (modificabili)",
     rules:
       "un punteggio per ogni driver nella scala attiva, confidenza 0–100 separata dal punteggio, livello e commitment, motivazione e cosa manca per aumentare la confidenza",
+    activation: "Le prossime valutazioni di tutti gli atleti useranno",
   },
   CALIBRATION: {
     title: "Domande di calibrazione",
@@ -28,6 +29,17 @@ const COPY = {
     instructions: "Istruzioni per le domande (modificabili)",
     rules:
       "esattamente le domande richieste per ogni driver, da 3 a 5 opzioni con uno score nella scala attiva, testi brevi",
+    activation: "I prossimi round di domande di tutti gli atleti useranno",
+  },
+  MICRO_TEST: {
+    title: "Micro-test su misura",
+    description:
+      "Prompt che, dopo ogni valutazione della calibrazione, scrive per l'atleta un micro-test pratico su ciascuno dei driver meno affidabili, partendo dalla sua storia: profilo, risposte, micro-test fatti e feedback del coach. Attivo con il flag ai_micro_tests; senza, restano i micro-test del catalogo.",
+    usedBy: "tutti i nuovi lotti di micro-test",
+    instructions: "Istruzioni per i micro-test (modificabili)",
+    rules:
+      "un micro-test per ogni driver ricevuto, titolo e istruzioni brevi, da 3 a 5 esiti con score crescenti nella scala attiva, titoli mai già proposti",
+    activation: "I prossimi micro-test su misura di tutti gli atleti useranno",
   },
 } as const;
 
@@ -87,7 +99,9 @@ export function AssessmentPromptEditor({
                   }
                 }}
               >
-                {item.isActive && <span className="pf-created-prompt-badge">In uso</span>}
+                {item.isActive && (
+                  <span className="pf-created-prompt-badge">In uso</span>
+                )}
                 <div className="pf-prompt-card-title">
                   <h3>{item.name}</h3>
                 </div>
@@ -124,7 +138,9 @@ export function AssessmentPromptEditor({
               <input
                 className="pf-input"
                 value={draft.name}
-                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                onChange={(event) =>
+                  setDraft({ ...draft, name: event.target.value })
+                }
               />
             </label>
             <label className="pf-field">
@@ -133,7 +149,9 @@ export function AssessmentPromptEditor({
                 className="pf-textarea pf-prompt-textarea"
                 rows={16}
                 value={draft.basePrompt}
-                onChange={(event) => setDraft({ ...draft, basePrompt: event.target.value })}
+                onChange={(event) =>
+                  setDraft({ ...draft, basePrompt: event.target.value })
+                }
               />
             </label>
             <p className="pf-muted">
@@ -145,7 +163,9 @@ export function AssessmentPromptEditor({
               <button
                 type="button"
                 className="pf-button-secondary"
-                disabled={busy === "save" || !changed || !draft.basePrompt.trim()}
+                disabled={
+                  busy === "save" || !changed || !draft.basePrompt.trim()
+                }
                 onClick={() => void save()}
               >
                 {busy === "save" ? "Salvataggio..." : "Salva bozza"}
@@ -213,6 +233,30 @@ export function AssessmentPromptEditor({
           </section>
         )}
 
+        {test && "tests" in test.output && (
+          <section className="pf-panel" aria-label="Risultato della prova">
+            <h2>Risultato della prova</h2>
+            <p className="pf-muted">
+              {test.provider} · {test.model} · {test.latencyMs} ms. Non salvato.
+            </p>
+            {test.output.tests.map((t) => (
+              <article className="pf-card" key={t.areaId}>
+                <h3>
+                  {t.name ?? t.areaId} · {t.title}
+                </h3>
+                <p>{t.instructions}</p>
+                <ul className="pf-muted">
+                  {t.options.map((o) => (
+                    <li key={o.value}>
+                      {o.label} · score {o.score}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </section>
+        )}
+
         {test && "drivers" in test.output && (
           <section className="pf-panel" aria-label="Risultato della prova">
             <h2>Risultato della prova</h2>
@@ -252,10 +296,7 @@ export function AssessmentPromptEditor({
             <section className="pf-modal pf-confirm-modal">
               <h2>Attivare prompt?</h2>
               <p className="pf-muted">
-                {kind === "EVALUATION"
-                  ? "Le prossime valutazioni di tutti gli atleti useranno"
-                  : "I prossimi round di domande di tutti gli atleti useranno"}{" "}
-                “{confirm.name}”.
+                {copy.activation} “{confirm.name}”.
               </p>
               <div className="pf-form-actions">
                 <button

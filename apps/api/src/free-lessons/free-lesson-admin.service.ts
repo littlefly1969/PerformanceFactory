@@ -67,7 +67,9 @@ export class FreeLessonAdminService {
           select: { id: true, email: true, firstName: true, lastName: true },
           orderBy: { email: 'asc' },
         }),
+        // Solo il catalogo: i test su misura restano dell'atleta.
         this.prisma.microTest.findMany({
+          where: { userId: null },
           orderBy: { createdAt: 'asc' },
           include: { area: { select: { name: true } } },
         }),
@@ -361,11 +363,12 @@ export class FreeLessonAdminService {
   }
 
   /** I micro-test si disattivano, non si cancellano: gli esiti restano leggibili. */
-  setMicroTestActive(id: string, isActive: boolean) {
-    return this.prisma.microTest.update({
-      where: { id },
+  async setMicroTestActive(id: string, isActive: boolean) {
+    const updated = await this.prisma.microTest.updateMany({
+      where: { id, userId: null },
       data: { isActive },
-      select: { id: true, isActive: true },
     });
+    if (!updated.count) throw new NotFoundException('Micro-test non trovato');
+    return { id, isActive };
   }
 }

@@ -178,3 +178,36 @@ export function freeLessonSettingsProblems(s: FreeLessonSettings) {
     problems.push('I giorni prima della scadenza non possono superare 30');
   return problems;
 }
+
+/** Micro-test AI: lotto per valutazione, lease e tentativi limitati. */
+export const MICRO_TEST_GENERATION = {
+  targets: 3,
+  evidencePerDriver: 12,
+  proposedTitles: 50,
+  leaseMs: 2 * 60 * 1000,
+  retryAfterMs: 10 * 60 * 1000,
+  maxAttempts: 3,
+};
+
+/** Driver bersaglio: i meno affidabili dell'ultima valutazione. */
+export function microTestTargets<T extends { confidence: number }>(
+  areas: T[],
+  count: number,
+) {
+  return [...areas].sort((a, b) => a.confidence - b.confidence).slice(0, count);
+}
+
+/** Un lotto si prende in carico se nuovo, se il lease è scaduto o se un fallimento è abbastanza vecchio. */
+export function canClaimGeneration(
+  row: { status: string; attempts: number; claimedAt: Date | null } | null,
+  now: Date,
+) {
+  if (!row) return true;
+  if (row.attempts >= MICRO_TEST_GENERATION.maxAttempts) return false;
+  const since = now.getTime() - (row.claimedAt?.getTime() ?? 0);
+  if (row.status === 'PENDING') return true;
+  if (row.status === 'RUNNING') return since > MICRO_TEST_GENERATION.leaseMs;
+  if (row.status === 'FAILED')
+    return since > MICRO_TEST_GENERATION.retryAfterMs;
+  return false;
+}

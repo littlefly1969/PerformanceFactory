@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE, secureFetch } from "@/app/lib/api";
 
 type Club = { id: string; name: string; city: string | null };
@@ -37,9 +37,13 @@ export type FreeLessonView =
         title: string;
         instructions: string;
         areaName: string;
+        /** Scritto dall'AI per questo atleta; altrimenti dal catalogo. */
+        personal: boolean;
         options: Array<{ value: string; label: string }>;
       }>;
       microTestsLeft: number;
+      /** Il server chiede di preparare i micro-test su misura. */
+      generateMicroTests: boolean;
     };
 
 const URL = `${API_BASE}/athlete-journey/free-lesson`;
@@ -69,6 +73,8 @@ export function FreeLessonPanel({ refreshKey }: { refreshKey: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const [clubId, setClubId] = useState("");
   const [share, setShare] = useState(false);
+  const [preparing, setPreparing] = useState(false);
+  const generated = useRef<string | null>(null);
 
   const call = useCallback(async (path = "", body?: unknown) => {
     setBusy(true);
@@ -101,6 +107,15 @@ export function FreeLessonPanel({ refreshKey }: { refreshKey: string }) {
   useEffect(() => {
     void call();
   }, [call, refreshKey]);
+
+  // Una richiesta di micro-test su misura per stato del percorso, mai in loop.
+  const wantsTests = view?.enabled === true && view.generateMicroTests;
+  useEffect(() => {
+    if (!wantsTests || generated.current === refreshKey) return;
+    generated.current = refreshKey;
+    setPreparing(true);
+    void call("/micro-tests/generate", {}).finally(() => setPreparing(false));
+  }, [call, wantsTests, refreshKey]);
 
   if (!view?.enabled || view.phase === "UNAVAILABLE") return null;
   const { credits, earn, seat } = view;
@@ -235,6 +250,9 @@ export function FreeLessonPanel({ refreshKey }: { refreshKey: string }) {
           La calibrazione è chiusa: la lezione gratuita serviva a completarla.
         </p>
       )}
+      {preparing && view.microTests.length === 0 && (
+        <p role="status">Preparo i micro-test su misura per te…</p>
+      )}
       {view.microTests.length > 0 && (
         <div className="pf4-micro-tests">
           <h3>Micro-test di oggi</h3>
@@ -242,6 +260,7 @@ export function FreeLessonPanel({ refreshKey }: { refreshKey: string }) {
             <fieldset key={test.id}>
               <legend>
                 {test.title} · {test.areaName}
+                {test.personal ? " · su misura" : ""}
               </legend>
               <p>{test.instructions}</p>
               <div className="pf4-options">

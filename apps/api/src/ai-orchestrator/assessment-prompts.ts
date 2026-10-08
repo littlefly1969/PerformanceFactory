@@ -9,13 +9,22 @@ import {
   CALIBRATION_PROMPT_TYPE,
   DEFAULT_CALIBRATION_PROMPT,
 } from './calibration-questions';
+import {
+  DEFAULT_MICRO_TEST_PROMPT,
+  MICRO_TEST_PROMPT_TYPE,
+} from './micro-test-generation';
 
 /**
- * Due famiglie di prompt con lo stesso ciclo di vita (bozze, attivazione,
- * versioni): la valutazione delle risposte e le domande di calibrazione.
- * Al massimo un prompt attivo per famiglia.
+ * Tre famiglie di prompt con lo stesso ciclo di vita (bozze, attivazione,
+ * versioni): la valutazione delle risposte, le domande di calibrazione e i
+ * micro-test su misura. Al massimo un prompt attivo per famiglia.
  */
-export type AssessmentPromptKind = 'EVALUATION' | 'CALIBRATION';
+export const ASSESSMENT_PROMPT_KINDS = [
+  'EVALUATION',
+  'CALIBRATION',
+  'MICRO_TEST',
+] as const;
+export type AssessmentPromptKind = (typeof ASSESSMENT_PROMPT_KINDS)[number];
 const KINDS = {
   EVALUATION: {
     defaultId: 'assessment-prompt-default',
@@ -29,11 +38,17 @@ const KINDS = {
     defaultPrompt: DEFAULT_CALIBRATION_PROMPT,
     promptType: CALIBRATION_PROMPT_TYPE,
   },
+  MICRO_TEST: {
+    defaultId: 'micro-test-prompt-default',
+    defaultName: 'micro-test su misura',
+    defaultPrompt: DEFAULT_MICRO_TEST_PROMPT,
+    promptType: MICRO_TEST_PROMPT_TYPE,
+  },
 } as const;
 export const isAssessmentPromptKind = (
   value: unknown,
 ): value is AssessmentPromptKind =>
-  value === 'EVALUATION' || value === 'CALIBRATION';
+  (ASSESSMENT_PROMPT_KINDS as readonly unknown[]).includes(value);
 const select = {
   id: true,
   name: true,

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { API_BASE, secureFetch } from "@/app/lib/api";
 import { readError } from "../prompt-management-model";
 
-export type AssessmentPromptKind = "EVALUATION" | "CALIBRATION";
+export type AssessmentPromptKind = "EVALUATION" | "CALIBRATION" | "MICRO_TEST";
 
 export type AssessmentPrompt = {
   id?: string;
@@ -30,12 +30,23 @@ export type CalibrationTestOutput = {
   }[];
 };
 
+export type MicroTestTestOutput = {
+  tests: {
+    areaId: string;
+    name?: string;
+    title: string;
+    instructions: string;
+    options: { value: string; label: string; score: number }[];
+  }[];
+};
+
 export type AssessmentTestResult = {
   provider: string;
   model: string;
   latencyMs: number;
   output:
     | CalibrationTestOutput
+    | MicroTestTestOutput
     | {
         summary: string;
         overallConfidence: number;
@@ -98,7 +109,10 @@ export function useAssessmentPrompts(
 
   useEffect(() => {
     void load().then((items) =>
-      setDraft((current) => current ?? items.find((p) => p.isActive) ?? items[0] ?? null),
+      setDraft(
+        (current) =>
+          current ?? items.find((p) => p.isActive) ?? items[0] ?? null,
+      ),
     );
   }, [load]);
 

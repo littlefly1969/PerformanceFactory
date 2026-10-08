@@ -146,6 +146,9 @@ prossimo round) durante la fase `EVALUATION`.
   bozza, attivazione e versione del prompt di valutazione (`promptType =
   CALIBRATION_QUESTIONS`). **Prova la bozza** usa un caso sintetico con due driver a
   confidence bassa.
+- `/ai-tuner/prompts/micro-test`: prompt dei micro-test su misura della lezione
+  gratuita (`promptType = MICRO_TESTS`), stesso ciclo di vita; vedi
+  `docs/lezione-gratuita.md`.
 
 ## Sviluppo e test
 
