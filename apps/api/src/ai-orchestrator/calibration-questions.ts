@@ -9,19 +9,36 @@ import { AssessmentEvaluationAnswer } from './assessment-evaluation-model';
 export const CALIBRATION_PROMPT_TYPE = 'CALIBRATION_QUESTIONS';
 
 export const DEFAULT_CALIBRATION_PROMPT = [
-  'Sei il motore di calibrazione di Performance Factory. Dopo la prima valutazione di un atleta amatoriale maggiorenne ricevi, per i driver con la confidenza più bassa, lo score R provvisorio, la confidenza, le lacune di evidenza indicate dalla valutazione e le domande già fatte.',
-  'Scrivi nuove domande a scelta singola che riducano proprio quelle lacune: comportamenti concreti, frequenze, situazioni di gioco, risultati misurabili. Evita domande già fatte o equivalenti.',
+  'Sei il motore di calibrazione di Performance Factory. Dopo la prima valutazione di un atleta amatoriale maggiorenne ricevi tutti i driver con score R provvisorio, confidenza, lacune di evidenza e domande già fatte; i driver ancora sotto la regola di consolidamento sono marcati come focus.',
+  'A ogni passo decidi tu la prossima azione: una sola domanda quando la risposta cambierà la domanda successiva, un gruppo di domande indipendenti quando si possono rispondere insieme, un chiarimento neutro quando due risposte si contraddicono. Non c’è un numero fisso di domande per driver: chiedi solo ciò che riduce davvero una lacuna, e non coprire un driver le cui evidenze bastano già.',
+  'Domande a scelta singola su comportamenti concreti, frequenze, situazioni di gioco, risultati misurabili. Evita domande già fatte o equivalenti.',
   'Ogni opzione ha uno score di riferimento sulla scala ricevuta: deve ancorare la risposta al livello reale, non premiare la risposta più lunga. Le opzioni coprono tutta la scala e sono mutuamente esclusive.',
-  'Puoi chiedere un micro-test pratico che l’atleta svolge da solo in pochi minuti e poi descrive scegliendo un’opzione, senza attrezzi particolari e senza rischi.',
-  "Nel round di chiusura copri tutti i driver ricevuti con le domande più informative: è l'ultima occasione prima di consolidare R.",
-  'Scrivi in italiano, con il tu, frasi brevi. Niente diagnosi mediche, niente dati personali, niente promesse di risultato.',
+  'Scrivi in italiano, con il tu, frasi brevi. Niente diagnosi mediche, niente dati personali, niente promesse di risultato. Un chiarimento non accusa e non rivela sospetti.',
 ].join('\n');
 
+/**
+ * Azioni del motore della prossima domanda (PF-FS-PREPAYWALL §4.2). La
+ * prontezza al reveal e alla lezione resta del server, che applica le regole
+ * di confidence versionate; il micro-test come passo arriva con la sua slice.
+ */
+export const CALIBRATION_ACTIONS = [
+  'ASK_SINGLE',
+  'ASK_GROUP',
+  'REQUEST_CLARIFICATION',
+] as const;
+export type CalibrationAction = (typeof CALIBRATION_ACTIONS)[number];
+
+/**
+ * Vincoli di formato, UX e sicurezza: non sono un numero di domande per area.
+ * `maxQuestions` limita la lunghezza di un singolo passo a schermo.
+ */
 export const CALIBRATION_LIMITS = {
   question: 200,
   option: 100,
   minOptions: 3,
   maxOptions: 5,
+  maxQuestions: 6,
+  rationale: 300,
 };
 
 export type CalibrationTarget = {
@@ -31,13 +48,13 @@ export type CalibrationTarget = {
   confidence: number;
   evidenceGaps: string[];
   askedQuestions: string[];
+  /** Driver sotto la regola di consolidamento: solo su questi si chiede. */
+  focus: boolean;
 };
 
 export type CalibrationQuestionsInput = {
   basePrompt: string;
   promptVersionId: string | null;
-  kind: 'ADAPTIVE' | 'CLOSING';
-  questionsPerDriver: number;
   scale: { minScore: number; maxScore: number };
   athleteContext: AssessmentEvaluationAnswer[];
   targets: CalibrationTarget[];
@@ -50,28 +67,42 @@ export type CalibrationQuestion = {
   options: { value: string; label: string; score: number }[];
 };
 
-export type CalibrationQuestionsResult = {
+/** Decisione validata del passo (§10.2): azione, aree, motivo, domande. */
+export type CalibrationStep = {
+  action: CalibrationAction;
+  targetAreas: string[];
+  rationale: string;
+  questions: CalibrationQuestion[];
+};
+
+export type CalibrationQuestionsResult = CalibrationStep & {
   provider: AiProvider;
   model: string;
   promptHash: string;
-  questions: CalibrationQuestion[];
   latencyMs: number;
 };
 
-function formatRules(input: CalibrationQuestionsInput) {
+function formatRules() {
+  const l = CALIBRATION_LIMITS;
   return [
     'FORMATO DI RISPOSTA (fisso): rispondi solo con JSON conforme allo schema.',
-    `- questions: esattamente ${input.questionsPerDriver} domande per ciascuno dei ${input.targets.length} driver ricevuti, con lo stesso areaId.`,
-    `- text: massimo ${CALIBRATION_LIMITS.question} caratteri.`,
-    `- options: da ${CALIBRATION_LIMITS.minOptions} a ${CALIBRATION_LIMITS.maxOptions}, label di massimo ${CALIBRATION_LIMITS.option} caratteri, score tra ${input.scale.minScore} e ${input.scale.maxScore}.`,
+    '- action: ASK_SINGLE (esattamente 1 domanda), ASK_GROUP (da 2 a ' +
+      `${l.maxQuestions} domande indipendenti) oppure REQUEST_CLARIFICATION (esattamente 1 domanda neutra su una contraddizione).`,
+    '- questions: solo sui driver con focus true, con il loro areaId; non serve coprirli tutti.',
+    `- rationale: perché questo passo, in una frase di massimo ${l.rationale} caratteri, senza dati personali.`,
+    `- text: massimo ${l.question} caratteri.`,
+    '- solo domande su comportamenti, frequenze e situazioni di gioco già vissute: niente micro-test, esercizi o prove da svolgere. Questa regola prevale sulle istruzioni sopra.',
+    `- options: da ${l.minOptions} a ${l.maxOptions}, label di massimo ${l.option} caratteri, score tra la scala minima e massima ricevute.`,
   ].join('\n');
 }
 
 const schema = {
   type: 'object',
   additionalProperties: false,
-  required: ['questions'],
+  required: ['action', 'rationale', 'questions'],
   properties: {
+    action: { type: 'string', enum: [...CALIBRATION_ACTIONS] },
+    rationale: { type: 'string' },
     questions: {
       type: 'array',
       items: {
@@ -101,14 +132,10 @@ const schema = {
 
 export function buildCalibrationPrompt(input: CalibrationQuestionsInput) {
   return {
-    system: `${input.basePrompt.trim()}\n\n${formatRules(input)}`,
+    system: `${input.basePrompt.trim()}\n\n${formatRules()}`,
     user: {
-      task:
-        input.kind === 'CLOSING'
-          ? 'Round di chiusura: domande finali sui driver ancora poco affidabili.'
-          : 'Nuovo round: domande sui driver con la confidenza più bassa.',
+      task: 'Decidi il prossimo passo sui driver con focus: una domanda, un gruppo o un chiarimento.',
       scale: input.scale,
-      questionsPerDriver: input.questionsPerDriver,
       athleteContext: input.athleteContext,
       drivers: input.targets,
     },
@@ -143,8 +170,8 @@ export async function generateCalibrationQuestions(
     }
   }
   const problems: string[] = [];
-  const questions = validateCalibrationQuestions(raw, input, problems);
-  if (!questions) {
+  const step = validateCalibrationStep(raw, input, problems);
+  if (!step) {
     logger.warn(
       `INVALID_CALIBRATION_QUESTIONS ${provider}/${model}: ${problems.join('; ')}`,
     );
@@ -157,53 +184,98 @@ export async function generateCalibrationQuestions(
     provider,
     model,
     promptHash: hashJson(inputJson),
-    questions,
+    ...step,
     latencyMs: Date.now() - startedAt,
   };
 }
 
-/** Stub deterministico per sviluppo e test: domande generiche sul driver. */
+/**
+ * Stub deterministico per sviluppo e test: una domanda se il focus è un solo
+ * driver, altrimenti un gruppo con una domanda per driver in focus.
+ */
 export function stubCalibrationQuestions(input: CalibrationQuestionsInput) {
   const { minScore, maxScore } = input.scale;
   const step = (maxScore - minScore) / 3;
+  const focus = input.targets
+    .filter((t) => t.focus)
+    .slice(0, CALIBRATION_LIMITS.maxQuestions);
   return {
-    questions: input.targets.flatMap((target) =>
-      Array.from({ length: input.questionsPerDriver }, (_, i) => ({
-        areaId: target.areaId,
-        text: `${target.name}: quanto spesso ti capita la situazione ${target.askedQuestions.length + i + 1}?`,
-        options: ['Mai', 'A volte', 'Spesso', 'Sempre'].map((label, k) => ({
-          label,
-          score: Math.round(minScore + step * k),
-        })),
+    action: focus.length === 1 ? 'ASK_SINGLE' : 'ASK_GROUP',
+    rationale: 'Domande sui driver ancora sotto la regola di consolidamento.',
+    questions: focus.map((target) => ({
+      areaId: target.areaId,
+      text: `${target.name}: quanto spesso ti capita la situazione ${target.askedQuestions.length + 1}?`,
+      options: ['Mai', 'A volte', 'Spesso', 'Sempre'].map((label, k) => ({
+        label,
+        score: Math.round(minScore + step * k),
       })),
-    ),
+    })),
   };
 }
 
-/** Contratto rigido: numero di domande, driver, opzioni e scala sono verificati. */
-export function validateCalibrationQuestions(
+const QUESTION_COUNT: Record<CalibrationAction, [number, number]> = {
+  ASK_SINGLE: [1, 1],
+  ASK_GROUP: [2, CALIBRATION_LIMITS.maxQuestions],
+  REQUEST_CLARIFICATION: [1, 1],
+};
+
+const normalized = (text: string) => text.toLowerCase().replace(/\s+/g, ' ');
+
+/**
+ * Contratto del passo: azione ammessa, numero di domande coerente con
+ * l'azione (mai per area), solo driver in focus, opzioni nella scala, nessuna
+ * domanda già fatta. Le aree del passo si ricavano dalle domande.
+ */
+export function validateCalibrationStep(
   raw: unknown,
   input: CalibrationQuestionsInput,
   problems: string[] = [],
-): CalibrationQuestion[] | null {
-  const items = (raw as { questions?: unknown } | null)?.questions;
+): CalibrationStep | null {
+  const body = raw as {
+    action?: unknown;
+    rationale?: unknown;
+    questions?: unknown;
+  } | null;
+  const action = CALIBRATION_ACTIONS.find((a) => a === body?.action);
+  if (!action) problems.push(`azione non ammessa: ${String(body?.action)}`);
+  const rationale = clean(body?.rationale, CALIBRATION_LIMITS.rationale);
+  if (!rationale) problems.push('motivo del passo mancante');
+  const items = body?.questions;
   if (!Array.isArray(items)) {
     problems.push('questions mancanti');
     return null;
   }
-  const targets = new Set(input.targets.map((t) => t.areaId));
-  const perDriver = new Map<string, number>();
+  if (action) {
+    const [min, max] = QUESTION_COUNT[action];
+    if (items.length < min || items.length > max)
+      problems.push(
+        `${action}: da ${min} a ${max} domande, ricevute ${items.length}`,
+      );
+  }
+  const focus = new Map(
+    input.targets.filter((t) => t.focus).map((t) => [t.areaId, t]),
+  );
   const questions: CalibrationQuestion[] = [];
+  const seen = new Set<string>();
   items.forEach((item, index) => {
     const entry = item as Partial<Record<string, unknown>>;
     const areaId = typeof entry?.areaId === 'string' ? entry.areaId : '';
-    if (!targets.has(areaId)) {
-      problems.push(`driver inatteso: ${areaId || '?'}`);
+    const target = focus.get(areaId);
+    if (!target) {
+      problems.push(`driver non in focus: ${areaId || '?'}`);
       return;
     }
-    perDriver.set(areaId, (perDriver.get(areaId) ?? 0) + 1);
     const text = clean(entry.text, CALIBRATION_LIMITS.question);
     if (!text) problems.push(`testo non valido (${index + 1})`);
+    else {
+      const key = normalized(text);
+      if (
+        seen.has(key) ||
+        target.askedQuestions.some((q) => normalized(q) === key)
+      )
+        problems.push(`domanda già fatta (${index + 1})`);
+      seen.add(key);
+    }
     const options = Array.isArray(entry.options) ? entry.options : [];
     if (
       options.length < CALIBRATION_LIMITS.minOptions ||
@@ -233,12 +305,13 @@ export function validateCalibrationQuestions(
       options: parsed,
     });
   });
-  for (const areaId of targets)
-    if (perDriver.get(areaId) !== input.questionsPerDriver)
-      problems.push(
-        `domande per ${areaId}: attese ${input.questionsPerDriver}`,
-      );
-  return problems.length ? null : questions;
+  if (problems.length || !action || !rationale) return null;
+  return {
+    action,
+    rationale,
+    targetAreas: [...new Set(questions.map((q) => q.areaId))],
+    questions,
+  };
 }
 
 function clean(value: unknown, max: number) {

@@ -77,25 +77,25 @@ export async function testAssessmentPrompt(
   };
 }
 
-/** Prova le domande di calibrazione sul caso sintetico: due driver a confidence bassa. */
+/** Prova il passo di calibrazione sul caso sintetico: due driver in focus a confidence bassa. */
 export async function testCalibrationPrompt(
   ai: AiProposalProviderService,
   basePrompt: string,
 ) {
   const input = SYNTHETIC_ASSESSMENT_CASE;
-  const targets = input.drivers.slice(0, 2).map((driver) => ({
+  const targets = input.drivers.map((driver, i) => ({
     areaId: driver.areaId,
     name: driver.name,
     score: 50,
-    confidence: 30,
-    evidenceGaps: ['Servono esempi concreti di situazioni di gioco.'],
+    confidence: i < 2 ? 30 : 80,
+    evidenceGaps:
+      i < 2 ? ['Servono esempi concreti di situazioni di gioco.'] : [],
     askedQuestions: driver.answers.map((a) => a.question),
+    focus: i < 2,
   }));
   const result = await ai.generateCalibrationQuestions({
     basePrompt,
     promptVersionId: null,
-    kind: 'ADAPTIVE',
-    questionsPerDriver: 2,
     scale: input.scale,
     athleteContext: input.athleteContext,
     targets,
@@ -106,6 +106,8 @@ export async function testCalibrationPrompt(
     model: result.model,
     latencyMs: result.latencyMs,
     output: {
+      action: result.action,
+      rationale: result.rationale,
       questions: result.questions.map((q) => ({
         ...q,
         name: targets.find((t) => t.areaId === q.areaId)?.name,

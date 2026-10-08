@@ -21,6 +21,9 @@ export type AssessmentTestCase = {
 };
 
 export type CalibrationTestOutput = {
+  /** Azione scelta dall'AI per il passo e motivo sintetico. */
+  action?: "ASK_SINGLE" | "ASK_GROUP" | "REQUEST_CLARIFICATION";
+  rationale?: string;
   questions: {
     id: string;
     areaId: string;

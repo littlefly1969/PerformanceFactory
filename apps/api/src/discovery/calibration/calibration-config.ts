@@ -11,8 +11,6 @@ const ID = 'default';
 const select = {
   levelConfidenceThreshold: true,
   maxDays: true,
-  questionsPerDriver: true,
-  driversPerRound: true,
   programBeforePaywall: true,
 } as const;
 

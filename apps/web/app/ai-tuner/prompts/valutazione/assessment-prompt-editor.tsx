@@ -9,6 +9,13 @@ import {
   useAssessmentPrompts,
 } from "./use-assessment-prompts";
 
+/** Azioni del motore della prossima domanda (PF-FS-PREPAYWALL §4.2). */
+const ACTION_LABEL = {
+  ASK_SINGLE: "Una domanda",
+  ASK_GROUP: "Gruppo di domande",
+  REQUEST_CLARIFICATION: "Chiarimento",
+} as const;
+
 /** Testi delle tre famiglie di prompt: valutazione, domande di calibrazione, micro-test su misura. */
 const COPY = {
   EVALUATION: {
@@ -216,6 +223,12 @@ export function AssessmentPromptEditor({
             <p className="pf-muted">
               {test.provider} · {test.model} · {test.latencyMs} ms. Non salvato.
             </p>
+            {test.output.action && (
+              <p>
+                <strong>{ACTION_LABEL[test.output.action]}</strong>
+                {test.output.rationale ? ` · ${test.output.rationale}` : ""}
+              </p>
+            )}
             {test.output.questions.map((q) => (
               <article className="pf-card" key={q.id}>
                 <h3>
@@ -282,7 +295,8 @@ export function AssessmentPromptEditor({
                     <td>{d.confidence}</td>
                     <td>
                       {d.rationale}
-                      {d.evidenceGaps.length > 0 && ` Per affinare: ${d.evidenceGaps.join(" ")}`}
+                      {d.evidenceGaps.length > 0 &&
+                        ` Per affinare: ${d.evidenceGaps.join(" ")}`}
                     </td>
                   </tr>
                 ))}

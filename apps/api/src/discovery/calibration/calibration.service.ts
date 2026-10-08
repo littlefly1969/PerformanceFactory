@@ -25,7 +25,7 @@ import {
   CalibrationStatus,
   dayOf,
   isCalibrationClosed,
-  roundTargets,
+  focusDrivers,
   statusAfterEvaluation,
 } from './calibration-rules';
 import { loadActivePolicy } from './confidence-policy';
@@ -154,6 +154,8 @@ export class CalibrationService {
         ? {
             id: open.id,
             kind: open.kind,
+            // Una domanda, un gruppo o un chiarimento: il motivo resta interno.
+            action: open.action,
             status: open.status,
             // Lo score delle opzioni resta sul server: l'atleta vede solo le etichette.
             questions: (open.questionsJson as CalibrationQuestion[]).map(
@@ -180,7 +182,6 @@ export class CalibrationService {
       throw new ConflictException('Completa prima la valutazione iniziale');
     if (isCalibrationClosed(calibration.status))
       throw new ConflictException('La calibrazione è già completata');
-    const settings = await loadCalibrationSettings(this.prisma);
     await requireAiConsent(this.prisma, userId);
     const lease = await this.claim(userId);
     try {
@@ -207,14 +208,13 @@ export class CalibrationService {
         confidence: a.confidence,
         evidenceGaps: a.evidenceGaps as string[],
       }));
-      const targets = roundTargets(
+      const focus = focusDrivers(
         { overallConfidence: latest.overallConfidence, drivers },
         policy,
-        settings,
       );
       // La valutazione corrente soddisfa la regola in vigore (per esempio
       // abbassata dal back office): si consolida senza nuove domande.
-      if (!targets.length) {
+      if (!focus.length) {
         const { gate, completed } = await this.prisma.$transaction(
           async (tx) => {
             await lockCalibration(tx, userId);
@@ -245,16 +245,17 @@ export class CalibrationService {
         userId,
         rounds.filter((r) => r.status === 'EVALUATED'),
       );
+      // L'AI vede tutti i driver e sceglie azione e domande su quelli in focus.
+      const inFocus = new Set(focus.map((d) => d.areaId));
       const result = await this.ai.generateCalibrationQuestions({
         basePrompt: prompt.basePrompt,
         promptVersionId: prompt.promptVersionId,
-        kind,
-        questionsPerDriver: settings.questionsPerDriver,
         scale: input.scale,
         athleteContext: input.athleteContext,
-        targets: targets.map((t) => ({
-          ...t,
-          askedQuestions: asked.get(t.areaId) ?? [],
+        targets: drivers.map((d) => ({
+          ...d,
+          askedQuestions: asked.get(d.areaId) ?? [],
+          focus: inFocus.has(d.areaId),
         })),
       });
       await this.prisma.calibrationRound.create({
@@ -263,6 +264,9 @@ export class CalibrationService {
           sequence: (rounds.at(-1)?.sequence ?? 0) + 1,
           kind,
           questionsJson: result.questions as unknown as Prisma.InputJsonValue,
+          action: result.action,
+          targetAreas: result.targetAreas,
+          rationale: result.rationale,
           provider: result.provider,
           model: result.model,
           promptVersionId: prompt.promptVersionId,

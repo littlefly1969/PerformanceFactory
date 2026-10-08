@@ -2,7 +2,7 @@ import {
   DEFAULT_CALIBRATION_SETTINGS as settings,
   NO_LESSON,
   dayOf,
-  roundTargets,
+  focusDrivers,
   settingsProblems,
   statusAfterEvaluation,
 } from './calibration-rules';
@@ -28,29 +28,31 @@ describe('calibration rules', () => {
     expect(dayOf(day(1), day(24))).toBe(24);
   });
 
-  it('targets the least reliable drivers below the area threshold of the rule', () => {
-    const list = { overallConfidence: 60, drivers: drivers(60, 20, 80, 45) };
-    expect(roundTargets(list, rule, settings).map((d) => d.areaId)).toEqual([
+  it('AT-07: focuses every driver below the area threshold, none above', () => {
+    const list = {
+      overallConfidence: 60,
+      drivers: drivers(60, 20, 80, 45, 30),
+    };
+    expect(focusDrivers(list, rule).map((d) => d.areaId)).toEqual([
       'a1',
+      'a4',
       'a3',
+      'a0',
     ]);
   });
 
-  it('targets the weakest drivers when only the overall confidence is missing', () => {
+  it('focuses all drivers when only the overall confidence is missing', () => {
     const list = { overallConfidence: 60, drivers: drivers(75, 72, 90) };
-    expect(roundTargets(list, rule, settings).map((d) => d.areaId)).toEqual([
+    expect(focusDrivers(list, rule).map((d) => d.areaId)).toEqual([
       'a1',
       'a0',
+      'a2',
     ]);
   });
 
   it('has nothing to ask once the rule is met', () => {
     expect(
-      roundTargets(
-        { overallConfidence: 80, drivers: drivers(75, 90) },
-        rule,
-        settings,
-      ),
+      focusDrivers({ overallConfidence: 80, drivers: drivers(75, 90) }, rule),
     ).toEqual([]);
   });
 

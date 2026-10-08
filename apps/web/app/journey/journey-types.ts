@@ -80,6 +80,8 @@ export type Calibration = {
   round: {
     id: string;
     kind: "ADAPTIVE" | "CLOSING";
+    /** Decisione dell'AI: una domanda, un gruppo o un chiarimento; nullo nei round storici. */
+    action: "ASK_SINGLE" | "ASK_GROUP" | "REQUEST_CLARIFICATION" | null;
     status: string;
     questions: {
       id: string;

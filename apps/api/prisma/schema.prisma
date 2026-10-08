@@ -1724,6 +1724,12 @@ model CalibrationRound {
   status          String    @default("OPEN")
   questionsJson   Json
   answersJson     Json      @default("{}")
+  /// Decisione del motore (PF-FS-PREPAYWALL §4.2, §10.2): ASK_SINGLE,
+  /// ASK_GROUP o REQUEST_CLARIFICATION; nullo nei round storici.
+  action          String?
+  /// Aree su cui il passo cerca evidenze e motivo sintetico, senza dati personali.
+  targetAreas     String[]  @default([])
+  rationale       String?
   provider        String
   model           String
   promptVersionId String?
@@ -1748,8 +1754,6 @@ model CalibrationConfig {
   levelConfidenceThreshold Int      @default(50)
   /// Durata indicativa della fase gratuita: non chiude né consolida R.
   maxDays                  Int      @default(30)
-  questionsPerDriver       Int      @default(2)
-  driversPerRound          Int      @default(2)
   /// Programma (baseline e piano) prima del paywall per chi è in calibrazione.
   /// Decisione 13 aperta; Blueprint A4.6: no, quindi spento di default.
   programBeforePaywall     Boolean  @default(false)
