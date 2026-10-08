@@ -114,3 +114,44 @@ export async function testCalibrationPrompt(
     previousOutput: null,
   };
 }
+
+/** Prova i micro-test sul caso sintetico: i due driver meno affidabili. */
+export async function testMicroTestPrompt(
+  ai: AiProposalProviderService,
+  basePrompt: string,
+) {
+  const input = SYNTHETIC_ASSESSMENT_CASE;
+  const targets = input.drivers.slice(0, 2).map((driver) => ({
+    areaId: driver.areaId,
+    name: driver.name,
+    score: 50,
+    confidence: 30,
+    evidenceGaps: ['Manca una prova pratica di quanto dichiarato.'],
+    evidence: driver.answers.map((a) => ({
+      source: 'ASSESSMENT',
+      question: a.question,
+      answer: a.answer,
+    })),
+  }));
+  const result = await ai.generateMicroTests({
+    basePrompt,
+    promptVersionId: null,
+    scale: input.scale,
+    athleteContext: input.athleteContext,
+    targets,
+    proposedTitles: [],
+  });
+  return {
+    caseEvaluationId: null,
+    provider: result.provider,
+    model: result.model,
+    latencyMs: result.latencyMs,
+    output: {
+      tests: result.tests.map((t) => ({
+        ...t,
+        name: targets.find((x) => x.areaId === t.areaId)?.name,
+      })),
+    },
+    previousOutput: null,
+  };
+}

@@ -23,6 +23,7 @@ const base: Extract<FreeLessonView, { enabled: true }> = {
       title: "Bandeja",
       instructions: "Dieci bandeje: quante finiscono in campo?",
       areaName: "Tecnico-tattico",
+      personal: false,
       options: [
         { value: "low", label: "Meno di 5" },
         { value: "high", label: "5 o più" },
@@ -30,6 +31,7 @@ const base: Extract<FreeLessonView, { enabled: true }> = {
     },
   ],
   microTestsLeft: 1,
+  generateMicroTests: false,
 };
 
 const serve = (...views: FreeLessonView[]) => {
@@ -109,5 +111,32 @@ describe("FreeLessonPanel", () => {
       await screen.findByText(/Richiesta inviata a Padel Roma Nord, Roma/),
     ).toBeInTheDocument();
     expect(calls[1].body).toEqual({ partnerId: "c1", shareWithCoach: true });
+  });
+
+  it("asks once for the micro-tests written for the athlete", async () => {
+    const calls = serve(
+      { ...base, microTests: [], generateMicroTests: true },
+      {
+        ...base,
+        microTests: [
+          {
+            ...base.microTests[0],
+            id: "m2",
+            title: "Uscita dalla parete",
+            personal: true,
+          },
+        ],
+      },
+    );
+    render(<FreeLessonPanel refreshKey="a" />);
+    expect(
+      await screen.findByText(
+        /Uscita dalla parete · Tecnico-tattico · su misura/,
+      ),
+    ).toBeInTheDocument();
+    expect(calls.map((c) => c.url)).toEqual([
+      "/api/athlete-journey/free-lesson",
+      "/api/athlete-journey/free-lesson/micro-tests/generate",
+    ]);
   });
 });

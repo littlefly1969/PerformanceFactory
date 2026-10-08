@@ -28,6 +28,10 @@ import { AdminService } from '../admin/admin.service';
 import { UpsertAiAreaGenerationConfigDto } from '../admin/dto/upsert-ai-area-generation-config.dto';
 import { UpsertGoalPromptConfigDto } from '../admin/dto/upsert-goal-prompt-config.dto';
 import { UpsertOnboardingTemplateDto } from '../admin/dto/upsert-onboarding-template.dto';
+import {
+  ASSESSMENT_PROMPT_KINDS,
+  isAssessmentPromptKind,
+} from '../ai-orchestrator/assessment-prompts';
 import { AiTuningService } from './ai-tuning.service';
 import { RunReplayDto } from './dto/run-replay.dto';
 import { SaveReplayFeedbackDto } from './dto/save-replay-feedback.dto';
@@ -172,16 +176,16 @@ export class AiTuningController {
   @Get('assessment-prompts')
   @ApiOperation({
     summary:
-      'Prompt AI dell assessment (attivo e bozze): valutazione o domande di calibrazione',
+      'Prompt AI dell assessment (attivo e bozze): valutazione, domande di calibrazione o micro-test',
   })
   @ApiQuery({
     name: 'kind',
     required: false,
-    enum: ['EVALUATION', 'CALIBRATION'],
+    enum: ASSESSMENT_PROMPT_KINDS,
   })
   listAssessmentPrompts(@Query('kind') kind?: string) {
     return this.tuning.listAssessmentPrompts(
-      kind === 'CALIBRATION' ? 'CALIBRATION' : 'EVALUATION',
+      isAssessmentPromptKind(kind) ? kind : 'EVALUATION',
     );
   }
 
@@ -213,9 +217,11 @@ export class AiTuningController {
   })
   @Roles(UserRole.AI_TUNER)
   testAssessmentPrompt(@Body() body: TestAssessmentPromptDto) {
-    return body.kind === 'CALIBRATION'
-      ? this.tuning.testCalibrationPrompt(body.basePrompt)
-      : this.tuning.testAssessmentPrompt(body.basePrompt, body.evaluationId);
+    if (body.kind === 'CALIBRATION')
+      return this.tuning.testCalibrationPrompt(body.basePrompt);
+    if (body.kind === 'MICRO_TEST')
+      return this.tuning.testMicroTestPrompt(body.basePrompt);
+    return this.tuning.testAssessmentPrompt(body.basePrompt, body.evaluationId);
   }
 
   @Post('sports')

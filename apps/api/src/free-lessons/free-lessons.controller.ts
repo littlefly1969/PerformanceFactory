@@ -52,6 +52,15 @@ export class FreeLessonController {
     return this.lessons.view(req.user.id);
   }
 
+  @Post('micro-tests/generate')
+  @ApiOperation({
+    summary:
+      'Prepara con l AI i micro-test su misura per l ultima valutazione (una volta per lotto)',
+  })
+  generateMicroTests(@Req() req: AuthRequest) {
+    return this.lessons.generateMicroTests(req.user.id);
+  }
+
   @Post('micro-tests/:id')
   @ApiOperation({ summary: 'Registra l esito di un micro-test' })
   microTest(

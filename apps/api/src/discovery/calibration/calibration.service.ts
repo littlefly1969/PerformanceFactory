@@ -435,6 +435,20 @@ export class CalibrationService {
     }
   }
 
+  /**
+   * Storia dell'atleta come la vede la valutazione: primo set, round valutati,
+   * micro-test e feedback del coach, ciascuno con la sua fonte. Sola lettura.
+   */
+  async athleteHistory(userId: string) {
+    const rounds = await this.prisma.calibrationRound.findMany({
+      where: { userId, status: 'EVALUATED' },
+      orderBy: { sequence: 'asc' },
+    });
+    const input = await this.evaluationInput(userId, rounds);
+    await addLessonEvidence(this.prisma, userId, input);
+    return input;
+  }
+
   /** Va chiamata sotto il lease dell'atleta. */
   private evaluatePendingFeedback(userId: string) {
     return evaluatePendingFeedback(this.prisma, this.ai, userId, (rounds) =>

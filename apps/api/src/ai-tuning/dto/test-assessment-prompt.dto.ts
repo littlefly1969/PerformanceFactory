@@ -6,6 +6,10 @@ import {
   IsString,
   MaxLength,
 } from 'class-validator';
+import {
+  ASSESSMENT_PROMPT_KINDS,
+  type AssessmentPromptKind,
+} from '../../ai-orchestrator/assessment-prompts';
 
 export class TestAssessmentPromptDto {
   @ApiProperty()
@@ -21,9 +25,9 @@ export class TestAssessmentPromptDto {
   @MaxLength(64)
   evaluationId?: string;
 
-  /** CALIBRATION prova le domande dei round, solo sul caso sintetico. */
-  @ApiPropertyOptional({ enum: ['EVALUATION', 'CALIBRATION'] })
+  /** CALIBRATION e MICRO_TEST si provano solo sul caso sintetico. */
+  @ApiPropertyOptional({ enum: ASSESSMENT_PROMPT_KINDS })
   @IsOptional()
-  @IsIn(['EVALUATION', 'CALIBRATION'])
-  kind?: 'EVALUATION' | 'CALIBRATION';
+  @IsIn(ASSESSMENT_PROMPT_KINDS)
+  kind?: AssessmentPromptKind;
 }
