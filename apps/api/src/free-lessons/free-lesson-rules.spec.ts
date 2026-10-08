@@ -96,6 +96,17 @@ describe('free lesson rules', () => {
     );
   });
 
+  it('OP-04: a booked seat survives the consolidation of R', () => {
+    for (const seatStatus of ['REQUESTED', 'ASSIGNED'])
+      expect(
+        lessonEligibility({
+          ...base,
+          calibrationStatus: 'PAYWALL_READY',
+          seatStatus,
+        }).phase,
+      ).toBe(seatStatus);
+  });
+
   it('keeps the lesson far enough from the calibration deadline', () => {
     const deadline = new Date('2026-11-01T00:00:00Z');
     expect(

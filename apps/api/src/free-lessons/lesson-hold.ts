@@ -2,9 +2,9 @@ import { Prisma } from '@prisma/client';
 import { isLessonPending } from '../discovery/calibration/lesson-evidence';
 
 /**
- * Posto assegnato: la calibrazione passa a FREE_LESSON_VALIDATION e R non si
- * chiude per soglia finché il coach non ha dato il suo feedback. Va chiamata
- * con la riga della calibrazione sotto lock.
+ * Posto assegnato: la calibrazione mostra FREE_LESSON_VALIDATION. È solo
+ * informativo: la lezione non blocca il consolidamento di R
+ * (PF-FS-PREPAYWALL §6.4). Va chiamata con la riga della calibrazione sotto lock.
  */
 export function holdCalibration(tx: Prisma.TransactionClient, userId: string) {
   return tx.athleteCalibration.updateMany({

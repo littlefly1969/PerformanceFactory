@@ -405,19 +405,16 @@ describe('Free lesson with PostgreSQL', () => {
     );
   });
 
-  it('holds R open until the coach feedback is evaluated, then closes at threshold', async () => {
-    // Driver già sopra soglia: senza lezione la calibrazione si chiuderebbe.
+  it('AT-17/AT-18: the lesson never holds R, and the coach feedback is a distinct source', async () => {
     const id = await requested([80, 90]);
     const roundAthlete = await requested([40, 50]);
     const lessonId = await lesson();
     await admin.assign(lessonId, id);
     await admin.assign(lessonId, roundAthlete);
-    await expect(calibration.openRound(id)).rejects.toMatchObject({
-      response: { code: 'CALIBRATION_WAITING_LESSON' },
-    });
     expect(await status(id)).toBe('FREE_LESSON_VALIDATION');
 
-    // Un round valutato sopra soglia non chiude mentre il posto è assegnato.
+    // AT-18: un round che soddisfa la regola consolida R anche con il posto
+    // assegnato; il posto resta valido dopo il consolidamento (OP-04).
     const round = await prisma.calibrationRound.create({
       data: {
         userId: roundAthlete,
@@ -440,7 +437,18 @@ describe('Free lesson with PostgreSQL', () => {
     });
     aiConfidence = 90;
     await calibration.answerRound(roundAthlete, round.id, { q1: 'b' });
-    expect(await status(roundAthlete)).toBe('FREE_LESSON_VALIDATION');
+    expect(await status(roundAthlete)).toBe('CALIBRATION_COMPLETED');
+    expect(
+      (
+        await prisma.assessmentEvaluation.findFirstOrThrow({
+          where: { userId: roundAthlete },
+          orderBy: { sequence: 'desc' },
+        })
+      ).status,
+    ).toBe('CONSOLIDATED');
+    expect(await athletes.view(roundAthlete)).toMatchObject({
+      phase: 'ASSIGNED',
+    });
 
     // Prima dell'inizio e da un altro coach il feedback non entra.
     const feedback = {
@@ -514,9 +522,9 @@ describe('Free lesson with PostgreSQL', () => {
       }),
     ).toBe(1);
 
-    // Assenza: il beneficio è consumato e R torna a poter chiudersi.
+    // Assenza dopo il consolidamento: il beneficio è consumato, R resta com'è.
     await coaches.markNoShow(coachId, lessonId, roundAthlete);
-    expect(await status(roundAthlete)).toBe('FREE_LEVEL_ESTIMATED');
+    expect(await status(roundAthlete)).toBe('CALIBRATION_COMPLETED');
     expect(
       (await prisma.freeLesson.findUniqueOrThrow({ where: { id: lessonId } }))
         .status,

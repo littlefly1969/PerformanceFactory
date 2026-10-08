@@ -10,13 +10,6 @@ const LEVELS: Record<string, string> = {
   PRO: "Professionista",
 };
 
-const dateTime = (iso: string) =>
-  new Date(iso).toLocaleString("it-IT", {
-    weekday: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
 /** Domande del round aperto: si inviano tutte insieme, poi R e confidence si aggiornano. */
 function RoundForm({
   round,
@@ -70,7 +63,8 @@ function RoundForm({
 
 /**
  * Fase gratuita: niente programma, solo domande mirate che rendono R più
- * affidabile fino alla soglia o all'assessment di chiusura.
+ * affidabile. Nessuna attesa fra un round e l'altro e nessun conto alla
+ * rovescia: R si consolida quando le evidenze bastano (PF-FS-PREPAYWALL §4.3, §7).
  */
 export function CalibrationPanel({
   calibration: c,
@@ -97,16 +91,12 @@ export function CalibrationPanel({
       aria-labelledby="pf4-calibration-title"
     >
       <span className="pf4-kicker">
-        {completed
-          ? "Calibrazione completata"
-          : `Calibrazione · giorno ${c.day} di ${c.maxDays}`}
+        {completed ? "Calibrazione completata" : "Calibrazione"}
       </span>
       <h2 id="pf4-calibration-title">
         {completed
           ? "La tua R è consolidata."
-          : c.round?.kind === "CLOSING"
-            ? "Assessment di chiusura."
-            : "Rendiamo la stima più precisa."}
+          : "Rendiamo la stima più precisa."}
       </h2>
       {level && (
         <p>
@@ -116,26 +106,20 @@ export function CalibrationPanel({
       )}
       {c.status === "FREE_LESSON_VALIDATION" && (
         <p role="status">
-          Hai un posto nella lezione gratuita: la tua R si chiude dopo il
-          feedback del coach del circolo.
+          Hai un posto nella lezione gratuita: il feedback del coach del circolo
+          renderà la tua R ancora più precisa.
         </p>
       )}
       {completed ? (
         <p>
           {c.completionReason === "CONFIDENCE_REACHED"
-            ? `Ogni driver ha raggiunto un'affidabilità di almeno ${c.confidenceThreshold} su 100.`
-            : c.completionReason === "DEADLINE_REACHED"
-              ? `Sono passati ${c.maxDays} giorni: abbiamo consolidato con le risposte che hai dato. I driver ancora poco affidabili restano indicati come tali, senza valori inventati.`
-              : "Abbiamo chiuso con l'assessment finale: i driver ancora poco affidabili restano indicati come tali, senza valori inventati."}{" "}
+            ? "Le tue risposte sono abbastanza coerenti e complete per una stima affidabile."
+            : "I driver ancora poco affidabili restano indicati come tali, senza valori inventati."}{" "}
           Il prossimo passo sono i tuoi scenari a 3, 6 e 12 mesi.
         </p>
       ) : c.round ? (
         <>
-          <p>
-            {c.round.kind === "CLOSING"
-              ? "Ultime domande sui driver ancora poco affidabili: dopo queste la tua R viene consolidata."
-              : "Poche domande sui driver dove la stima è meno sicura."}
-          </p>
+          <p>Poche domande sui driver dove la stima è meno sicura.</p>
           <RoundForm
             key={c.round.id}
             round={c.round}
@@ -147,25 +131,12 @@ export function CalibrationPanel({
         <>
           <p>
             Ogni round fa qualche domanda mirata sui driver meno affidabili.
-            L&apos;obiettivo è un&apos;affidabilità di almeno{" "}
-            {c.confidenceThreshold} su 100 per ogni driver, entro {c.maxDays}{" "}
-            giorni.
-            {c.roundsCompleted > 0 &&
-              ` Round completati: ${c.roundsCompleted}.`}
+            Puoi continuare subito o riprendere quando vuoi: R si consolida
+            quando le tue risposte sono abbastanza coerenti e complete.
           </p>
-          {c.nextRoundAt ? (
-            <p role="status">
-              Le prossime domande saranno pronte {dateTime(c.nextRoundAt)}.
-            </p>
-          ) : (
-            <button className="pf4-cta" disabled={busy} onClick={onOpenRound}>
-              {busy
-                ? "Prepariamo le domande…"
-                : c.nextRoundKind === "CLOSING"
-                  ? "Inizia l'assessment di chiusura →"
-                  : "Nuove domande →"}
-            </button>
-          )}
+          <button className="pf4-cta" disabled={busy} onClick={onOpenRound}>
+            {busy ? "Prepariamo le domande…" : "Nuove domande →"}
+          </button>
         </>
       )}
     </section>

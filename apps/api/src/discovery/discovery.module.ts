@@ -13,6 +13,7 @@ import { DiscoveryService } from './discovery.service';
 import { AthleteRegistrationService } from './athlete-registration.service';
 import { CalibrationService } from './calibration/calibration.service';
 import { CalibrationAdminController } from './calibration/calibration-admin.controller';
+import { ConfidencePolicyAdminController } from './calibration/confidence-policy-admin.controller';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { CalibrationAdminController } from './calibration/calibration-admin.cont
     DiscoveryController,
     AthleteJourneyController,
     CalibrationAdminController,
+    ConfidencePolicyAdminController,
   ],
   providers: [
     DiscoveryService,

@@ -1,57 +1,73 @@
 import {
   DEFAULT_CALIBRATION_SETTINGS as settings,
   dayOf,
-  nextRoundAt,
-  nextRoundKind,
   roundTargets,
   settingsProblems,
   statusAfterEvaluation,
 } from './calibration-rules';
+import { ConfidenceRule } from './confidence-policy';
 
 const day = (n: number) => new Date(Date.UTC(2026, 9, n, 10));
 const drivers = (...confidences: number[]) =>
   confidences.map((confidence, i) => ({ areaId: `a${i}`, confidence }));
+const rule: ConfidenceRule = {
+  minOverallConfidence: 70,
+  minAreaConfidence: 70,
+  minAreasAtConfidence: null,
+};
+const evaluation = (
+  overallConfidence: number,
+  levelConfidence: number | null,
+  ...confidences: number[]
+) => ({ overallConfidence, levelConfidence, drivers: drivers(...confidences) });
 
 describe('calibration rules', () => {
-  it('counts days from the first evaluation and switches to closing on day 25', () => {
+  it('counts days from the first evaluation, for information only', () => {
     expect(dayOf(day(1), day(1))).toBe(1);
     expect(dayOf(day(1), day(24))).toBe(24);
-    expect(nextRoundKind(day(1), day(24), settings)).toBe('ADAPTIVE');
-    expect(nextRoundKind(day(1), day(25), settings)).toBe('CLOSING');
   });
 
-  it('targets the least reliable drivers below threshold', () => {
-    const list = drivers(60, 20, 80, 45);
+  it('targets the least reliable drivers below the area threshold of the rule', () => {
+    const list = { overallConfidence: 60, drivers: drivers(60, 20, 80, 45) };
+    expect(roundTargets(list, rule, settings).map((d) => d.areaId)).toEqual([
+      'a1',
+      'a3',
+    ]);
+  });
+
+  it('targets the weakest drivers when only the overall confidence is missing', () => {
+    const list = { overallConfidence: 60, drivers: drivers(75, 72, 90) };
+    expect(roundTargets(list, rule, settings).map((d) => d.areaId)).toEqual([
+      'a1',
+      'a0',
+    ]);
+  });
+
+  it('has nothing to ask once the rule is met', () => {
     expect(
-      roundTargets(list, 'ADAPTIVE', settings).map((d) => d.areaId),
-    ).toEqual(['a1', 'a3']);
-    expect(
-      roundTargets(list, 'CLOSING', settings).map((d) => d.areaId),
-    ).toEqual(['a1', 'a3', 'a0']);
+      roundTargets(
+        { overallConfidence: 80, drivers: drivers(75, 90) },
+        rule,
+        settings,
+      ),
+    ).toEqual([]);
   });
 
-  it('waits the configured hours between rounds', () => {
-    expect(nextRoundAt(null, settings)).toBeNull();
-    expect(nextRoundAt(day(1), settings)).toEqual(
-      new Date(day(1).getTime() + 20 * 60 * 60 * 1000),
-    );
-  });
-
-  it('estimates the level, then completes at threshold', () => {
+  it('estimates the level, then consolidates only when the rule is met', () => {
     expect(
       statusAfterEvaluation(
         'FREE_CALIBRATING',
-        { levelConfidence: 55, drivers: drivers(40, 50) },
+        evaluation(45, 55, 40, 50),
         settings,
-        'ADAPTIVE',
+        rule,
       ),
     ).toEqual({ status: 'FREE_LEVEL_ESTIMATED', levelEstimated: true });
     expect(
       statusAfterEvaluation(
         'FREE_LEVEL_ESTIMATED',
-        { levelConfidence: 80, drivers: drivers(70, 90) },
+        evaluation(80, 80, 70, 90),
         settings,
-        'ADAPTIVE',
+        rule,
       ),
     ).toEqual({
       status: 'CALIBRATION_COMPLETED',
@@ -60,73 +76,71 @@ describe('calibration rules', () => {
     });
   });
 
-  it('closes with the closing assessment even below threshold', () => {
+  it('AT-11: many answers with low quality do not consolidate R', () => {
+    // Le aree sono sopra soglia, ma la confidence complessiva resta bassa.
+    expect(
+      statusAfterEvaluation(
+        'FREE_LEVEL_ESTIMATED',
+        evaluation(40, 80, 75, 90),
+        settings,
+        rule,
+      ).status,
+    ).toBe('FREE_LEVEL_ESTIMATED');
+  });
+
+  it('AT-19/AT-27: no time or round count consolidates a weak R', () => {
+    // Nessun parametro di tempo o di round: solo la regola decide.
+    expect(settings).not.toHaveProperty('closingDay');
+    expect(settings).not.toHaveProperty('minHoursBetweenRounds');
     expect(
       statusAfterEvaluation(
         'FREE_CALIBRATING',
-        { levelConfidence: 30, drivers: drivers(40, 50) },
+        evaluation(40, 30, 40, 50),
         settings,
-        'CLOSING',
+        rule,
+      ),
+    ).toEqual({ status: 'FREE_CALIBRATING', levelEstimated: false });
+  });
+
+  it('AT-18: a pending free lesson never blocks consolidation', () => {
+    expect(
+      statusAfterEvaluation(
+        'FREE_LESSON_VALIDATION',
+        evaluation(80, 80, 75, 90),
+        settings,
+        rule,
+        true,
       ),
     ).toMatchObject({
       status: 'CALIBRATION_COMPLETED',
-      completionReason: 'CLOSING_ASSESSMENT',
+      completionReason: 'CONFIDENCE_REACHED',
     });
+    expect(
+      statusAfterEvaluation(
+        'FREE_LESSON_VALIDATION',
+        evaluation(60, 80, 40, 90),
+        settings,
+        rule,
+        false,
+      ),
+    ).toEqual({ status: 'FREE_LEVEL_ESTIMATED', levelEstimated: false });
   });
 
   it('never reopens a completed calibration', () => {
     expect(
       statusAfterEvaluation(
         'CALIBRATION_COMPLETED',
-        { levelConfidence: 10, drivers: drivers(10) },
+        evaluation(10, 10, 10),
         settings,
-        'ADAPTIVE',
+        rule,
       ).status,
     ).toBe('CALIBRATION_COMPLETED');
   });
 
-  it('refuses a closing day after the deadline', () => {
-    expect(settingsProblems({ ...settings, closingDay: 31 })).toHaveLength(1);
-  });
-
-  it('keeps R open while the free lesson is pending, except at the closing assessment', () => {
-    const above = { levelConfidence: 80, drivers: drivers(75, 90) };
+  it('refuses a level threshold outside 1-100', () => {
     expect(
-      statusAfterEvaluation(
-        'FREE_LESSON_VALIDATION',
-        above,
-        settings,
-        'ADAPTIVE',
-        true,
-      ),
-    ).toEqual({ status: 'FREE_LESSON_VALIDATION', levelEstimated: false });
-    expect(
-      statusAfterEvaluation(
-        'FREE_LESSON_VALIDATION',
-        above,
-        settings,
-        'CLOSING',
-        true,
-      ).status,
-    ).toBe('CALIBRATION_COMPLETED');
-    // Feedback valutato: la soglia torna a chiudere.
-    expect(
-      statusAfterEvaluation(
-        'FREE_LESSON_VALIDATION',
-        above,
-        settings,
-        'ADAPTIVE',
-        false,
-      ).completionReason,
-    ).toBe('CONFIDENCE_REACHED');
-    expect(
-      statusAfterEvaluation(
-        'FREE_LESSON_VALIDATION',
-        { levelConfidence: 80, drivers: drivers(40, 90) },
-        settings,
-        'ADAPTIVE',
-        false,
-      ),
-    ).toEqual({ status: 'FREE_LEVEL_ESTIMATED', levelEstimated: false });
+      settingsProblems({ ...settings, levelConfidenceThreshold: 0 }),
+    ).toHaveLength(1);
+    expect(settingsProblems(settings)).toEqual([]);
   });
 });

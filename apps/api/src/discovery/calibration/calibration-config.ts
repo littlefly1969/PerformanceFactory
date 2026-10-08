@@ -9,13 +9,10 @@ import {
 
 const ID = 'default';
 const select = {
-  confidenceThreshold: true,
   levelConfidenceThreshold: true,
   maxDays: true,
-  closingDay: true,
   questionsPerDriver: true,
   driversPerRound: true,
-  minHoursBetweenRounds: true,
   programBeforePaywall: true,
 } as const;
 

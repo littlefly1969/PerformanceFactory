@@ -11,9 +11,9 @@ il suo feedback, che entra nella valutazione successiva come fonte distinta.
 
 ```
 FREE_CALIBRATING ──► FREE_LEVEL_ESTIMATED ──► FREE_LESSON_VALIDATION ──► CALIBRATION_COMPLETED
-                      crediti ≥ soglia          posto assegnato:            soglia raggiunta
-                      richiesta del posto       R non chiude per soglia     dopo il feedback,
-                                                fino al feedback del coach  chiusura o scadenza
+                      crediti ≥ soglia          posto assegnato          regola di consolidamento
+                      richiesta del posto       (solo informativo)       soddisfatta, con o senza
+                                                                         feedback del coach
 ```
 
 Tutto è dietro il feature flag `free_lesson` (spento di default, come
@@ -37,10 +37,12 @@ progetto `notes/slice4-lezione-gratuita.md`.
   dietro `programBeforePaywall` (decisione 13 aperta).
 - **Due condizioni insieme.** Livello stimato con R aperta (Blueprint) e crediti
   sopra soglia. Con soglia 0 resta solo la regola del Blueprint.
-- **R aspetta il coach.** Con un posto assegnato la soglia di confidence non chiude
-  la calibrazione finché il feedback non è valutato; l'assessment di chiusura e la
-  scadenza restano il tetto. Per questo una lezione si assegna solo se inizia
-  almeno `minDaysBeforeDeadline` giorni prima della scadenza.
+- **R non aspetta il coach** (PF-FS-PREPAYWALL §6.4, AT-18). Il posto assegnato
+  porta la calibrazione a `FREE_LESSON_VALIDATION`, solo informativo: la regola di
+  consolidamento chiude R anche con la lezione in attesa, e il posto resta valido
+  dopo il consolidamento (OP-04). Il feedback arrivato a R aperta entra nella
+  valutazione successiva; quello arrivato dopo il consolidamento resta salvato
+  senza modificare R (la ratifica arriva con la slice della lezione).
 - **Crediti, confidence ed engagement sono misure diverse.** La confidence resta
   della valutazione AI; lo stato di engagement (A8) non è in questa slice. I
   crediti si alimentano degli stessi eventi.

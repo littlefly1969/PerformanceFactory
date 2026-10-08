@@ -18,7 +18,7 @@ import {
 import { loadSpecialistQuestionRecords } from '../../onboarding/onboarding-questions';
 import { PrismaService } from '../../prisma/prisma.service';
 import { loadCalibrationSettings } from './calibration-config';
-import { closeAtDeadline, completeCalibration } from './calibration-completion';
+import { completeCalibration } from './calibration-completion';
 import {
   addLessonEvidence,
   isLessonPending,
@@ -29,16 +29,14 @@ import {
   CalibrationStatus,
   dayOf,
   isCalibrationClosed,
-  nextRoundAt,
-  nextRoundKind,
   roundTargets,
   statusAfterEvaluation,
 } from './calibration-rules';
+import { loadActivePolicy } from './confidence-policy';
 
 const LEASE_MS = 10 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-type RoundKind = 'ADAPTIVE' | 'CLOSING';
 type Answers = Record<string, string>;
 
 /** Annulla la transazione quando il round non è più di questa richiesta. */
@@ -47,7 +45,8 @@ class RoundNotOwned extends Error {}
 /**
  * Calibrazione gratuita dopo la prima valutazione: round di domande scritte
  * dall'AI sui driver meno affidabili, nuova valutazione a ogni round, chiusura
- * alla soglia di confidence o con l'assessment di chiusura.
+ * solo quando la regola di consolidamento è soddisfatta. Nessuna attesa fra i
+ * round (PF-FS-PREPAYWALL §4.3): resta solo il lease tecnico per atleta.
  */
 @Injectable()
 export class CalibrationService {
@@ -71,12 +70,19 @@ export class CalibrationService {
       include: { areas: true },
     });
     if (!first) return null;
-    const settings = await loadCalibrationSettings(this.prisma);
+    const [settings, policy] = await Promise.all([
+      loadCalibrationSettings(this.prisma),
+      loadActivePolicy(this.prisma, 'R_CONSOLIDATION'),
+    ]);
     const next = statusAfterEvaluation(
       'FREE_CALIBRATING',
-      { levelConfidence: first.levelConfidence, drivers: first.areas },
+      {
+        overallConfidence: first.overallConfidence,
+        levelConfidence: first.levelConfidence,
+        drivers: first.areas,
+      },
       settings,
-      'INITIAL',
+      policy,
     );
     await this.prisma.$transaction(async (tx) => {
       const created = await tx.athleteCalibration.createMany({
@@ -94,68 +100,57 @@ export class CalibrationService {
         skipDuplicates: true,
       });
       if (!created.count) return;
-      // Prima valutazione già sopra soglia: si chiude e si consolida subito.
+      // Prima valutazione che soddisfa già la regola: si chiude e si consolida subito.
       if (next.completionReason)
         await completeCalibration(
           tx,
           userId,
           next.completionReason,
           first.createdAt,
+          policy.id,
         );
+      else
+        await tx.assessmentEvaluation.update({
+          where: { id: first.id },
+          data: { consolidationPolicyId: policy.id },
+        });
     });
     return this.prisma.athleteCalibration.findUnique({ where: { userId } });
   }
 
-  /** Stato mostrato all'atleta: giorno, soglia, round aperto senza punteggi. */
+  /**
+   * Stato mostrato all'atleta: round aperto senza punteggi. Il giorno della
+   * fase gratuita è solo informativo: la scadenza non chiude R.
+   */
   async view(userId: string, now = new Date()) {
-    let calibration = await this.ensureStarted(userId);
+    const calibration = await this.ensureStarted(userId);
     if (!calibration) return null;
-    if (
-      !isCalibrationClosed(calibration.status) &&
-      calibration.deadlineAt <= now
-    ) {
-      // Se un'altra operazione ha il lease, chiuderà lei alla prossima visita.
-      const lease = await this.tryClaim(userId);
-      if (lease)
-        try {
-          await this.prisma.$transaction((tx) =>
-            closeAtDeadline(tx, userId, now),
-          );
-        } finally {
-          await this.release(userId, lease);
-        }
-      calibration = await this.prisma.athleteCalibration.findUniqueOrThrow({
-        where: { userId },
-      });
-    }
-    const settings = await loadCalibrationSettings(this.prisma);
-    const [open, last, evaluations] = await Promise.all([
+    const [policy, open, evaluations] = await Promise.all([
+      loadActivePolicy(this.prisma, 'R_CONSOLIDATION'),
       this.prisma.calibrationRound.findFirst({
         where: { userId, status: { in: ['OPEN', 'EVALUATING'] } },
         orderBy: { sequence: 'desc' },
       }),
-      this.lastEvaluatedAt(userId),
       this.prisma.calibrationRound.count({
         where: { userId, status: 'EVALUATED' },
       }),
     ]);
     const completed = isCalibrationClosed(calibration.status);
-    const available = nextRoundAt(last, settings);
     return {
       status: calibration.status as CalibrationStatus,
       startedAt: calibration.startedAt,
-      deadlineAt: calibration.deadlineAt,
-      day: Math.min(dayOf(calibration.startedAt, now), settings.maxDays),
-      maxDays: settings.maxDays,
-      confidenceThreshold: settings.confidenceThreshold,
+      day: dayOf(calibration.startedAt, now),
+      consolidationRule: {
+        version: policy.version,
+        minOverallConfidence: policy.minOverallConfidence,
+        minAreaConfidence: policy.minAreaConfidence,
+        minAreasAtConfidence: policy.minAreasAtConfidence,
+      },
       completedAt: calibration.completedAt,
       completionReason: calibration.completionReason,
       roundsCompleted: evaluations,
-      nextRoundKind: completed
-        ? null
-        : nextRoundKind(calibration.startedAt, now, settings),
-      nextRoundAt:
-        completed || open || !available || available <= now ? null : available,
+      // Il prossimo round è sempre disponibile finché R non è consolidata.
+      nextRoundKind: completed ? null : ('ADAPTIVE' as const),
       round: open
         ? {
             id: open.id,
@@ -190,11 +185,6 @@ export class CalibrationService {
     await requireAiConsent(this.prisma, userId);
     const lease = await this.claim(userId);
     try {
-      // Tetto dei giorni: alla scadenza nessun nuovo round, si consolida.
-      if (
-        await this.prisma.$transaction((tx) => closeAtDeadline(tx, userId, now))
-      )
-        return;
       const rounds = await this.prisma.calibrationRound.findMany({
         where: { userId },
         orderBy: { sequence: 'asc' },
@@ -204,23 +194,13 @@ export class CalibrationService {
         return;
       // Il feedback del coach non ancora valutato passa prima di nuove domande.
       if (await this.evaluatePendingFeedback(userId)) return;
-      // L'intervallo parte dalla valutazione del round precedente, non dalla sua apertura.
-      const available = nextRoundAt(
-        await this.lastEvaluatedAt(userId),
-        settings,
-      );
-      if (available && available > now)
-        throw new ConflictException({
-          code: 'CALIBRATION_ROUND_NOT_YET',
-          message: 'Il prossimo round sarà disponibile più tardi.',
-          availableAt: available.toISOString(),
-        });
       const latest = await this.prisma.assessmentEvaluation.findFirstOrThrow({
         where: { userId },
         orderBy: { sequence: 'desc' },
         include: { areas: { include: { area: { select: { name: true } } } } },
       });
-      const kind = nextRoundKind(calibration.startedAt, now, settings);
+      const kind = 'ADAPTIVE' as const;
+      const policy = await loadActivePolicy(this.prisma, 'R_CONSOLIDATION');
       const drivers = latest.areas.map((a) => ({
         areaId: a.areaId,
         name: a.area.name,
@@ -228,18 +208,16 @@ export class CalibrationService {
         confidence: a.confidence,
         evidenceGaps: a.evidenceGaps as string[],
       }));
-      const targets = roundTargets(drivers, kind, settings);
-      // Nessun driver sotto soglia: la valutazione corrente chiude già la
-      // calibrazione, salvo che la lezione gratuita sia ancora in attesa.
+      const targets = roundTargets(
+        { overallConfidence: latest.overallConfidence, drivers },
+        policy,
+        settings,
+      );
+      // La valutazione corrente soddisfa la regola in vigore (per esempio
+      // abbassata dal back office): si consolida senza nuove domande.
       if (!targets.length) {
-        if (await isLessonPending(this.prisma, userId))
-          throw new ConflictException({
-            code: 'CALIBRATION_WAITING_LESSON',
-            message:
-              'La tua R si chiude dopo la lezione con il coach del circolo.',
-          });
         await this.prisma.$transaction((tx) =>
-          completeCalibration(tx, userId, 'CONFIDENCE_REACHED', now),
+          completeCalibration(tx, userId, 'CONFIDENCE_REACHED', now, policy.id),
         );
         return;
       }
@@ -308,10 +286,6 @@ export class CalibrationService {
     await requireAiConsent(this.prisma, userId);
     const lease = await this.claim(userId);
     try {
-      if (
-        await this.prisma.$transaction((tx) => closeAtDeadline(tx, userId, now))
-      )
-        throw new ConflictException('La calibrazione è scaduta');
       const token = randomUUID();
       const fixed = await this.prisma.calibrationRound.updateMany({
         where: { id: roundId, status: 'OPEN' },
@@ -361,7 +335,10 @@ export class CalibrationService {
     );
     const feedbackIds = await addLessonEvidence(this.prisma, userId, input);
     const result = await this.ai.evaluateAssessment(input);
-    const settings = await loadCalibrationSettings(this.prisma);
+    const [settings, policy] = await Promise.all([
+      loadCalibrationSettings(this.prisma),
+      loadActivePolicy(this.prisma, 'R_CONSOLIDATION'),
+    ]);
     const now = new Date();
     await this.prisma.$transaction(async (tx) => {
       // Lock della riga: un posto assegnato in questo momento sospende la chiusura.
@@ -369,7 +346,7 @@ export class CalibrationService {
       const calibration = await tx.athleteCalibration.findUniqueOrThrow({
         where: { userId },
       });
-      // Chiusa nel frattempo (scadenza): nessuna valutazione oltre quella consolidata.
+      // Chiusa nel frattempo: nessuna valutazione oltre quella consolidata.
       if (isCalibrationClosed(calibration.status)) throw new RoundNotOwned();
       const last = await tx.assessmentEvaluation.findFirstOrThrow({
         where: { userId },
@@ -380,6 +357,7 @@ export class CalibrationService {
         sequence: last.sequence + 1,
         source:
           round.kind === 'CLOSING' ? 'CLOSING_ASSESSMENT' : 'CALIBRATION_ROUND',
+        consolidationPolicyId: policy.id,
       });
       // Collega solo il proprietario attuale: chi ha perso il round annulla tutto.
       const linked = await tx.calibrationRound.updateMany({
@@ -395,18 +373,19 @@ export class CalibrationService {
       await linkFeedback(tx, feedbackIds, saved.id);
       const next = statusAfterEvaluation(
         calibration.status as CalibrationStatus,
-        {
-          levelConfidence: result.output.levelConfidence,
-          drivers: result.output.drivers,
-        },
+        result.output,
         settings,
-        round.kind as RoundKind,
+        policy,
         await isLessonPending(tx, userId),
       );
-      const reason =
-        next.completionReason ??
-        (calibration.deadlineAt <= now ? 'DEADLINE_REACHED' : undefined);
-      if (reason) await completeCalibration(tx, userId, reason, now);
+      if (next.completionReason)
+        await completeCalibration(
+          tx,
+          userId,
+          next.completionReason,
+          now,
+          policy.id,
+        );
       else
         await tx.athleteCalibration.update({
           where: { userId },
@@ -526,16 +505,6 @@ export class CalibrationService {
       for (const q of round.questionsJson as CalibrationQuestion[])
         add(q.areaId, q.text);
     return asked;
-  }
-
-  /** Fine dell'ultima valutazione di un round: da qui parte l'intervallo minimo. */
-  private async lastEvaluatedAt(userId: string) {
-    const last = await this.prisma.calibrationRound.findFirst({
-      where: { userId, status: 'EVALUATED' },
-      orderBy: { sequence: 'desc' },
-      select: { evaluatedAt: true, answeredAt: true },
-    });
-    return last ? (last.evaluatedAt ?? last.answeredAt) : null;
   }
 
   /** Una sola operazione AI alla volta per atleta; un lease scaduto si riprende. */
