@@ -12,6 +12,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { profileValue } from '../ai-orchestrator/training-constraints';
+import { PROGRAM_WEEKS, horizonForWeeks } from '../discovery/program-horizon';
 
 export class TrainingAvailabilityDto {
   @ApiProperty({ enum: ['0_1', '2_3', '4_5', '6_PLUS'] })
@@ -25,9 +26,9 @@ export class TrainingAvailabilityDto {
   @ApiProperty({ enum: [30, 45, 60, 90, 120] })
   @IsIn([30, 45, 60, 90, 120])
   sessionDurationMinutes!: number;
-  @ApiPropertyOptional({ enum: [4, 12, 52] })
+  @ApiPropertyOptional({ enum: PROGRAM_WEEKS })
   @IsOptional()
-  @IsIn([4, 12, 52])
+  @IsIn([...PROGRAM_WEEKS])
   programDurationWeeks?: number;
   @ApiPropertyOptional({
     type: [Number],
@@ -123,6 +124,7 @@ export class TrainingAvailabilityService {
           where: { userId },
           data: {
             programDurationWeeks: input.programDurationWeeks,
+            programHorizon: horizonForWeeks(input.programDurationWeeks),
             durationSelectedAt: new Date(),
           },
         });

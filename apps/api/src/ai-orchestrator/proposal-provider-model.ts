@@ -1,3 +1,4 @@
+import type { ProgramWeeks } from '../discovery/program-horizon';
 export type AiScaleConfig = {
   minScore: number;
   maxScore: number;
@@ -371,7 +372,8 @@ export type ScheduleConstraints = {
   prescription: { minSessionsPerWeek: number; maxSessionsPerWeek: number };
 };
 export type TrainingConstraints = ScheduleConstraints & {
-  programDurationWeeks: 4 | 12 | 52;
+  /** Orizzonte di 3, 6 o 12 mesi espresso in settimane. */
+  programDurationWeeks: ProgramWeeks;
   operationalWindowDays: 14;
 };
 export type TrainingWindow = {

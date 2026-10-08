@@ -5,6 +5,7 @@ import { AssessmentIntro } from "./assessment-intro";
 import { ConsentStep } from "./consent-step";
 import { ProvisionalEvaluation } from "./provisional-evaluation";
 import { CalibrationPanel } from "./calibration-panel";
+import { ScenariosReveal } from "./scenarios-reveal";
 import { DurationStep, PerformanceResult } from "./performance-result";
 import { useJourney } from "./use-journey";
 import "./journey.css";
@@ -142,6 +143,13 @@ export default function JourneyPage() {
                 onAnswer={(roundId, answers) =>
                   void action("calibration/answers", { roundId, answers })
                 }
+              />
+            )}
+            {j.scenarios && (
+              <ScenariosReveal
+                scenarios={j.scenarios}
+                busy={busy}
+                onSelect={(horizon) => void action("horizon", { horizon })}
               />
             )}
           </>

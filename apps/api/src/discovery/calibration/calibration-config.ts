@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
+import { hasEntitlement } from '../../payments/subscription-transitions';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   CalibrationSettings,
@@ -47,23 +48,33 @@ export async function updateCalibrationSettings(
 
 /**
  * Chi è entrato in calibrazione non ottiene il programma (baseline e piano) dal
- * flusso precedente, nemmeno a calibrazione completata: la sequenza è
- * calibrazione → P3/P6/P12 → Program Horizon → paywall (slice successive).
+ * flusso precedente, nemmeno a calibrazione completata o con l'orizzonte
+ * scelto (PAYWALL_READY): la sequenza è calibrazione → P3/P6/P12 → Program
+ * Horizon → paywall. Lo sblocca solo un abbonamento con entitlement attivo.
  * Il back office può riaprirlo (decisione 13). Gli atleti senza valutazione AI
  * seguono ancora il flusso precedente finché non arriva il paywall (gap 1.10).
  */
 export async function assertProgramAllowed(
-  prisma: Pick<PrismaService, 'calibrationConfig' | 'assessmentEvaluation'>,
+  prisma: Pick<
+    PrismaService,
+    'calibrationConfig' | 'assessmentEvaluation' | 'subscription'
+  >,
   userId: string,
+  now = new Date(),
 ) {
-  const [evaluation, settings] = await Promise.all([
+  const [evaluation, settings, subscriptions] = await Promise.all([
     prisma.assessmentEvaluation.findFirst({
       where: { userId },
       select: { id: true },
     }),
     loadCalibrationSettings(prisma),
+    prisma.subscription.findMany({
+      where: { userId, status: { in: ['ACTIVE', 'PAYMENT_GRACE'] } },
+      select: { status: true, entitlementEndAt: true, graceEndsAt: true },
+    }),
   ]);
   if (!evaluation || settings.programBeforePaywall) return;
+  if (subscriptions.some((s) => hasEntitlement(s, now))) return;
   throw new ConflictException({
     code: 'PROGRAM_LOCKED_BEFORE_PAYWALL',
     message:

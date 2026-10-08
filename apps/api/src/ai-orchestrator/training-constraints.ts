@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { isProgramWeeks } from '../discovery/program-horizon';
 import { LifecycleError } from '../training-lifecycle/training-lifecycle.policy';
 import { TrainingConstraints } from './proposal-provider-model';
 
@@ -122,11 +123,7 @@ export class TrainingConstraintsService {
     const programDurationWeeks =
       discovery?.programDurationWeeks ??
       Number(profileValue(assessment?.profileJson, 'program_duration_weeks'));
-    if (
-      programDurationWeeks !== 4 &&
-      programDurationWeeks !== 12 &&
-      programDurationWeeks !== 52
-    )
+    if (!isProgramWeeks(programDurationWeeks))
       throw new LifecycleError('TRAINING_PROGRAM_REQUIRED');
     const { currentFrequency, availability } = trainingAvailability(
       assessment?.profileJson,

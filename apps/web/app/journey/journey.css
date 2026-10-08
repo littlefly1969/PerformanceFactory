@@ -272,3 +272,24 @@
   line-height: 24px;
   margin-bottom: 12px;
 }
+
+.pf4 .pf4-scenario-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  margin: 16px 0;
+}
+.pf4 .pf4-scenario {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 12px;
+  padding: 16px;
+}
+.pf4 .pf4-scenario.is-selected {
+  border-color: currentColor;
+  box-shadow: 0 0 0 2px currentColor inset;
+}
+.pf4 .pf4-scenario ul,
+.pf4 .pf4-offer {
+  list-style: none;
+  padding: 0;
+}

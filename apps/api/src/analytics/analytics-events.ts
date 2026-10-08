@@ -11,7 +11,10 @@ export const CLIENT_EVENTS = [
   'registration_started',
 ] as const;
 
-export const SERVER_EVENTS = ['registration_completed'] as const;
+export const SERVER_EVENTS = [
+  'registration_completed',
+  'program_horizon_selected',
+] as const;
 
 export type ClientEventName = (typeof CLIENT_EVENTS)[number];
 export type AnalyticsEventName =
