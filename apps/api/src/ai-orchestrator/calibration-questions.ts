@@ -12,7 +12,6 @@ export const DEFAULT_CALIBRATION_PROMPT = [
   'Sei il motore di calibrazione di Performance Factory. Dopo la prima valutazione di un atleta amatoriale maggiorenne ricevi, per i driver con la confidenza più bassa, lo score R provvisorio, la confidenza, le lacune di evidenza indicate dalla valutazione e le domande già fatte.',
   'Scrivi nuove domande a scelta singola che riducano proprio quelle lacune: comportamenti concreti, frequenze, situazioni di gioco, risultati misurabili. Evita domande già fatte o equivalenti.',
   'Ogni opzione ha uno score di riferimento sulla scala ricevuta: deve ancorare la risposta al livello reale, non premiare la risposta più lunga. Le opzioni coprono tutta la scala e sono mutuamente esclusive.',
-  'Puoi chiedere un micro-test pratico che l’atleta svolge da solo in pochi minuti e poi descrive scegliendo un’opzione, senza attrezzi particolari e senza rischi.',
   "Nel round di chiusura copri tutti i driver ricevuti con le domande più informative: è l'ultima occasione prima di consolidare R.",
   'Scrivi in italiano, con il tu, frasi brevi. Niente diagnosi mediche, niente dati personali, niente promesse di risultato.',
 ].join('\n');
@@ -63,6 +62,7 @@ function formatRules(input: CalibrationQuestionsInput) {
     'FORMATO DI RISPOSTA (fisso): rispondi solo con JSON conforme allo schema.',
     `- questions: esattamente ${input.questionsPerDriver} domande per ciascuno dei ${input.targets.length} driver ricevuti, con lo stesso areaId.`,
     `- text: massimo ${CALIBRATION_LIMITS.question} caratteri.`,
+    '- solo domande su comportamenti, frequenze e situazioni di gioco già vissute: niente micro-test, esercizi o prove da svolgere, che l’atleta riceve a parte nel pannello della lezione gratuita. Questa regola prevale sulle istruzioni sopra.',
     `- options: da ${CALIBRATION_LIMITS.minOptions} a ${CALIBRATION_LIMITS.maxOptions}, label di massimo ${CALIBRATION_LIMITS.option} caratteri, score tra ${input.scale.minScore} e ${input.scale.maxScore}.`,
   ].join('\n');
 }

@@ -145,7 +145,8 @@ prossimo round) durante la fase `EVALUATION`.
 - `/ai-tuner/prompts/calibrazione`: prompt delle domande, con le stesse regole di
   bozza, attivazione e versione del prompt di valutazione (`promptType =
   CALIBRATION_QUESTIONS`). **Prova la bozza** usa un caso sintetico con due driver a
-  confidence bassa.
+  confidence bassa. Una regola fissa del formato esclude micro-test ed esercizi
+  dalle domande: arrivano a parte nel pannello della lezione gratuita.
 - `/ai-tuner/prompts/micro-test`: prompt dei micro-test su misura della lezione
   gratuita (`promptType = MICRO_TESTS`), stesso ciclo di vita; vedi
   `docs/lezione-gratuita.md`.
