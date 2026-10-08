@@ -268,7 +268,11 @@ export class FreeLessonAdminService {
         throw new ConflictException('L’atleta ha scelto un altro circolo');
       if (taken >= lesson.capacity)
         throw new ConflictException('La lezione è al completo');
-      if (calibration?.status !== 'FREE_LEVEL_ESTIMATED')
+      // Dalla richiesta la calibrazione aspetta già la lezione.
+      if (
+        calibration?.status !== 'FREE_LEVEL_ESTIMATED' &&
+        calibration?.status !== 'FREE_LESSON_VALIDATION'
+      )
         throw new ConflictException(
           'Serve il livello stimato con la calibrazione ancora aperta',
         );
@@ -292,7 +296,7 @@ export class FreeLessonAdminService {
     });
   }
 
-  /** Toglie l'atleta dal gruppo: la richiesta resta, R torna a poter chiudersi. */
+  /** Toglie l'atleta dal gruppo: la richiesta resta e R continua ad aspettare la lezione. */
   async unassign(lessonId: string, userId: string) {
     await this.prisma.$transaction(async (tx) => {
       await lockLesson(tx, lessonId);

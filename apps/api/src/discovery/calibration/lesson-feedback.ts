@@ -6,6 +6,7 @@ import { saveEvaluation } from '../assessment-evaluation';
 import { completeCalibration } from './calibration-completion';
 import { loadCalibrationSettings } from './calibration-config';
 import { CalibrationStatus, statusAfterEvaluation } from './calibration-rules';
+import { loadActivePolicy } from './confidence-policy';
 import {
   addLessonEvidence,
   isCalibrationOpen,
@@ -33,8 +34,8 @@ export function linkFeedback(
 
 /**
  * Nuova valutazione con il feedback del coach ancora in attesa: R e confidence
- * si aggiornano con la fonte COACH_LESSON e, senza più attesa della lezione,
- * la soglia può chiudere la calibrazione. Va chiamata sotto il lease
+ * si aggiornano con la fonte COACH_LESSON e la regola di consolidamento può
+ * chiudere la calibrazione. Va chiamata sotto il lease
  * dell'atleta. Restituisce true se ha salvato una valutazione.
  */
 export async function evaluatePendingFeedback(
@@ -55,7 +56,10 @@ export async function evaluatePendingFeedback(
   const input = await buildInput(rounds);
   const feedbackIds = await addLessonEvidence(prisma, userId, input);
   const result = await ai.evaluateAssessment(input);
-  const settings = await loadCalibrationSettings(prisma);
+  const [settings, policy] = await Promise.all([
+    loadCalibrationSettings(prisma),
+    loadActivePolicy(prisma, 'R_CONSOLIDATION'),
+  ]);
   const now = new Date();
   return prisma.$transaction(async (tx) => {
     await lockCalibration(tx, userId);
@@ -76,22 +80,24 @@ export async function evaluatePendingFeedback(
     const saved = await saveEvaluation(tx, userId, input, result, {
       sequence: last.sequence + 1,
       source: 'COACH_LESSON',
+      consolidationPolicyId: policy.id,
     });
     await linkFeedback(tx, feedbackIds, saved.id);
     const next = statusAfterEvaluation(
       current.status as CalibrationStatus,
-      {
-        levelConfidence: result.output.levelConfidence,
-        drivers: result.output.drivers,
-      },
+      result.output,
       settings,
-      'ADAPTIVE',
+      policy,
       await isLessonPending(tx, userId),
     );
-    const reason =
-      next.completionReason ??
-      (current.deadlineAt <= now ? 'DEADLINE_REACHED' : undefined);
-    if (reason) await completeCalibration(tx, userId, reason, now);
+    if (next.completionReason)
+      await completeCalibration(
+        tx,
+        userId,
+        next.completionReason,
+        now,
+        policy.id,
+      );
     else
       await tx.athleteCalibration.update({
         where: { userId },

@@ -104,7 +104,9 @@ describe('Free lesson with PostgreSQL', () => {
         userId: id,
         sequence: 1,
         summary: 's',
-        overallConfidence: 50,
+        overallConfidence: Math.round(
+          confidences.reduce((sum, c) => sum + c, 0) / confidences.length,
+        ),
         level: 'INTERMEDIATE',
         levelConfidence: 60,
         minScore: 0,
@@ -343,6 +345,14 @@ describe('Free lesson with PostgreSQL', () => {
       where: { userId: id },
     });
     expect(seat.status).toBe('REQUESTED');
+    // Già dalla richiesta la lezione è il passaggio che chiude R e P, e
+    // l'admin può assegnare il posto.
+    expect(await status(id)).toBe('FREE_LESSON_VALIDATION');
+    await admin.assign(await lesson(), id);
+    expect(
+      (await prisma.freeLessonSeat.findUniqueOrThrow({ where: { userId: id } }))
+        .status,
+    ).toBe('ASSIGNED');
     await updateFreeLessonSettings(
       prisma,
       { creditsToUnlock: DEFAULT_FREE_LESSON_SETTINGS.creditsToUnlock },
@@ -350,7 +360,7 @@ describe('Free lesson with PostgreSQL', () => {
     );
   });
 
-  it('never fills a lesson beyond its capacity under concurrent assignments, and cancel releases every hold', async () => {
+  it('never fills a lesson beyond its capacity under concurrent assignments, and cancel keeps the request pending', async () => {
     const ids = await Promise.all(
       Array.from({ length: 5 }, () => requested([40, 50])),
     );
@@ -381,7 +391,9 @@ describe('Free lesson with PostgreSQL', () => {
           })
         ).status,
       ).toBe('REQUESTED');
-      expect(await status(id)).toBe('FREE_LEVEL_ESTIMATED');
+      // La richiesta resta: R continua ad aspettare la lezione.
+      if (seats.some((seat) => seat.userId === id))
+        expect(await status(id)).toBe('FREE_LESSON_VALIDATION');
     }
   });
 
@@ -532,6 +544,14 @@ describe('Free lesson with PostgreSQL', () => {
     await admin.assign(lessonId, id);
     await athletes.withdraw(id);
     expect(await status(id)).toBe('FREE_LEVEL_ESTIMATED');
+    // Anche una richiesta mai assegnata, ritirata, libera R.
+    const pending = await requested([40, 50]);
+    await prisma.athleteCalibration.update({
+      where: { userId: pending },
+      data: { status: 'FREE_LESSON_VALIDATION' },
+    });
+    await athletes.withdraw(pending);
+    expect(await status(pending)).toBe('FREE_LEVEL_ESTIMATED');
     const other = await requested([40, 50]);
     await admin.assign(lessonId, other);
     expect(

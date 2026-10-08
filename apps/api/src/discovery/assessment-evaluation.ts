@@ -131,7 +131,12 @@ export function saveEvaluation(
   userId: string,
   input: AssessmentEvaluationInput,
   result: AssessmentEvaluationResult,
-  meta: { sequence: number; source: string; status?: string },
+  meta: {
+    sequence: number;
+    source: string;
+    status?: string;
+    consolidationPolicyId?: string;
+  },
 ) {
   return prisma.assessmentEvaluation.create({
     data: {
@@ -139,6 +144,9 @@ export function saveEvaluation(
       sequence: meta.sequence,
       source: meta.source,
       ...(meta.status ? { status: meta.status } : {}),
+      ...(meta.consolidationPolicyId
+        ? { consolidationPolicyId: meta.consolidationPolicyId }
+        : {}),
       summary: result.output.summary,
       overallConfidence: result.output.overallConfidence,
       level: result.output.level,

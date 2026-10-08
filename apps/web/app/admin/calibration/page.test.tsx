@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
@@ -24,67 +24,150 @@ vi.mock("@/app/lib/api", () => ({
 }));
 
 const settings = {
-  confidenceThreshold: 70,
   levelConfidenceThreshold: 50,
   maxDays: 30,
-  closingDay: 25,
   questionsPerDriver: 2,
   driversPerRound: 2,
-  minHoursBetweenRounds: 20,
   programBeforePaywall: false,
 };
+
+const version = (version: number, rule: Record<string, number | null>) => ({
+  id: `v${version}`,
+  version,
+  note: null,
+  createdAt: "2026-10-08T08:00:00.000Z",
+  createdBy: "admin@example.test",
+  minOverallConfidence: null,
+  minAreaConfidence: null,
+  minAreasAtConfidence: null,
+  ...rule,
+});
+const policies = () => [
+  {
+    kind: "R_CONSOLIDATION",
+    active: version(1, { minOverallConfidence: 70, minAreaConfidence: 70 }),
+    versions: [version(1, { minOverallConfidence: 70, minAreaConfidence: 70 })],
+  },
+  {
+    kind: "LESSON_ELIGIBILITY",
+    active: version(1, { minOverallConfidence: 50 }),
+    versions: [version(1, { minOverallConfidence: 50 })],
+  },
+];
+
+/** Risposte del server: parametri e regole; i POST pubblicano una versione. */
+const server = (
+  onPut: (body: Record<string, unknown>) => Response,
+  posts: { url: string; body: Record<string, unknown> }[] = [],
+) =>
+  vi.fn(async (url: string, init?: RequestInit) => {
+    if (url.endsWith("/admin/confidence-policies"))
+      return new Response(JSON.stringify(policies()));
+    if (init?.method === "POST") {
+      const body = JSON.parse(String(init.body));
+      posts.push({ url, body });
+      if (body.minOverallConfidence === null && body.minAreaConfidence === null)
+        return new Response(
+          JSON.stringify({ message: "Indica almeno una soglia di confidence" }),
+          { status: 400 },
+        );
+      return new Response(JSON.stringify({ ...body, version: 2 }));
+    }
+    if (init?.method === "PUT") return onPut(JSON.parse(String(init.body)));
+    return new Response(JSON.stringify(settings));
+  });
 
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
 
-it("saves the calibration parameters and shows the server's refusal", async () => {
-  const puts: Record<string, number | boolean>[] = [];
+it("saves the calibration parameters, without time-based fields, and shows the server's refusal", async () => {
+  const puts: Record<string, unknown>[] = [];
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (_url: string, init?: RequestInit) => {
-      if (init?.method !== "PUT") return new Response(JSON.stringify(settings));
-      const body = JSON.parse(String(init.body));
+    server((body) => {
       puts.push(body);
-      if (body.closingDay > body.maxDays)
+      if (Number(body.levelConfidenceThreshold) > 100)
         return new Response(
-          JSON.stringify({
-            message: [
-              "Il giorno di chiusura non può superare la durata massima",
-            ],
-          }),
+          JSON.stringify({ message: ["La soglia del livello va da 1 a 100"] }),
           { status: 400 },
         );
       return new Response(JSON.stringify(body));
     }),
   );
   render(<Page />);
-  const threshold = await screen.findByLabelText(
-    /Soglia di confidence per driver/,
-  );
-  await userEvent.clear(threshold);
-  await userEvent.type(threshold, "80");
+  const level = await screen.findByLabelText(/Soglia per il livello stimato/);
+  // AT-10: nessuna attesa fra i round né giorno di chiusura da impostare.
+  expect(screen.queryByLabelText(/Ore minime/)).toBeNull();
+  expect(screen.queryByLabelText(/assessment di chiusura/)).toBeNull();
+  await userEvent.clear(level);
+  await userEvent.type(level, "60");
   await userEvent.click(
     screen.getByRole("button", { name: "Salva parametri" }),
   );
   expect(puts[0]).toMatchObject({
-    confidenceThreshold: 80,
+    levelConfidenceThreshold: 60,
     maxDays: 30,
     programBeforePaywall: false,
   });
+  expect(puts[0]).not.toHaveProperty("confidenceThreshold");
   expect(await screen.findByText(/Parametri salvati/)).toBeVisible();
 
-  const closing = screen.getByLabelText(/Giorno dell'assessment di chiusura/);
-  await userEvent.clear(closing);
-  await userEvent.type(closing, "40");
+  await userEvent.clear(level);
+  await userEvent.type(level, "140");
   await userEvent.click(
     screen.getByRole("button", { name: "Salva parametri" }),
   );
   expect(
-    await screen.findByText(
-      "Il giorno di chiusura non può superare la durata massima",
-    ),
+    await screen.findByText("La soglia del livello va da 1 a 100"),
+  ).toBeVisible();
+});
+
+it("publishes a new version of a confidence rule, separately for lesson and consolidation", async () => {
+  const posts: { url: string; body: Record<string, unknown> }[] = [];
+  vi.stubGlobal(
+    "fetch",
+    server(() => new Response("{}"), posts),
+  );
+  render(<Page />);
+  const consolidation = await screen.findByRole("region", {
+    name: "Consolidamento di R",
+  });
+  expect(consolidation).toHaveTextContent(
+    "versione 1, complessiva ≥ 70 e tutte le aree ≥ 70",
+  );
+  expect(
+    screen.getByRole("region", { name: "Eleggibilità alla lezione gratuita" }),
+  ).toHaveTextContent("complessiva ≥ 50");
+  const [overall] = within(consolidation).getAllByRole("spinbutton");
+  await userEvent.clear(overall);
+  await userEvent.type(overall, "75");
+  await userEvent.click(
+    within(consolidation).getByRole("button", {
+      name: "Pubblica nuova versione",
+    }),
+  );
+  expect(posts[0]).toEqual({
+    url: "/api/admin/confidence-policies/R_CONSOLIDATION",
+    body: {
+      minOverallConfidence: 75,
+      minAreaConfidence: 70,
+      minAreasAtConfidence: null,
+    },
+  });
+
+  // Una regola senza soglie viene rifiutata dal server, il messaggio resta visibile.
+  const lesson = screen.getByRole("region", {
+    name: "Eleggibilità alla lezione gratuita",
+  });
+  const [lessonOverall] = within(lesson).getAllByRole("spinbutton");
+  await userEvent.clear(lessonOverall);
+  await userEvent.click(
+    within(lesson).getByRole("button", { name: "Pubblica nuova versione" }),
+  );
+  expect(
+    await within(lesson).findByText("Indica almeno una soglia di confidence"),
   ).toBeVisible();
 });
 
@@ -92,9 +175,7 @@ it("turns on training during calibration only when the admin ticks it", async ()
   const puts: Record<string, unknown>[] = [];
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (_url: string, init?: RequestInit) => {
-      if (init?.method !== "PUT") return new Response(JSON.stringify(settings));
-      const body = JSON.parse(String(init.body));
+    server((body) => {
       puts.push(body);
       return new Response(JSON.stringify(body));
     }),

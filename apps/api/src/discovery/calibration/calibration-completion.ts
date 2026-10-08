@@ -1,18 +1,19 @@
 import { Prisma } from '@prisma/client';
-import {
-  CLOSED_CALIBRATION_STATUSES,
-  isCalibrationClosed,
-} from './calibration-rules';
+import { CLOSED_CALIBRATION_STATUSES } from './calibration-rules';
 
-export type CompletionReason =
-  | 'CONFIDENCE_REACHED'
-  | 'CLOSING_ASSESSMENT'
-  | 'DEADLINE_REACHED';
+/**
+ * Unico motivo di chiusura: la regola di consolidamento soddisfatta. Le
+ * chiusure per scadenza o round di chiusura (CLOSING_ASSESSMENT,
+ * DEADLINE_REACHED) restano solo nello storico (PF-FS-PREPAYWALL §7.2).
+ */
+export type CompletionReason = 'CONFIDENCE_REACHED';
 
 /**
  * Chiude la calibrazione e consolida l'ultima valutazione nella stessa
- * transazione, così stato del percorso e valutazione non divergono. I valori
- * restano quelli stimati: nessuna confidence viene alzata o inventata.
+ * transazione, così stato del percorso e valutazione non divergono. Va
+ * chiamata solo quando l'ultima valutazione soddisfa la regola indicata, che
+ * resta registrata come base del consolidamento. I valori restano quelli
+ * stimati: nessuna confidence viene alzata o inventata.
  * Restituisce false se la calibrazione era già chiusa.
  */
 export async function completeCalibration(
@@ -20,6 +21,7 @@ export async function completeCalibration(
   userId: string,
   reason: CompletionReason,
   now: Date,
+  policyId: string,
 ) {
   const closed = await tx.athleteCalibration.updateMany({
     where: { userId, status: { notIn: [...CLOSED_CALIBRATION_STATUSES] } },
@@ -27,6 +29,7 @@ export async function completeCalibration(
       status: 'CALIBRATION_COMPLETED',
       completedAt: now,
       completionReason: reason,
+      consolidationPolicyId: policyId,
     },
   });
   if (!closed.count) return false;
@@ -38,33 +41,7 @@ export async function completeCalibration(
   if (latest)
     await tx.assessmentEvaluation.update({
       where: { id: latest.id },
-      data: { status: 'CONSOLIDATED' },
+      data: { status: 'CONSOLIDATED', consolidationPolicyId: policyId },
     });
   return true;
-}
-
-/**
- * Tetto della calibrazione: alla scadenza i round non ancora valutati scadono e
- * si consolida con i dati disponibili. Va chiamata sotto il lease dell'atleta.
- */
-export async function closeAtDeadline(
-  tx: Prisma.TransactionClient,
-  userId: string,
-  now: Date,
-) {
-  const calibration = await tx.athleteCalibration.findUnique({
-    where: { userId },
-    select: { status: true, deadlineAt: true },
-  });
-  if (
-    !calibration ||
-    isCalibrationClosed(calibration.status) ||
-    calibration.deadlineAt > now
-  )
-    return false;
-  await tx.calibrationRound.updateMany({
-    where: { userId, status: { in: ['OPEN', 'EVALUATING'] } },
-    data: { status: 'EXPIRED', evaluationToken: null },
-  });
-  return completeCalibration(tx, userId, 'DEADLINE_REACHED', now);
 }

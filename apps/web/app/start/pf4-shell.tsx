@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { LogoutButton } from "../components/logout-button";
 import "./pf4.css";
 import "./pf4-desktop.css";
 import "../journey/journey.css";
@@ -9,12 +10,14 @@ export function PF4Shell({
   progress = 0,
   total = 0,
   onBack,
+  showLogout = false,
 }: {
   children: ReactNode;
   label?: string;
   progress?: number;
   total?: number;
   onBack?: () => void;
+  showLogout?: boolean;
 }) {
   return (
     <main className="pf4">
@@ -55,7 +58,9 @@ export function PF4Shell({
           </div>
         </aside>
         <div className="pf4-stage">
-          <header className="pf4-header">
+          <header
+            className={`pf4-header${showLogout ? " pf4-header-with-logout" : ""}`}
+          >
             {onBack ? (
               <button type="button" aria-label="Indietro" onClick={onBack}>
                 ←
@@ -64,7 +69,7 @@ export function PF4Shell({
               <span />
             )}
             <span>{label}</span>
-            <span />
+            {showLogout ? <LogoutButton className="pf4-logout" /> : <span />}
           </header>
           {total > 0 && (
             <div

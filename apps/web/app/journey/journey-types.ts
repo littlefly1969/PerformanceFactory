@@ -62,16 +62,21 @@ export type Calibration = {
     | "CALIBRATION_COMPLETED"
     | "PAYWALL_READY";
   day: number;
-  maxDays: number;
-  confidenceThreshold: number;
+  /** Regola di consolidamento in vigore: solo la confidence chiude R. */
+  consolidationRule: {
+    version: number;
+    minOverallConfidence: number | null;
+    minAreaConfidence: number | null;
+    minAreasAtConfidence: number | null;
+  };
+  /** CLOSING_ASSESSMENT e DEADLINE_REACHED solo per chiusure storiche. */
   completionReason:
     | "CONFIDENCE_REACHED"
     | "CLOSING_ASSESSMENT"
     | "DEADLINE_REACHED"
     | null;
   roundsCompleted: number;
-  nextRoundKind: "ADAPTIVE" | "CLOSING" | null;
-  nextRoundAt: string | null;
+  nextRoundKind: "ADAPTIVE" | null;
   round: {
     id: string;
     kind: "ADAPTIVE" | "CLOSING";

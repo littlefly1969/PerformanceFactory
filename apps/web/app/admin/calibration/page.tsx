@@ -3,15 +3,13 @@
 import { useEffect, useState } from "react";
 import { ProductShell } from "@/app/components/product-shell";
 import { API_BASE, secureFetch } from "@/app/lib/api";
+import { ConfidencePolicies } from "./confidence-policies";
 
 type Settings = {
-  confidenceThreshold: number;
   levelConfidenceThreshold: number;
   maxDays: number;
-  closingDay: number;
   questionsPerDriver: number;
   driversPerRound: number;
-  minHoursBetweenRounds: number;
   programBeforePaywall: boolean;
 };
 
@@ -20,24 +18,14 @@ type NumericKey = Exclude<keyof Settings, "programBeforePaywall">;
 
 const FIELDS: { key: NumericKey; label: string; hint: string }[] = [
   {
-    key: "confidenceThreshold",
-    label: "Soglia di confidence per driver",
-    hint: "La calibrazione si chiude quando ogni driver la raggiunge (0-100).",
-  },
-  {
     key: "levelConfidenceThreshold",
     label: "Soglia per il livello stimato",
     hint: "Sopra questa confidence il livello conta come stimato.",
   },
   {
     key: "maxDays",
-    label: "Durata massima in giorni",
-    hint: "Regola dei ~30 giorni del Blueprint.",
-  },
-  {
-    key: "closingDay",
-    label: "Giorno dell'assessment di chiusura",
-    hint: "Da questo giorno il round successivo è quello di chiusura.",
+    label: "Durata indicativa in giorni",
+    hint: "Riferimento dei ~30 giorni del Blueprint: non chiude e non consolida R.",
   },
   {
     key: "driversPerRound",
@@ -48,11 +36,6 @@ const FIELDS: { key: NumericKey; label: string; hint: string }[] = [
     key: "questionsPerDriver",
     label: "Domande per driver",
     hint: "Domande scritte dall'AI per ogni driver del round.",
-  },
-  {
-    key: "minHoursBetweenRounds",
-    label: "Ore minime tra due round",
-    hint: "Ritmo delle domande nei giorni di calibrazione.",
   },
 ];
 
@@ -100,8 +83,9 @@ export default function AdminCalibrationPage() {
     <ProductShell
       eyebrow="Amministrazione percorso"
       title="Calibrazione gratuita"
-      description="Soglia di confidence e tempi della fase gratuita dopo la prima valutazione. Sono parametri provvisori: la soglia definitiva è una decisione aperta (A4-D01)."
+      description="Regole di confidence e parametri dei round della fase gratuita. I valori sono provvisori: le soglie definitive sono decisioni aperte (A4-D01, PF-FS-PREPAYWALL OP-02 e OP-03)."
     >
+      <ConfidencePolicies />
       {message && <div className="pf-alert warning">{message}</div>}
       {settings && (
         <section className="pf-panel">

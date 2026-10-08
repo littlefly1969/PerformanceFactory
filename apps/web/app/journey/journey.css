@@ -44,6 +44,9 @@
 .pf4-assessment .pf4-header {
   color: #bfc4b8;
 }
+.pf4-assessment .pf4-header .pf4-logout {
+  color: #fff;
+}
 .pf4-assessment .pf4-progress .is-done {
   background: #c8f02e;
 }
