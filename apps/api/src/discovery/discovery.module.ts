@@ -10,6 +10,7 @@ import { PartnersModule } from '../partners/partners.module';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { DiscoveryController } from './discovery.controller';
 import { DiscoveryService } from './discovery.service';
+import { QuizDraftService } from './quiz-draft.service';
 import { AthleteRegistrationService } from './athlete-registration.service';
 import { CalibrationService } from './calibration/calibration.service';
 import { CalibrationAdminController } from './calibration/calibration-admin.controller';
@@ -34,6 +35,7 @@ import { AssessmentAnomalyAdminController } from './calibration/assessment-anoma
   ],
   providers: [
     DiscoveryService,
+    QuizDraftService,
     AthleteRegistrationService,
     AthleteJourneyService,
     CalibrationService,

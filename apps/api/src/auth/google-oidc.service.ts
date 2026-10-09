@@ -237,6 +237,7 @@ export class GoogleOidcService {
     req: SessionCarrier,
     input: {
       discovery?: unknown;
+      quizToken?: string;
       adultConfirmed?: boolean;
       attribution?: AttributionInput;
       marketingAccepted?: boolean;
@@ -289,6 +290,7 @@ export class GoogleOidcService {
         lastName: pending.familyName || 'Google',
         password: `google:${pending.subject}:${this.randomToken()}`,
         discovery: input.discovery,
+        quizToken: input.quizToken,
         adultConfirmed: input.adultConfirmed,
         attribution: input.attribution,
       },

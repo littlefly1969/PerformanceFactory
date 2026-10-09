@@ -52,6 +52,7 @@ function mockConfig(configuration = config) {
 afterEach(() => {
   cleanup();
   window.sessionStorage.clear();
+  window.localStorage.clear();
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
@@ -81,7 +82,7 @@ describe("PF4 configured journey", () => {
     await screen.findByRole("heading", { name: "Altra domanda configurata" });
     await userEvent.click(screen.getByRole("button", { name: "No" }));
     await screen.findByRole("heading", {
-      name: "Analizziamo le tue risposte…",
+      name: "Raccogliamo le tue risposte…",
     });
     await act(() =>
       vi.advanceTimersByTimeAsync(DISCOVERY_ANALYSIS_MIN_DURATION_MS),
@@ -196,7 +197,7 @@ it("allows skipping an optional choice without opening its conditional branch", 
   );
   await userEvent.click(screen.getByRole("button", { name: "Continua" }));
   expect(
-    screen.getByRole("heading", { name: "Analizziamo le tue risposte…" }),
+    screen.getByRole("heading", { name: "Raccogliamo le tue risposte…" }),
   ).toBeInTheDocument();
   expect(JSON.parse(sessionStorage.getItem(DRAFT_KEY)!).answers).toEqual({});
 });
@@ -279,12 +280,16 @@ describe("PF5 pre-account experience", () => {
     await act(() => vi.advanceTimersByTimeAsync(0));
     const phase = () => screen.getByRole("heading", { level: 1 });
     const header = () => document.querySelector(".pf4-header");
-    expect(phase()).toHaveTextContent("Analizziamo le tue risposte…");
+    expect(phase()).toHaveTextContent("Raccogliamo le tue risposte…");
     expect(header()).toHaveTextContent("Misure");
     await act(() => vi.advanceTimersByTimeAsync(1300));
-    expect(phase()).toHaveTextContent("Organizziamo il tuo profilo…");
+    expect(phase()).toHaveTextContent(
+      "Mettiamo in ordine i dati che ci hai dato…",
+    );
     await act(() => vi.advanceTimersByTimeAsync(1300));
-    expect(phase()).toHaveTextContent("Prepariamo il tuo punto di partenza…");
+    expect(phase()).toHaveTextContent(
+      "Prepariamo il riepilogo del tuo profilo…",
+    );
     await act(() =>
       vi.advanceTimersByTimeAsync(DISCOVERY_ANALYSIS_MIN_DURATION_MS - 2601),
     );

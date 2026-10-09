@@ -49,3 +49,5 @@ Il motore di visibilità è mantenuto coerente in API e frontend con test equiva
 ## Accesso e ripresa del percorso
 
 La pagina `/login` offre email/password, il pulsante **Accedi con Google** e **Fai il quiz** verso `/start`. Dopo il login la home risolve il ruolo e, per gli atleti, lo stato di `/auth/journey`. Non esiste più il fallback al wizard legacy: `/onboarding` reindirizza a `/journey`. Se il journey manca o il servizio non risponde, viene mostrato un errore con possibilità di riprovare. I servizi backend onboarding rimangono usati per la validazione finale e la baseline.
+
+Prima dell'account il quiz si riprende dalla bozza salvata sul server per 7 giorni dall'ultima risposta, sulla versione delle domande con cui è iniziato; la registrazione Google la collega allo stesso modo dell'email. Dettagli in `docs/discovery-pf5.md`, sezione Persistenza.

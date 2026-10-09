@@ -18,15 +18,16 @@ filtrati dalle condizioni di visibilità (`visibleQuestions()`).
 ## Analisi
 
 `AnalysisTransition` (`apps/web/app/start/analysis-transition.tsx`) è una
-transizione di interfaccia, **non** una valutazione AI. Il passaggio al risultato
+transizione di interfaccia, **non** una valutazione AI, e i messaggi non
+promettono un'analisi che non avviene. Il passaggio al risultato
 avviene dopo `DISCOVERY_ANALYSIS_MIN_DURATION_MS` (4000 ms), con un timer che non
 dipende dalla velocità del dispositivo. Nella stessa pagina scorrono tre fasi:
 
-| Tempo | Messaggio |
-|---|---|
-| 0 s | Analizziamo le tue risposte… |
-| 1,3 s | Organizziamo il tuo profilo… |
-| 2,6 s | Prepariamo il tuo punto di partenza… |
+| Tempo | Messaggio                                  |
+| ----- | ------------------------------------------ |
+| 0 s   | Raccogliamo le tue risposte…               |
+| 1,3 s | Mettiamo in ordine i dati che ci hai dato… |
+| 2,6 s | Prepariamo il riepilogo del tuo profilo…   |
 
 Quando esisterà un'analisi server-side la durata diventerà
 `max(4000 ms, durata elaborazione)`. Con `prefers-reduced-motion` la barra di
@@ -54,13 +55,39 @@ separa due contenuti.
   - Seguono obiettivo, sport e le altre risposte visibili. Altezza e peso non
     si ripetono, perché sono già rappresentati dal BMI.
 
-## Persistenza invariata
+## Persistenza
 
-Prima dell'account la bozza resta in `sessionStorage`. La registrazione invia
-`discovery: draft` e il backend salva in `AthleteDiscovery` sia la bozza sia la
-configurazione esatta usata. Una modifica successiva delle domande non
-reinterpreta le discovery già salvate. Assessment e generazione training
-continuano a consumare `answersJson`, `profileJson` e snapshot come prima.
+Prima dell'account il quiz vive in due copie (PF-FS-PREPAYWALL F1).
+
+- **Bozza sul server (`QuizDraft`).** Lasciando l'intro, `POST
+/public/quiz-drafts` crea una bozza anonima con la configurazione corrente
+  congelata e restituisce un token casuale. Il token resta in `localStorage`
+  (`pf.quizToken`), il server ne conserva solo l'hash SHA-256. Ogni risposta
+  viene salvata con `PUT /public/quiz-draft` (header `x-quiz-token`, debounce
+  800 ms), validata sulla versione congelata. La bozza scade 7 giorni dopo
+  l'ultimo salvataggio valido: leggerla con `GET` non la proroga, `DELETE` la
+  cancella. Il token non identifica la persona e non entra negli eventi.
+- **Copia di scheda (`sessionStorage`).** Resta la copia più recente nella
+  stessa scheda e il ripiego quando il browser non permette di salvare il
+  token o il server non risponde.
+
+Riaprendo `/start` la pagina riprende prima la bozza del server, sulla sua
+versione congelata, anche se nel frattempo le domande sono cambiate (AT-04).
+La registrazione, email o Google, invia `quizToken` insieme a `discovery`: il
+backend consuma la bozza nella stessa transazione che crea l'account e valida
+le risposte sulla configurazione congelata (AT-06). Un secondo uso dello stesso
+token fallisce con 404; se la bozza è scaduta il client riprova una volta senza
+token, con la configurazione corrente.
+
+`AthleteDiscovery` salva sia la bozza sia la configurazione esatta usata. Una
+modifica successiva delle domande non reinterpreta le discovery già salvate.
+Assessment e generazione training continuano a consumare `answersJson`,
+`profileJson` e snapshot come prima.
+
+## Ingresso da campagna
+
+Con `utm_source`, `utm_campaign`, `club` o `ref` nell'URL e nessuna risposta
+già data, `/start` salta l'intro e apre la prima domanda (A6-D01, AT-01).
 
 ## Verifica
 
