@@ -37,7 +37,6 @@ const input: CalibrationQuestionsInput = {
       focus: false,
     },
   ],
-  microTests: true,
 };
 const step = (
   questions: object[],
@@ -180,22 +179,11 @@ describe('calibration questions', () => {
     expect(problems.join(' ')).toContain(problem);
   });
 
-  it('never accepts a micro-test while the flag is off', () => {
-    const off = { ...input, microTests: false };
-    const problems: string[] = [];
-    expect(
-      validateCalibrationStep(
-        step([], 'PROPOSE_MICRO_TEST', 'tecnica'),
-        off,
-        problems,
-      ),
-    ).toBeNull();
-    expect(problems.join(' ')).toContain('non disponibile');
-    expect(buildCalibrationPrompt(off).system).toContain(
-      'PROPOSE_MICRO_TEST non è disponibile',
-    );
-    expect(buildCalibrationPrompt(input).system).not.toContain(
-      'non è disponibile',
+  it('always offers practical tests, first on drivers without one', () => {
+    const { system } = buildCalibrationPrompt(input);
+    expect(system).not.toContain('non è disponibile');
+    expect(system).toContain(
+      'se un driver con focus true ha microTests vuoto o assente, scegli PROPOSE_MICRO_TEST',
     );
   });
 

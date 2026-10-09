@@ -118,7 +118,7 @@ export function MicroTestCatalog({
       <p className="pf-muted">
         Contenuto amministrativo: l&apos;atleta non li riceve in automatico. I
         micro-test dell&apos;assessment li propone e li scrive l&apos;AI come
-        passo della calibrazione (flag ai_micro_tests).
+        passo della calibrazione, per tutti gli atleti.
       </p>
       <div className="pf-stack">
         {overview.microTests.map((test) => (

@@ -12,7 +12,7 @@ export const DEFAULT_CALIBRATION_PROMPT = [
   'Sei il motore di calibrazione di Performance Factory. Dopo la prima valutazione di un atleta amatoriale maggiorenne ricevi tutti i driver con score R provvisorio, confidenza, lacune di evidenza e domande già fatte; i driver ancora sotto la regola di consolidamento sono marcati come focus.',
   'A ogni passo decidi tu la prossima azione: una sola domanda quando la risposta cambierà la domanda successiva, un gruppo di domande indipendenti quando si possono rispondere insieme, un chiarimento neutro quando due risposte si contraddicono. Non c’è un numero fisso di domande per driver: chiedi solo ciò che riduce davvero una lacuna, e non coprire un driver le cui evidenze bastano già.',
   'Domande a scelta singola su comportamenti concreti, frequenze, situazioni di gioco, risultati misurabili. Evita domande già fatte o equivalenti.',
-  'Quando su un driver le dichiarazioni non bastano e serve un’evidenza diversa (una prova pratica breve che l’atleta svolge e di cui riporta l’esito), proponi un micro-test su quel driver invece di altre domande: lo scrive il preparatore, tu indichi solo il driver e il perché. Non riproporre micro-test già fatti o saltati.',
+  'Le prove pratiche fanno parte della calibrazione: un driver in focus che ha solo dichiarazioni riceve un micro-test (una prova pratica breve che l’atleta svolge e di cui riporta l’esito) prima di altre domande. Lo scrive il preparatore, tu indichi solo il driver e il perché. Non riproporre micro-test già fatti o saltati; quando li ha già, torna alle domande.',
   'Ogni opzione ha uno score di riferimento sulla scala ricevuta: deve ancorare la risposta al livello reale, non premiare la risposta più lunga. Le opzioni coprono tutta la scala e sono mutuamente esclusive.',
   'Scrivi in italiano, con il tu, frasi brevi. Niente diagnosi mediche, niente dati personali, niente promesse di risultato. Un chiarimento non accusa e non rivela sospetti.',
 ].join('\n');
@@ -63,8 +63,6 @@ export type CalibrationQuestionsInput = {
   scale: { minScore: number; maxScore: number };
   athleteContext: AssessmentEvaluationAnswer[];
   targets: CalibrationTarget[];
-  /** Flag `ai_micro_tests`: spento, il motore propone solo domande. */
-  microTests?: boolean;
 };
 
 export type CalibrationQuestion = {
@@ -112,15 +110,11 @@ function formatRules(input: CalibrationQuestionsInput) {
   const l = CALIBRATION_LIMITS;
   return [
     'FORMATO DI RISPOSTA (fisso): rispondi solo con JSON conforme allo schema.',
-    ...(input.microTests
-      ? []
-      : [
-          '- PROPOSE_MICRO_TEST non è disponibile per questo atleta: scegli solo tra le domande.',
-        ]),
     '- action: ASK_SINGLE (esattamente 1 domanda), ASK_GROUP (da 2 a ' +
       `${l.maxQuestions} domande indipendenti), REQUEST_CLARIFICATION (esattamente 1 domanda neutra su una contraddizione) oppure PROPOSE_MICRO_TEST (nessuna domanda, microTestAreaId del driver).`,
     '- questions: solo sui driver con focus true, con il loro areaId; non serve coprirli tutti.',
     '- microTestAreaId: l’areaId di un driver con focus true solo con PROPOSE_MICRO_TEST, altrimenti null.',
+    '- se un driver con focus true ha microTests vuoto o assente, scegli PROPOSE_MICRO_TEST su quel driver invece di altre domande, un driver per passo. Questa regola prevale sulle istruzioni sopra.',
     `- rationale: perché questo passo, in una frase di massimo ${l.rationale} caratteri, senza dati personali.`,
     `- text: massimo ${l.question} caratteri.`,
     '- le domande sono solo su comportamenti, frequenze e situazioni di gioco già vissute: niente micro-test, esercizi o prove da svolgere dentro una domanda; una prova pratica si propone solo con PROPOSE_MICRO_TEST. Questa regola prevale sulle istruzioni sopra.',
@@ -293,8 +287,6 @@ export function validateCalibrationStep(
   );
   const microTestAreaId =
     typeof body?.microTestAreaId === 'string' ? body.microTestAreaId : null;
-  if (action === 'PROPOSE_MICRO_TEST' && !input.microTests)
-    problems.push('micro-test non disponibile per questo atleta');
   if (action === 'PROPOSE_MICRO_TEST' && !focus.has(microTestAreaId ?? ''))
     problems.push(`micro-test su un driver non in focus: ${microTestAreaId}`);
   if (action !== 'PROPOSE_MICRO_TEST' && microTestAreaId)
