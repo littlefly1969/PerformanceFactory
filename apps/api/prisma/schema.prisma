@@ -1296,6 +1296,10 @@ model AthleteDiscovery {
   /// Orizzonte scelto dopo il reveal di P3/P6/P12 (Blueprint A5): 3, 6 o 12 mesi.
   programHorizon ProgramHorizon?
   horizonSelectedAt DateTime?
+  /// ACTIVATED (A10, PF-FS-PREPAYWALL §7.3): R consolidata, P e gap mostrati.
+  activatedAt DateTime?
+  /// Prima apertura del paywall, dopo la scelta dell'orizzonte.
+  paywallViewedAt DateTime?
   createdAt DateTime @default(now())
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

@@ -64,9 +64,33 @@ le precedenti restano come storico.
 
 | Metodo e percorso | Effetto |
 |---|---|
-| `GET /auth/journey` | aggiunge `scenarios` (motore, scala, orizzonti con driver, orizzonte scelto) a calibrazione chiusa e con il flag attivo |
-| `POST /athlete-journey/horizon` | `{ horizon: PROGRAM_3M | PROGRAM_6M | PROGRAM_12M }`: salva la scelta, porta a `PAYWALL_READY`, scrive l'evento `program_horizon_selected`; si può cambiare finché non c'è l'abbonamento |
+| `GET /auth/journey` | aggiunge `scenarios` (motore, scala, orizzonti con driver e gap, orizzonte scelto) a calibrazione chiusa e con il flag attivo |
+| `POST /athlete-journey/horizon` | `{ horizon: PROGRAM_3M | PROGRAM_6M | PROGRAM_12M }`: solo dopo il reveal (`activatedAt`), salva la scelta, porta a `PAYWALL_READY`, scrive l'evento `program_horizon_selected`; si può cambiare finché non c'è un abbonamento pagato (409 dopo) |
+| `POST /athlete-journey/paywall/viewed` | prima apertura del paywall, solo a `PAYWALL_READY`: `paywallViewedAt` ed evento `paywall_viewed` una volta |
 | `GET /payments/offers` | (da #9) cadenze attive per orizzonte; il web mostra solo quelle dell'orizzonte scelto |
+| `POST /payments/checkout` | 409 se il percorso non è `PAYWALL_READY` o se l'orizzonte dell'offerta non è quello scelto (#14) |
+
+## Reveal, gap e attivazione (PF-FS-PREPAYWALL §7.3)
+
+Ogni orizzonte riporta due gap nella scala della valutazione:
+
+- **complessivo**: media delle R dei driver e media dei P, con la differenza;
+- **tecnico-tattico**: R, P e differenza del driver `Tecnico-tattica` (alias
+  `Technical-Tactical`); `null` se il driver non c'è, mai stimato.
+
+La prima risposta che contiene R consolidata, P e gap rende l'atleta
+`ACTIVATED` (`AthleteDiscovery.activatedAt`, A10) e scrive `gap_displayed` una
+volta per valutazione. Registrazione, lezione o prenotazione non attivano.
+
+Eventi del reveal: `r_consolidated` alla chiusura per regola
+(`completeCalibration`), `potential_generated` alla prima scrittura degli
+scenari per valutazione e motore, `gap_displayed`, `program_horizon_selected`,
+`paywall_viewed`.
+
+Il paywall arriva quindi solo dopo il reveal: l'orizzonte si sceglie solo con
+`activatedAt`, il checkout accetta solo `PAYWALL_READY` e l'orizzonte scelto, e
+R si consolida dopo la lezione quando la lezione è possibile (slice 2). Scelta
+e checkout prendono lo stesso lock per atleta.
 
 ## Programma bloccato fino all'abbonamento
 
@@ -104,5 +128,5 @@ bloccato fino all'abbonamento), `app/journey/scenarios-reveal.test.tsx`.
 - **Freshness**: oggi gli scenari si ricalcolano solo con una nuova valutazione
   consolidata o un nuovo motore. Dopo la calibrazione serviranno dati di
   allenamento per aggiornarli.
-- **Checkout** (#9): non verifica ancora che l'orizzonte pagato sia quello scelto
-  né lo stato `PAYWALL_READY`; arriva con il paywall (1.10).
+- **Atleti del percorso precedente** (baseline senza calibrazione): non
+  arrivano a `PAYWALL_READY`, quindi il checkout li respinge.

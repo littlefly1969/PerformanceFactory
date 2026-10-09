@@ -349,3 +349,17 @@
   border-left: 3px solid #d6d6d1;
   background: #f7f7f4;
 }
+.pf4 .pf4-gap {
+  display: grid;
+  gap: 4px;
+  margin: 12px 0;
+}
+.pf4 .pf4-gap div {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.pf4 .pf4-gap dd {
+  margin: 0;
+  font-weight: 600;
+}

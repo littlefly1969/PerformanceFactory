@@ -14,6 +14,11 @@ export const CLIENT_EVENTS = [
 export const SERVER_EVENTS = [
   'registration_completed',
   'program_horizon_selected',
+  // Reveal del valore e conversione (A10, §7.3, §11).
+  'r_consolidated',
+  'potential_generated',
+  'gap_displayed',
+  'paywall_viewed',
   // Motore dell'assessment (PF-FS-PREPAYWALL §11): mai testi nelle proprietà.
   'ai_question_presented',
   'ai_question_answered',
