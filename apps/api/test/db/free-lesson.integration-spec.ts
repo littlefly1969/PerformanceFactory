@@ -14,7 +14,14 @@ import { CoachLessonService } from '../../src/free-lessons/coach-lesson.service'
 import { FeatureFlagsService } from '../../src/features/feature-flags.service';
 import { CalibrationService } from '../../src/discovery/calibration/calibration.service';
 import { AiProposalProviderService } from '../../src/ai-orchestrator/proposal-provider.service';
-import { AssessmentEvaluationInput } from '../../src/ai-orchestrator/assessment-evaluation-model';
+import {
+  AssessmentAnomalyOutput,
+  AssessmentEvaluationInput,
+} from '../../src/ai-orchestrator/assessment-evaluation-model';
+import {
+  listAnomalies,
+  reviewAnomaly,
+} from '../../src/discovery/calibration/assessment-anomalies';
 import { loadFreeLessonSettings } from '../../src/free-lessons/free-lesson-config';
 import { loadActivePolicy } from '../../src/discovery/calibration/confidence-policy';
 import { getRequiredTestDatabaseUrl } from '../utils/db-test-guard';
@@ -38,6 +45,8 @@ describe('Free lesson with PostgreSQL', () => {
   let otherCoachId: string;
   /** Confidence restituita dalla valutazione AI simulata. */
   let aiConfidence = 85;
+  /** Segnalazione interna restituita dalla valutazione AI simulata. */
+  let aiAnomaly: AssessmentAnomalyOutput | null = null;
   const inputs: AssessmentEvaluationInput[] = [];
   const users: string[] = [];
   const lessons: string[] = [];
@@ -215,6 +224,7 @@ describe('Free lesson with PostgreSQL', () => {
             evidenceGaps: [],
             commitment: 'MEDIUM',
           })),
+          anomaly: aiAnomaly,
         },
       });
     });
@@ -632,6 +642,80 @@ describe('Free lesson with PostgreSQL', () => {
         data: { freeLessonsEnabled: true },
       });
     }
+  });
+
+  it('AT-11: an internal anomaly suspends only the lesson and never reaches the athlete', async () => {
+    const id = await athlete([60, 60]);
+    expect(await athletes.view(id)).toMatchObject({ phase: 'ELIGIBLE' });
+    const evidence =
+      'Dichiara 5 partite a settimana, poi di non giocare da tre mesi.';
+    aiConfidence = 60;
+    aiAnomaly = { kind: 'CONTRADICTIONS', priority: 'HIGH', evidence };
+    try {
+      await calibration.openRound(id);
+      const round = await prisma.calibrationRound.findFirstOrThrow({
+        where: { userId: id, status: 'OPEN' },
+      });
+      const questions = round.questionsJson as {
+        id: string;
+        options: { value: string }[];
+      }[];
+      await calibration.answerRound(
+        id,
+        round.id,
+        Object.fromEntries(questions.map((q) => [q.id, q.options[0].value])),
+      );
+    } finally {
+      aiConfidence = 85;
+      aiAnomaly = null;
+    }
+    const latest = await prisma.assessmentEvaluation.findFirstOrThrow({
+      where: { userId: id },
+      orderBy: { sequence: 'desc' },
+      include: { anomalies: true },
+    });
+    expect(latest.anomalies).toEqual([
+      expect.objectContaining({
+        kind: 'CONTRADICTIONS',
+        priority: 'HIGH',
+        status: 'OPEN',
+        evidence,
+      }),
+    ]);
+    // Le evidenze restano nella riga riservata: non nell'output salvato né negli eventi.
+    expect(JSON.stringify(latest.outputJson)).not.toContain('anomaly');
+    const event = await prisma.analyticsEvent.findFirstOrThrow({
+      where: { userId: id, name: 'assessment_anomaly_flagged' },
+    });
+    expect(event.properties).toEqual({
+      kind: 'CONTRADICTIONS',
+      priority: 'HIGH',
+    });
+    // L'atleta vede solo un messaggio neutro e non può chiedere il posto.
+    const view = await athletes.view(id);
+    expect(view).toMatchObject({ phase: 'LOCKED', missing: ['PROFILE'] });
+    expect(JSON.stringify(view)).not.toContain(evidence);
+    expect(JSON.stringify(await calibration.view(id))).not.toMatch(
+      /anomal|CONTRADICTIONS|tre mesi/,
+    );
+    await expect(athletes.request(id, partnerId, true)).rejects.toThrow();
+    expect(await status(id)).toBe('FREE_LEVEL_ESTIMATED');
+
+    // Revisione dell'admin, con audit: la lezione torna disponibile.
+    const [queued] = (await listAnomalies(prisma, 'OPEN')).filter(
+      (a) => a.userId === id,
+    );
+    expect(queued).toMatchObject({ evidence, evaluation: { sequence: 2 } });
+    await reviewAnomaly(prisma, queued.id, adminId, 'REVIEWED', 'Verificato.');
+    const [reviewed] = (await listAnomalies(prisma)).filter(
+      (a) => a.userId === id,
+    );
+    expect(reviewed).toMatchObject({
+      status: 'REVIEWED',
+      reviewNote: 'Verificato.',
+      reviewedBy: expect.stringContaining('@example.test') as string,
+    });
+    expect(await athletes.view(id)).toMatchObject({ phase: 'ELIGIBLE' });
   });
 
   it('hides everything while the feature flag is off', async () => {

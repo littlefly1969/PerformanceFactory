@@ -83,6 +83,21 @@ describe('free lesson rules', () => {
     ).toEqual({ phase: 'LOCKED', missing: ['CONFIDENCE'] });
   });
 
+  it('AT-11: an open internal flag suspends only the lesson, with a neutral reason', () => {
+    expect(lessonEligibility({ ...base, suspended: true })).toEqual({
+      phase: 'LOCKED',
+      missing: ['PROFILE'],
+    });
+    // Le ragioni vere restano quelle mostrate; un posto già chiesto resta.
+    expect(
+      lessonEligibility({ ...base, eligibilityMet: false, suspended: true }),
+    ).toEqual({ phase: 'LOCKED', missing: ['CONFIDENCE'] });
+    expect(
+      lessonEligibility({ ...base, seatStatus: 'REQUESTED', suspended: true })
+        .phase,
+    ).toBe('REQUESTED');
+  });
+
   it('lets the seat decide the phase, and a used seat stays used', () => {
     expect(lessonEligibility({ ...base, seatStatus: 'REQUESTED' }).phase).toBe(
       'REQUESTED',

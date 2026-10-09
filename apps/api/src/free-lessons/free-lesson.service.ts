@@ -10,6 +10,7 @@ import {
   checkRule,
   loadActivePolicy,
 } from '../discovery/calibration/confidence-policy';
+import { lessonSuspended } from '../discovery/calibration/assessment-anomalies';
 import { lockCalibration } from '../discovery/calibration/lesson-evidence';
 import {
   lessonClubs,
@@ -29,24 +30,26 @@ type Db = PrismaService | Prisma.TransactionClient;
  * anche la versione della regola e la valutazione usate, da registrare.
  */
 async function checkLesson(db: Db, userId: string) {
-  const [calibration, seat, clubs, policy, latest] = await Promise.all([
-    db.athleteCalibration.findUnique({
-      where: { userId },
-      select: { status: true, lessonDeclinedAt: true },
-    }),
-    db.freeLessonSeat.findUnique({ where: { userId } }),
-    lessonClubs(db),
-    loadActivePolicy(db, 'LESSON_ELIGIBILITY'),
-    db.assessmentEvaluation.findFirst({
-      where: { userId },
-      orderBy: { sequence: 'desc' },
-      select: {
-        id: true,
-        overallConfidence: true,
-        areas: { select: { areaId: true, confidence: true } },
-      },
-    }),
-  ]);
+  const [calibration, seat, clubs, policy, latest, suspended] =
+    await Promise.all([
+      db.athleteCalibration.findUnique({
+        where: { userId },
+        select: { status: true, lessonDeclinedAt: true },
+      }),
+      db.freeLessonSeat.findUnique({ where: { userId } }),
+      lessonClubs(db),
+      loadActivePolicy(db, 'LESSON_ELIGIBILITY'),
+      db.assessmentEvaluation.findFirst({
+        where: { userId },
+        orderBy: { sequence: 'desc' },
+        select: {
+          id: true,
+          overallConfidence: true,
+          areas: { select: { areaId: true, confidence: true } },
+        },
+      }),
+      lessonSuspended(db, userId),
+    ]);
   const eligibilityMet =
     !!latest &&
     checkRule(policy, {
@@ -64,6 +67,7 @@ async function checkLesson(db: Db, userId: string) {
       clubs: clubs.length,
       seatStatus: seat?.status ?? null,
       declined: !!calibration?.lessonDeclinedAt,
+      suspended,
     }),
   };
 }

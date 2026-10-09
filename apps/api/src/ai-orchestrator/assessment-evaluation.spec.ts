@@ -159,10 +159,46 @@ describe('assessment evaluation', () => {
       { ...valid([driver('tecnica'), driver('mental')]), summary: '' },
       'summary non valido',
     ],
+    [
+      'an anomaly without evidence',
+      {
+        ...valid([driver('tecnica'), driver('mental')]),
+        anomaly: { kind: 'CONTRADICTIONS', priority: 'HIGH', evidence: ' ' },
+      },
+      'anomaly non valida',
+    ],
+    [
+      'an unknown anomaly kind',
+      {
+        ...valid([driver('tecnica'), driver('mental')]),
+        anomaly: { kind: 'CHEATING', priority: 'HIGH', evidence: 'Fatti.' },
+      },
+      'anomaly non valida',
+    ],
   ])('rejects %s', (_label, raw, problem) => {
     const problems: string[] = [];
     expect(validateAssessmentEvaluation(raw, input, problems)).toBeNull();
     expect(problems.join(' ')).toContain(problem);
+  });
+
+  it('AT-11: keeps an internal anomaly with observable evidence, null otherwise', () => {
+    const anomaly = {
+      kind: 'CONTRADICTIONS',
+      priority: 'HIGH',
+      evidence: 'Dichiara 5 partite a settimana e poi di non giocare da mesi.',
+    };
+    expect(
+      validateAssessmentEvaluation(
+        { ...valid([driver('tecnica'), driver('mental')]), anomaly },
+        input,
+      )?.anomaly,
+    ).toEqual(anomaly);
+    expect(
+      validateAssessmentEvaluation(
+        valid([driver('tecnica'), driver('mental')]),
+        input,
+      )?.anomaly,
+    ).toBeNull();
   });
 
   it('puts the editable prompt first and the fixed format contract after it', () => {

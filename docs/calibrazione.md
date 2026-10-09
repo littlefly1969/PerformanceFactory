@@ -89,6 +89,19 @@ Tutte in `apps/api/src/discovery/calibration/calibration-rules.ts`, senza I/O:
 - **Eventi** (§11, senza testi): `ai_question_presented` e `ai_question_answered`
   (azione, numero di domande, sequenza del round), `ai_micro_test_presented`
   (area) e `ai_micro_test_completed`.
+- **Segnalazioni riservate** (§5.3, AT-11, OP-08). La valutazione AI può
+  restituire `anomaly` (di norma `null`): `CONTRADICTIONS`, `AUTOMATED_PATTERN` o
+  `MICRO_TEST_MISMATCH`, priorità `LOW` o `HIGH` ed evidenze osservabili (massimo
+  300 caratteri, senza accuse). Il backend la toglie dall'output salvato e la
+  registra in `AssessmentAnomaly`, legata alla valutazione: la vede solo l'admin
+  in `/admin/anomalies` (`GET` e `PATCH /admin/assessment-anomalies`, stati
+  `OPEN`, `REVIEWED`, `ARCHIVED`, con chi e quando ha esaminato). L'evento
+  `assessment_anomaly_flagged` porta solo tipo e priorità. All'atleta non arriva
+  nulla: continua con domande e chiarimenti normali e la confidence non si alza
+  per compensare. Una `HIGH` aperta sospende solo l'eleggibilità alla lezione
+  gratuita (fase `LOCKED` con `PROFILE`, messaggio «Continuiamo a conoscere il tuo
+  profilo»), mai un posto già richiesto o assegnato; con la lezione sospesa R
+  segue la sola regola di consolidamento. Nessuna esclusione automatica.
 - **Ritmo**: nessuno. Il round successivo si apre appena il precedente è valutato;
   restano solo il lease tecnico per atleta e il rate limit dell'API, mai mostrati
   come attese (§4.3, OP-09).

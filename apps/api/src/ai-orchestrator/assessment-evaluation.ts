@@ -7,6 +7,8 @@ import {
   AthleteLevel,
   COMMITMENT_LEVELS,
   CommitmentLevel,
+  ANOMALY_KINDS,
+  ANOMALY_PRIORITIES,
   ASSESSMENT_LIMITS,
   AssessmentEvaluationInput,
   AssessmentEvaluationOutput,
@@ -122,6 +124,7 @@ export function stubAssessmentEvaluation(
     level: ATHLETE_LEVELS[Math.min(2, Math.floor(average * 3))],
     levelConfidence: Math.min(...drivers.map((d) => d.confidence), 100),
     drivers,
+    anomaly: null,
   };
 }
 
@@ -190,6 +193,7 @@ export function validateAssessmentEvaluation(
   }
   for (const areaId of expected)
     if (!seen.has(areaId)) problems.push(`driver mancante: ${areaId}`);
+  const anomaly = parseAnomaly(record.anomaly, problems);
   if (problems.length) return null;
   // Stesso ordine dei driver ricevuti, indipendente dall'ordine del modello.
   const order = input.drivers.map((d) => d.areaId);
@@ -200,7 +204,22 @@ export function validateAssessmentEvaluation(
     level: level as AthleteLevel,
     levelConfidence: levelConfidence!,
     drivers,
+    anomaly,
   };
+}
+
+/** Segnalazione facoltativa: assente o nulla quasi sempre, altrimenti completa. */
+function parseAnomaly(value: unknown, problems: string[]) {
+  if (value === undefined || value === null) return null;
+  const entry = value as Partial<Record<string, unknown>>;
+  const kind = oneOf(entry.kind, ANOMALY_KINDS);
+  const priority = oneOf(entry.priority, ANOMALY_PRIORITIES);
+  const evidence = text(entry.evidence, ASSESSMENT_LIMITS.anomalyEvidence);
+  if (!kind || !priority || !evidence) {
+    problems.push('anomaly non valida');
+    return null;
+  }
+  return { kind, priority, evidence };
 }
 
 function oneOf<T extends string>(value: unknown, allowed: readonly T[]) {
