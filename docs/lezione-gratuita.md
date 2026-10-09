@@ -41,8 +41,8 @@ progetto `notes/slice4-lezione-gratuita.md`.
   comprano, non si spendono e non sbloccano nulla, mostrano il percorso fatto. Il wallet Token PF
   (A4.11) resta separato e non è toccato.
 - **Micro-test, non allenamenti.** In calibrazione l'atleta riporta l'esito di
-  esercizi brevi (A4.6) che l'AI propone come passo del motore, con il flag
-  `ai_micro_tests`. Il programma resta dietro `programBeforePaywall` (decisione
+  esercizi brevi (A4.6) che l'AI propone come passo del motore, per tutti gli
+  atleti. Il programma resta dietro `programBeforePaywall` (decisione
   13 aperta).
 - **Due verifiche distinte (§6.2).** Eleggibilità dell'atleta: livello stimato con
   R aperta e regola `LESSON_ELIGIBILITY` soddisfatta sull'ultima valutazione.

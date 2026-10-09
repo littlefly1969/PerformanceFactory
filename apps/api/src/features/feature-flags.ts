@@ -21,11 +21,6 @@ export const FEATURE_FLAG_REGISTRY = [
     description:
       'A calibrazione chiusa mostra P3/P6/P12 e la scelta del percorso di 3, 6 o 12 mesi (1.8-1.9).',
   },
-  {
-    key: 'ai_micro_tests',
-    description:
-      'Micro-test scritti dall’AI come passo della calibrazione; spento, il motore propone solo domande. Il catalogo del back office non li sostituisce.',
-  },
 ] as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAG_REGISTRY)[number]['key'];

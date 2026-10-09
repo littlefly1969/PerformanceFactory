@@ -67,8 +67,10 @@ Tutte in `apps/api/src/discovery/calibration/calibration-rules.ts`, senza I/O:
   restano sul round (`action`, `targetAreas`, `rationale`, §10.2). Prontezza al
   reveal e alla lezione restano del server (regole versionate). All'atleta gli
   score delle opzioni e il motivo non arrivano mai.
-- **Micro-test come passo del motore** (§4.4, AT-12, AT-13; flag `ai_micro_tests`,
-  spento: il motore propone solo domande). Il motore sceglie il driver; il test lo
+- **Micro-test come passo del motore** (§4.4, AT-12, AT-13), sempre attivo, senza
+  flag. Una regola fissa del formato chiede al motore un micro-test su ogni driver
+  in focus che non ne ha ancora uno, prima di altre domande e un driver per passo;
+  fatti o saltati, torna alle domande. Il motore sceglie il driver; il test lo
   scrive il generatore dedicato (`micro-test-generation.ts`, prompt `MICRO_TEST`)
   con il motivo del passo, la storia del driver, i titoli già proposti e le
   risposte del profilo che dichiarano dolori o limitazioni. Il backend valida:

@@ -10,7 +10,6 @@ import { AiProposalProviderService } from '../../ai-orchestrator/proposal-provid
 import { loadActiveAssessmentPrompt } from '../../ai-orchestrator/assessment-prompts';
 import { CalibrationQuestion } from '../../ai-orchestrator/calibration-questions';
 import { AnalyticsService } from '../../analytics/analytics.service';
-import { FeatureFlagsService } from '../../features/feature-flags.service';
 import { loadOperationalTemplates } from '../assessment-configuration';
 import {
   buildAssessmentEvaluationInput,
@@ -61,7 +60,6 @@ export class CalibrationService {
     private readonly prisma: PrismaService,
     private readonly ai: AiProposalProviderService,
     private readonly analytics: AnalyticsService,
-    private readonly flags: FeatureFlagsService,
   ) {}
 
   /**
@@ -266,7 +264,6 @@ export class CalibrationService {
         promptVersionId: prompt.promptVersionId,
         scale: input.scale,
         athleteContext: input.athleteContext,
-        microTests: await this.flags.isEnabled('ai_micro_tests', userId),
         targets: drivers.map((d) => ({
           ...d,
           askedQuestions: asked.get(d.areaId) ?? [],

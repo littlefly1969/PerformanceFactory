@@ -198,16 +198,10 @@ describe('Micro-test engine step with PostgreSQL', () => {
       return evaluate(input);
     });
     adminId = await user(UserRole.ADMIN);
-    await flags.update(
-      'ai_micro_tests',
-      { enabled: true, rolloutPercent: 100 },
-      adminId,
-    );
     await flags.update('free_lesson', { enabled: false }, adminId);
   });
 
   afterAll(async () => {
-    await flags.update('ai_micro_tests', { enabled: false }, adminId);
     await prisma.featureFlagChange.deleteMany({
       where: { actorId: { in: users } },
     });
@@ -221,7 +215,8 @@ describe('Micro-test engine step with PostgreSQL', () => {
     const id = await athlete();
     proposeMicroTest();
     await calibration.openRound(id);
-    expect(steps.at(-1)!.microTests).toBe(true);
+    // Nessun flag: le prove pratiche fanno sempre parte della calibrazione.
+    expect(steps.at(-1)!.targets.find((t) => t.focus)!.microTests).toEqual([]);
 
     const round = await openRound(id);
     expect(round).toMatchObject({
@@ -337,21 +332,5 @@ describe('Micro-test engine step with PostgreSQL', () => {
     await expect(
       calibration.skipMicroTest(await athlete(), round.id),
     ).rejects.toBeInstanceOf(NotFoundException);
-  });
-
-  it('asks only questions while the flag is off', async () => {
-    const id = await athlete();
-    await flags.update('ai_micro_tests', { enabled: false }, adminId);
-    try {
-      await calibration.openRound(id);
-      expect(steps.at(-1)!.microTests).toBe(false);
-      expect((await openRound(id)).action).not.toBe('PROPOSE_MICRO_TEST');
-    } finally {
-      await flags.update(
-        'ai_micro_tests',
-        { enabled: true, rolloutPercent: 100 },
-        adminId,
-      );
-    }
   });
 });

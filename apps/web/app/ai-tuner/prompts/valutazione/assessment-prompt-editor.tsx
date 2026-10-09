@@ -41,7 +41,7 @@ const COPY = {
   MICRO_TEST: {
     title: "Micro-test su misura",
     description:
-      "Prompt che, quando il motore della calibrazione sceglie un micro-test, lo scrive per l'atleta sul driver indicato, partendo dalla sua storia: profilo, risposte, micro-test fatti e feedback del coach. Attivo con il flag ai_micro_tests.",
+      "Prompt che, quando il motore della calibrazione sceglie un micro-test, lo scrive per l'atleta sul driver indicato, partendo dalla sua storia: profilo, risposte, micro-test fatti e feedback del coach. Sempre attivo.",
     usedBy: "tutti i nuovi lotti di micro-test",
     instructions: "Istruzioni per i micro-test (modificabili)",
     rules:
