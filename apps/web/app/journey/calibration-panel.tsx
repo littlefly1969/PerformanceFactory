@@ -10,6 +10,77 @@ const LEVELS: Record<string, string> = {
   PRO: "Professionista",
 };
 
+/**
+ * Micro-test proposto dall'AI: istruzioni, durata e sicurezza, poi l'esito
+ * che l'atleta riporta. Si può saltare se ora non si può fare.
+ */
+function MicroTestForm({
+  question: q,
+  driver,
+  busy,
+  onSubmit,
+  onSkip,
+}: {
+  question: NonNullable<Calibration["round"]>["questions"][number];
+  driver: string | undefined;
+  busy: boolean;
+  onSubmit: (answers: Record<string, string>) => void;
+  onSkip: () => void;
+}) {
+  const [value, setValue] = useState<string>();
+  const test = q.microTest!;
+  return (
+    <form
+      className="pf4-calibration-round"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (value !== undefined) onSubmit({ [q.id]: value });
+      }}
+    >
+      <p className="pf4-kicker">
+        Micro-test{driver ? ` · ${driver}` : ""}
+        {test.durationMinutes ? ` · circa ${test.durationMinutes} minuti` : ""}
+      </p>
+      <h3>{q.text}</h3>
+      <p>{test.instructions}</p>
+      {test.safetyNotes && (
+        <p className="pf4-note">
+          <strong>Sicurezza:</strong> {test.safetyNotes}
+        </p>
+      )}
+      <fieldset>
+        <legend>Com&apos;è andata? L&apos;esito lo riporti tu.</legend>
+        <div className="pf4-options">
+          {q.options.map((o) => (
+            <button
+              type="button"
+              key={o.value}
+              disabled={busy}
+              aria-pressed={value === o.value}
+              className={`pf4-option ${value === o.value ? "is-selected" : ""}`}
+              onClick={() => setValue(o.value)}
+            >
+              <span>{o.label}</span>
+              <span className="pf4-dot" />
+            </button>
+          ))}
+        </div>
+      </fieldset>
+      <button className="pf4-cta" disabled={busy || value === undefined}>
+        {busy ? "Aggiorniamo la tua valutazione…" : "Invia l'esito →"}
+      </button>
+      <button
+        type="button"
+        className="pf4-link"
+        disabled={busy}
+        onClick={onSkip}
+      >
+        Non posso farlo ora
+      </button>
+    </form>
+  );
+}
+
 /** Domande del round aperto: si inviano tutte insieme, poi R e confidence si aggiornano. */
 function RoundForm({
   round,
@@ -80,12 +151,14 @@ export function CalibrationPanel({
   busy,
   onOpenRound,
   onAnswer,
+  onSkip,
 }: {
   calibration: Calibration;
   evaluation: Evaluation;
   busy: boolean;
   onOpenRound: () => void;
   onAnswer: (roundId: string, answers: Record<string, string>) => void;
+  onSkip: (roundId: string) => void;
 }) {
   const completed =
     c.status === "CALIBRATION_COMPLETED" || c.status === "PAYWALL_READY";
@@ -125,6 +198,26 @@ export function CalibrationPanel({
             : "I driver ancora poco affidabili restano indicati come tali, senza valori inventati."}{" "}
           Il prossimo passo sono i tuoi scenari a 3, 6 e 12 mesi.
         </p>
+      ) : c.round?.action === "PROPOSE_MICRO_TEST" &&
+        c.round.questions[0]?.microTest ? (
+        <>
+          <p>
+            Una prova pratica breve: dice sul driver più di quanto possano dire
+            le domande.
+          </p>
+          <MicroTestForm
+            key={c.round.id}
+            question={c.round.questions[0]}
+            driver={
+              evaluation.drivers.find(
+                (d) => d.id === c.round!.questions[0].areaId,
+              )?.name
+            }
+            busy={busy}
+            onSubmit={(answers) => onAnswer(c.round!.id, answers)}
+            onSkip={() => onSkip(c.round!.id)}
+          />
+        </>
       ) : c.round ? (
         <>
           <p>Poche domande sui driver dove la stima è meno sicura.</p>
@@ -138,9 +231,10 @@ export function CalibrationPanel({
       ) : (
         <>
           <p>
-            Ogni round fa qualche domanda mirata sui driver meno affidabili.
-            Puoi continuare subito o riprendere quando vuoi: R si consolida
-            quando le tue risposte sono abbastanza coerenti e complete.
+            Ogni passo fa qualche domanda mirata, o propone una breve prova
+            pratica, sui driver meno affidabili. Puoi continuare subito o
+            riprendere quando vuoi: R si consolida quando le tue risposte sono
+            abbastanza coerenti e complete.
           </p>
           <button className="pf4-cta" disabled={busy} onClick={onOpenRound}>
             {busy ? "Prepariamo le domande…" : "Nuove domande →"}

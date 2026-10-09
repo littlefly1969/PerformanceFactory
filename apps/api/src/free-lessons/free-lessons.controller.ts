@@ -22,7 +22,6 @@ import {
   AssignSeatDto,
   CoachFeedbackDto,
   CoachNoShowDto,
-  CompleteMicroTestDto,
   CreateFreeLessonDto,
   CreateMicroTestDto,
   RequestFreeLessonDto,
@@ -37,7 +36,7 @@ import { FreeLessonService } from './free-lesson.service';
 
 type AuthRequest = { user: { id: string } };
 
-/** Atleta: obiettivo lezione, crediti, micro-test e richiesta del posto. */
+/** Atleta: obiettivo lezione, crediti e richiesta del posto. */
 @ApiTags('free-lesson')
 @ApiCookieAuth()
 @Controller('athlete-journey/free-lesson')
@@ -47,28 +46,9 @@ export class FreeLessonController {
   constructor(private readonly lessons: FreeLessonService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Lezione gratuita: crediti, fase e micro-test' })
+  @ApiOperation({ summary: 'Lezione gratuita: crediti e fase' })
   view(@Req() req: AuthRequest) {
     return this.lessons.view(req.user.id);
-  }
-
-  @Post('micro-tests/generate')
-  @ApiOperation({
-    summary:
-      'Prepara con l AI i micro-test su misura per l ultima valutazione (una volta per lotto)',
-  })
-  generateMicroTests(@Req() req: AuthRequest) {
-    return this.lessons.generateMicroTests(req.user.id);
-  }
-
-  @Post('micro-tests/:id')
-  @ApiOperation({ summary: 'Registra l esito di un micro-test' })
-  microTest(
-    @Req() req: AuthRequest,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() body: CompleteMicroTestDto,
-  ) {
-    return this.lessons.completeMicroTest(req.user.id, id, body.value);
   }
 
   @Post('request')

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { API_BASE, secureFetch } from "@/app/lib/api";
 
 type Club = { id: string; name: string; city: string | null };
@@ -24,7 +24,6 @@ export type FreeLessonView =
       earn: {
         initialAssessment: number;
         calibrationRound: number;
-        microTest: number;
       };
       clubs: Club[];
       attributedClubId: string | null;
@@ -33,18 +32,6 @@ export type FreeLessonView =
         club: { name: string; city: string | null };
         lesson: { startsAt: string; durationMinutes: number } | null;
       } | null;
-      microTests: Array<{
-        id: string;
-        title: string;
-        instructions: string;
-        areaName: string;
-        /** Scritto dall'AI per questo atleta; altrimenti dal catalogo. */
-        personal: boolean;
-        options: Array<{ value: string; label: string }>;
-      }>;
-      microTestsLeft: number;
-      /** Il server chiede di preparare i micro-test su misura. */
-      generateMicroTests: boolean;
     };
 
 const URL = `${API_BASE}/athlete-journey/free-lesson`;
@@ -83,8 +70,6 @@ export function FreeLessonPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [clubId, setClubId] = useState("");
   const [share, setShare] = useState(false);
-  const [preparing, setPreparing] = useState(false);
-  const generated = useRef<string | null>(null);
 
   const call = useCallback(async (path = "", body?: unknown) => {
     setBusy(true);
@@ -118,15 +103,6 @@ export function FreeLessonPanel({
   useEffect(() => {
     void call();
   }, [call, refreshKey]);
-
-  // Una richiesta di micro-test su misura per stato del percorso, mai in loop.
-  const wantsTests = view?.enabled === true && view.generateMicroTests;
-  useEffect(() => {
-    if (!wantsTests || generated.current === refreshKey) return;
-    generated.current = refreshKey;
-    setPreparing(true);
-    void call("/micro-tests/generate", {}).finally(() => setPreparing(false));
-  }, [call, wantsTests, refreshKey]);
 
   if (!view?.enabled || view.phase === "UNAVAILABLE") return null;
   const { credits, earn, seat } = view;
@@ -163,8 +139,8 @@ export function FreeLessonPanel({
             potenziale. La sblocchi con un profilo attendibile: risposte
             coerenti e micro-test. I crediti segnano il percorso fatto: +
             {earn.initialAssessment} con la prima valutazione, +
-            {earn.calibrationRound} per ogni round di domande, +{earn.microTest}{" "}
-            per ogni micro-test.
+            {earn.calibrationRound} per ogni passo della calibrazione, domande o
+            micro-test.
           </p>
           <div
             className="pf4-credits"
@@ -286,41 +262,6 @@ export function FreeLessonPanel({
         <p>
           La calibrazione è chiusa: la lezione gratuita serviva a completarla.
         </p>
-      )}
-      {preparing && view.microTests.length === 0 && (
-        <p role="status">Preparo i micro-test su misura per te…</p>
-      )}
-      {view.microTests.length > 0 && (
-        <div className="pf4-micro-tests">
-          <h3>Micro-test di oggi</h3>
-          {view.microTests.map((test) => (
-            <fieldset key={test.id}>
-              <legend>
-                {test.title} · {test.areaName}
-                {test.personal ? " · su misura" : ""}
-              </legend>
-              <p>{test.instructions}</p>
-              <div className="pf4-options">
-                {test.options.map((option) => (
-                  <button
-                    type="button"
-                    key={option.value}
-                    className="pf4-option"
-                    disabled={busy}
-                    onClick={() =>
-                      void call(`/micro-tests/${test.id}`, {
-                        value: option.value,
-                      })
-                    }
-                  >
-                    <span>{option.label}</span>
-                    <span className="pf4-dot" />
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-          ))}
-        </div>
       )}
     </section>
   );

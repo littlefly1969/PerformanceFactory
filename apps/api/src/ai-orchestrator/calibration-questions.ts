@@ -12,6 +12,7 @@ export const DEFAULT_CALIBRATION_PROMPT = [
   'Sei il motore di calibrazione di Performance Factory. Dopo la prima valutazione di un atleta amatoriale maggiorenne ricevi tutti i driver con score R provvisorio, confidenza, lacune di evidenza e domande già fatte; i driver ancora sotto la regola di consolidamento sono marcati come focus.',
   'A ogni passo decidi tu la prossima azione: una sola domanda quando la risposta cambierà la domanda successiva, un gruppo di domande indipendenti quando si possono rispondere insieme, un chiarimento neutro quando due risposte si contraddicono. Non c’è un numero fisso di domande per driver: chiedi solo ciò che riduce davvero una lacuna, e non coprire un driver le cui evidenze bastano già.',
   'Domande a scelta singola su comportamenti concreti, frequenze, situazioni di gioco, risultati misurabili. Evita domande già fatte o equivalenti.',
+  'Quando su un driver le dichiarazioni non bastano e serve un’evidenza diversa (una prova pratica breve che l’atleta svolge e di cui riporta l’esito), proponi un micro-test su quel driver invece di altre domande: lo scrive il preparatore, tu indichi solo il driver e il perché. Non riproporre micro-test già fatti o saltati.',
   'Ogni opzione ha uno score di riferimento sulla scala ricevuta: deve ancorare la risposta al livello reale, non premiare la risposta più lunga. Le opzioni coprono tutta la scala e sono mutuamente esclusive.',
   'Scrivi in italiano, con il tu, frasi brevi. Niente diagnosi mediche, niente dati personali, niente promesse di risultato. Un chiarimento non accusa e non rivela sospetti.',
 ].join('\n');
@@ -19,12 +20,14 @@ export const DEFAULT_CALIBRATION_PROMPT = [
 /**
  * Azioni del motore della prossima domanda (PF-FS-PREPAYWALL §4.2). La
  * prontezza al reveal e alla lezione resta del server, che applica le regole
- * di confidence versionate; il micro-test come passo arriva con la sua slice.
+ * di confidence versionate. Con PROPOSE_MICRO_TEST il motore sceglie solo il
+ * driver: il micro-test lo scrive e lo valida il generatore dedicato.
  */
 export const CALIBRATION_ACTIONS = [
   'ASK_SINGLE',
   'ASK_GROUP',
   'REQUEST_CLARIFICATION',
+  'PROPOSE_MICRO_TEST',
 ] as const;
 export type CalibrationAction = (typeof CALIBRATION_ACTIONS)[number];
 
@@ -48,6 +51,8 @@ export type CalibrationTarget = {
   confidence: number;
   evidenceGaps: string[];
   askedQuestions: string[];
+  /** Micro-test già proposti sul driver, fatti o saltati. */
+  microTests?: string[];
   /** Driver sotto la regola di consolidamento: solo su questi si chiede. */
   focus: boolean;
 };
@@ -58,6 +63,8 @@ export type CalibrationQuestionsInput = {
   scale: { minScore: number; maxScore: number };
   athleteContext: AssessmentEvaluationAnswer[];
   targets: CalibrationTarget[];
+  /** Flag `ai_micro_tests`: spento, il motore propone solo domande. */
+  microTests?: boolean;
 };
 
 export type CalibrationQuestion = {
@@ -65,9 +72,28 @@ export type CalibrationQuestion = {
   areaId: string;
   text: string;
   options: { value: string; label: string; score: number }[];
+  /**
+   * Micro-test del motore: `text` è il titolo, l'esito lo riporta l'atleta
+   * (self-report). Assente sulle domande.
+   */
+  microTest?: {
+    id: string;
+    instructions: string;
+    informationGoal: string;
+    durationMinutes: number | null;
+    physicalLoad: string;
+    safetyNotes: string;
+    provider: string;
+    model: string;
+    promptVersionId: string | null;
+    promptHash: string;
+  };
 };
 
-/** Decisione validata del passo (§10.2): azione, aree, motivo, domande. */
+/**
+ * Decisione validata del passo (§10.2): azione, aree, motivo, domande. Con
+ * PROPOSE_MICRO_TEST le domande sono vuote e l'unica area è quella del test.
+ */
 export type CalibrationStep = {
   action: CalibrationAction;
   targetAreas: string[];
@@ -82,16 +108,22 @@ export type CalibrationQuestionsResult = CalibrationStep & {
   latencyMs: number;
 };
 
-function formatRules() {
+function formatRules(input: CalibrationQuestionsInput) {
   const l = CALIBRATION_LIMITS;
   return [
     'FORMATO DI RISPOSTA (fisso): rispondi solo con JSON conforme allo schema.',
+    ...(input.microTests
+      ? []
+      : [
+          '- PROPOSE_MICRO_TEST non è disponibile per questo atleta: scegli solo tra le domande.',
+        ]),
     '- action: ASK_SINGLE (esattamente 1 domanda), ASK_GROUP (da 2 a ' +
-      `${l.maxQuestions} domande indipendenti) oppure REQUEST_CLARIFICATION (esattamente 1 domanda neutra su una contraddizione).`,
+      `${l.maxQuestions} domande indipendenti), REQUEST_CLARIFICATION (esattamente 1 domanda neutra su una contraddizione) oppure PROPOSE_MICRO_TEST (nessuna domanda, microTestAreaId del driver).`,
     '- questions: solo sui driver con focus true, con il loro areaId; non serve coprirli tutti.',
+    '- microTestAreaId: l’areaId di un driver con focus true solo con PROPOSE_MICRO_TEST, altrimenti null.',
     `- rationale: perché questo passo, in una frase di massimo ${l.rationale} caratteri, senza dati personali.`,
     `- text: massimo ${l.question} caratteri.`,
-    '- solo domande su comportamenti, frequenze e situazioni di gioco già vissute: niente micro-test, esercizi o prove da svolgere. Questa regola prevale sulle istruzioni sopra.',
+    '- le domande sono solo su comportamenti, frequenze e situazioni di gioco già vissute: niente micro-test, esercizi o prove da svolgere dentro una domanda; una prova pratica si propone solo con PROPOSE_MICRO_TEST. Questa regola prevale sulle istruzioni sopra.',
     `- options: da ${l.minOptions} a ${l.maxOptions}, label di massimo ${l.option} caratteri, score tra la scala minima e massima ricevute.`,
   ].join('\n');
 }
@@ -99,10 +131,11 @@ function formatRules() {
 const schema = {
   type: 'object',
   additionalProperties: false,
-  required: ['action', 'rationale', 'questions'],
+  required: ['action', 'rationale', 'microTestAreaId', 'questions'],
   properties: {
     action: { type: 'string', enum: [...CALIBRATION_ACTIONS] },
     rationale: { type: 'string' },
+    microTestAreaId: { type: ['string', 'null'] },
     questions: {
       type: 'array',
       items: {
@@ -132,9 +165,9 @@ const schema = {
 
 export function buildCalibrationPrompt(input: CalibrationQuestionsInput) {
   return {
-    system: `${input.basePrompt.trim()}\n\n${formatRules()}`,
+    system: `${input.basePrompt.trim()}\n\n${formatRules(input)}`,
     user: {
-      task: 'Decidi il prossimo passo sui driver con focus: una domanda, un gruppo o un chiarimento.',
+      task: 'Decidi il prossimo passo sui driver con focus: una domanda, un gruppo, un chiarimento o un micro-test.',
       scale: input.scale,
       athleteContext: input.athleteContext,
       drivers: input.targets,
@@ -202,6 +235,7 @@ export function stubCalibrationQuestions(input: CalibrationQuestionsInput) {
   return {
     action: focus.length === 1 ? 'ASK_SINGLE' : 'ASK_GROUP',
     rationale: 'Domande sui driver ancora sotto la regola di consolidamento.',
+    microTestAreaId: null,
     questions: focus.map((target) => ({
       areaId: target.areaId,
       text: `${target.name}: quanto spesso ti capita la situazione ${target.askedQuestions.length + 1}?`,
@@ -217,6 +251,7 @@ const QUESTION_COUNT: Record<CalibrationAction, [number, number]> = {
   ASK_SINGLE: [1, 1],
   ASK_GROUP: [2, CALIBRATION_LIMITS.maxQuestions],
   REQUEST_CLARIFICATION: [1, 1],
+  PROPOSE_MICRO_TEST: [0, 0],
 };
 
 const normalized = (text: string) => text.toLowerCase().replace(/\s+/g, ' ');
@@ -234,6 +269,7 @@ export function validateCalibrationStep(
   const body = raw as {
     action?: unknown;
     rationale?: unknown;
+    microTestAreaId?: unknown;
     questions?: unknown;
   } | null;
   const action = CALIBRATION_ACTIONS.find((a) => a === body?.action);
@@ -255,6 +291,14 @@ export function validateCalibrationStep(
   const focus = new Map(
     input.targets.filter((t) => t.focus).map((t) => [t.areaId, t]),
   );
+  const microTestAreaId =
+    typeof body?.microTestAreaId === 'string' ? body.microTestAreaId : null;
+  if (action === 'PROPOSE_MICRO_TEST' && !input.microTests)
+    problems.push('micro-test non disponibile per questo atleta');
+  if (action === 'PROPOSE_MICRO_TEST' && !focus.has(microTestAreaId ?? ''))
+    problems.push(`micro-test su un driver non in focus: ${microTestAreaId}`);
+  if (action !== 'PROPOSE_MICRO_TEST' && microTestAreaId)
+    problems.push('microTestAreaId solo con PROPOSE_MICRO_TEST');
   const questions: CalibrationQuestion[] = [];
   const seen = new Set<string>();
   items.forEach((item, index) => {
@@ -309,7 +353,10 @@ export function validateCalibrationStep(
   return {
     action,
     rationale,
-    targetAreas: [...new Set(questions.map((q) => q.areaId))],
+    targetAreas:
+      action === 'PROPOSE_MICRO_TEST'
+        ? [microTestAreaId!]
+        : [...new Set(questions.map((q) => q.areaId))],
     questions,
   };
 }

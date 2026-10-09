@@ -1,12 +1,9 @@
 import {
   DEFAULT_FREE_LESSON_SETTINGS as settings,
-  MICRO_TEST_GENERATION,
-  canClaimGeneration,
   creditEntries,
   freeLessonSettingsProblems,
   lessonEligibility,
   microTestOptionProblems,
-  microTestTargets,
 } from './free-lesson-rules';
 import { ratingScore } from '../discovery/calibration/lesson-evidence';
 
@@ -138,48 +135,5 @@ describe('free lesson rules', () => {
   it('maps the coach rating onto the evaluation scale', () => {
     const scale = { minScore: 0, maxScore: 100 };
     expect([1, 3, 5].map((r) => ratingScore(r, scale))).toEqual([0, 50, 100]);
-  });
-
-  it('targets the least reliable drivers for the AI micro-tests', () => {
-    expect(
-      microTestTargets(
-        [
-          { areaId: 'a', confidence: 70 },
-          { areaId: 'b', confidence: 20 },
-          { areaId: 'c', confidence: 40 },
-        ],
-        2,
-      ).map((a) => a.areaId),
-    ).toEqual(['b', 'c']);
-  });
-
-  it('lets one request at a time generate a batch, with bounded retries', () => {
-    const now = new Date('2026-10-10T10:00:00Z');
-    const ago = (ms: number) => new Date(now.getTime() - ms);
-    const { leaseMs, retryAfterMs, maxAttempts } = MICRO_TEST_GENERATION;
-    const row = (status: string, claimedAt: Date | null, attempts = 1) => ({
-      status,
-      claimedAt,
-      attempts,
-    });
-    expect(canClaimGeneration(null, now)).toBe(true);
-    expect(canClaimGeneration(row('PENDING', null, 0), now)).toBe(true);
-    expect(canClaimGeneration(row('RUNNING', ago(1000)), now)).toBe(false);
-    expect(canClaimGeneration(row('RUNNING', ago(leaseMs + 1)), now)).toBe(
-      true,
-    );
-    expect(canClaimGeneration(row('FAILED', ago(1000)), now)).toBe(false);
-    expect(canClaimGeneration(row('FAILED', ago(retryAfterMs + 1)), now)).toBe(
-      true,
-    );
-    expect(
-      canClaimGeneration(
-        row('FAILED', ago(retryAfterMs + 1), maxAttempts),
-        now,
-      ),
-    ).toBe(false);
-    expect(canClaimGeneration(row('READY', ago(retryAfterMs + 1)), now)).toBe(
-      false,
-    );
   });
 });

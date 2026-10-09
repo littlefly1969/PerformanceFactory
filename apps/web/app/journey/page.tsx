@@ -147,6 +147,9 @@ export default function JourneyPage() {
                 onAnswer={(roundId, answers) =>
                   void action("calibration/answers", { roundId, answers })
                 }
+                onSkip={(roundId) =>
+                  void action("calibration/skip", { roundId })
+                }
               />
             )}
             {j.calibration && (

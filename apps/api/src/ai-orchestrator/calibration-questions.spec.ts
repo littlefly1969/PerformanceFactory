@@ -37,10 +37,16 @@ const input: CalibrationQuestionsInput = {
       focus: false,
     },
   ],
+  microTests: true,
 };
-const step = (questions: object[], action = 'ASK_GROUP') => ({
+const step = (
+  questions: object[],
+  action = 'ASK_GROUP',
+  microTestAreaId: string | null = null,
+) => ({
   action,
   rationale: 'Mancano esempi concreti di colpi in partita.',
+  microTestAreaId,
   questions,
 });
 const question = (extra: object = {}) => ({
@@ -153,10 +159,55 @@ describe('calibration questions', () => {
       ]),
       'numero di opzioni',
     ],
+    [
+      'a micro-test on a driver not in focus',
+      step([], 'PROPOSE_MICRO_TEST', 'mental'),
+      'non in focus',
+    ],
+    [
+      'a micro-test with questions',
+      step([question()], 'PROPOSE_MICRO_TEST', 'tecnica'),
+      'da 0 a 0 domande',
+    ],
+    [
+      'a micro-test area on a question step',
+      step([question()], 'ASK_SINGLE', 'tecnica'),
+      'solo con PROPOSE_MICRO_TEST',
+    ],
   ])('rejects %s', (_label, raw, problem) => {
     const problems: string[] = [];
     expect(validateCalibrationStep(raw, input, problems)).toBeNull();
     expect(problems.join(' ')).toContain(problem);
+  });
+
+  it('never accepts a micro-test while the flag is off', () => {
+    const off = { ...input, microTests: false };
+    const problems: string[] = [];
+    expect(
+      validateCalibrationStep(
+        step([], 'PROPOSE_MICRO_TEST', 'tecnica'),
+        off,
+        problems,
+      ),
+    ).toBeNull();
+    expect(problems.join(' ')).toContain('non disponibile');
+    expect(buildCalibrationPrompt(off).system).toContain(
+      'PROPOSE_MICRO_TEST non è disponibile',
+    );
+    expect(buildCalibrationPrompt(input).system).not.toContain(
+      'non è disponibile',
+    );
+  });
+
+  it('AT-12: proposes a micro-test on one driver in focus, without questions', () => {
+    expect(
+      validateCalibrationStep(step([], 'PROPOSE_MICRO_TEST', 'tecnica'), input),
+    ).toEqual({
+      action: 'PROPOSE_MICRO_TEST',
+      rationale: 'Mancano esempi concreti di colpi in partita.',
+      targetAreas: ['tecnica'],
+      questions: [],
+    });
   });
 
   it('stub output passes its own contract, only on drivers in focus', () => {

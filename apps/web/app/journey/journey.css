@@ -309,7 +309,8 @@
   background: #fff;
   font: inherit;
 }
-.pf4-free-lesson .pf4-link {
+.pf4-free-lesson .pf4-link,
+.pf4-calibration-round .pf4-link {
   margin-top: 12px;
   padding: 0;
   border: 0;
@@ -317,15 +318,6 @@
   font: inherit;
   text-decoration: underline;
   cursor: pointer;
-}
-.pf4-micro-tests fieldset {
-  border: 0;
-  padding: 0;
-  margin: 24px 0 0;
-}
-.pf4-micro-tests legend {
-  font-size: 16px;
-  line-height: 24px;
 }
 
 .pf4 .pf4-scenario-grid {
@@ -347,4 +339,13 @@
 .pf4 .pf4-offer {
   list-style: none;
   padding: 0;
+}
+.pf4-calibration-round .pf4-link {
+  display: block;
+  color: inherit;
+}
+.pf4-calibration-round .pf4-note {
+  padding: 12px;
+  border-left: 3px solid #d6d6d1;
+  background: #f7f7f4;
 }

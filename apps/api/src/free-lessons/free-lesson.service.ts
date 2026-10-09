@@ -3,7 +3,6 @@ import {
   ConflictException,
   ForbiddenException,
   Injectable,
-  NotFoundException,
 } from '@nestjs/common';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { Prisma } from '@prisma/client';
@@ -11,23 +10,16 @@ import {
   checkRule,
   loadActivePolicy,
 } from '../discovery/calibration/confidence-policy';
-import {
-  isCalibrationOpen,
-  lockCalibration,
-} from '../discovery/calibration/lesson-evidence';
+import { lockCalibration } from '../discovery/calibration/lesson-evidence';
 import {
   lessonClubs,
   settleCalibration,
 } from '../discovery/calibration/lesson-gate';
 import { FeatureFlagsService } from '../features/feature-flags.service';
-import { performanceDriverName as driverName } from '../performance/performance-display';
 import { PrismaService } from '../prisma/prisma.service';
 import { loadFreeLessonSettings, syncCredits } from './free-lesson-config';
 import { lessonEligibility } from './free-lesson-rules';
 import { holdCalibration, releaseCalibration } from './lesson-hold';
-import { MicroTestGenerationService } from './micro-test-generation.service';
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 type Db = PrismaService | Prisma.TransactionClient;
 
@@ -76,8 +68,6 @@ async function checkLesson(db: Db, userId: string) {
   };
 }
 
-type Option = { value: string; label: string; score: number };
-
 /**
  * Lezione gratuita lato atleta: obiettivo visibile dall'inizio della prova,
  * crediti guadagnati con le interazioni che rendono R più affidabile,
@@ -89,7 +79,6 @@ export class FreeLessonService {
     private readonly prisma: PrismaService,
     private readonly flags: FeatureFlagsService,
     private readonly analytics: AnalyticsService,
-    private readonly generation: MicroTestGenerationService,
   ) {}
 
   private async requireEnabled(userId: string) {
@@ -97,16 +86,12 @@ export class FreeLessonService {
       throw new ForbiddenException('La lezione gratuita non è attiva');
   }
 
-  async view(userId: string, now = new Date()) {
+  async view(userId: string) {
     if (!(await this.flags.isEnabled('free_lesson', userId)))
       return { enabled: false as const };
     const settings = await loadFreeLessonSettings(this.prisma);
     const credits = await syncCredits(this.prisma, userId, settings);
-    const [calibration, attribution, check] = await Promise.all([
-      this.prisma.athleteCalibration.findUnique({
-        where: { userId },
-        select: { status: true },
-      }),
+    const [attribution, check] = await Promise.all([
       this.prisma.userAttribution.findUnique({
         where: { userId },
         select: { partnerId: true },
@@ -143,8 +128,8 @@ export class FreeLessonService {
       credits: { balance: credits, toUnlock: settings.creditsToUnlock },
       earn: {
         initialAssessment: settings.creditsInitialAssessment,
+        // Un micro-test è un passo della calibrazione e vale come un round.
         calibrationRound: settings.creditsCalibrationRound,
-        microTest: settings.creditsMicroTest,
       },
       clubs,
       attributedClubId: clubId,
@@ -161,165 +146,7 @@ export class FreeLessonService {
                 : null,
           }
         : null,
-      ...(await this.microTests(
-        userId,
-        isCalibrationOpen(calibration?.status),
-        settings.microTestsPerDay,
-        now,
-      )),
     };
-  }
-
-  /**
-   * Micro-test proposti oggi: prima quelli scritti dall'AI per l'atleta
-   * (ultimo lotto pronto), poi il catalogo del back office, sui driver con la
-   * confidence più bassa, uno per test e mai oltre il limite delle ultime 24
-   * ore. Solo a calibrazione aperta.
-   */
-  private async microTests(
-    userId: string,
-    open: boolean,
-    perDay: number,
-    now: Date,
-  ) {
-    const none = {
-      microTests: [],
-      microTestsLeft: 0,
-      generateMicroTests: false,
-    };
-    if (!open || perDay === 0) return none;
-    const [latest, done, batch] = await Promise.all([
-      this.prisma.assessmentEvaluation.findFirst({
-        where: { userId },
-        orderBy: { sequence: 'desc' },
-        select: { areas: { select: { areaId: true, confidence: true } } },
-      }),
-      this.prisma.microTestCompletion.findMany({
-        where: { userId },
-        select: { microTestId: true, completedAt: true },
-      }),
-      this.prisma.microTestGeneration.findFirst({
-        where: { userId, status: 'READY' },
-        orderBy: { createdAt: 'desc' },
-        select: { id: true },
-      }),
-    ]);
-    const recent = done.filter(
-      (d) => d.completedAt.getTime() > now.getTime() - DAY_MS,
-    ).length;
-    const left = Math.max(0, perDay - recent);
-    if (!latest || !left) return { ...none, microTestsLeft: left };
-    const confidence = new Map(
-      latest.areas.map((a) => [a.areaId, a.confidence]),
-    );
-    const tests = await this.prisma.microTest.findMany({
-      where: {
-        isActive: true,
-        areaId: { in: [...confidence.keys()] },
-        id: { notIn: done.map((d) => d.microTestId) },
-        OR: [
-          { userId: null },
-          ...(batch ? [{ userId, generationId: batch.id }] : []),
-        ],
-      },
-      include: { area: { select: { name: true } } },
-      orderBy: { createdAt: 'asc' },
-    });
-    // Su misura prima del catalogo, poi i driver meno affidabili.
-    tests.sort(
-      (a, b) =>
-        Number(!a.userId) - Number(!b.userId) ||
-        confidence.get(a.areaId)! - confidence.get(b.areaId)!,
-    );
-    return {
-      microTestsLeft: left,
-      generateMicroTests: await this.generation.shouldGenerate(userId, now),
-      microTests: tests.slice(0, left).map((t) => ({
-        id: t.id,
-        title: t.title,
-        instructions: t.instructions,
-        areaName: driverName(t.area.name),
-        personal: !!t.userId,
-        // Il punteggio degli esiti resta sul server, come per i round.
-        options: (t.optionsJson as Option[]).map(({ value, label }) => ({
-          value,
-          label,
-        })),
-      })),
-    };
-  }
-
-  /** Prepara i micro-test su misura per l'ultima valutazione, poi restituisce il pannello. */
-  async generateMicroTests(userId: string, now = new Date()) {
-    await this.requireEnabled(userId);
-    const calibration = await this.prisma.athleteCalibration.findUnique({
-      where: { userId },
-      select: { status: true },
-    });
-    if (!isCalibrationOpen(calibration?.status))
-      throw new ConflictException('La calibrazione è chiusa');
-    await this.generation.generate(userId, now);
-    return this.view(userId, now);
-  }
-
-  /** Esito di un micro-test: una volta per test, entro il limite giornaliero. */
-  async completeMicroTest(
-    userId: string,
-    microTestId: string,
-    value: string,
-    now = new Date(),
-  ) {
-    await this.requireEnabled(userId);
-    const [test, settings] = await Promise.all([
-      // Un test su misura vale solo per il suo atleta.
-      this.prisma.microTest.findFirst({
-        where: {
-          id: microTestId,
-          isActive: true,
-          OR: [{ userId: null }, { userId }],
-        },
-      }),
-      loadFreeLessonSettings(this.prisma),
-    ]);
-    if (!test) throw new NotFoundException('Micro-test non trovato');
-    if (!(test.optionsJson as Option[]).some((o) => o.value === value))
-      throw new BadRequestException('Esito non valido');
-    await this.prisma.$transaction(async (tx) => {
-      // Lock per atleta: il limite giornaliero vale anche con invii paralleli.
-      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`micro-test:${userId}`}))`;
-      const already = await tx.microTestCompletion.findUnique({
-        where: { userId_microTestId: { userId, microTestId } },
-      });
-      if (already) return;
-      const calibration = await tx.athleteCalibration.findUnique({
-        where: { userId },
-        select: { status: true },
-      });
-      if (!isCalibrationOpen(calibration?.status))
-        throw new ConflictException('La calibrazione è chiusa');
-      const latest = await tx.assessmentEvaluation.findFirst({
-        where: { userId },
-        orderBy: { sequence: 'desc' },
-        select: { areas: { select: { areaId: true } } },
-      });
-      if (!latest?.areas.some((a) => a.areaId === test.areaId))
-        throw new BadRequestException('Micro-test non previsto per te');
-      const recent = await tx.microTestCompletion.count({
-        where: {
-          userId,
-          completedAt: { gt: new Date(now.getTime() - DAY_MS) },
-        },
-      });
-      if (recent >= settings.microTestsPerDay)
-        throw new ConflictException({
-          code: 'MICRO_TEST_DAILY_LIMIT',
-          message: 'Hai già fatto i micro-test di oggi. Riprendi domani.',
-        });
-      await tx.microTestCompletion.create({
-        data: { userId, microTestId, value, completedAt: now },
-      });
-    });
-    return this.view(userId, now);
   }
 
   /**

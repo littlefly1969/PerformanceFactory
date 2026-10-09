@@ -6,7 +6,6 @@ import { FeaturesModule } from '../features/features.module';
 import { CoachLessonService } from './coach-lesson.service';
 import { FreeLessonAdminService } from './free-lesson-admin.service';
 import { FreeLessonService } from './free-lesson.service';
-import { MicroTestGenerationService } from './micro-test-generation.service';
 import {
   CoachLessonController,
   FreeLessonAdminController,
@@ -20,11 +19,6 @@ import {
     FreeLessonAdminController,
     CoachLessonController,
   ],
-  providers: [
-    FreeLessonService,
-    FreeLessonAdminService,
-    CoachLessonService,
-    MicroTestGenerationService,
-  ],
+  providers: [FreeLessonService, FreeLessonAdminService, CoachLessonService],
 })
 export class FreeLessonsModule {}

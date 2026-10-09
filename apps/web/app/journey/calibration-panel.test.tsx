@@ -61,19 +61,21 @@ const round: NonNullable<Calibration["round"]> = {
   answers: {},
 };
 
-const renderPanel = (calibration: Calibration) => {
+const renderPanel = (calibration: Calibration, current = evaluation) => {
   const onOpenRound = vi.fn();
   const onAnswer = vi.fn();
+  const onSkip = vi.fn();
   render(
     <CalibrationPanel
       calibration={calibration}
-      evaluation={evaluation}
+      evaluation={current}
       busy={false}
       onOpenRound={onOpenRound}
       onAnswer={onAnswer}
+      onSkip={onSkip}
     />,
   );
-  return { onOpenRound, onAnswer };
+  return { onOpenRound, onAnswer, onSkip };
 };
 
 afterEach(cleanup);
@@ -123,6 +125,63 @@ describe("free calibration panel", () => {
       screen.getByRole("button", { name: "Invia la risposta →" }),
     );
     expect(onAnswer).toHaveBeenCalledWith("r1", { q1: "0" });
+  });
+
+  it("AT-12: shows a micro-test with safety notes and a self-reported outcome", async () => {
+    const { onAnswer, onSkip } = renderPanel(
+      {
+        ...base,
+        round: {
+          ...round,
+          id: "r2",
+          action: "PROPOSE_MICRO_TEST",
+          questions: [
+            {
+              id: "t1",
+              areaId: "a",
+              text: "Volée a muro",
+              options: [
+                { value: "o1", label: "0-3 su 10" },
+                { value: "o2", label: "4-10 su 10" },
+              ],
+              microTest: {
+                instructions: "Dieci volée a due metri dal muro.",
+                durationMinutes: 10,
+                safetyNotes: "Fermati se senti fastidio.",
+              },
+            },
+          ],
+        },
+      },
+      {
+        ...evaluation,
+        drivers: [
+          {
+            id: "a",
+            name: "Tecnico-tattico",
+            score: 50,
+            confidence: 30,
+            rationale: "r",
+            evidenceGaps: [],
+          },
+        ],
+      },
+    );
+    expect(
+      screen.getByText("Micro-test · Tecnico-tattico · circa 10 minuti"),
+    ).toBeVisible();
+    expect(screen.getByText("Dieci volée a due metri dal muro.")).toBeVisible();
+    expect(screen.getByText(/Fermati se senti fastidio/)).toBeVisible();
+    expect(screen.getByText(/L'esito lo riporti tu/)).toBeVisible();
+    const send = screen.getByRole("button", { name: "Invia l'esito →" });
+    expect(send).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "4-10 su 10" }));
+    await userEvent.click(send);
+    expect(onAnswer).toHaveBeenCalledWith("r2", { t1: "o2" });
+    await userEvent.click(
+      screen.getByRole("button", { name: "Non posso farlo ora" }),
+    );
+    expect(onSkip).toHaveBeenCalledWith("r2");
   });
 
   it("AT-10: offers the next round right away, without waiting", () => {

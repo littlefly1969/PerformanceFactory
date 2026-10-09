@@ -3,7 +3,6 @@ export type Settings = {
   creditsInitialAssessment: number;
   creditsCalibrationRound: number;
   creditsMicroTest: number;
-  microTestsPerDay: number;
 };
 
 export type Athlete = {

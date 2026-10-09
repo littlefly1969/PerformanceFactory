@@ -70,8 +70,9 @@ export function ConsentStep({
               checked={marketing}
               onChange={(e) => setMarketing(e.target.checked)}
             />{" "}
-            Facoltativo: voglio ricevere novità, offerte e iniziative dei circoli
-            partner. Puoi cambiare idea in qualsiasi momento dal profilo.
+            Facoltativo: voglio ricevere novità, offerte e iniziative dei
+            circoli partner. Puoi cambiare idea in qualsiasi momento dal
+            profilo.
           </label>
           {askAdult && (
             <label>

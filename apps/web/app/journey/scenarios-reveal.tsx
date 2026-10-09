@@ -81,8 +81,8 @@ export function ScenariosReveal({
       <h2 id="pf4-scenarios-title">Dove puoi arrivare in 3, 6 e 12 mesi.</h2>
       <p>
         Partiamo dalla tua R consolidata. Il potenziale cresce più in fretta
-        all&apos;inizio e poi rallenta: dipende dal tuo livello, dal tuo
-        impegno e dai giorni che puoi dedicare.
+        all&apos;inizio e poi rallenta: dipende dal tuo livello, dal tuo impegno
+        e dai giorni che puoi dedicare.
         {scenarios.engine.provisional &&
           " È una stima provvisoria, che affineremo con i dati dei tuoi allenamenti."}
       </p>
@@ -108,7 +108,8 @@ export function ScenariosReveal({
             <ul>
               {h.drivers.map((d) => (
                 <li key={d.id}>
-                  {d.name}: {round(d.current)} → <strong>{round(d.potential)}</strong>{" "}
+                  {d.name}: {round(d.current)} →{" "}
+                  <strong>{round(d.potential)}</strong>{" "}
                   <small>(affidabilità {confidenceLabel(d.confidence)})</small>
                 </li>
               ))}

@@ -29,13 +29,6 @@ export class RequestFreeLessonDto {
   shareWithCoach: boolean;
 }
 
-export class CompleteMicroTestDto {
-  @ApiProperty()
-  @IsString()
-  @MaxLength(60)
-  value: string;
-}
-
 export class UpdateFreeLessonConfigDto {
   @ApiPropertyOptional({ minimum: 0, maximum: 1000 })
   @IsOptional()
@@ -64,13 +57,6 @@ export class UpdateFreeLessonConfigDto {
   @Min(0)
   @Max(1000)
   creditsMicroTest?: number;
-
-  @ApiPropertyOptional({ minimum: 0, maximum: 10 })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(10)
-  microTestsPerDay?: number;
 }
 
 export class SetClubFreeLessonsDto {

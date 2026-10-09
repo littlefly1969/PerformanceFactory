@@ -30,7 +30,11 @@ describe("P3/P6/P12 reveal", () => {
   it("shows three scenarios marked as provisional and sends the chosen horizon", async () => {
     const onSelect = vi.fn();
     render(
-      <ScenariosReveal scenarios={scenarios()} busy={false} onSelect={onSelect} />,
+      <ScenariosReveal
+        scenarios={scenarios()}
+        busy={false}
+        onSelect={onSelect}
+      />,
     );
     expect(screen.getByText(/stima provvisoria/)).toBeVisible();
     const six = screen.getByRole("article", { name: "Scenario a 6 mesi" });
@@ -47,24 +51,40 @@ describe("P3/P6/P12 reveal", () => {
   it("shows only the payment cadences of the chosen horizon", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify([
-            {
-              horizon: "PROGRAM_3M",
-              billingOptions: [
-                { billingCycle: "MONTHLY", billingMonths: 1, amountCents: 3900, currency: "EUR" },
-              ],
-            },
-            {
-              horizon: "PROGRAM_12M",
-              billingOptions: [
-                { billingCycle: "MONTHLY", billingMonths: 1, amountCents: 2900, currency: "EUR" },
-                { billingCycle: "ANNUAL", billingMonths: 12, amountCents: 29000, currency: "EUR" },
-              ],
-            },
-          ]),
-        ),
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify([
+              {
+                horizon: "PROGRAM_3M",
+                billingOptions: [
+                  {
+                    billingCycle: "MONTHLY",
+                    billingMonths: 1,
+                    amountCents: 3900,
+                    currency: "EUR",
+                  },
+                ],
+              },
+              {
+                horizon: "PROGRAM_12M",
+                billingOptions: [
+                  {
+                    billingCycle: "MONTHLY",
+                    billingMonths: 1,
+                    amountCents: 2900,
+                    currency: "EUR",
+                  },
+                  {
+                    billingCycle: "ANNUAL",
+                    billingMonths: 12,
+                    amountCents: 29000,
+                    currency: "EUR",
+                  },
+                ],
+              },
+            ]),
+          ),
       ),
     );
     render(

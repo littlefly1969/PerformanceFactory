@@ -9,6 +9,8 @@ import { randomUUID } from 'node:crypto';
 import { AiProposalProviderService } from '../../ai-orchestrator/proposal-provider.service';
 import { loadActiveAssessmentPrompt } from '../../ai-orchestrator/assessment-prompts';
 import { CalibrationQuestion } from '../../ai-orchestrator/calibration-questions';
+import { AnalyticsService } from '../../analytics/analytics.service';
+import { FeatureFlagsService } from '../../features/feature-flags.service';
 import { loadOperationalTemplates } from '../assessment-configuration';
 import {
   buildAssessmentEvaluationInput,
@@ -30,6 +32,14 @@ import {
 } from './calibration-rules';
 import { loadActivePolicy } from './confidence-policy';
 import { lessonGate, settleCalibration } from './lesson-gate';
+import {
+  generateMicroTest,
+  microTestQuestion,
+  microTestsByArea,
+  publicMicroTest,
+  roundEvidence,
+  skipMicroTest,
+} from './micro-test-step';
 
 const LEASE_MS = 10 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -50,6 +60,8 @@ export class CalibrationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ai: AiProposalProviderService,
+    private readonly analytics: AnalyticsService,
+    private readonly flags: FeatureFlagsService,
   ) {}
 
   /**
@@ -167,6 +179,7 @@ export class CalibrationService {
                   value,
                   label,
                 })),
+                ...publicMicroTest(q.microTest),
               }),
             ),
             answers: open.answersJson as Answers,
@@ -237,6 +250,7 @@ export class CalibrationService {
         return;
       }
       const asked = await this.askedQuestions(userId, rounds);
+      const microTests = microTestsByArea(rounds);
       const prompt = await loadActiveAssessmentPrompt(
         this.prisma,
         'CALIBRATION',
@@ -252,26 +266,56 @@ export class CalibrationService {
         promptVersionId: prompt.promptVersionId,
         scale: input.scale,
         athleteContext: input.athleteContext,
+        microTests: await this.flags.isEnabled('ai_micro_tests', userId),
         targets: drivers.map((d) => ({
           ...d,
           askedQuestions: asked.get(d.areaId) ?? [],
+          microTests: microTests.get(d.areaId) ?? [],
           focus: inFocus.has(d.areaId),
         })),
       });
-      await this.prisma.calibrationRound.create({
-        data: {
-          userId,
-          sequence: (rounds.at(-1)?.sequence ?? 0) + 1,
-          kind,
-          questionsJson: result.questions as unknown as Prisma.InputJsonValue,
-          action: result.action,
-          targetAreas: result.targetAreas,
-          rationale: result.rationale,
-          provider: result.provider,
-          model: result.model,
-          promptVersionId: prompt.promptVersionId,
-          promptHash: result.promptHash,
-        },
+      const sequence = (rounds.at(-1)?.sequence ?? 0) + 1;
+      // Il micro-test lo scrive il generatore dedicato: se l'AI non risponde o
+      // il test non supera i controlli, il passo fallisce e si riprova, senza
+      // ripiegare sul catalogo (§4.4, AT-13).
+      const test =
+        result.action === 'PROPOSE_MICRO_TEST'
+          ? await generateMicroTest(this.prisma, this.ai, userId, input, result)
+          : null;
+      await this.prisma.$transaction(async (tx) => {
+        const questions = test
+          ? [await microTestQuestion(tx, userId, test)]
+          : result.questions;
+        await tx.calibrationRound.create({
+          data: {
+            userId,
+            sequence,
+            kind,
+            questionsJson: questions as unknown as Prisma.InputJsonValue,
+            action: result.action,
+            targetAreas: result.targetAreas,
+            rationale: result.rationale,
+            provider: result.provider,
+            model: result.model,
+            promptVersionId: prompt.promptVersionId,
+            promptHash: result.promptHash,
+          },
+        });
+        // Diagnostica senza testi: azione, numero di domande, area del test.
+        await this.analytics.trackServer(
+          test ? 'ai_micro_test_presented' : 'ai_question_presented',
+          {
+            userId,
+            properties: test
+              ? { area_id: test.areaId, round_sequence: sequence }
+              : {
+                  action: result.action,
+                  questions: questions.length,
+                  round_sequence: sequence,
+                },
+          },
+          tx,
+        );
       });
     } finally {
       await this.release(userId, lease);
@@ -315,6 +359,19 @@ export class CalibrationService {
           evaluationToken: token,
         },
       });
+      if (fixed.count)
+        await this.analytics.trackServer(
+          round.action === 'PROPOSE_MICRO_TEST'
+            ? 'ai_micro_test_completed'
+            : 'ai_question_answered',
+          {
+            userId,
+            properties: {
+              action: round.action ?? 'LEGACY',
+              round_sequence: round.sequence,
+            },
+          },
+        );
       // Già in valutazione: si prende in carico senza toccare le risposte.
       const owned =
         fixed.count ||
@@ -497,18 +554,21 @@ export class CalibrationService {
         if (!driver || !option) continue;
         const scores = q.options.map((o) => o.score);
         driver.answers.push({
-          question: q.text,
-          answer: option.label,
+          ...roundEvidence(q, option),
           optionScore: option.score,
           optionScoreRange: {
             min: Math.min(...scores),
             max: Math.max(...scores),
           },
-          source: 'CALIBRATION',
         });
       }
     }
     return input;
+  }
+
+  /** «Non posso farlo ora»: chiude il micro-test senza evidenza. */
+  skipMicroTest(userId: string, roundId: string, now = new Date()) {
+    return skipMicroTest(this.prisma, userId, roundId, now);
   }
 
   private async askedQuestions(
