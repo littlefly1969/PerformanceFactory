@@ -33,6 +33,8 @@ import { CalibrationService } from './calibration/calibration.service';
 import { ScenariosService } from './scenarios/scenarios.service';
 
 import { PROGRAM_DURATIONS, horizonForWeeks } from './program-horizon';
+import { recordMeaningfulInteraction } from '../engagement/meaningful-interaction';
+import { pendingWakeup } from '../engagement/engagement.service';
 const LEASE_MS = 10 * 60 * 1000;
 /** Prova mostrata all'atleta: solo visualizzazione, nessun blocco a scadenza. */
 const TRIAL_DAYS = 7;
@@ -58,13 +60,14 @@ export class AthleteJourneyService {
         nextStep: 'CONSENTS',
         documents: consent.documents,
       };
-    const [operational, bank, user] = await Promise.all([
+    const [operational, bank, user, wakeup] = await Promise.all([
       loadOperationalTemplates(this.prisma),
       loadSpecialistQuestionRecords(this.prisma, userId),
       this.prisma.user.findUniqueOrThrow({
         where: { id: userId },
         select: { firstName: true, createdAt: true },
       }),
+      pendingWakeup(this.prisma, userId),
     ]);
     const started = bank.length > 0;
     // Prima dell'avvio l'intro legge la configurazione; dopo fa fede la banca copiata.
@@ -146,6 +149,8 @@ export class AthleteJourneyService {
       phase,
       nextStep: phase,
       firstName: user.firstName,
+      // Bentornato dopo 10 giorni: riprende dal profilo esistente (§8.4).
+      wakeup,
       trial: {
         days: TRIAL_DAYS,
         daysLeft: Math.max(
@@ -251,6 +256,7 @@ export class AthleteJourneyService {
       // Le risposte operative vanno subito nel profilo letto dal training.
       if (!questions[index].areaId)
         await this.saveOperational(tx, userId, questions[index], value);
+      await recordMeaningfulInteraction(tx, userId, 'ASSESSMENT_ANSWER');
     });
     return this.state(userId);
   }

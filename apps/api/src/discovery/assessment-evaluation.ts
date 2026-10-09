@@ -13,6 +13,8 @@ import { performanceDriverName as driverName } from '../performance/performance-
 import { PrismaService } from '../prisma/prisma.service';
 import { AnalyticsEventName } from '../analytics/analytics-events';
 import { discoveryContext } from './discovery-context';
+import type { MeaningfulSource } from '../engagement/engagement-rules';
+import { recordMeaningfulInteraction } from '../engagement/meaningful-interaction';
 
 type Option = { value: unknown; label?: string; score?: unknown };
 
@@ -119,6 +121,7 @@ export async function runAssessmentEvaluation(
     return await saveEvaluation(prisma, userId, input, result, {
       sequence: INITIAL_SEQUENCE,
       source: 'SELF_ASSESSMENT',
+      interaction: 'ASSESSMENT_SUBMITTED',
     });
   } catch (error) {
     // Una richiesta concorrente ha già salvato la prima valutazione: vale quella.
@@ -144,13 +147,18 @@ export const INITIAL_SEQUENCE = 1;
  * (§5.3): l'atleta, l'AI Tuner e gli eventi non ne vedono le evidenze.
  */
 export async function saveEvaluation(
-  prisma: Pick<PrismaService, 'assessmentEvaluation' | 'analyticsEvent'>,
+  prisma: Pick<
+    PrismaService,
+    'assessmentEvaluation' | 'analyticsEvent' | 'userEngagement'
+  >,
   userId: string,
   input: AssessmentEvaluationInput,
   result: AssessmentEvaluationResult,
   meta: {
     sequence: number;
     source: string;
+    /** Fonte dell'interazione significativa che ha prodotto questa evidenza. */
+    interaction: MeaningfulSource;
     status?: string;
     consolidationPolicyId?: string;
   },
@@ -192,6 +200,7 @@ export async function saveEvaluation(
     },
     select: { id: true, createdAt: true },
   });
+  await recordMeaningfulInteraction(prisma, userId, meta.interaction);
   if (anomaly) {
     const name: AnalyticsEventName = 'assessment_anomaly_flagged';
     await prisma.analyticsEvent.create({

@@ -28,6 +28,7 @@ import { FeaturesModule } from './features/features.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { PartnersModule } from './partners/partners.module';
 import { FreeLessonsModule } from './free-lessons/free-lessons.module';
+import { EngagementModule } from './engagement/engagement.module';
 
 function buildThrottlerStorage() {
   const redisUrl = process.env.REDIS_URL;
@@ -89,6 +90,7 @@ function buildThrottlerStorage() {
     AnalyticsModule,
     PartnersModule,
     FreeLessonsModule,
+    EngagementModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -28,6 +28,12 @@ export const SERVER_EVENTS = [
   'lesson_booked',
   'lesson_completed',
   'coach_feedback_submitted',
+  // Engagement e dormienza a 10 giorni (§8, §11).
+  'meaningful_interaction',
+  'user_became_sleepy',
+  'user_became_dormant',
+  'wakeup_sent',
+  'user_reactivated',
 ] as const;
 
 export type ClientEventName = (typeof CLIENT_EVENTS)[number];

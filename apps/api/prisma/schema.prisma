@@ -65,6 +65,7 @@ model User {
   personalMicroTests       MicroTest[]
   microTestGenerations     MicroTestGeneration[]
   freeLessonSeat           FreeLessonSeat?
+  engagement               UserEngagement?
   coachedLessons           FreeLesson[]          @relation("FreeLessonCoach")
   lessonFeedbackReceived   CoachLessonFeedback[] @relation("LessonFeedbackAthlete")
   lessonFeedbackGiven      CoachLessonFeedback[] @relation("LessonFeedbackCoach")
@@ -1779,6 +1780,24 @@ model AssessmentAnomaly {
 
   @@index([userId, status])
   @@index([status, createdAt])
+}
+
+/// Stato di engagement dell'atleta (PF-FS-PREPAYWALL §8): dipende solo dal
+/// tempo trascorso dall'ultima interazione significativa, mai da login o refresh.
+model UserEngagement {
+  userId           String    @id
+  /// ACTIVE_RECENT, SLEEPY, DORMANT oppure REACTIVATED
+  state            String    @default("ACTIVE_RECENT")
+  /// Ultima interazione significativa; prima di ogni interazione, la registrazione.
+  lastMeaningfulAt DateTime
+  stateChangedAt   DateTime  @default(now())
+  /// Risveglio in-app avviato al passaggio a DORMANT (OP-07: nessun altro canale).
+  wakeupSentAt     DateTime?
+  reactivatedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([state, lastMeaningfulAt])
 }
 
 /// Parametri di back office della calibrazione (A4-D01 aperto): una sola riga.

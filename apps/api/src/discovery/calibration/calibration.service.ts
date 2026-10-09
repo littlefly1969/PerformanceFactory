@@ -433,6 +433,7 @@ export class CalibrationService {
         sequence: last.sequence + 1,
         source:
           round.kind === 'CLOSING' ? 'CLOSING_ASSESSMENT' : 'CALIBRATION_ROUND',
+        interaction: 'CALIBRATION_ROUND',
         consolidationPolicyId: policy.id,
       });
       // Collega solo il proprietario attuale: chi ha perso il round annulla tutto.
