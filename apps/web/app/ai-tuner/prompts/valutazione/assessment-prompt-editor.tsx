@@ -16,7 +16,7 @@ const ACTION_LABEL = {
   REQUEST_CLARIFICATION: "Chiarimento",
 } as const;
 
-/** Testi delle tre famiglie di prompt: valutazione, domande di calibrazione, micro-test su misura. */
+/** Testi delle famiglie di prompt: valutazione, calibrazione, micro-test e scenari P. */
 const COPY = {
   EVALUATION: {
     title: "Valutazione dell'assessment",
@@ -41,13 +41,29 @@ const COPY = {
   MICRO_TEST: {
     title: "Micro-test su misura",
     description:
-      "Prompt che, dopo ogni valutazione della calibrazione, scrive per l'atleta un micro-test pratico su ciascuno dei driver meno affidabili, partendo dalla sua storia: profilo, risposte, micro-test fatti e feedback del coach. Attivo con il flag ai_micro_tests; senza, restano i micro-test del catalogo.",
+      "Prompt che, quando il motore della calibrazione sceglie un micro-test, lo scrive per l'atleta sul driver indicato, partendo dalla sua storia: profilo, risposte, micro-test fatti e feedback del coach. Attivo con il flag ai_micro_tests.",
     usedBy: "tutti i nuovi lotti di micro-test",
     instructions: "Istruzioni per i micro-test (modificabili)",
     rules:
       "un micro-test per ogni driver ricevuto, titolo e istruzioni brevi, da 3 a 5 esiti con score crescenti nella scala attiva, titoli mai già proposti",
     activation: "I prossimi micro-test su misura di tutti gli atleti useranno",
   },
+  POTENTIAL: {
+    title: "Scenari P3/P6/P12",
+    description:
+      "Prompt del Performance Engine che, a R consolidata, stima dove può arrivare ogni driver in 3, 6 e 12 mesi. Il backend accetta solo stime entro i criteri versionati: tetto del livello, nessun calo con l'orizzonte, confidenza decrescente.",
+    usedBy: "tutti i nuovi reveal",
+    instructions: "Istruzioni per gli scenari (modificabili)",
+    rules:
+      "uno scenario per driver e orizzonte, P fra R e il limite dei criteri, mai in calo, confidenza entro il limite e mai in crescita, motivazione breve",
+    activation: "I prossimi scenari di tutti gli atleti useranno",
+  },
+} as const;
+
+const HORIZON_LABEL = {
+  PROGRAM_3M: "P3",
+  PROGRAM_6M: "P6",
+  PROGRAM_12M: "P12",
 } as const;
 
 export function AssessmentPromptEditor({
@@ -267,6 +283,40 @@ export function AssessmentPromptEditor({
                 </ul>
               </article>
             ))}
+          </section>
+        )}
+
+        {test && "scenarios" in test.output && (
+          <section className="pf-panel" aria-label="Risultato della prova">
+            <h2>Risultato della prova</h2>
+            <p className="pf-muted">
+              {test.provider} · {test.model} · {test.latencyMs} ms · criteri{" "}
+              {test.output.criteria}. Non salvato.
+            </p>
+            <table className="pf-table">
+              <thead>
+                <tr>
+                  <th>Driver</th>
+                  <th>Orizzonte</th>
+                  <th>R → P</th>
+                  <th>Confidenza</th>
+                  <th>Motivazione</th>
+                </tr>
+              </thead>
+              <tbody>
+                {test.output.scenarios.map((s) => (
+                  <tr key={`${s.areaId}:${s.horizon}`}>
+                    <td>{s.name ?? s.areaId}</td>
+                    <td>{HORIZON_LABEL[s.horizon]}</td>
+                    <td>
+                      {s.current ?? "?"} → {s.value}
+                    </td>
+                    <td>{s.confidence}</td>
+                    <td>{s.rationale}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </section>
         )}
 

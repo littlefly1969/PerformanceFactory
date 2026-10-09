@@ -21,7 +21,8 @@ const gap = (p: number) => ({
 
 const scenarios = (selectedHorizon: Scenarios["selectedHorizon"] = null) =>
   ({
-    engine: { key: "provisional-plateau", version: "1", provisional: true },
+    status: "READY",
+    engine: { key: "ai-potential", version: "1", provisional: true },
     scale: { min: 0, max: 100 },
     selectedHorizon,
     horizons: [

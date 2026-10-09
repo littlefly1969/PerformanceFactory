@@ -25,7 +25,7 @@ export class TestAssessmentPromptDto {
   @MaxLength(64)
   evaluationId?: string;
 
-  /** CALIBRATION e MICRO_TEST si provano solo sul caso sintetico. */
+  /** CALIBRATION, MICRO_TEST e POTENTIAL si provano solo sul caso sintetico. */
   @ApiPropertyOptional({ enum: ASSESSMENT_PROMPT_KINDS })
   @IsOptional()
   @IsIn(ASSESSMENT_PROMPT_KINDS)

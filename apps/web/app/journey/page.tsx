@@ -168,7 +168,23 @@ export default function JourneyPage() {
                 onChanged={() => void refresh()}
               />
             )}
-            {j.scenarios && (
+            {j.scenarios && j.scenarios.status !== "READY" && (
+              <section className="pf4-body" role="status">
+                <h2>
+                  {j.scenarios.status === "PENDING"
+                    ? "Stiamo preparando i tuoi scenari…"
+                    : "I tuoi scenari non sono ancora pronti."}
+                </h2>
+                <p>
+                  La tua R è consolidata: stiamo calcolando dove puoi arrivare
+                  in 3, 6 e 12 mesi. Aggiorna tra qualche istante.
+                </p>
+                <button className="pf4-cta" onClick={() => void refresh()}>
+                  Aggiorna
+                </button>
+              </section>
+            )}
+            {j.scenarios?.status === "READY" && (
               <ScenariosReveal
                 scenarios={j.scenarios}
                 busy={busy}

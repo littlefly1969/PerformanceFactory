@@ -157,3 +157,43 @@ export async function testMicroTestPrompt(
     previousOutput: null,
   };
 }
+
+/** Prova gli scenari P3/P6/P12 sul caso sintetico, con una R consolidata fittizia. */
+export async function testPotentialPrompt(
+  ai: AiProposalProviderService,
+  basePrompt: string,
+) {
+  const input = SYNTHETIC_ASSESSMENT_CASE;
+  const drivers = input.drivers.map((driver, k) => ({
+    areaId: driver.areaId,
+    name: driver.name,
+    score: 40 + k * 8,
+    confidence: 75,
+    commitment: k % 2 ? 'MEDIUM' : 'HIGH',
+    rationale: 'Valutazione consolidata del caso sintetico.',
+    evidenceGaps: [],
+  }));
+  const result = await ai.generatePotential({
+    basePrompt,
+    promptVersionId: null,
+    scale: { min: input.scale.minScore, max: input.scale.maxScore },
+    level: 'INTERMEDIATE',
+    levelConfidence: 80,
+    daysPerWeek: 3,
+    drivers,
+  });
+  return {
+    caseEvaluationId: null,
+    provider: result.provider,
+    model: result.model,
+    latencyMs: result.latencyMs,
+    output: {
+      criteria: result.criteria,
+      scenarios: result.scenarios.map((s) => {
+        const driver = drivers.find((d) => d.areaId === s.areaId);
+        return { ...s, name: driver?.name, current: driver?.score };
+      }),
+    },
+    previousOutput: null,
+  };
+}

@@ -8,6 +8,8 @@ import {
   loadCalibrationSettings,
 } from '../../src/discovery/calibration/calibration-config';
 import { ScenariosService } from '../../src/discovery/scenarios/scenarios.service';
+import { AiProposalProviderService } from '../../src/ai-orchestrator/proposal-provider.service';
+import { PotentialGenerationInput } from '../../src/ai-orchestrator/potential-generation';
 import { FeatureFlagsService } from '../../src/features/feature-flags.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { getRequiredTestDatabaseUrl } from '../utils/db-test-guard';
@@ -16,11 +18,17 @@ import { ensureTestDatabaseExists } from '../utils/ensure-test-database';
 describe('P3/P6/P12 scenarios and program horizon on PostgreSQL', () => {
   let prisma: PrismaService;
   let service: ScenariosService;
+  let ai: AiProposalProviderService;
+  let generateSpy: jest.SpiedFunction<
+    AiProposalProviderService['generatePotential']
+  >;
+  const inputs: PotentialGenerationInput[] = [];
   const users: string[] = [];
   const areaIds: string[] = [];
   const originalUrl = process.env.DATABASE_URL;
 
   beforeAll(async () => {
+    process.env.AI_PROVIDER = 'stub';
     process.env.DATABASE_URL = getRequiredTestDatabaseUrl();
     await ensureTestDatabaseExists(process.env.DATABASE_URL);
     execFileSync('pnpm', ['prisma', 'migrate', 'deploy'], {
@@ -30,10 +38,19 @@ describe('P3/P6/P12 scenarios and program horizon on PostgreSQL', () => {
     });
     prisma = new PrismaService();
     await prisma.$connect();
+    ai = new AiProposalProviderService();
+    const generate = ai.generatePotential.bind(ai);
+    generateSpy = jest
+      .spyOn(ai, 'generatePotential')
+      .mockImplementation((input) => {
+        inputs.push(input);
+        return generate(input);
+      });
     service = new ScenariosService(
       prisma,
       new FeatureFlagsService(prisma),
       new AnalyticsService(prisma),
+      ai,
     );
     for (const name of ['Tecnica', 'Fisico'])
       areaIds.push(
@@ -56,6 +73,14 @@ describe('P3/P6/P12 scenarios and program horizon on PostgreSQL', () => {
     }
     process.env.DATABASE_URL = originalUrl;
   });
+
+  /** Vista pronta: gli scenari sono stati scritti e validati. */
+  const ready = async (userId: string) => {
+    const view = await service.view(userId, areaIds);
+    if (view?.status !== 'READY')
+      throw new Error(`scenari non pronti: ${view?.status}`);
+    return view;
+  };
 
   const setFlag = (enabled: boolean) =>
     prisma.featureFlag.upsert({
@@ -154,23 +179,37 @@ describe('P3/P6/P12 scenarios and program horizon on PostgreSQL', () => {
     );
   });
 
-  it('computes P3/P6/P12 once per consolidated evaluation, with plateau and versioned engine', async () => {
+  it('has the AI write P3/P6/P12 once per consolidated evaluation, within the versioned criteria', async () => {
     await setFlag(true);
     const userId = await athlete();
+    const calls = generateSpy.mock.calls.length;
+    // Due aperture concorrenti: una scrive, l'altra aspetta; mai due chiamate.
     const views = await Promise.all([
       service.view(userId, areaIds),
       service.view(userId, areaIds),
     ]);
-    const view = views[0]!;
+    expect(views.map((v) => v?.status).sort()).toEqual(
+      expect.arrayContaining(['READY']),
+    );
+    expect(generateSpy.mock.calls.length - calls).toBe(1);
+    const sent = inputs.at(-1)!;
+    expect(sent.level).toBe('INTERMEDIATE');
+    expect(sent.drivers.map((d) => d.score)).toEqual([40, 85]);
+    const view = await ready(userId);
     expect(view.engine).toEqual({
-      key: 'provisional-plateau',
+      key: 'ai-potential',
       version: '1',
       provisional: true,
     });
     expect(view.horizons.map((h) => h.months)).toEqual([3, 6, 12]);
-    const technique = view.horizons.map((h) => h.drivers[0].potential);
-    expect(technique[0]).toBeGreaterThan(40);
-    expect(technique[2]).toBeGreaterThan(technique[1]);
+    // Stub: quattro quinti del limite dei criteri (tetto INTERMEDIATE = 80).
+    expect(view.horizons.map((h) => h.drivers[0].potential)).toEqual([
+      56, 64, 70.4,
+    ]);
+    expect(view.horizons.map((h) => h.drivers[0].confidence)).toEqual([
+      72, 60, 48,
+    ]);
+    expect(view.horizons[0].drivers[0].rationale).toEqual(expect.any(String));
     // Il driver fisico è già oltre il tetto del livello: P resta R.
     expect(view.horizons.map((h) => h.drivers[1].potential)).toEqual([
       85, 85, 85,
@@ -178,6 +217,7 @@ describe('P3/P6/P12 scenarios and program horizon on PostgreSQL', () => {
     expect(await prisma.potentialScenario.count({ where: { userId } })).toBe(6);
     await service.view(userId, areaIds);
     expect(await prisma.potentialScenario.count({ where: { userId } })).toBe(6);
+    expect(generateSpy.mock.calls.length - calls).toBe(1);
     // Gap complessivo come media dei driver; senza driver tecnico-tattico
     // nessun gap inventato.
     const p12 = view.horizons[2];
@@ -188,6 +228,52 @@ describe('P3/P6/P12 scenarios and program horizon on PostgreSQL', () => {
     });
     expect(p12.gap.overall!.gap).toBeGreaterThan(0);
     expect(p12.gap.technicalTactical).toBeNull();
+  });
+
+  it('OP-09: a provider failure shows a retry, never invented scenarios', async () => {
+    await setFlag(true);
+    const userId = await athlete();
+    generateSpy.mockRejectedValueOnce(new Error('provider down'));
+    expect(await service.view(userId, areaIds)).toEqual({
+      status: 'UNAVAILABLE',
+    });
+    expect(await prisma.potentialScenario.count({ where: { userId } })).toBe(0);
+    // Il lease è stato liberato: la prossima apertura riprova e riesce.
+    expect((await ready(userId)).horizons[2].drivers).toHaveLength(2);
+  });
+
+  it('keeps showing the scenarios already revealed, whatever engine wrote them', async () => {
+    await setFlag(true);
+    const userId = await athlete();
+    const evaluation = await prisma.assessmentEvaluation.findFirstOrThrow({
+      where: { userId, status: 'CONSOLIDATED' },
+    });
+    await prisma.potentialScenario.createMany({
+      data: (['PROGRAM_3M', 'PROGRAM_6M', 'PROGRAM_12M'] as const).flatMap(
+        (horizon, k) =>
+          areaIds.map((areaId) => ({
+            userId,
+            evaluationId: evaluation.id,
+            areaId,
+            horizon,
+            current: 40,
+            value: 41 + k,
+            confidence: 50,
+            assumptions: {},
+            engine: 'provisional-plateau',
+            engineVersion: '1',
+            provisional: true,
+          })),
+      ),
+    });
+    const calls = generateSpy.mock.calls.length;
+    const view = await ready(userId);
+    expect(view.engine.key).toBe('provisional-plateau');
+    expect(view.horizons.map((h) => h.drivers[0].potential)).toEqual([
+      41, 42, 43,
+    ]);
+    expect(view.horizons[0].drivers[0].rationale).toBeNull();
+    expect(generateSpy.mock.calls.length).toBe(calls);
   });
 
   it('AT-20: showing R, P and gaps activates the athlete once, with reveal events', async () => {
@@ -236,9 +322,7 @@ describe('P3/P6/P12 scenarios and program horizon on PostgreSQL', () => {
     ).toMatchObject({ programHorizon: 'PROGRAM_6M', programDurationWeeks: 26 });
     // Si può cambiare idea prima di pagare.
     await service.select(userId, 'PROGRAM_12M');
-    expect((await service.view(userId, areaIds))!.selectedHorizon).toBe(
-      'PROGRAM_12M',
-    );
+    expect((await ready(userId)).selectedHorizon).toBe('PROGRAM_12M');
     expect(
       await prisma.analyticsEvent.count({
         where: { userId, name: 'program_horizon_selected' },
