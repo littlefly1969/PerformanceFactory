@@ -116,6 +116,8 @@ export type Journey = {
     | "COMPLETE";
   nextStep: string;
   firstName?: string | null;
+  /** Risveglio in-app dopo 10 giorni senza interazioni significative. */
+  wakeup?: boolean;
   /** Prova mostrata all'atleta, calcolata dal backend. */
   trial?: { days: number; daysLeft: number };
   currentQuestion: number;

@@ -420,3 +420,33 @@ it("shows an error for a missing journey without redirecting back to the home pa
   );
   expect(screen.getByRole("button", { name: "Riprova" })).toBeInTheDocument();
 });
+
+describe("Wake-up after ten idle days", () => {
+  it("AT-23: welcomes the athlete back to their next step, not a restart", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ ...base, wakeup: true, firstName: "Stefano" }),
+          ),
+      ),
+    );
+    render(<JourneyPage />);
+    expect(
+      await screen.findByText(/Stefano, il tuo profilo è come l’hai lasciato/),
+    ).toBeInTheDocument();
+    // Il percorso resta dove era: la domanda successiva è subito disponibile.
+    expect(screen.getByText("Domanda configurata")).toBeInTheDocument();
+  });
+
+  it("shows no wake-up to an active athlete", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify(base))),
+    );
+    render(<JourneyPage />);
+    expect(await screen.findByText("Domanda configurata")).toBeInTheDocument();
+    expect(screen.queryByText("Bentornato")).toBeNull();
+  });
+});

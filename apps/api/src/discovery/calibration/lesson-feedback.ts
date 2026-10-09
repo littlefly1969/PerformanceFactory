@@ -80,6 +80,7 @@ export async function evaluatePendingFeedback(
     const saved = await saveEvaluation(tx, userId, input, result, {
       sequence: last.sequence + 1,
       source: 'COACH_LESSON',
+      interaction: 'COACH_FEEDBACK',
       consolidationPolicyId: policy.id,
     });
     await linkFeedback(tx, feedbackIds, saved.id);

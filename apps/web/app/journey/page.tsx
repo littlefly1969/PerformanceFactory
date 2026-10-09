@@ -56,6 +56,16 @@ export default function JourneyPage() {
             )}
           </div>
         )}
+        {/* Risveglio in-app: si riprende dal profilo, mai da capo (§8.4). */}
+        {j?.wakeup && (
+          <section className="pf4-body pf4-wakeup" role="status">
+            <span className="pf4-kicker">Bentornato</span>
+            <p>
+              {j.firstName ? `${j.firstName}, il` : "Il"} tuo profilo è come
+              l’hai lasciato: riprendi dal prossimo passo, senza ricominciare.
+            </p>
+          </section>
+        )}
         {!j && !google && !error && (
           <section className="pf4-body">
             <h1>Riprendiamo da qui…</h1>
