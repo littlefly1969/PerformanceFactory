@@ -328,6 +328,12 @@ export class AthleteJourneyService {
     return this.state(userId);
   }
 
+  async paywallViewed(userId: string) {
+    await this.allowed(userId);
+    await this.scenarios.paywallViewed(userId);
+    return { recorded: true };
+  }
+
   async calibrationRound(userId: string) {
     await this.allowed(userId);
     await this.calibration.openRound(userId);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { RadarChart } from "../components/radar-chart";
-import { API_BASE } from "../lib/api";
-import type { ProgramHorizon, Scenarios } from "./journey-types";
+import { API_BASE, secureFetch } from "../lib/api";
+import type { Gap, ProgramHorizon, Scenarios } from "./journey-types";
 import { confidenceLabel } from "./provisional-evaluation";
 
 type Offer = {
@@ -28,9 +28,76 @@ const price = (cents: number, currency: string) =>
 
 const round = (value: number) => Math.round(value);
 
-/** Cadenze di pagamento compatibili con l'orizzonte scelto (offerta di #9). */
+const margin = (gap: Gap) => `+${round(gap.gap)}`;
+
+/** Gap complessivo e tecnico-tattico dello scenario (§7.3). */
+function ScenarioGap({ gap }: { gap: Scenarios["horizons"][number]["gap"] }) {
+  if (!gap.overall) return null;
+  return (
+    <dl className="pf4-gap">
+      <div>
+        <dt>Margine complessivo</dt>
+        <dd>
+          {margin(gap.overall)}{" "}
+          <small>
+            ({round(gap.overall.current)} → {round(gap.overall.potential)})
+          </small>
+        </dd>
+      </div>
+      {gap.technicalTactical && (
+        <div>
+          <dt>Margine tecnico-tattico</dt>
+          <dd>
+            {margin(gap.technicalTactical)}{" "}
+            <small>
+              ({round(gap.technicalTactical.current)} →{" "}
+              {round(gap.technicalTactical.potential)})
+            </small>
+          </dd>
+        </div>
+      )}
+    </dl>
+  );
+}
+
+/**
+ * Paywall dopo il reveal (AT-28): cadenze dell'orizzonte scelto e checkout
+ * ospitato. La prima apertura viene registrata dal server.
+ */
 function HorizonOffer({ horizon }: { horizon: ProgramHorizon }) {
   const [offer, setOffer] = useState<Offer | null>();
+  const [paying, setPaying] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const shown = !!offer?.billingOptions.length;
+  useEffect(() => {
+    if (!shown) return;
+    void secureFetch(`${API_BASE}/athlete-journey/paywall/viewed`, {
+      method: "POST",
+      credentials: "include",
+    }).catch(() => undefined);
+  }, [shown]);
+  const checkout = async (billingCycle: string) => {
+    setPaying(billingCycle);
+    setError(null);
+    try {
+      const response = await secureFetch(`${API_BASE}/payments/checkout`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ horizon, billingCycle }),
+      });
+      const body = (await response.json().catch(() => ({}))) as {
+        checkoutUrl?: string;
+        message?: string;
+      };
+      if (!response.ok || !body.checkoutUrl)
+        throw new Error(body.message ?? "Pagamento non disponibile, riprova.");
+      window.location.assign(body.checkoutUrl);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Pagamento non disponibile.");
+      setPaying(null);
+    }
+  };
   useEffect(() => {
     let active = true;
     void fetch(`${API_BASE}/payments/offers`)
@@ -47,14 +114,26 @@ function HorizonOffer({ horizon }: { horizon: ProgramHorizon }) {
   if (!offer?.billingOptions.length)
     return <p>Le offerte per questo percorso non sono ancora disponibili.</p>;
   return (
-    <ul className="pf4-offer" aria-label="Come pagare il percorso">
-      {offer.billingOptions.map((o) => (
-        <li key={o.billingCycle}>
-          <strong>{price(o.amountCents, o.currency)}</strong>{" "}
-          {CYCLES[o.billingCycle] ?? o.billingCycle}
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className="pf4-offer" aria-label="Come pagare il percorso">
+        {offer.billingOptions.map((o) => (
+          <li key={o.billingCycle}>
+            <strong>{price(o.amountCents, o.currency)}</strong>{" "}
+            {CYCLES[o.billingCycle] ?? o.billingCycle}{" "}
+            <button
+              className="pf4-cta"
+              disabled={paying !== null}
+              onClick={() => void checkout(o.billingCycle)}
+            >
+              {paying === o.billingCycle
+                ? "Ti portiamo al pagamento…"
+                : "Attiva"}
+            </button>
+          </li>
+        ))}
+      </ul>
+      {error && <p role="alert">{error}</p>}
+    </>
   );
 }
 
@@ -114,6 +193,7 @@ export function ScenariosReveal({
                 </li>
               ))}
             </ul>
+            <ScenarioGap gap={h.gap} />
             <button
               className="pf4-cta"
               disabled={busy}

@@ -14,6 +14,8 @@ import {
 } from '../assessment-configuration';
 import { isCalibrationClosed } from '../calibration/calibration-rules';
 import { PROGRAM_HORIZON_WEEKS } from '../program-horizon';
+import { OPEN_SUBSCRIPTION_STATUSES } from '../../payments/checkout.service';
+import { revealGaps } from './reveal-gap';
 import {
   ACTIVE_POTENTIAL_ENGINE,
   HORIZON_MONTHS,
@@ -25,10 +27,14 @@ const HORIZONS = Object.keys(HORIZON_MONTHS) as ProgramHorizon[];
 export const isProgramHorizon = (value: unknown): value is ProgramHorizon =>
   HORIZONS.includes(value as ProgramHorizon);
 
+/** Messaggio unico: scegliere un percorso richiede il reveal completo. */
+const NOT_REVEALED = 'Gli scenari si sbloccano a calibrazione completata';
+
 /**
  * Scenari P3/P6/P12 a calibrazione chiusa e scelta dell'orizzonte (gap 1.8,
  * 1.9). Gli scenari si calcolano una volta per valutazione consolidata e
- * motore; la scelta porta il percorso a PAYWALL_READY.
+ * motore. Mostrarli con i gap rende l'atleta ACTIVATED (A10); solo allora la
+ * scelta dell'orizzonte porta il percorso a PAYWALL_READY (§7.3, AT-28).
  */
 @Injectable()
 export class ScenariosService {
@@ -65,6 +71,30 @@ export class ScenariosService {
       const index = orderedAreas.indexOf(id);
       return index < 0 ? Number.MAX_SAFE_INTEGER : index;
     };
+    const horizons = HORIZONS.map((horizon) => {
+      const drivers = rows
+        .filter((r) => r.horizon === horizon)
+        .sort((a, b) => position(a.areaId) - position(b.areaId));
+      return {
+        horizon,
+        months: HORIZON_MONTHS[horizon],
+        drivers: drivers.map((r) => ({
+          id: r.areaId,
+          name: driverName(r.area.name),
+          current: r.current,
+          potential: r.value,
+          confidence: r.confidence,
+        })),
+        gap: revealGaps(
+          drivers.map((r) => ({
+            areaName: r.area.name,
+            current: r.current,
+            potential: r.value,
+          })),
+        ),
+      };
+    });
+    if (rows.length) await this.activate(userId, evaluation.id);
     return {
       engine: {
         key: this.engine.key,
@@ -75,33 +105,80 @@ export class ScenariosService {
       scale: { min: evaluation.minScore, max: evaluation.maxScore },
       computedAt: rows[0]?.computedAt ?? null,
       selectedHorizon: discovery?.programHorizon ?? null,
-      horizons: HORIZONS.map((horizon) => ({
-        horizon,
-        months: HORIZON_MONTHS[horizon],
-        drivers: rows
-          .filter((r) => r.horizon === horizon)
-          .sort((a, b) => position(a.areaId) - position(b.areaId))
-          .map((r) => ({
-            id: r.areaId,
-            name: driverName(r.area.name),
-            current: r.current,
-            potential: r.value,
-            confidence: r.confidence,
-          })),
-      })),
+      horizons,
     };
   }
 
-  /** Salva l'orizzonte scelto: si può cambiare finché non c'è un abbonamento. */
+  /**
+   * R consolidata, P e gap sono nella risposta mostrata all'atleta: diventa
+   * ACTIVATED una volta sola, con `gap_displayed` per valutazione.
+   */
+  private async activate(userId: string, evaluationId: string) {
+    const now = new Date();
+    await this.prisma.athleteDiscovery.updateMany({
+      where: { userId, activatedAt: null },
+      data: { activatedAt: now },
+    });
+    await this.analytics.trackServerOnce('gap_displayed', {
+      userId,
+      onceKey: evaluationId,
+    });
+  }
+
+  /**
+   * Prima apertura del paywall (§7.3): solo dopo la scelta dell'orizzonte,
+   * quindi dopo aver visto R, P e gap (AT-28). Le aperture successive non
+   * contano di nuovo.
+   */
+  async paywallViewed(userId: string) {
+    const calibration = await this.prisma.athleteCalibration.findUnique({
+      where: { userId },
+      select: { status: true },
+    });
+    if (calibration?.status !== 'PAYWALL_READY')
+      throw new ConflictException('Scegli prima il tuo percorso');
+    const first = await this.prisma.athleteDiscovery.updateMany({
+      where: { userId, paywallViewedAt: null },
+      data: { paywallViewedAt: new Date() },
+    });
+    if (first.count)
+      await this.analytics.trackServerOnce('paywall_viewed', {
+        userId,
+        onceKey: userId,
+      });
+  }
+
+  /**
+   * Salva l'orizzonte scelto dopo il reveal: si può cambiare finché non c'è
+   * un abbonamento pagato; un checkout ancora aperto viene sostituito al
+   * prossimo avvio (#14).
+   */
   async select(userId: string, horizon: unknown) {
     if (!isProgramHorizon(horizon))
       throw new BadRequestException('Orizzonte non valido');
-    if (!(await this.ready(userId)))
-      throw new ConflictException(
-        'Gli scenari si sbloccano a calibrazione completata',
-      );
+    if (!(await this.ready(userId))) throw new ConflictException(NOT_REVEALED);
     const now = new Date();
     await this.prisma.$transaction(async (tx) => {
+      // Stesso lock del checkout: scelta e pagamento non si incrociano.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`pf-checkout:${userId}`}, 0))`;
+      const paid = await tx.subscription.count({
+        where: {
+          userId,
+          status: {
+            in: OPEN_SUBSCRIPTION_STATUSES.filter(
+              (s) => s !== 'CHECKOUT_PENDING',
+            ),
+          },
+        },
+      });
+      if (paid)
+        throw new ConflictException(
+          'Il percorso è già attivo: l’orizzonte non si può cambiare',
+        );
+      const activated = await tx.athleteDiscovery.count({
+        where: { userId, activatedAt: { not: null } },
+      });
+      if (!activated) throw new ConflictException(NOT_REVEALED);
       const changed = await tx.athleteCalibration.updateMany({
         where: {
           userId,
@@ -109,10 +186,7 @@ export class ScenariosService {
         },
         data: { status: 'PAYWALL_READY' },
       });
-      if (!changed.count)
-        throw new ConflictException(
-          'Gli scenari si sbloccano a calibrazione completata',
-        );
+      if (!changed.count) throw new ConflictException(NOT_REVEALED);
       await tx.athleteDiscovery.update({
         where: { userId },
         data: {
@@ -177,7 +251,7 @@ export class ScenariosService {
       })),
     });
     // Due richieste concorrenti calcolano lo stesso risultato: vale il primo.
-    await this.prisma.potentialScenario.createMany({
+    const created = await this.prisma.potentialScenario.createMany({
       data: scenarios.map((s) => ({
         userId,
         evaluationId: evaluation.id,
@@ -193,6 +267,15 @@ export class ScenariosService {
       })),
       skipDuplicates: true,
     });
+    if (created.count)
+      await this.analytics.trackServerOnce('potential_generated', {
+        userId,
+        onceKey: `${evaluation.id}:${this.engine.key}:${this.engine.version}`,
+        properties: {
+          engine: this.engine.key,
+          engineVersion: this.engine.version,
+        },
+      });
   }
 
   /** Giorni a settimana dalla domanda operativa dell'assessment, se presente. */

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   BillingCycle,
+  Prisma,
   PaymentProviderKind,
   ProgramHorizon,
   Subscription,
@@ -54,6 +55,36 @@ function sameOffer(subscription: Subscription, offer: Offer, kind: string) {
     subscription.amountCents === offer.amountCents &&
     subscription.currency === offer.currency
   );
+}
+
+/**
+ * Il paywall segue il reveal (PF-FS-PREPAYWALL §7.3, #14): si paga solo con
+ * il percorso in PAYWALL_READY, quindi dopo aver visto R, P e gap, e solo
+ * l'orizzonte scelto nel reveal, mai un'offerta diversa.
+ */
+async function assertPaywallReady(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  horizon: ProgramHorizon,
+) {
+  const [calibration, discovery] = await Promise.all([
+    tx.athleteCalibration.findUnique({
+      where: { userId },
+      select: { status: true },
+    }),
+    tx.athleteDiscovery.findUnique({
+      where: { userId },
+      select: { programHorizon: true },
+    }),
+  ]);
+  if (calibration?.status !== 'PAYWALL_READY')
+    throw new ConflictException(
+      'Il percorso si attiva dopo aver visto i tuoi scenari e scelto l’orizzonte',
+    );
+  if (discovery?.programHorizon !== horizon)
+    throw new ConflictException(
+      'L’offerta non corrisponde al percorso che hai scelto',
+    );
 }
 
 /**
@@ -119,6 +150,7 @@ export class CheckoutService {
       if (open && open.status !== SubscriptionStatus.CHECKOUT_PENDING) {
         throw new ConflictException('Esiste gia un abbonamento attivo');
       }
+      await assertPaywallReady(tx, userId, offer.horizon);
       if (open && !open.checkoutUrl) {
         const preparing =
           now.getTime() - open.createdAt.getTime() < PREPARATION_TIMEOUT_MS;

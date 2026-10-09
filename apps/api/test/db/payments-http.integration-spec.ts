@@ -19,6 +19,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { applyValidationPipe } from '../utils/apply-validation-pipe';
 import { getRequiredTestDatabaseUrl } from '../utils/db-test-guard';
 import { ensureTestDatabaseExists } from '../utils/ensure-test-database';
+import { paywallReady } from './paywall-test-helper';
 
 const SECRET = 'http-integration-stub-secret';
 
@@ -101,6 +102,7 @@ describe('Payments HTTP flow on PostgreSQL', () => {
         role: 'USER',
       },
     });
+    await paywallReady(prisma, user.id, 'PROGRAM_3M');
     const headers = {
       'content-type': 'application/json',
       'x-test-user': user.id,

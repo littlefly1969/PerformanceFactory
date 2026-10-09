@@ -178,12 +178,55 @@ describe('P3/P6/P12 scenarios and program horizon on PostgreSQL', () => {
     expect(await prisma.potentialScenario.count({ where: { userId } })).toBe(6);
     await service.view(userId, areaIds);
     expect(await prisma.potentialScenario.count({ where: { userId } })).toBe(6);
+    // Gap complessivo come media dei driver; senza driver tecnico-tattico
+    // nessun gap inventato.
+    const p12 = view.horizons[2];
+    expect(p12.gap.overall).toEqual({
+      current: 62.5,
+      potential: expect.any(Number) as number,
+      gap: expect.any(Number) as number,
+    });
+    expect(p12.gap.overall!.gap).toBeGreaterThan(0);
+    expect(p12.gap.technicalTactical).toBeNull();
+  });
+
+  it('AT-20: showing R, P and gaps activates the athlete once, with reveal events', async () => {
+    await setFlag(true);
+    const userId = await athlete();
+    await Promise.all([
+      service.view(userId, areaIds),
+      service.view(userId, areaIds),
+    ]);
+    const discovery = await prisma.athleteDiscovery.findUniqueOrThrow({
+      where: { userId },
+    });
+    expect(discovery.activatedAt).not.toBeNull();
+    await service.view(userId, areaIds);
+    expect(
+      (await prisma.athleteDiscovery.findUniqueOrThrow({ where: { userId } }))
+        .activatedAt,
+    ).toEqual(discovery.activatedAt);
+    const names = (
+      await prisma.analyticsEvent.findMany({
+        where: { userId },
+        select: { name: true },
+      })
+    ).map((e) => e.name);
+    expect(names.sort()).toEqual(['gap_displayed', 'potential_generated']);
   });
 
   it('saves the chosen horizon as PAYWALL_READY and keeps the program locked until a subscription', async () => {
     await setFlag(true);
     const userId = await athlete();
     await expect(service.select(userId, 'PROGRAM_9M')).rejects.toThrow();
+    // AT-28: niente scelta (e quindi niente paywall) prima di aver visto R/P/gap.
+    await expect(service.select(userId, 'PROGRAM_6M')).rejects.toThrow(
+      ConflictException,
+    );
+    await expect(service.paywallViewed(userId)).rejects.toThrow(
+      ConflictException,
+    );
+    await service.view(userId, areaIds);
     await service.select(userId, 'PROGRAM_6M');
     expect(
       await prisma.athleteCalibration.findUniqueOrThrow({ where: { userId } }),
@@ -201,6 +244,13 @@ describe('P3/P6/P12 scenarios and program horizon on PostgreSQL', () => {
         where: { userId, name: 'program_horizon_selected' },
       }),
     ).toBe(2);
+    await service.paywallViewed(userId);
+    await service.paywallViewed(userId);
+    expect(
+      await prisma.analyticsEvent.count({
+        where: { userId, name: 'paywall_viewed' },
+      }),
+    ).toBe(1);
 
     // Altri test possono aver riaperto il programma dal back office.
     const settings = await loadCalibrationSettings(prisma);
@@ -224,6 +274,10 @@ describe('P3/P6/P12 scenarios and program horizon on PostgreSQL', () => {
       },
     });
     await expect(assertProgramAllowed(prisma, userId)).resolves.toBeUndefined();
+    // Dopo il pagamento l'orizzonte non cambia più (#14).
+    await expect(service.select(userId, 'PROGRAM_3M')).rejects.toThrow(
+      'non si può cambiare',
+    );
     await prisma.calibrationConfig.update({
       where: { id: 'default' },
       data: { programBeforePaywall: settings.programBeforePaywall },

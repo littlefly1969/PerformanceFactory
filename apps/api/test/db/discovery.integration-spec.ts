@@ -1055,6 +1055,11 @@ describe('PF4 discovery to authenticated journey', () => {
         status: 'CONSOLIDATED',
         consolidationPolicyId: lowered.id,
       });
+      expect(
+        await prisma.analyticsEvent.count({
+          where: { userId, name: 'r_consolidated' },
+        }),
+      ).toBe(1);
       // La versione precedente resta nello storico.
       expect(
         await prisma.confidencePolicy.count({

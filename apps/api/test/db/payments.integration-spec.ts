@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, ProgramHorizon } from '@prisma/client';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { resolve } from 'node:path';
@@ -15,6 +15,7 @@ import { SubscriptionsService } from '../../src/payments/subscriptions.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { getRequiredTestDatabaseUrl } from '../utils/db-test-guard';
 import { ensureTestDatabaseExists } from '../utils/ensure-test-database';
+import { paywallReady } from './paywall-test-helper';
 
 const SECRET = 'integration-stub-secret';
 
@@ -113,6 +114,17 @@ describe('Payments on PostgreSQL (stub provider)', () => {
     await expect(checkouts.start(user, 'PROGRAM_3M', 'ANNUAL')).rejects.toThrow(
       'non disponibile',
     );
+    // Il paywall segue il reveal: niente checkout prima, niente altro orizzonte (#14).
+    await expect(
+      checkouts.start(user, 'PROGRAM_12M', 'MONTHLY'),
+    ).rejects.toThrow('dopo aver visto i tuoi scenari');
+    await paywallReady(prisma, user.id, 'PROGRAM_12M');
+    await expect(
+      checkouts.start(user, 'PROGRAM_3M', 'MONTHLY'),
+    ).rejects.toThrow('non corrisponde al percorso');
+    expect(
+      await prisma.subscription.count({ where: { userId: user.id } }),
+    ).toBe(0);
 
     const checkout = await checkouts.start(user, 'PROGRAM_12M', 'MONTHLY');
     expect(checkout.provider).toBe('STUB');
@@ -203,14 +215,16 @@ describe('Payments on PostgreSQL (stub provider)', () => {
     ]);
   });
 
-  async function newUser() {
-    return prisma.user.create({
+  async function newUser(horizon: ProgramHorizon = 'PROGRAM_6M') {
+    const user = await prisma.user.create({
       data: {
         email: `payments-${randomUUID()}@example.test`,
         password: 'unused-test-hash',
         role: 'USER',
       },
     });
+    await paywallReady(prisma, user.id, horizon);
+    return user;
   }
 
   function openCount(userId: string) {
@@ -240,7 +254,7 @@ describe('Payments on PostgreSQL (stub provider)', () => {
 
   describe('concurrency and ordering', () => {
     it('gives the same checkout to a double click and keeps one open subscription', async () => {
-      const user = await newUser();
+      const user = await newUser('PROGRAM_12M');
       const results = await Promise.all(
         Array.from({ length: 6 }, () =>
           checkouts.start(user, 'PROGRAM_12M', 'QUARTERLY'),
@@ -255,8 +269,9 @@ describe('Payments on PostgreSQL (stub provider)', () => {
     });
 
     it('invalidates a pending checkout when the athlete changes horizon or cycle', async () => {
-      const user = await newUser();
+      const user = await newUser('PROGRAM_3M');
       const first = await checkouts.start(user, 'PROGRAM_3M', 'MONTHLY');
+      await paywallReady(prisma, user.id, 'PROGRAM_12M');
       const second = await checkouts.start(user, 'PROGRAM_12M', 'ANNUAL');
       expect(second.subscriptionId).not.toBe(first.subscriptionId);
       const rows = await prisma.subscription.findMany({

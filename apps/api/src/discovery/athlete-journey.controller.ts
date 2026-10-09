@@ -116,4 +116,12 @@ export class AthleteJourneyController {
   ) {
     return this.journey.horizon(req.user.id, body.horizon);
   }
+  @ApiOperation({
+    summary:
+      'Registra la prima apertura del paywall, dopo il reveal e la scelta del percorso',
+  })
+  @Post('paywall/viewed')
+  paywallViewed(@Req() req: { user: { id: string } }) {
+    return this.journey.paywallViewed(req.user.id);
+  }
 }

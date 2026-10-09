@@ -1,4 +1,5 @@
 import { Prisma } from '@prisma/client';
+import type { AnalyticsEventName } from '../../analytics/analytics-events';
 import { CLOSED_CALIBRATION_STATUSES } from './calibration-rules';
 
 /**
@@ -43,5 +44,15 @@ export async function completeCalibration(
       where: { id: latest.id },
       data: { status: 'CONSOLIDATED', consolidationPolicyId: policyId },
     });
+  const name: AnalyticsEventName = 'r_consolidated';
+  await tx.analyticsEvent.create({
+    data: {
+      name,
+      occurredAt: now,
+      userId,
+      origin: 'SERVER',
+      properties: { reason },
+    },
+  });
   return true;
 }

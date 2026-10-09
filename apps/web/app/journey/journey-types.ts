@@ -37,6 +37,8 @@ export type Evaluation = {
 };
 export type ProgramHorizon = "PROGRAM_3M" | "PROGRAM_6M" | "PROGRAM_12M";
 /** Scenari P3/P6/P12 a calibrazione chiusa, dal motore di P (provvisorio finché manca la Parte C). */
+/** Gap tra R consolidata e P, nella scala della valutazione. */
+export type Gap = { current: number; potential: number; gap: number };
 export type Scenarios = {
   engine: { key: string; version: string; provisional: boolean };
   scale: { min: number; max: number };
@@ -51,6 +53,8 @@ export type Scenarios = {
       potential: number;
       confidence: number;
     }[];
+    /** Complessivo (media dei driver) e tecnico-tattico, se il driver esiste. */
+    gap: { overall: Gap | null; technicalTactical: Gap | null };
   }[];
 };
 /** Calibrazione gratuita dopo la prima valutazione (A4.3): round di domande AI. */
