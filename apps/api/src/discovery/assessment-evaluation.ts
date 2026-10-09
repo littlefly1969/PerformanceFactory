@@ -11,6 +11,7 @@ import { TemplateRecord } from '../onboarding/onboarding-model';
 import { normalizeOptions } from '../onboarding/onboarding-answers';
 import { performanceDriverName as driverName } from '../performance/performance-display';
 import { PrismaService } from '../prisma/prisma.service';
+import { AnalyticsEventName } from '../analytics/analytics-events';
 import { discoveryContext } from './discovery-context';
 
 type Option = { value: unknown; label?: string; score?: unknown };
@@ -136,9 +137,14 @@ export async function runAssessmentEvaluation(
 /** Prima valutazione dell'assessment: unica per atleta grazie a (userId, sequence). */
 export const INITIAL_SEQUENCE = 1;
 
-/** Salva una valutazione versionata; sequence e fonte distinguono prima valutazione e round. */
-export function saveEvaluation(
-  prisma: Pick<PrismaService, 'assessmentEvaluation'>,
+/**
+ * Salva una valutazione versionata; sequence e fonte distinguono prima
+ * valutazione e round. Un'eventuale segnalazione dell'AI esce dall'output
+ * salvato e diventa una riga `AssessmentAnomaly`, visibile solo all'admin
+ * (§5.3): l'atleta, l'AI Tuner e gli eventi non ne vedono le evidenze.
+ */
+export async function saveEvaluation(
+  prisma: Pick<PrismaService, 'assessmentEvaluation' | 'analyticsEvent'>,
   userId: string,
   input: AssessmentEvaluationInput,
   result: AssessmentEvaluationResult,
@@ -149,7 +155,8 @@ export function saveEvaluation(
     consolidationPolicyId?: string;
   },
 ) {
-  return prisma.assessmentEvaluation.create({
+  const { anomaly, ...output } = result.output;
+  const saved = await prisma.assessmentEvaluation.create({
     data: {
       userId,
       sequence: meta.sequence,
@@ -169,7 +176,7 @@ export function saveEvaluation(
       promptVersionId: input.promptVersionId,
       promptHash: result.promptHash,
       inputJson: result.inputJson as Prisma.InputJsonValue,
-      outputJson: result.output as unknown as Prisma.InputJsonValue,
+      outputJson: output as unknown as Prisma.InputJsonValue,
       latencyMs: result.latencyMs,
       areas: {
         create: result.output.drivers.map((d) => ({
@@ -181,9 +188,23 @@ export function saveEvaluation(
           commitment: d.commitment,
         })),
       },
+      ...(anomaly ? { anomalies: { create: [{ userId, ...anomaly }] } } : {}),
     },
     select: { id: true, createdAt: true },
   });
+  if (anomaly) {
+    const name: AnalyticsEventName = 'assessment_anomaly_flagged';
+    await prisma.analyticsEvent.create({
+      data: {
+        name,
+        occurredAt: new Date(),
+        userId,
+        origin: 'SERVER',
+        properties: { kind: anomaly.kind, priority: anomaly.priority },
+      },
+    });
+  }
+  return saved;
 }
 
 /** Ultima valutazione nel formato mostrato all'atleta: R provvisoria, mai P. */

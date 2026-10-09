@@ -102,6 +102,16 @@ describe("FreeLessonPanel", () => {
     expect(screen.queryByRole("button", { name: /Richiedi/ })).toBeNull();
   });
 
+  it("AT-11: shows only a neutral message while the lesson is suspended", async () => {
+    serve({ ...base, missing: ["PROFILE"] });
+    render(<FreeLessonPanel refreshKey="a" />);
+    expect(
+      await screen.findByText(/Continuiamo a conoscere il tuo profilo/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/segnalazion|sospes|anomal/i)).toBeNull();
+    expect(screen.queryByRole("button", { name: /Richiedi/ })).toBeNull();
+  });
+
   it("AT-18: lets an eligible athlete decline, then change their mind", async () => {
     const onChanged = vi.fn();
     const calls = serve(

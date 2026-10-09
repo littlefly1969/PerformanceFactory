@@ -14,6 +14,7 @@ import { AthleteRegistrationService } from './athlete-registration.service';
 import { CalibrationService } from './calibration/calibration.service';
 import { CalibrationAdminController } from './calibration/calibration-admin.controller';
 import { ConfidencePolicyAdminController } from './calibration/confidence-policy-admin.controller';
+import { AssessmentAnomalyAdminController } from './calibration/assessment-anomaly-admin.controller';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { ConfidencePolicyAdminController } from './calibration/confidence-policy
     AthleteJourneyController,
     CalibrationAdminController,
     ConfidencePolicyAdminController,
+    AssessmentAnomalyAdminController,
   ],
   providers: [
     DiscoveryService,

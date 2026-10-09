@@ -72,6 +72,7 @@ const roleNav: Record<string, NavItem[]> = {
     { href: "/admin/assessment", label: "Assessment" },
     { href: "/admin/consents", label: "Privacy" },
     { href: "/admin/calibration", label: "Calibrazione" },
+    { href: "/admin/anomalies", label: "Segnalazioni" },
     { href: "/admin/partners", label: "Circoli" },
     { href: "/admin/free-lessons", label: "Lezione gratuita" },
     { href: "/admin/feature-flags", label: "Rilasci" },
@@ -127,6 +128,7 @@ const pathMatchesRole = (path: string, role?: string) => {
       path.startsWith("/admin/assessment") ||
       path.startsWith("/admin/consents") ||
       path.startsWith("/admin/calibration") ||
+      path.startsWith("/admin/anomalies") ||
       path.startsWith("/admin/partners") ||
       path.startsWith("/admin/free-lessons") ||
       path.startsWith("/admin/feature-flags")
@@ -169,7 +171,9 @@ const isNavActive = (path: string, href: string) => {
   return (
     path === href ||
     (href === "/user" && path.startsWith("/user/areas/")) ||
-    (href !== "/user" && href !== "/professional" && path.startsWith(`${href}/`))
+    (href !== "/user" &&
+      href !== "/professional" &&
+      path.startsWith(`${href}/`))
   );
 };
 
@@ -220,13 +224,17 @@ const getLogicalBackHref = (path: string, search: string) => {
     return search ? "/user" : null;
   }
 
-  if (path === "/professional/approvals" || path.startsWith("/professional/users/")) {
+  if (
+    path === "/professional/approvals" ||
+    path.startsWith("/professional/users/")
+  ) {
     return "/professional";
   }
 
   if (
     path === "/admin/consents" ||
     path === "/admin/calibration" ||
+    path === "/admin/anomalies" ||
     path === "/admin/partners" ||
     path === "/admin/free-lessons" ||
     path === "/admin/feature-flags"
@@ -379,9 +387,15 @@ export function ProductShell({
   };
 
   return (
-    <main className={`pf-shell ${me?.role === "AI_TUNER" ? "pf-ai-tuner-shell" : ""}`}>
+    <main
+      className={`pf-shell ${me?.role === "AI_TUNER" ? "pf-ai-tuner-shell" : ""}`}
+    >
       <header className="pf-topbar">
-        <Link className="pf-brand pf-brand-with-logo" href="/" aria-label="Performance Factory">
+        <Link
+          className="pf-brand pf-brand-with-logo"
+          href="/"
+          aria-label="Performance Factory"
+        >
           <Image
             className="pf-brand-logo"
             src="/brand/performance-factory-horizontal-clean.png"
@@ -393,7 +407,11 @@ export function ProductShell({
         </Link>
         <div className="pf-topbar-right">
           {resolvedNav.length > 0 && (
-            <nav ref={navRef} className="pf-nav" aria-label="Navigazione ambiente">
+            <nav
+              ref={navRef}
+              className="pf-nav"
+              aria-label="Navigazione ambiente"
+            >
               {resolvedNav.map((item) =>
                 item.children?.length ? (
                   <details
@@ -426,16 +444,16 @@ export function ProductShell({
                         onMouseEnter={() => openNavMenu(item.href)}
                         onMouseLeave={scheduleNavMenuClose}
                       >
-                      {item.children.map((child) => (
-                        <Link
-                          key={child.href}
-                          className=""
-                          href={child.href}
-                          onClick={() => setOpenNavHref(null)}
-                        >
-                          {child.label}
-                        </Link>
-                      ))}
+                        {item.children.map((child) => (
+                          <Link
+                            key={child.href}
+                            className=""
+                            href={child.href}
+                            onClick={() => setOpenNavHref(null)}
+                          >
+                            {child.label}
+                          </Link>
+                        ))}
                       </div>
                     )}
                   </details>
@@ -453,7 +471,9 @@ export function ProductShell({
             </nav>
           )}
           <div className="pf-userbar">
-            <span>{authChecked ? (me?.email ?? "Account") : "Caricamento..."}</span>
+            <span>
+              {authChecked ? (me?.email ?? "Account") : "Caricamento..."}
+            </span>
             <button
               className="pf-button-secondary"
               type="button"

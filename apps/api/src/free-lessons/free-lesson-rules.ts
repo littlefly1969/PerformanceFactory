@@ -94,7 +94,11 @@ export type LessonPhase =
   | 'NO_SHOW'
   | 'CLOSED';
 
-export type MissingRequirement = 'LEVEL' | 'CONFIDENCE';
+/**
+ * PROFILE: una segnalazione interna aperta sospende la lezione; l'atleta legge
+ * solo «Continuiamo a conoscere il tuo profilo» (§5.3, §12).
+ */
+export type MissingRequirement = 'LEVEL' | 'CONFIDENCE' | 'PROFILE';
 
 /**
  * Due verifiche distinte (PF-FS-PREPAYWALL §6.2). Eleggibilità dell'atleta:
@@ -110,6 +114,8 @@ export function lessonEligibility(input: {
   clubs: number;
   seatStatus: string | null;
   declined: boolean;
+  /** Segnalazione HIGH aperta: mai un posto già richiesto o assegnato. */
+  suspended?: boolean;
 }): { phase: LessonPhase; missing: MissingRequirement[] } {
   const { calibrationStatus: status, seatStatus } = input;
   const open =
@@ -127,6 +133,7 @@ export function lessonEligibility(input: {
   if (status === 'FREE_CALIBRATING') missing.push('LEVEL');
   if (!input.eligibilityMet) missing.push('CONFIDENCE');
   if (missing.length) return { phase: 'LOCKED', missing };
+  if (input.suspended) return { phase: 'LOCKED', missing: ['PROFILE'] };
   // Territorio non servito: nessuna promessa, R e paywall proseguono (AT-16).
   if (input.clubs === 0) return { phase: 'UNAVAILABLE', missing: [] };
   if (input.declined || seatStatus === 'WITHDRAWN')

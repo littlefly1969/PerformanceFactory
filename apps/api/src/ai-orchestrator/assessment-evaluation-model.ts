@@ -72,12 +72,27 @@ export type AssessmentDriverEvaluation = {
   commitment: CommitmentLevel;
 };
 
+/** Segnalazione interna (§5.3): solo con evidenze osservabili, mai per l'atleta. */
+export const ANOMALY_KINDS = [
+  'CONTRADICTIONS',
+  'AUTOMATED_PATTERN',
+  'MICRO_TEST_MISMATCH',
+] as const;
+export const ANOMALY_PRIORITIES = ['LOW', 'HIGH'] as const;
+export type AssessmentAnomalyOutput = {
+  kind: (typeof ANOMALY_KINDS)[number];
+  priority: (typeof ANOMALY_PRIORITIES)[number];
+  evidence: string;
+};
+
 export type AssessmentEvaluationOutput = {
   summary: string;
   overallConfidence: number;
   level: AthleteLevel;
   levelConfidence: number;
   drivers: AssessmentDriverEvaluation[];
+  /** Nulla quasi sempre; il backend la toglie dall'output salvato e la riserva all'admin. */
+  anomaly?: AssessmentAnomalyOutput | null;
 };
 
 export type AssessmentEvaluationResult = {
@@ -94,6 +109,7 @@ export const ASSESSMENT_LIMITS = {
   rationale: 400,
   evidenceGap: 160,
   evidenceGaps: 3,
+  anomalyEvidence: 300,
 };
 
 /** Contratto fisso, non modificabile dall'AI Tuner: il backend lo valida comunque. */
@@ -108,6 +124,7 @@ export function assessmentFormatRules(input: AssessmentEvaluationInput) {
     `- summary: massimo ${ASSESSMENT_LIMITS.summary} caratteri; overallConfidence: intero tra 0 e 100.`,
     `- level: uno tra ${ATHLETE_LEVELS.join(', ')}; levelConfidence: intero tra 0 e 100.`,
     `- commitment: per ogni driver uno tra ${COMMITMENT_LEVELS.join(', ')}.`,
+    `- anomaly: null, salvo risposte ripetutamente contraddittorie (CONTRADICTIONS), segni di compilazione automatica o opportunistica (AUTOMATED_PATTERN) o esiti dei micro-test incompatibili con le dichiarazioni (MICRO_TEST_MISMATCH). In quel caso priority LOW o HIGH ed evidence: i fatti osservabili in massimo ${ASSESSMENT_LIMITS.anomalyEvidence} caratteri, senza accuse né giudizi sulla persona. La segnalazione resta interna: summary e rationale non la citano, e la confidence non si alza per compensarla.`,
     ...(input.drivers.some((d) => !d.answers.length)
       ? [
           '- Un driver con answers vuoto non ha ancora evidenze: valutalo comunque, con confidence molto bassa, e indica in evidenceGaps cosa chiedere.',
@@ -137,12 +154,28 @@ export function buildAssessmentJsonSchema() {
       'level',
       'levelConfidence',
       'drivers',
+      'anomaly',
     ],
     properties: {
       summary: { type: 'string' },
       overallConfidence: { type: 'integer' },
       level: { type: 'string', enum: [...ATHLETE_LEVELS] },
       levelConfidence: { type: 'integer' },
+      anomaly: {
+        anyOf: [
+          { type: 'null' },
+          {
+            type: 'object',
+            additionalProperties: false,
+            required: ['kind', 'priority', 'evidence'],
+            properties: {
+              kind: { type: 'string', enum: [...ANOMALY_KINDS] },
+              priority: { type: 'string', enum: [...ANOMALY_PRIORITIES] },
+              evidence: { type: 'string' },
+            },
+          },
+        ],
+      },
       drivers: {
         type: 'array',
         items: {

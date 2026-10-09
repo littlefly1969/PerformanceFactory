@@ -53,6 +53,8 @@ model User {
   areaSessions AreaSession[]
   discovery AthleteDiscovery?
   assessmentEvaluations AssessmentEvaluation[]
+  assessmentAnomalies   AssessmentAnomaly[]
+  reviewedAnomalies     AssessmentAnomaly[]    @relation("AnomalyReviewer")
   calibration           AthleteCalibration?
   calibrationRounds     CalibrationRound[]
   potentialScenarios    PotentialScenario[]
@@ -1379,6 +1381,7 @@ model AssessmentEvaluation {
   scenarios     PotentialScenario[]
   microTestGenerations MicroTestGeneration[]
   lessonSeats   FreeLessonSeat[]
+  anomalies     AssessmentAnomaly[]
 
   @@unique([userId, sequence])
   @@index([userId, createdAt])
@@ -1747,6 +1750,35 @@ model CalibrationRound {
 
   @@unique([userId, sequence])
   @@index([userId, status])
+}
+
+/// Segnalazione interna sull'assessment (PF-FS-PREPAYWALL §5.3, OP-08): solo
+/// ADMIN, mai mostrata all'atleta né negli eventi con i suoi testi. Non è una
+/// prova di condotta e non esclude nessuno: una HIGH aperta sospende solo
+/// l'eleggibilità alla lezione gratuita, finché un admin non la esamina.
+model AssessmentAnomaly {
+  id           String    @id @default(uuid())
+  userId       String
+  evaluationId String
+  /// CONTRADICTIONS, AUTOMATED_PATTERN oppure MICRO_TEST_MISMATCH
+  kind         String
+  /// LOW oppure HIGH
+  priority     String
+  /// Evidenze osservabili scritte dall'AI, senza accuse né dati identificativi.
+  evidence     String
+  /// OPEN, REVIEWED oppure ARCHIVED
+  status       String    @default("OPEN")
+  reviewNote   String?
+  reviewedById String?
+  reviewedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  evaluation AssessmentEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
+  reviewedBy User?                @relation("AnomalyReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([status, createdAt])
 }
 
 /// Parametri di back office della calibrazione (A4-D01 aperto): una sola riga.

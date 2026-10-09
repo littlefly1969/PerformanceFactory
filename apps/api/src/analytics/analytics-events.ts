@@ -19,6 +19,8 @@ export const SERVER_EVENTS = [
   'ai_question_answered',
   'ai_micro_test_presented',
   'ai_micro_test_completed',
+  // Audit riservato (§5.3): solo tipo e priorità, mai le evidenze.
+  'assessment_anomaly_flagged',
   // Lezione gratuita (event map A7).
   'lesson_eligible',
   'lesson_requested',

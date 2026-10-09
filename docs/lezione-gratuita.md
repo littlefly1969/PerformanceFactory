@@ -74,7 +74,8 @@ In `apps/api/src/free-lessons/free-lesson-rules.ts`, senza I/O:
   lettura; i punti sono quelli in vigore quando la voce nasce, una modifica del
   back office non riscrive le voci già registrate. Una voce a 0 punti non si crea.
 - **Fasi** (`lessonEligibility`): `LOCKED` con i requisiti mancanti (`LEVEL`,
-  `CONFIDENCE`), `UNAVAILABLE` (nessun circolo, o nessuna calibrazione),
+  `CONFIDENCE`, o `PROFILE` quando una segnalazione interna `HIGH` aperta sospende
+  la lezione, con un messaggio neutro; vedi `docs/calibrazione.md`), `UNAVAILABLE` (nessun circolo, o nessuna calibrazione),
   `ELIGIBLE`, `DECLINED` (rinuncia o ritiro), `REQUESTED`, `ASSIGNED`, `ATTENDED`,
   `NO_SHOW`, `CLOSED` (R già chiusa). Un posto svolto o perso per assenza consuma
   il beneficio; una rinuncia o un ritiro prima della lezione no.

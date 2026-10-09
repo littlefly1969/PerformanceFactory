@@ -8,6 +8,7 @@ import {
   isCalibrationClosed,
 } from './calibration-rules';
 import { checkRule, loadActivePolicy } from './confidence-policy';
+import { lessonSuspended } from './assessment-anomalies';
 import { isLessonPending } from './lesson-evidence';
 
 type Db = PrismaService | Prisma.TransactionClient;
@@ -48,7 +49,7 @@ export async function lessonGate(
   if (await isLessonPending(db, userId))
     return { pending: true, available: false };
   if (!(await freeLessonEnabledFor(db, userId))) return NO_LESSON;
-  const [calibration, seat, clubs, rule] = await Promise.all([
+  const [calibration, seat, clubs, rule, suspended] = await Promise.all([
     db.athleteCalibration.findUnique({
       where: { userId },
       select: { lessonDeclinedAt: true },
@@ -59,8 +60,11 @@ export async function lessonGate(
     }),
     lessonClubs(db),
     loadActivePolicy(db, 'LESSON_ELIGIBILITY'),
+    lessonSuspended(db, userId),
   ]);
+  // Una segnalazione HIGH aperta sospende la lezione: R segue la sola regola.
   const available =
+    !suspended &&
     !calibration?.lessonDeclinedAt &&
     !seat &&
     clubs.length > 0 &&

@@ -19,7 +19,7 @@ export type FreeLessonView =
         | "ATTENDED"
         | "NO_SHOW"
         | "CLOSED";
-      missing: Array<"LEVEL" | "CONFIDENCE">;
+      missing: Array<"LEVEL" | "CONFIDENCE" | "PROFILE">;
       credits: { balance: number; toUnlock: number };
       earn: {
         initialAssessment: number;
@@ -50,6 +50,9 @@ const MISSING: Record<string, string> = {
     "Serve un livello stimato: rispondi ai round di calibrazione per formare gruppi omogenei.",
   CONFIDENCE:
     "Continua con domande e micro-test: quando il tuo profilo è abbastanza attendibile, la lezione si sblocca.",
+  // Messaggio neutro: nessun segnale interno arriva all'atleta (§5.3, §12).
+  PROFILE:
+    "Continuiamo a conoscere il tuo profilo: rispondi alle prossime domande.",
 };
 
 /**
