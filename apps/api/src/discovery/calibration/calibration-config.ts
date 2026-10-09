@@ -12,6 +12,7 @@ const select = {
   levelConfidenceThreshold: true,
   maxDays: true,
   programBeforePaywall: true,
+  questionsPerMicroTest: true,
 } as const;
 
 /** Parametri correnti; la riga nasce con i valori di default alla prima lettura. */

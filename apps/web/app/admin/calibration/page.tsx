@@ -9,6 +9,7 @@ type Settings = {
   levelConfidenceThreshold: number;
   maxDays: number;
   programBeforePaywall: boolean;
+  questionsPerMicroTest: number;
 };
 
 /** Campi modificabili: valori provvisori finché A4-D01 non è deciso. */
@@ -24,6 +25,11 @@ const FIELDS: { key: NumericKey; label: string; hint: string }[] = [
     key: "maxDays",
     label: "Durata indicativa in giorni",
     hint: "Riferimento dei ~30 giorni del Blueprint: non chiude e non consolida R.",
+  },
+  {
+    key: "questionsPerMicroTest",
+    label: "Domande per ogni micro-prova",
+    hint: "Indicazione per l'AI: in media una micro-prova ogni N domande. L'AI ne tiene conto ma decide passo per passo. 0 = nessuna indicazione.",
   },
 ];
 

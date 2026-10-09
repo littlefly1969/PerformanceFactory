@@ -29,12 +29,18 @@ export type CalibrationSettings = {
   maxDays: number;
   /** Decisione 13 aperta: il Blueprint (A4.6) non dà programmi prima del paywall. */
   programBeforePaywall: boolean;
+  /**
+   * Indicazione al motore: una micro-prova ogni N domande. L'AI ne tiene conto
+   * ma decide passo per passo; 0 significa nessuna indicazione.
+   */
+  questionsPerMicroTest: number;
 };
 
 export const DEFAULT_CALIBRATION_SETTINGS: CalibrationSettings = {
   levelConfidenceThreshold: 50,
   maxDays: 30,
   programBeforePaywall: false,
+  questionsPerMicroTest: 0,
 };
 
 export type EvaluatedDriver = {
@@ -142,5 +148,7 @@ export function settingsProblems(s: CalibrationSettings) {
   if (s.levelConfidenceThreshold < 1 || s.levelConfidenceThreshold > 100)
     problems.push('La soglia del livello va da 1 a 100');
   if (s.maxDays < 1) problems.push('La durata deve essere positiva');
+  if (s.questionsPerMicroTest < 0 || s.questionsPerMicroTest > 50)
+    problems.push('Le domande per micro-prova vanno da 0 a 50');
   return problems;
 }
