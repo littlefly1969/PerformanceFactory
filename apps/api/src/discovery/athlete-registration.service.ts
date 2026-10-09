@@ -10,6 +10,7 @@ import { ConsentsService } from '../consents/consents.service';
 import { RegisterAthleteDto } from '../auth/dto/register-athlete.dto';
 import { DiscoveryService } from './discovery.service';
 import { validateDiscovery } from './discovery-validation';
+import { QuizDraftService } from './quiz-draft.service';
 import { PartnersService } from '../partners/partners.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { AttributionInput } from '../partners/attribution';
@@ -38,6 +39,8 @@ export class AthleteRegistrationService {
       email: string;
       password: string;
       discovery: unknown;
+      /** Bozza server del quiz: fissa la versione e si collega una volta sola. */
+      quizToken?: string;
       adultConfirmed?: boolean;
       attribution?: AttributionInput;
     },
@@ -61,8 +64,17 @@ export class AthleteRegistrationService {
     try {
       const user = await this.prisma.$transaction(
         async (tx) => {
-          const configuration = await this.discovery.configuration(tx);
-          const draft = validateDiscovery(configuration, input.discovery);
+          // Con la bozza server vale la versione con cui il quiz è iniziato
+          // (F1): un cambio di configurazione non resetta né reinterpreta.
+          const saved = input.quizToken
+            ? await QuizDraftService.consume(tx, input.quizToken)
+            : null;
+          const configuration =
+            saved?.configuration ?? (await this.discovery.configuration(tx));
+          const draft = validateDiscovery(
+            configuration,
+            input.discovery ?? saved?.draft,
+          );
           const identity = await tx.authIdentity.findFirst({
             where: { email },
             select: { id: true },

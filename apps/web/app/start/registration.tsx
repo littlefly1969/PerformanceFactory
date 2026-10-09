@@ -5,6 +5,7 @@ import { API_BASE } from "../lib/api";
 import { clearAttribution, currentAttribution } from "../lib/attribution";
 import type { DiscoveryDraft } from "./discovery-types";
 import { DRAFT_KEY, journeyHref } from "./discovery-state";
+import { clearQuizToken, withQuizToken } from "./quiz-draft";
 
 export function Registration({
   draft,
@@ -34,20 +35,23 @@ export function Registration({
         onBusyChange(true);
         setError("");
         try {
-          const response = await fetch(`${API_BASE}/auth/register-athlete`, {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              firstName: data.get("firstName"),
-              lastName: data.get("lastName"),
-              email: data.get("email"),
-              password: data.get("password"),
-              adultConfirmed: data.get("adultConfirmed") === "on",
-              discovery: draft,
-              attribution: currentAttribution(),
+          const response = await withQuizToken((quizToken) =>
+            fetch(`${API_BASE}/auth/register-athlete`, {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                firstName: data.get("firstName"),
+                lastName: data.get("lastName"),
+                email: data.get("email"),
+                password: data.get("password"),
+                adultConfirmed: data.get("adultConfirmed") === "on",
+                discovery: draft,
+                attribution: currentAttribution(),
+                quizToken,
+              }),
             }),
-          });
+          );
           const result = await response.json();
           if (!response.ok)
             throw new Error(
@@ -57,6 +61,7 @@ export function Registration({
             );
           const href = journeyHref(result.journey?.nextStep);
           clearAttribution();
+          clearQuizToken();
           try {
             sessionStorage.removeItem(DRAFT_KEY);
             sessionStorage.removeItem("pf.accessToken");

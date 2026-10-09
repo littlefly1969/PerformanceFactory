@@ -60,9 +60,8 @@ describe("Ingresso: attribuzione, eventi e 18+", () => {
     window.history.replaceState(null, "", "/start?club=padel-nord");
     const calls = serve();
     render(<StartPage />);
-    await userEvent.click(
-      await screen.findByRole("button", { name: "Inizia il percorso →" }),
-    );
+    // Dal QR del circolo il quiz parte dalla prima domanda (AT-01).
+    await screen.findByRole("heading", { name: "Unica domanda" });
     await waitFor(() =>
       expect(events(calls)).toEqual(["landing_viewed", "discovery_started"]),
     );

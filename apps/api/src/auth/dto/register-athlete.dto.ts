@@ -49,6 +49,15 @@ export class RegisterAthleteDto {
   @IsBoolean()
   adultConfirmed: boolean;
 
+  @ApiProperty({
+    required: false,
+    description: 'Token della bozza server del quiz, da collegare all’account',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  quizToken?: string;
+
   @ApiProperty({ required: false, type: AttributionDto })
   @IsOptional()
   @ValidateNested()

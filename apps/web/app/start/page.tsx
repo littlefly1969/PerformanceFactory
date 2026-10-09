@@ -3,7 +3,13 @@ import {
   GoogleRegistrationButton,
   usePendingGoogle,
 } from "./google-registration";
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { API_BASE } from "../lib/api";
 import { track } from "../lib/analytics";
 import { captureTouch } from "../lib/attribution";
@@ -25,6 +31,46 @@ import {
   AnalysisTransition,
   DISCOVERY_ANALYSIS_MIN_DURATION_MS,
 } from "./analysis-transition";
+import {
+  campaignEntry,
+  readQuizToken,
+  resumeQuiz,
+  saveQuiz,
+  startQuiz,
+} from "./quiz-draft";
+
+const SAVE_DELAY_MS = 800;
+
+/** Primo passaggio dopo l'intro: le campagne entrano dritte nel quiz (AT-01). */
+const firstStep = (config: DiscoveryConfiguration, draft: DiscoveryDraft) =>
+  visibleQuestions(config.questions, draft)[0]?.id ?? "processing";
+
+/**
+ * Crea la bozza sul server lasciando l'intro e congela la versione del quiz.
+ * Se nel frattempo la configurazione è cambiata, si passa a quella congelata:
+ * è quella che la registrazione userà.
+ */
+function startServerDraft(
+  config: DiscoveryConfiguration,
+  setConfig: (config: DiscoveryConfiguration) => void,
+  setDraft: Dispatch<SetStateAction<DiscoveryDraft | undefined>>,
+) {
+  if (readQuizToken()) return;
+  void startQuiz().then((created) => {
+    if (!created || created.configuration.version === config.version) return;
+    const frozen = created.configuration;
+    setConfig(frozen);
+    setDraft((current) => {
+      const next = restoreDraft(
+        JSON.stringify({ ...current, version: frozen.version }),
+        frozen,
+      );
+      return next.currentStep === "intro"
+        ? { ...next, currentStep: firstStep(frozen, next) }
+        : next;
+    });
+  });
+}
 
 export default function StartPage() {
   const googlePending = usePendingGoogle();
@@ -43,6 +89,7 @@ export default function StartPage() {
   }, []);
   const heading = useRef<HTMLHeadingElement>(null);
   const lastStep = useRef<string | undefined>(undefined);
+  const lastSaved = useRef<string | undefined>(undefined);
   useEffect(() => {
     captureTouch(new URL(window.location.href));
     track("landing_viewed", { path: window.location.pathname });
@@ -60,32 +107,57 @@ export default function StartPage() {
   }, [draft?.currentStep]);
   useEffect(() => {
     const controller = new AbortController();
-    fetch(`${API_BASE}/public/athlete-discovery`, {
-      signal: controller.signal,
-      cache: "no-store",
-    })
-      .then(async (response) => {
+    (async () => {
+      // Una bozza salvata sul server vince sulla configurazione corrente: il
+      // quiz riprende sulla versione con cui è iniziato (AT-04, AT-06).
+      const saved = await resumeQuiz();
+      let configuration = saved?.configuration;
+      if (!configuration) {
+        const response = await fetch(`${API_BASE}/public/athlete-discovery`, {
+          signal: controller.signal,
+          cache: "no-store",
+        });
         if (!response.ok)
           throw new Error("Discovery non disponibile. Riprova tra poco.");
-        const configuration: DiscoveryConfiguration = await response.json();
-        let raw: string | null = null;
-        try {
-          raw = sessionStorage.getItem(DRAFT_KEY);
-          sessionStorage.setItem(DRAFT_KEY, raw ?? "null");
-        } catch {
-          setStorageWarning(true);
-        }
-        setConfig(configuration);
-        setDraft(restoreDraft(raw, configuration));
-      })
-      .catch((failure) => {
-        if (!controller.signal.aborted)
-          setError(
-            failure instanceof Error
-              ? failure.message
-              : "Connessione non disponibile",
-          );
-      });
+        configuration = (await response.json()) as DiscoveryConfiguration;
+      }
+      if (controller.signal.aborted) return;
+      let raw: string | null = null;
+      try {
+        raw = sessionStorage.getItem(DRAFT_KEY);
+        sessionStorage.setItem(DRAFT_KEY, raw ?? "null");
+      } catch {
+        setStorageWarning(true);
+      }
+      // La copia di questa scheda è la più recente; il server copre un'altra
+      // scheda, un altro giorno o una pagina ricaricata dopo la chiusura.
+      let restored = restoreDraft(raw, configuration);
+      if (saved && restored.currentStep === "intro")
+        restored = restoreDraft(JSON.stringify(saved.draft), configuration);
+      lastSaved.current = JSON.stringify(restored);
+      setConfig(configuration);
+      if (
+        restored.currentStep === "intro" &&
+        !Object.keys(restored.answers).length &&
+        campaignEntry(new URL(window.location.href))
+      ) {
+        // Conta comunque l'avvio della discovery, come dal pulsante.
+        lastStep.current = "intro";
+        restored = {
+          ...restored,
+          currentStep: firstStep(configuration, restored),
+        };
+        startServerDraft(configuration, setConfig, setDraft);
+      }
+      setDraft(restored);
+    })().catch((failure) => {
+      if (!controller.signal.aborted)
+        setError(
+          failure instanceof Error
+            ? failure.message
+            : "Connessione non disponibile",
+        );
+    });
     return () => controller.abort();
   }, []);
   useEffect(() => {
@@ -95,6 +167,14 @@ export default function StartPage() {
     } catch {
       /* Storage warning is set by the initial availability check. */
     }
+    const serialized = JSON.stringify(draft);
+    if (serialized === lastSaved.current || draft.currentStep === "intro")
+      return;
+    const timer = setTimeout(() => {
+      lastSaved.current = serialized;
+      void saveQuiz(draft);
+    }, SAVE_DELAY_MS);
+    return () => clearTimeout(timer);
   }, [draft]);
   useEffect(() => {
     if (draft?.currentStep !== "processing") return;
@@ -112,6 +192,11 @@ export default function StartPage() {
   useEffect(() => {
     heading.current?.focus();
   }, [draft?.currentStep]);
+  const begin = () => {
+    if (!config || !draft) return;
+    setDraft({ ...draft, currentStep: firstStep(config, draft) });
+    startServerDraft(config, setConfig, setDraft);
+  };
   if (!config || !draft)
     return (
       <PF4Shell>
@@ -192,7 +277,7 @@ export default function StartPage() {
             <br />
             Un primo passo per conoscerti meglio.
           </p>
-          <button className="pf4-cta" onClick={() => move(1)}>
+          <button className="pf4-cta" onClick={begin}>
             Inizia il percorso →
           </button>
           {!googlePending && (

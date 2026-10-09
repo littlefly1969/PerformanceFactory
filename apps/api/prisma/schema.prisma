@@ -1304,6 +1304,24 @@ model AthleteDiscovery {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+/// Bozza anonima del Quiz Funnel (PF-FS-PREPAYWALL F1, AT-04): salvata lato
+/// server, ripresa con un token sul dispositivo, valida 7 giorni dall'ultima
+/// interazione valida e cancellata alla registrazione o alla scadenza.
+model QuizDraft {
+  id            String   @id @default(uuid())
+  /// SHA-256 del token: il token in chiaro resta solo sul dispositivo.
+  tokenHash     String   @unique
+  /// Versione e configurazione con cui il percorso è iniziato, mai reinterpretate.
+  version       BigInt
+  configuration Json
+  draft         Json
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([expiresAt])
+}
+
 model AbilityPlanOperation {
   id String @id @default(uuid())
   userId String

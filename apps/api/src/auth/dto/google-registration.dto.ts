@@ -4,6 +4,8 @@ import {
   IsBoolean,
   IsObject,
   IsOptional,
+  IsString,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 import { ConsentAcceptanceDto } from '../../consents/dto/consent-acceptance.dto';
@@ -16,6 +18,14 @@ export class GoogleRegistrationDto extends ConsentAcceptanceDto {
   })
   @IsBoolean()
   adultConfirmed!: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Token della bozza server del quiz, da collegare all’account',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  quizToken?: string;
 
   @ApiPropertyOptional({ type: AttributionDto })
   @IsOptional()

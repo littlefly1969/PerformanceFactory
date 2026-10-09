@@ -1,15 +1,16 @@
 import { useEffect, useState, type CSSProperties } from "react";
 
 /**
- * Transizione UX fra l'ultima risposta e il riepilogo: non è una valutazione AI.
- * Con un'analisi server-side la durata diventerà
+ * Transizione UX fra l'ultima risposta e il riepilogo: non è una valutazione AI
+ * e il testo non lo lascia intendere (PF-FS-PREPAYWALL, copy onesto). Con
+ * un'analisi server-side la durata diventerà
  * max(DISCOVERY_ANALYSIS_MIN_DURATION_MS, durata dell'elaborazione).
  */
 export const DISCOVERY_ANALYSIS_MIN_DURATION_MS = 4000;
 const PHASES = [
-  { at: 0, text: "Analizziamo le tue risposte…" },
-  { at: 1300, text: "Organizziamo il tuo profilo…" },
-  { at: 2600, text: "Prepariamo il tuo punto di partenza…" },
+  { at: 0, text: "Raccogliamo le tue risposte…" },
+  { at: 1300, text: "Mettiamo in ordine i dati che ci hai dato…" },
+  { at: 2600, text: "Prepariamo il riepilogo del tuo profilo…" },
 ];
 
 export function AnalysisTransition() {

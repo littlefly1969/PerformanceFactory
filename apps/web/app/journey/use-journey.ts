@@ -3,6 +3,7 @@ import { clearAttribution, currentAttribution } from "../lib/attribution";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE, secureFetch } from "../lib/api";
 import { DRAFT_KEY } from "../start/discovery-state";
+import { clearQuizToken, withQuizToken } from "../start/quiz-draft";
 import type { Journey, ConsentDocument } from "./journey-types";
 export function useJourney() {
   const [journey, setJourney] = useState<Journey>();
@@ -119,18 +120,22 @@ export function useJourney() {
             "La discovery non è disponibile in questo browser. Torna su /start per completarla.",
           );
         await read(
-          await fetch(`${API_BASE}/auth/google/register/complete`, {
-            method: "POST",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              ...(input as object),
-              discovery: JSON.parse(raw),
-              attribution: currentAttribution(),
+          await withQuizToken((quizToken) =>
+            fetch(`${API_BASE}/auth/google/register/complete`, {
+              method: "POST",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...(input as object),
+                discovery: JSON.parse(raw),
+                attribution: currentAttribution(),
+                quizToken,
+              }),
             }),
-          }),
+          ),
         );
         clearAttribution();
+        clearQuizToken();
         sessionStorage.removeItem(DRAFT_KEY);
         sessionStorage.removeItem("pf.accessToken");
         window.history.replaceState(null, "", "/journey");
