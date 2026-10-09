@@ -59,6 +59,32 @@ export function microTestsByArea(
 }
 
 /**
+ * Conteggi della calibrazione passati al motore con l'indicazione del back
+ * office: il motore decide, l'indicazione orienta il rapporto prove/domande.
+ */
+export function microTestBalance(
+  rounds: { status: string; action: string | null; questionsJson: unknown }[],
+  questionsPerMicroTest: number,
+) {
+  let microTestsDone = 0;
+  let microTestsSkipped = 0;
+  let questionsAnswered = 0;
+  for (const round of rounds) {
+    const microTest = round.action === 'PROPOSE_MICRO_TEST';
+    if (round.status === 'SKIPPED' && microTest) microTestsSkipped++;
+    if (round.status !== 'EVALUATED') continue;
+    if (microTest) microTestsDone++;
+    else questionsAnswered += (round.questionsJson as unknown[]).length;
+  }
+  return {
+    questionsPerMicroTest,
+    microTestsDone,
+    microTestsSkipped,
+    questionsAnswered,
+  };
+}
+
+/**
  * Un micro-test validato sul driver scelto dal motore, con la sua provenienza.
  * Se l'AI non risponde o il test non supera i controlli, lancia: il passo
  * fallisce e si riprova, senza ripiegare sul catalogo (AT-13).

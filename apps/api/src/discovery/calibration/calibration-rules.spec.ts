@@ -201,4 +201,14 @@ describe('calibration rules', () => {
     ).toHaveLength(1);
     expect(settingsProblems(settings)).toEqual([]);
   });
+
+  it('accepts 0-50 questions per micro-test, 0 meaning no indication', () => {
+    expect(settings.questionsPerMicroTest).toBe(0);
+    expect(
+      settingsProblems({ ...settings, questionsPerMicroTest: 51 }),
+    ).toHaveLength(1);
+    expect(
+      settingsProblems({ ...settings, questionsPerMicroTest: -1 }),
+    ).toHaveLength(1);
+  });
 });

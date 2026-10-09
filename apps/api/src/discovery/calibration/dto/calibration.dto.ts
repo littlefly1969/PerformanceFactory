@@ -49,6 +49,14 @@ export class UpdateCalibrationConfigDto {
   @IsOptional()
   @IsBoolean()
   programBeforePaywall?: boolean;
+
+  /** Una micro-prova ogni N domande, come indicazione al motore; 0 = nessuna. */
+  @ApiPropertyOptional({ minimum: 0, maximum: 50 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(50)
+  questionsPerMicroTest?: number;
 }
 
 /** Nuova versione di una regola di confidence; null = criterio non applicato. */

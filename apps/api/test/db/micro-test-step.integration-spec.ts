@@ -215,8 +215,13 @@ describe('Micro-test engine step with PostgreSQL', () => {
     const id = await athlete();
     proposeMicroTest();
     await calibration.openRound(id);
-    // Nessun flag: le prove pratiche fanno sempre parte della calibrazione.
-    expect(steps.at(-1)!.targets.find((t) => t.focus)!.microTests).toEqual([]);
+    // L'AI decide; riceve i conteggi e l'indicazione del back office (0).
+    expect(steps.at(-1)!.microTestBalance).toEqual({
+      questionsPerMicroTest: 0,
+      microTestsDone: 0,
+      microTestsSkipped: 0,
+      questionsAnswered: 0,
+    });
 
     const round = await openRound(id);
     expect(round).toMatchObject({
@@ -325,6 +330,10 @@ describe('Micro-test engine step with PostgreSQL', () => {
     expect(next.action).toBe('ASK_GROUP');
     const target = steps.at(-1)!.targets.find((t) => t.areaId === AREAS[0])!;
     expect(target.microTests).toEqual([`${text} (saltato)`]);
+    expect(steps.at(-1)!.microTestBalance).toMatchObject({
+      microTestsDone: 0,
+      microTestsSkipped: 1,
+    });
     // Solo un micro-test si salta; un round di un altro atleta non si trova.
     await expect(calibration.skipMicroTest(id, next.id)).rejects.toBeInstanceOf(
       BadRequestException,

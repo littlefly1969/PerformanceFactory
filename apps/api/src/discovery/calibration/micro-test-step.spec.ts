@@ -1,10 +1,32 @@
 import {
   isDeclaredLimitation,
+  microTestBalance,
   microTestsByArea,
   roundEvidence,
 } from './micro-test-step';
 
 describe('micro-test step', () => {
+  it('counts micro-tests done and skipped against the questions answered', () => {
+    const q = (n: number) => Array.from({ length: n }, () => ({}));
+    const rounds = [
+      { status: 'EVALUATED', action: 'ASK_GROUP', questionsJson: q(3) },
+      { status: 'EVALUATED', action: null, questionsJson: q(2) },
+      {
+        status: 'EVALUATED',
+        action: 'PROPOSE_MICRO_TEST',
+        questionsJson: q(1),
+      },
+      { status: 'SKIPPED', action: 'PROPOSE_MICRO_TEST', questionsJson: q(1) },
+      { status: 'OPEN', action: 'ASK_SINGLE', questionsJson: q(1) },
+    ];
+    expect(microTestBalance(rounds, 4)).toEqual({
+      questionsPerMicroTest: 4,
+      microTestsDone: 1,
+      microTestsSkipped: 1,
+      questionsAnswered: 5,
+    });
+  });
+
   it.each([
     ['Hai dolori o infortuni recenti?', 'Mal di schiena da un mese', true],
     ['Stato di salute, limitazioni note', 'Ginocchio operato', true],

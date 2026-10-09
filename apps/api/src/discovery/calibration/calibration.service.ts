@@ -34,6 +34,7 @@ import { lessonGate, settleCalibration } from './lesson-gate';
 import {
   generateMicroTest,
   microTestQuestion,
+  microTestBalance,
   microTestsByArea,
   publicMicroTest,
   roundEvidence,
@@ -249,6 +250,9 @@ export class CalibrationService {
       }
       const asked = await this.askedQuestions(userId, rounds);
       const microTests = microTestsByArea(rounds);
+      const { questionsPerMicroTest } = await loadCalibrationSettings(
+        this.prisma,
+      );
       const prompt = await loadActiveAssessmentPrompt(
         this.prisma,
         'CALIBRATION',
@@ -270,6 +274,7 @@ export class CalibrationService {
           microTests: microTests.get(d.areaId) ?? [],
           focus: inFocus.has(d.areaId),
         })),
+        microTestBalance: microTestBalance(rounds, questionsPerMicroTest),
       });
       const sequence = (rounds.at(-1)?.sequence ?? 0) + 1;
       // Il micro-test lo scrive il generatore dedicato: se l'AI non risponde o

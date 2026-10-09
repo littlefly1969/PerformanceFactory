@@ -179,11 +179,23 @@ describe('calibration questions', () => {
     expect(problems.join(' ')).toContain(problem);
   });
 
-  it('always offers practical tests, first on drivers without one', () => {
-    const { system } = buildCalibrationPrompt(input);
-    expect(system).not.toContain('non è disponibile');
-    expect(system).toContain(
-      'se un driver con focus true ha microTests vuoto o assente, scegli PROPOSE_MICRO_TEST',
+  it('leaves micro-tests to the AI, guided by the back-office ratio', () => {
+    const balance = {
+      questionsPerMicroTest: 3,
+      microTestsDone: 1,
+      microTestsSkipped: 0,
+      questionsAnswered: 8,
+    };
+    const prompt = buildCalibrationPrompt({
+      ...input,
+      microTestBalance: balance,
+    });
+    expect(prompt.user.microTestBalance).toEqual(balance);
+    expect(prompt.system).toContain('è un’indicazione');
+    expect(prompt.system).toContain('non un vincolo');
+    expect(prompt.system).not.toContain('scegli PROPOSE_MICRO_TEST');
+    expect(buildCalibrationPrompt(input).user).not.toHaveProperty(
+      'microTestBalance',
     );
   });
 

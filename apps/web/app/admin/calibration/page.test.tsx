@@ -27,6 +27,7 @@ const settings = {
   levelConfidenceThreshold: 50,
   maxDays: 30,
   programBeforePaywall: false,
+  questionsPerMicroTest: 0,
 };
 
 const version = (version: number, rule: Record<string, number | null>) => ({
@@ -101,6 +102,10 @@ it("saves the calibration parameters, without time-based fields, and shows the s
   expect(screen.queryByLabelText(/assessment di chiusura/)).toBeNull();
   await userEvent.clear(level);
   await userEvent.type(level, "60");
+  // Indicazione all'AI sul rapporto prove/domande, non una regola.
+  const ratio = screen.getByLabelText(/Domande per ogni micro-prova/);
+  await userEvent.clear(ratio);
+  await userEvent.type(ratio, "3");
   await userEvent.click(
     screen.getByRole("button", { name: "Salva parametri" }),
   );
@@ -108,6 +113,7 @@ it("saves the calibration parameters, without time-based fields, and shows the s
     levelConfidenceThreshold: 60,
     maxDays: 30,
     programBeforePaywall: false,
+    questionsPerMicroTest: 3,
   });
   expect(puts[0]).not.toHaveProperty("confidenceThreshold");
   expect(await screen.findByText(/Parametri salvati/)).toBeVisible();
