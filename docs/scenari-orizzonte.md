@@ -21,44 +21,44 @@ percorso resta a `CALIBRATION_COMPLETED`, come nella slice 2.
 Riferimenti del Product Blueprint: A3.9 (P3/P6/P12 solo a calibrazione chiusa,
 senza inventare P), A4.4 (Spider), A5 (orizzonte e cadenza indipendenti).
 
-## Motore di P sostituibile
+## P formulata dall'AI entro criteri versionati (PF-FS-PREPAYWALL §7.1, §7.3)
 
-`apps/api/src/discovery/scenarios/potential-engine.ts` definisce un'interfaccia
-unica (`PotentialEngine`). Il motore in uso è `ACTIVE_POTENTIAL_ENGINE`: il
-motore della Parte C lo sostituirà senza toccare servizio, API e interfaccia.
+A R consolidata il Performance Engine AI
+(`apps/api/src/ai-orchestrator/potential-generation.ts`) scrive P3, P6 e P12 per
+ogni driver, con confidenza e motivazione. Il prompt è la famiglia `POTENTIAL`,
+modificabile e versionata dall'AI Tuner in `/ai-tuner/prompts/potenziale`.
 
-**Motore provvisorio `provisional-plateau` v1, da approvare.** Non è lineare: ogni
-mese colma una quota del margine tra R e un tetto che dipende dal livello, quindi
-la crescita rallenta e si appiattisce.
+Il backend accetta solo una proposta entro i criteri `potential-criteria` v1
+(`POTENTIAL_CRITERIA`), inviati all'AI come limiti per driver e orizzonte:
 
-```
-P(h) = R + (tetto − R) · (1 − (1 − quota)^h)        h = 3, 6, 12 mesi
-quota = 0,10 · commitment · disponibilità            (massimo 0,5)
-confidence(h) = min(confidence del driver, confidence del livello) · fattore orizzonte
-```
-
-| Parametro | Valori |
+| Criterio | Valore v1 (da approvare, Parte C) |
 |---|---|
 | Tetto per livello (quota della scala) | principiante 70%, intermedio 80%, avanzato 88%, agonista 94%, professionista 98%; livello assente 80% |
-| Fattore commitment del driver | basso 0,5, medio 1, alto 1,4, sconosciuto 0,8 |
-| Fattore disponibilità (giorni a settimana dell'assessment) | 1 → 0,6, 2 → 0,85, 3 → 1, 4+ → 1,15, mancante → 0,85 |
-| Fattore di confidence per orizzonte | 3 mesi 0,9, 6 mesi 0,75, 12 mesi 0,6 |
+| Quota massima del margine R→tetto | 3 mesi 50%, 6 mesi 75%, 12 mesi 95% |
+| Confidenza massima, rispetto a min(driver, livello) | 3 mesi 90%, 6 mesi 75%, 12 mesi 60% |
+| Forma | P fra R e il limite, mai in calo da P3 a P12; confidenza mai in crescita; motivazione di massimo 300 caratteri |
 
-Un driver già al tetto resta dov'è (plateau). Ogni scenario salva le assunzioni
-usate, il motore, la versione e `provisional = true`.
+Un driver già oltre il tetto resta dov'è. Una proposta fuori criteri non arriva
+all'atleta. Finché i criteri non sono approvati gli scenari restano marcati come
+stima provvisoria (`provisional = true`). Cambiare un valore richiede una nuova
+versione dei criteri.
+
+Gli scenari si scrivono una volta per valutazione consolidata, sotto il lease
+della calibrazione (chiusa, quindi libero): richieste concorrenti non chiamano
+il provider due volte, e il salvataggio ricontrolla sotto lock. Mentre l'AI
+scrive, `scenarios` vale `{ status: "PENDING" }`; se il provider fallisce o la
+proposta è fuori criteri vale `{ status: "UNAVAILABLE" }` e la prossima apertura
+riprova (OP-09). Gli scenari già mostrati non cambiano con un nuovo prompt o una
+nuova versione dei criteri: vale il primo insieme scritto per la valutazione,
+anche se di un motore precedente (`provisional-plateau`).
 
 ## Persistenza
 
 | Tabella | Contenuto |
 |---|---|
-| `PotentialScenario` | per valutazione, motore, versione, orizzonte e driver: R di partenza, P, confidence, assunzioni, `provisional`, `computedAt` |
-| `AthleteDiscovery` | `programHorizon` e `horizonSelectedAt` |
+| `PotentialScenario` | per valutazione, motore, versione, orizzonte e driver: R di partenza, P, confidence, `assumptions` (motivazione AI, criteri, versione del prompt, provider, modello, hash), `provisional`, `computedAt` |
+| `AthleteDiscovery` | `programHorizon`, `horizonSelectedAt`, `activatedAt`, `paywallViewedAt` |
 | `AthleteCalibration` | nuovo stato `PAYWALL_READY` |
-
-Gli scenari si calcolano una volta per valutazione consolidata e motore (vincolo
-unico, `createMany` con `skipDuplicates`): due richieste simultanee non duplicano
-nulla. Una nuova valutazione consolidata o un nuovo motore producono nuove righe;
-le precedenti restano come storico.
 
 ## API
 
@@ -116,17 +116,20 @@ Migrazione: `20261009090000_potential_scenarios`.
 
 ## Test
 
-`potential-engine.spec.ts` (forma della curva, plateau, commitment e disponibilità,
-confidence, altre scale), `test/db/scenarios.integration-spec.ts` (flag, calcolo
-unico anche concorrente, scelta e cambio di orizzonte, `PAYWALL_READY`, programma
-bloccato fino all'abbonamento), `app/journey/scenarios-reveal.test.tsx`.
+`potential-generation.spec.ts` (limiti dei criteri, proposte rifiutate),
+`reveal-gap.spec.ts`, `test/db/scenarios.integration-spec.ts` (flag, una sola
+chiamata AI anche concorrente, errore del provider e nuovo tentativo, stabilità
+degli scenari mostrati, attivazione ed eventi, scelta e blocco dell'orizzonte,
+`PAYWALL_READY`, programma bloccato fino all'abbonamento),
+`test/db/payments*.integration-spec.ts` (checkout solo dopo il reveal),
+`app/journey/scenarios-reveal.test.tsx`, `app/ai-tuner/prompts/potenziale`.
 
 ## Aperto
 
-- **Motore definitivo** (Parte C): il provvisorio va approvato da Stefano; i suoi
-  parametri sono costanti nel codice, non back office.
-- **Freshness**: oggi gli scenari si ricalcolano solo con una nuova valutazione
-  consolidata o un nuovo motore. Dopo la calibrazione serviranno dati di
+- **Criteri definitivi** (Parte C, OP-03): i valori v1 vanno approvati; sono
+  costanti versionate nel codice, non back office.
+- **Freshness**: oggi gli scenari si scrivono solo con una nuova valutazione
+  consolidata. Dopo la calibrazione serviranno dati di
   allenamento per aggiornarli.
 - **Atleti del percorso precedente** (baseline senza calibrazione): non
   arrivano a `PAYWALL_READY`, quindi il checkout li respinge.

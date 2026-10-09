@@ -221,6 +221,8 @@ export class AiTuningController {
       return this.tuning.testCalibrationPrompt(body.basePrompt);
     if (body.kind === 'MICRO_TEST')
       return this.tuning.testMicroTestPrompt(body.basePrompt);
+    if (body.kind === 'POTENTIAL')
+      return this.tuning.testPotentialPrompt(body.basePrompt);
     return this.tuning.testAssessmentPrompt(body.basePrompt, body.evaluationId);
   }
 

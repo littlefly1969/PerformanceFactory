@@ -2,7 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { API_BASE, secureFetch } from "@/app/lib/api";
 import { readError } from "../prompt-management-model";
 
-export type AssessmentPromptKind = "EVALUATION" | "CALIBRATION" | "MICRO_TEST";
+export type AssessmentPromptKind =
+  | "EVALUATION"
+  | "CALIBRATION"
+  | "MICRO_TEST"
+  | "POTENTIAL";
 
 export type AssessmentPrompt = {
   id?: string;
@@ -43,6 +47,19 @@ export type MicroTestTestOutput = {
   }[];
 };
 
+export type PotentialTestOutput = {
+  criteria: string;
+  scenarios: {
+    areaId: string;
+    name?: string;
+    current?: number;
+    horizon: "PROGRAM_3M" | "PROGRAM_6M" | "PROGRAM_12M";
+    value: number;
+    confidence: number;
+    rationale: string;
+  }[];
+};
+
 export type AssessmentTestResult = {
   provider: string;
   model: string;
@@ -50,6 +67,7 @@ export type AssessmentTestResult = {
   output:
     | CalibrationTestOutput
     | MicroTestTestOutput
+    | PotentialTestOutput
     | {
         summary: string;
         overallConfidence: number;

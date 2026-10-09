@@ -18,6 +18,7 @@ import {
   testAssessmentPrompt,
   testCalibrationPrompt,
   testMicroTestPrompt,
+  testPotentialPrompt,
 } from './assessment-prompt-test';
 import { UpsertAssessmentPromptConfigDto } from './dto/upsert-assessment-prompt-config.dto';
 import {
@@ -99,6 +100,10 @@ export class AiTuningService {
 
   testMicroTestPrompt(basePrompt: string) {
     return testMicroTestPrompt(this.proposalProvider, basePrompt);
+  }
+
+  testPotentialPrompt(basePrompt: string) {
+    return testPotentialPrompt(this.proposalProvider, basePrompt);
   }
 
   testAssessmentPrompt(basePrompt: string, evaluationId?: string) {

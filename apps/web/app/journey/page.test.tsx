@@ -450,3 +450,43 @@ describe("Wake-up after ten idle days", () => {
     expect(screen.queryByText("Bentornato")).toBeNull();
   });
 });
+
+describe("Scenarios being prepared", () => {
+  it("OP-09: asks to refresh while the AI writes the scenarios, never shows invented ones", async () => {
+    const requests: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        requests.push(url);
+        return new Response(
+          JSON.stringify({
+            ...base,
+            phase: "EVALUATION",
+            evaluation: {
+              id: "evaluation-2",
+              status: "CONSOLIDATED",
+              source: "CALIBRATION_ROUND",
+              summary: "R consolidata.",
+              overallConfidence: 80,
+              scale: { min: 0, max: 100 },
+              createdAt: "2026-10-08T22:00:00.000Z",
+              drivers: [],
+            },
+            calibration: null,
+            scenarios: { status: "PENDING" },
+          }),
+        );
+      }),
+    );
+    render(<JourneyPage />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Stiamo preparando i tuoi scenari…",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Dove puoi arrivare/)).toBeNull();
+    const before = requests.length;
+    await userEvent.click(screen.getByRole("button", { name: "Aggiorna" }));
+    await waitFor(() => expect(requests.length).toBeGreaterThan(before));
+  });
+});

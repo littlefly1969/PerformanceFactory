@@ -54,6 +54,20 @@ export function renderPromptOverview(model: PromptManagementModel) {
           </Link>
         </div>
       </section>
+      <section className="pf-panel pf-prompt-current-panel">
+        <div className="pf-panel-header pf-prompt-current-header">
+          <div>
+            <h2>Scenari P3/P6/P12</h2>
+            <p className="pf-muted">
+              Prompt che a R consolidata stima il potenziale a 3, 6 e 12 mesi,
+              entro i criteri versionati.
+            </p>
+          </div>
+          <Link className="pf-button" href="/ai-tuner/prompts/potenziale">
+            Apri prompt
+          </Link>
+        </div>
+      </section>
     </>
   );
 }

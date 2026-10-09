@@ -13,16 +13,22 @@ import {
   DEFAULT_MICRO_TEST_PROMPT,
   MICRO_TEST_PROMPT_TYPE,
 } from './micro-test-generation';
+import {
+  DEFAULT_POTENTIAL_PROMPT,
+  POTENTIAL_PROMPT_TYPE,
+} from './potential-generation';
 
 /**
- * Tre famiglie di prompt con lo stesso ciclo di vita (bozze, attivazione,
- * versioni): la valutazione delle risposte, le domande di calibrazione e i
- * micro-test su misura. Al massimo un prompt attivo per famiglia.
+ * Quattro famiglie di prompt con lo stesso ciclo di vita (bozze, attivazione,
+ * versioni): la valutazione delle risposte, le domande di calibrazione, i
+ * micro-test su misura e gli scenari P3/P6/P12. Al massimo un prompt attivo
+ * per famiglia.
  */
 export const ASSESSMENT_PROMPT_KINDS = [
   'EVALUATION',
   'CALIBRATION',
   'MICRO_TEST',
+  'POTENTIAL',
 ] as const;
 export type AssessmentPromptKind = (typeof ASSESSMENT_PROMPT_KINDS)[number];
 const KINDS = {
@@ -43,6 +49,12 @@ const KINDS = {
     defaultName: 'micro-test su misura',
     defaultPrompt: DEFAULT_MICRO_TEST_PROMPT,
     promptType: MICRO_TEST_PROMPT_TYPE,
+  },
+  POTENTIAL: {
+    defaultId: 'potential-prompt-default',
+    defaultName: 'scenari P3/P6/P12',
+    defaultPrompt: DEFAULT_POTENTIAL_PROMPT,
+    promptType: POTENTIAL_PROMPT_TYPE,
   },
 } as const;
 export const isAssessmentPromptKind = (

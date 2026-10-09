@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 import { Prisma, ProgramHorizon } from '@prisma/client';
 import { AnalyticsService } from '../../analytics/analytics.service';
@@ -15,14 +16,28 @@ import {
 import { isCalibrationClosed } from '../calibration/calibration-rules';
 import { PROGRAM_HORIZON_WEEKS } from '../program-horizon';
 import { OPEN_SUBSCRIPTION_STATUSES } from '../../payments/checkout.service';
+import { PROGRAM_HORIZON_MONTHS as HORIZON_MONTHS } from '../../payments/payment-plans';
+import { AiProposalProviderService } from '../../ai-orchestrator/proposal-provider.service';
+import { loadActiveAssessmentPrompt } from '../../ai-orchestrator/assessment-prompts';
+import { POTENTIAL_CRITERIA } from '../../ai-orchestrator/potential-generation';
+import { requireAiConsent } from '../assessment-evaluation';
 import { revealGaps } from './reveal-gap';
-import {
-  ACTIVE_POTENTIAL_ENGINE,
-  HORIZON_MONTHS,
-  PotentialEngine,
-} from './potential-engine';
 
 const HORIZONS = Object.keys(HORIZON_MONTHS) as ProgramHorizon[];
+
+/** Motore AI del potenziale, versionato con i criteri entro cui formula P. */
+export const POTENTIAL_ENGINE = {
+  key: 'ai-potential',
+  version: POTENTIAL_CRITERIA.version,
+  provisional: !POTENTIAL_CRITERIA.approved,
+};
+
+/** Generazione in corso per l'atleta: oltre questo tempo è interrotta. */
+const LEASE_MS = 2 * 60 * 1000;
+
+type ConsolidatedEvaluation = Prisma.AssessmentEvaluationGetPayload<{
+  include: { areas: { include: { area: { select: { name: true } } } } };
+}>;
 
 export const isProgramHorizon = (value: unknown): value is ProgramHorizon =>
   HORIZONS.includes(value as ProgramHorizon);
@@ -32,33 +47,45 @@ const NOT_REVEALED = 'Gli scenari si sbloccano a calibrazione completata';
 
 /**
  * Scenari P3/P6/P12 a calibrazione chiusa e scelta dell'orizzonte (gap 1.8,
- * 1.9). Gli scenari si calcolano una volta per valutazione consolidata e
- * motore. Mostrarli con i gap rende l'atleta ACTIVATED (A10); solo allora la
- * scelta dell'orizzonte porta il percorso a PAYWALL_READY (§7.3, AT-28).
+ * 1.9). L'AI formula P una volta per valutazione consolidata, entro criteri
+ * versionati (§7.1, §7.3); gli scenari già mostrati non cambiano con un nuovo
+ * prompt o una nuova versione dei criteri. Mostrarli con i gap rende l'atleta
+ * ACTIVATED (A10); solo allora la scelta dell'orizzonte porta il percorso a
+ * PAYWALL_READY (AT-28).
  */
 @Injectable()
 export class ScenariosService {
+  private readonly logger = new Logger(ScenariosService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly flags: FeatureFlagsService,
     private readonly analytics: AnalyticsService,
+    private readonly ai: AiProposalProviderService,
   ) {}
 
-  /** Motore in uso; sostituibile senza toccare il servizio. */
-  engine: PotentialEngine = ACTIVE_POTENTIAL_ENGINE;
-
-  /** Vista per l'atleta, o null se la funzione non è attiva o la calibrazione è aperta. */
+  /**
+   * Vista per l'atleta, o null se la funzione non è attiva o la calibrazione
+   * è aperta. Mentre l'AI scrive gli scenari la vista è PENDING; se il
+   * provider fallisce è UNAVAILABLE e la prossima apertura riprova (OP-09).
+   */
   async view(userId: string, orderedAreas: string[]) {
     if (!(await this.ready(userId))) return null;
     const evaluation = await this.consolidated(userId);
     if (!evaluation) return null;
-    await this.ensure(userId, evaluation);
+    let first = await this.firstScenario(evaluation.id);
+    if (!first) {
+      const outcome = await this.generate(userId, evaluation);
+      if (outcome !== 'DONE') return { status: outcome };
+      first = await this.firstScenario(evaluation.id);
+      if (!first) return { status: 'PENDING' as const };
+    }
     const [rows, discovery] = await Promise.all([
       this.prisma.potentialScenario.findMany({
         where: {
           evaluationId: evaluation.id,
-          engine: this.engine.key,
-          engineVersion: this.engine.version,
+          engine: first.engine,
+          engineVersion: first.engineVersion,
         },
         include: { area: { select: { name: true } } },
       }),
@@ -84,6 +111,7 @@ export class ScenariosService {
           current: r.current,
           potential: r.value,
           confidence: r.confidence,
+          rationale: rationaleOf(r.assumptions),
         })),
         gap: revealGaps(
           drivers.map((r) => ({
@@ -96,10 +124,11 @@ export class ScenariosService {
     });
     if (rows.length) await this.activate(userId, evaluation.id);
     return {
+      status: 'READY' as const,
       engine: {
-        key: this.engine.key,
-        version: this.engine.version,
-        provisional: this.engine.provisional,
+        key: first.engine,
+        version: first.engineVersion,
+        provisional: first.provisional,
       },
       evaluationId: evaluation.id,
       scale: { min: evaluation.minScore, max: evaluation.maxScore },
@@ -216,66 +245,126 @@ export class ScenariosService {
   }
 
   /** Ultima valutazione consolidata: P si calcola solo su R chiusa (A3.9). */
-  private consolidated(userId: string) {
+  private consolidated(userId: string): Promise<ConsolidatedEvaluation | null> {
     return this.prisma.assessmentEvaluation.findFirst({
       where: { userId, status: 'CONSOLIDATED' },
       orderBy: { sequence: 'desc' },
-      include: { areas: true },
+      include: { areas: { include: { area: { select: { name: true } } } } },
     });
   }
 
-  private async ensure(
+  /** Primo scenario della valutazione: fissa motore e versione mostrati. */
+  private firstScenario(evaluationId: string) {
+    return this.prisma.potentialScenario.findFirst({
+      where: { evaluationId },
+      orderBy: { computedAt: 'asc' },
+      select: { engine: true, engineVersion: true, provisional: true },
+    });
+  }
+
+  /**
+   * L'AI scrive P3/P6/P12 sotto lease per atleta: richieste concorrenti non
+   * chiamano il provider due volte. La calibrazione è chiusa, quindi il suo
+   * lease è libero. Il salvataggio ricontrolla sotto lock che nessun altro
+   * abbia già scritto gli scenari della stessa valutazione.
+   */
+  private async generate(
     userId: string,
-    evaluation: NonNullable<
-      Awaited<ReturnType<ScenariosService['consolidated']>>
-    >,
-  ) {
-    const exists = await this.prisma.potentialScenario.count({
+    evaluation: ConsolidatedEvaluation,
+  ): Promise<'DONE' | 'PENDING' | 'UNAVAILABLE'> {
+    const lease = new Date();
+    const claimed = await this.prisma.athleteCalibration.updateMany({
       where: {
-        evaluationId: evaluation.id,
-        engine: this.engine.key,
-        engineVersion: this.engine.version,
+        userId,
+        OR: [
+          { operationAt: null },
+          { operationAt: { lt: new Date(lease.getTime() - LEASE_MS) } },
+        ],
       },
+      data: { operationAt: lease },
     });
-    if (exists) return;
-    const scenarios = this.engine.compute({
-      scale: { min: evaluation.minScore, max: evaluation.maxScore },
-      level: evaluation.level,
-      levelConfidence: evaluation.levelConfidence,
-      daysPerWeek: await this.daysPerWeek(userId),
-      drivers: evaluation.areas.map((a) => ({
-        areaId: a.areaId,
-        score: a.score,
-        confidence: a.confidence,
-        commitment: a.commitment,
-      })),
-    });
-    // Due richieste concorrenti calcolano lo stesso risultato: vale il primo.
-    const created = await this.prisma.potentialScenario.createMany({
-      data: scenarios.map((s) => ({
-        userId,
-        evaluationId: evaluation.id,
-        areaId: s.areaId,
-        horizon: s.horizon,
-        current: s.current,
-        value: s.value,
-        confidence: s.confidence,
-        assumptions: s.assumptions as Prisma.InputJsonObject,
-        engine: this.engine.key,
-        engineVersion: this.engine.version,
-        provisional: this.engine.provisional,
-      })),
-      skipDuplicates: true,
-    });
-    if (created.count)
-      await this.analytics.trackServerOnce('potential_generated', {
-        userId,
-        onceKey: `${evaluation.id}:${this.engine.key}:${this.engine.version}`,
-        properties: {
-          engine: this.engine.key,
-          engineVersion: this.engine.version,
-        },
+    if (!claimed.count) return 'PENDING';
+    try {
+      await requireAiConsent(this.prisma, userId);
+      const [prompt, daysPerWeek] = await Promise.all([
+        loadActiveAssessmentPrompt(this.prisma, 'POTENTIAL'),
+        this.daysPerWeek(userId),
+      ]);
+      const result = await this.ai.generatePotential({
+        ...prompt,
+        scale: { min: evaluation.minScore, max: evaluation.maxScore },
+        level: evaluation.level,
+        levelConfidence: evaluation.levelConfidence,
+        daysPerWeek,
+        drivers: evaluation.areas.map((a) => ({
+          areaId: a.areaId,
+          name: driverName(a.area.name),
+          score: a.score,
+          confidence: a.confidence,
+          commitment: a.commitment,
+          rationale: a.rationale,
+          evidenceGaps: a.evidenceGaps as string[],
+        })),
       });
+      const current = new Map(evaluation.areas.map((a) => [a.areaId, a.score]));
+      await this.prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`potential:${evaluation.id}`}))`;
+        if (
+          await tx.potentialScenario.count({
+            where: { evaluationId: evaluation.id },
+          })
+        )
+          return;
+        await tx.potentialScenario.createMany({
+          data: result.scenarios.map((s) => ({
+            userId,
+            evaluationId: evaluation.id,
+            areaId: s.areaId,
+            horizon: s.horizon,
+            current: current.get(s.areaId)!,
+            value: s.value,
+            confidence: s.confidence,
+            assumptions: {
+              months: HORIZON_MONTHS[s.horizon],
+              rationale: s.rationale,
+              criteria: result.criteria,
+              promptVersionId: prompt.promptVersionId,
+              provider: result.provider,
+              model: result.model,
+              promptHash: result.promptHash,
+            },
+            engine: POTENTIAL_ENGINE.key,
+            engineVersion: POTENTIAL_ENGINE.version,
+            provisional: POTENTIAL_ENGINE.provisional,
+          })),
+        });
+        await this.analytics.trackServerOnce(
+          'potential_generated',
+          {
+            userId,
+            onceKey: evaluation.id,
+            properties: {
+              engine: POTENTIAL_ENGINE.key,
+              engineVersion: POTENTIAL_ENGINE.version,
+            },
+          },
+          tx,
+        );
+      });
+      return 'DONE';
+    } catch (error) {
+      this.logger.warn(
+        `Scenari non generati per la valutazione ${evaluation.id}: ${
+          error instanceof Error ? error.message : 'errore sconosciuto'
+        }`,
+      );
+      return 'UNAVAILABLE';
+    } finally {
+      await this.prisma.athleteCalibration.updateMany({
+        where: { userId, operationAt: lease },
+        data: { operationAt: null },
+      });
+    }
   }
 
   /** Giorni a settimana dalla domanda operativa dell'assessment, se presente. */
@@ -297,4 +386,10 @@ export class ScenariosService {
     const days = Number(template ? answers[template.id] : NaN);
     return Number.isInteger(days) && days >= 1 && days <= 7 ? days : null;
   }
+}
+
+/** Motivazione dell'AI salvata con lo scenario; assente negli scenari storici. */
+function rationaleOf(assumptions: Prisma.JsonValue) {
+  const value = (assumptions as { rationale?: unknown } | null)?.rationale;
+  return typeof value === 'string' ? value : null;
 }
