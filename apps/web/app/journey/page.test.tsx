@@ -490,3 +490,35 @@ describe("Scenarios being prepared", () => {
     await waitFor(() => expect(requests.length).toBeGreaterThan(before));
   });
 });
+describe("After the subscription", () => {
+  it("creates the program from the paid horizon and leads to the Home", async () => {
+    const requests: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        requests.push(url);
+        return new Response(
+          JSON.stringify(
+            url.endsWith("/athlete-journey/program")
+              ? { ...base, phase: "COMPLETE", programDurationWeeks: 26 }
+              : { ...base, phase: "SUBSCRIBED", programHorizon: "PROGRAM_6M" },
+          ),
+        );
+      }),
+    );
+    render(<JourneyPage />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Prepariamo il tuo programma.",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/scenario a 6 mesi/)).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Crea il mio programma →" }),
+    );
+    expect(
+      await screen.findByRole("link", { name: "Vai al programma →" }),
+    ).toHaveAttribute("href", "/user");
+    expect(requests).toContain("/api/athlete-journey/program");
+  });
+});

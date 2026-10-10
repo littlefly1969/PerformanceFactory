@@ -100,6 +100,30 @@ abbonamento con entitlement attivo (`ACTIVE` entro `entitlementEndAt`, oppure
 `PAYMENT_GRACE` entro `graceEndsAt`). `programBeforePaywall` resta l'eccezione da
 back office.
 
+## Dopo l'abbonamento: dal pagamento al programma
+
+Il checkout ospitato torna su `/abbonamento?checkout=success|cancel`
+(`PAYMENTS_SUCCESS_URL` / `PAYMENTS_CANCEL_URL`). Con `success` la pagina
+interroga `GET /payments/subscription` finché il webhook del provider non ha
+attivato l'abbonamento, poi riporta a `/journey`; dopo circa un minuto senza
+conferma chiede di verificare di nuovo. Con `cancel` dice che non c'è stato
+addebito e riporta agli scenari.
+
+Con la calibrazione in `PAYWALL_READY` e un entitlement attivo il percorso è in
+fase `SUBSCRIBED` (A4 `SUBSCRIBED_ACTIVE`) e non mostra più l'offerta.
+`POST /athlete-journey/program` crea il programma:
+
+- valida l'obiettivo finale come il flusso precedente (prompt per area inclusi);
+- la baseline (`PerformanceProfileSnapshot` e `CurrentState`) usa la R della
+  valutazione consolidata e, come P, lo scenario dell'orizzonte pagato, lo stesso
+  mostrato nel reveal; un driver senza scenario ha P uguale a R;
+- la durata è quella dell'orizzonte (12, 26 o 52 settimane), anche in
+  `program_duration_weeks` del profilo: il passo `DURATION` non si ripete.
+
+Il percorso passa a `COMPLETE` e porta alla Home `/user`, dove il motore rolling
+prepara la prima finestra. Senza entitlement la chiamata risponde 409; una
+seconda chiamata non crea un'altra baseline.
+
 ## Durate del programma: da 4/12/52 settimane a 3/6/12 mesi
 
 Il motore di training lavora a finestre di 14 giorni, quindi ogni orizzonte è un

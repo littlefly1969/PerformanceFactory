@@ -68,6 +68,14 @@ export class AthleteJourneyController {
   submit(@Req() req: { user: { id: string } }, @Body() body: SubmitDto) {
     return this.journey.submit(req.user.id, body.goal);
   }
+  @ApiOperation({
+    summary:
+      'Dopo l’abbonamento crea il programma da R consolidata e orizzonte pagato',
+  })
+  @Post('program')
+  program(@Req() req: { user: { id: string } }) {
+    return this.journey.program(req.user.id);
+  }
   @ApiOperation({ summary: 'Seleziona durata programma' })
   @Post('duration')
   duration(@Req() req: { user: { id: string } }, @Body() body: DurationDto) {

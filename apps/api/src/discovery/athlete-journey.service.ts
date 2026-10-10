@@ -32,7 +32,13 @@ import {
 import { CalibrationService } from './calibration/calibration.service';
 import { ScenariosService } from './scenarios/scenarios.service';
 
-import { PROGRAM_DURATIONS, horizonForWeeks } from './program-horizon';
+import {
+  PROGRAM_DURATIONS,
+  PROGRAM_HORIZON_WEEKS,
+  horizonForWeeks,
+} from './program-horizon';
+import { hasProgramEntitlement } from './calibration/calibration-config';
+import type { ProvidedBaseline } from '../onboarding/onboarding-assessment';
 import { recordMeaningfulInteraction } from '../engagement/meaningful-interaction';
 import { pendingWakeup } from '../engagement/engagement.service';
 const LEASE_MS = 10 * 60 * 1000;
@@ -111,21 +117,27 @@ export class AthleteJourneyService {
     const scenarios = calibration
       ? await this.scenarios.view(userId, orderedAreas)
       : null;
+    // Abbonato con l'orizzonte scelto: il prossimo passo è il programma.
+    const subscribed =
+      calibration?.status === 'PAYWALL_READY' &&
+      (await hasProgramEntitlement(this.prisma, userId));
     const phase = saved.baselineId
       ? saved.programDurationWeeks
         ? 'COMPLETE'
         : saved.phase === 'DURATION'
           ? 'DURATION'
           : 'RESULT'
-      : evaluation
-        ? 'EVALUATION'
-        : processing
-          ? 'PROCESSING'
-          : started
-            ? 'ASSESSMENT'
-            : config!.problems.length
-              ? 'ASSESSMENT_UNAVAILABLE'
-              : 'ASSESSMENT_INTRO';
+      : subscribed
+        ? 'SUBSCRIBED'
+        : evaluation
+          ? 'EVALUATION'
+          : processing
+            ? 'PROCESSING'
+            : started
+              ? 'ASSESSMENT'
+              : config!.problems.length
+                ? 'ASSESSMENT_UNAVAILABLE'
+                : 'ASSESSMENT_INTRO';
     const snapshot = saved.baselineId
       ? await this.prisma.performanceProfileSnapshot.findFirst({
           where: { id: saved.baselineId, userId },
@@ -194,6 +206,7 @@ export class AthleteJourneyService {
         : null,
       durationOptions: PROGRAM_DURATIONS,
       programDurationWeeks: saved.programDurationWeeks,
+      programHorizon: saved.programHorizon,
     };
   }
 
@@ -363,6 +376,72 @@ export class AthleteJourneyService {
     await this.allowed(userId);
     const saved = await this.record(userId);
     if (saved.baselineId) return this.state(userId);
+    await this.submitAnswers(userId, revisedGoal);
+    return this.state(userId);
+  }
+
+  /**
+   * Dopo il pagamento (A4 SUBSCRIBED_ACTIVE): il programma parte dalla R
+   * consolidata e dalla P dell'orizzonte pagato, non dallo scoring delle
+   * risposte, e la durata è quella dell'orizzonte, senza chiederla di nuovo.
+   */
+  async program(userId: string) {
+    await this.allowed(userId);
+    const saved = await this.record(userId);
+    if (saved.baselineId) return this.state(userId);
+    const calibration = await this.prisma.athleteCalibration.findUnique({
+      where: { userId },
+      select: { status: true },
+    });
+    if (
+      calibration?.status !== 'PAYWALL_READY' ||
+      !(await hasProgramEntitlement(this.prisma, userId))
+    )
+      throw new ConflictException(
+        'Il programma si sblocca dopo la scelta del percorso e l’abbonamento.',
+      );
+    const baseline = await this.scenarios.programBaseline(userId);
+    if (!baseline?.areas.length)
+      throw new ConflictException('I tuoi scenari non sono ancora pronti.');
+    await this.submitAnswers(userId, undefined, {
+      reason: `Baseline da R consolidata, orizzonte ${baseline.horizon}`,
+      areas: baseline.areas,
+    });
+    const weeks = PROGRAM_HORIZON_WEEKS[baseline.horizon];
+    await this.prisma.$transaction(async (tx) => {
+      await tx.athleteDiscovery.update({
+        where: { userId },
+        data: {
+          phase: 'COMPLETE',
+          programDurationWeeks: weeks,
+          durationSelectedAt: new Date(),
+        },
+      });
+      const assessment = await tx.userOnboardingAssessment.findUniqueOrThrow({
+        where: { userId },
+      });
+      await tx.userOnboardingAssessment.update({
+        where: { userId },
+        data: {
+          profileJson: {
+            ...((assessment.profileJson as Prisma.JsonObject) ?? {}),
+            program_duration_weeks: {
+              label: 'Durata del programma in settimane',
+              value: weeks,
+            },
+          },
+        },
+      });
+    });
+    return this.state(userId);
+  }
+
+  /** Obiettivo validato e baseline creata sotto lease, con tutte le risposte. */
+  private async submitAnswers(
+    userId: string,
+    revisedGoal?: string,
+    baseline?: ProvidedBaseline,
+  ) {
     const claimed = await this.claim(userId);
     try {
       const questions = await this.sequence(userId);
@@ -382,11 +461,10 @@ export class AthleteJourneyService {
       ];
       const goal = revisedGoal?.trim() || (await this.goal(userId));
       await this.onboarding.validateFinalGoal(actor(userId), goal, answers);
-      await this.onboarding.submit(actor(userId), goal, answers);
+      await this.onboarding.submit(actor(userId), goal, answers, baseline);
     } finally {
       await this.release(userId);
     }
-    return this.state(userId);
   }
 
   async duration(userId: string, weeks?: number) {

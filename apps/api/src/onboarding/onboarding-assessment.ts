@@ -210,11 +210,22 @@ export async function generateSpecialistQuestions(
   };
 }
 
+/**
+ * Baseline già nota (R consolidata della calibrazione e P dell'orizzonte
+ * pagato): sostituisce lo scoring delle risposte, che resta per il flusso
+ * precedente.
+ */
+export type ProvidedBaseline = {
+  reason: string;
+  areas: { areaId: string; realR: number; potentialP: number }[];
+};
+
 export async function submit(
   prisma: PrismaService,
   actor: Actor,
   goalTextInput: string,
   answers: OnboardingAnswer[],
+  baseline?: ProvidedBaseline,
 ) {
   assertAthlete(actor);
   const prepared = await prepareCompletedOnboarding(
@@ -239,7 +250,23 @@ export async function submit(
       'Valida prima l obiettivo finale con le risposte completate',
     );
   }
-  const { normalizedAnswers, profile, scoredAreas, rankingGlobal } = prepared;
+  const { normalizedAnswers, profile } = prepared;
+  const names = new Map(
+    prepared.configuredAreas.map((a) => [a.id, a.name] as const),
+  );
+  const scoredAreas = baseline
+    ? baseline.areas.map((a) => ({
+        ...a,
+        areaName: names.get(a.areaId) ?? '',
+        answers: [] as unknown[],
+      }))
+    : prepared.scoredAreas;
+  const rankingGlobal = baseline
+    ? Math.round(
+        scoredAreas.reduce((sum, area) => sum + area.realR, 0) /
+          Math.max(1, scoredAreas.length),
+      )
+    : prepared.rankingGlobal;
 
   const result = await prisma.$transaction(async (tx) => {
     if (tx.$executeRaw)
@@ -275,7 +302,7 @@ export async function submit(
       data: {
         userId: actor.id,
         rankingGlobal,
-        reason: 'Baseline questionario iniziale',
+        reason: baseline?.reason ?? 'Baseline questionario iniziale',
         areas: {
           create: scoredAreas.map((area) => ({
             areaId: area.areaId,

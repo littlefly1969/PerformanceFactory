@@ -232,6 +232,46 @@ export class ScenariosService {
     });
   }
 
+  /**
+   * Baseline del programma dopo l'abbonamento: R consolidata per driver e P
+   * dell'orizzonte scelto, dagli stessi scenari mostrati nel reveal. Un
+   * driver senza scenario parte con P uguale a R. Null se manca la scelta o
+   * la valutazione consolidata.
+   */
+  async programBaseline(userId: string) {
+    const [evaluation, discovery] = await Promise.all([
+      this.consolidated(userId),
+      this.prisma.athleteDiscovery.findUnique({
+        where: { userId },
+        select: { programHorizon: true },
+      }),
+    ]);
+    const horizon = discovery?.programHorizon;
+    if (!evaluation || !horizon) return null;
+    const first = await this.firstScenario(evaluation.id);
+    const rows = first
+      ? await this.prisma.potentialScenario.findMany({
+          where: {
+            evaluationId: evaluation.id,
+            engine: first.engine,
+            engineVersion: first.engineVersion,
+            horizon,
+          },
+          select: { areaId: true, value: true },
+        })
+      : [];
+    const potential = new Map(rows.map((r) => [r.areaId, r.value]));
+    return {
+      evaluationId: evaluation.id,
+      horizon,
+      areas: evaluation.areas.map((a) => ({
+        areaId: a.areaId,
+        realR: a.score,
+        potentialP: Math.max(a.score, potential.get(a.areaId) ?? a.score),
+      })),
+    };
+  }
+
   private async ready(userId: string) {
     const calibration = await this.prisma.athleteCalibration.findUnique({
       where: { userId },

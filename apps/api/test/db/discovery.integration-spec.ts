@@ -1297,6 +1297,153 @@ describe('PF4 discovery to authenticated journey', () => {
     }
   });
 
+  it('after the subscription builds the program from consolidated R and the paid horizon', async () => {
+    await updateCalibrationSettings(
+      prisma,
+      { programBeforePaywall: false },
+      userId,
+    );
+    const flag = await prisma.featureFlag.findUnique({
+      where: { key: 'potential_scenarios' },
+    });
+    await prisma.featureFlag.upsert({
+      where: { key: 'potential_scenarios' },
+      create: {
+        key: 'potential_scenarios',
+        description: 'test',
+        enabled: true,
+        rolloutPercent: 100,
+      },
+      update: { enabled: true, rolloutPercent: 100 },
+    });
+    const discovery = await prisma.athleteDiscovery.findUniqueOrThrow({
+      where: { userId },
+    });
+    const assessment = await prisma.userOnboardingAssessment.findUnique({
+      where: { userId },
+    });
+    try {
+      const reveal = await state();
+      expect(reveal.phase).toBe('EVALUATION');
+      expect(
+        (reveal as unknown as { scenarios: { status: string } }).scenarios,
+      ).toMatchObject({ status: 'READY' });
+      expect(
+        (await post('horizon', { horizon: 'PROGRAM_6M' })).statusCode,
+      ).toBe(201);
+      // Senza abbonamento il programma resta bloccato.
+      expect((await post('program')).statusCode).toBe(409);
+      await prisma.subscription.create({
+        data: {
+          userId,
+          horizon: 'PROGRAM_6M',
+          billingCycle: 'MONTHLY',
+          status: 'ACTIVE',
+          provider: 'STRIPE',
+          amountCents: 1990,
+          currency: 'EUR',
+          entitlementEndAt: new Date(Date.now() + 30 * 86400000),
+        },
+      });
+      expect(await state()).toMatchObject({
+        phase: 'SUBSCRIBED',
+        programHorizon: 'PROGRAM_6M',
+      });
+
+      const response = await post('program');
+      expect(response.statusCode).toBe(201);
+      // La durata è quella dell'orizzonte pagato: nessun passo DURATION.
+      expect(response.json<JourneyResponse>()).toMatchObject({
+        phase: 'COMPLETE',
+        programDurationWeeks: 26,
+      });
+      const consolidated = await prisma.assessmentEvaluation.findFirstOrThrow({
+        where: { userId, status: 'CONSOLIDATED' },
+        orderBy: { sequence: 'desc' },
+        include: { areas: true },
+      });
+      const p6 = await prisma.potentialScenario.findMany({
+        where: { evaluationId: consolidated.id, horizon: 'PROGRAM_6M' },
+      });
+      const snapshot = await prisma.performanceProfileSnapshot.findFirstOrThrow(
+        { where: { userId }, include: { areas: true } },
+      );
+      expect(snapshot.reason).toContain('R consolidata');
+      expect(snapshot.areas).toHaveLength(consolidated.areas.length);
+      for (const area of consolidated.areas) {
+        const saved = snapshot.areas.find((a) => a.areaId === area.areaId)!;
+        expect(saved.realR).toBe(area.score);
+        const p = p6.find((s) => s.areaId === area.areaId)?.value;
+        expect(saved.potentialP).toBe(Math.max(area.score, p ?? area.score));
+      }
+      expect(
+        await prisma.currentState.count({ where: { userId } }),
+      ).toBeGreaterThan(0);
+      const completed = await prisma.userOnboardingAssessment.findUniqueOrThrow(
+        { where: { userId } },
+      );
+      expect(completed.status).toBe('COMPLETED');
+      expect(completed.profileJson).toHaveProperty(
+        'program_duration_weeks.value',
+        26,
+      );
+      expect(
+        (
+          await prisma.userPerformanceGoal.findUniqueOrThrow({
+            where: { userId },
+          })
+        ).frozenAt,
+      ).not.toBeNull();
+      // Un secondo invio non crea un'altra baseline.
+      expect((await post('program')).statusCode).toBe(201);
+      expect(
+        await prisma.performanceProfileSnapshot.count({ where: { userId } }),
+      ).toBe(1);
+    } finally {
+      // I test successivi ripartono dal flusso precedente senza baseline.
+      await prisma.subscription.deleteMany({ where: { userId } });
+      await prisma.performanceProfileSnapshotArea.deleteMany({
+        where: { snapshot: { userId } },
+      });
+      await prisma.performanceProfileSnapshot.deleteMany({ where: { userId } });
+      await prisma.currentState.deleteMany({ where: { userId } });
+      await prisma.athleteDiscovery.update({
+        where: { userId },
+        data: {
+          baselineId: discovery.baselineId,
+          phase: discovery.phase,
+          programHorizon: discovery.programHorizon,
+          horizonSelectedAt: discovery.horizonSelectedAt,
+          programDurationWeeks: discovery.programDurationWeeks,
+          durationSelectedAt: discovery.durationSelectedAt,
+          operationAt: null,
+        },
+      });
+      if (assessment)
+        await prisma.userOnboardingAssessment.update({
+          where: { userId },
+          data: {
+            status: assessment.status,
+            completedAt: assessment.completedAt,
+            profileJson: assessment.profileJson ?? Prisma.JsonNull,
+          },
+        });
+      await prisma.athleteCalibration.update({
+        where: { userId },
+        data: { status: 'CALIBRATION_COMPLETED' },
+      });
+      if (flag)
+        await prisma.featureFlag.update({
+          where: { key: 'potential_scenarios' },
+          data: { enabled: flag.enabled, rolloutPercent: flag.rolloutPercent },
+        });
+      else
+        await prisma.featureFlag.delete({
+          where: { key: 'potential_scenarios' },
+        });
+    }
+  });
+
   it('submits a real baseline once and derives result exclusively from its persisted areas', async () => {
     // Flusso precedente (baseline e piano) riaperto dal back office per questi test.
     await updateCalibrationSettings(

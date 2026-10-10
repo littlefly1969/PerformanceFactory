@@ -63,7 +63,7 @@ Il checkout è rifiutato se la combinazione non è attiva o se l'utente ha già 
 | `PAYMENTS_GRACE_DAYS` | `6` | A5.8 |
 | `PAYMENTS_CANCEL_NOTICE_HOURS` | `24` | A5.5: disdetta entro il giorno precedente la scadenza |
 | `PAYMENTS_CHECKOUT_TTL_MINUTES` | `30` | durata del checkout ospitato, tra 30 e 1440 |
-| `PAYMENTS_SUCCESS_URL` / `PAYMENTS_CANCEL_URL` | `WEB_ORIGIN/abbonamento?checkout=…` | ritorno dal checkout |
+| `PAYMENTS_SUCCESS_URL` / `PAYMENTS_CANCEL_URL` | `WEB_ORIGIN/abbonamento?checkout=…` | ritorno dal checkout: la pagina web attende l'entitlement e riporta al percorso (`scenari-orizzonte.md`) |
 | `PAYMENTS_STUB_WEBHOOK_SECRET` | vuoto | se presente, i webhook stub richiedono l'header `x-pf-stub-signature` (HMAC-SHA256 del corpo) |
 | `STRIPE_SECRET_KEY` | vuoto | solo `sk_test_…`; una chiave live è rifiutata salvo `STRIPE_ALLOW_LIVE_KEYS=true` |
 | `STRIPE_WEBHOOK_SECRET` | vuoto | `whsec_…` della dashboard o della Stripe CLI |
@@ -104,4 +104,3 @@ curl -X POST localhost:4000/api/payments/webhooks/stub -H 'content-type: applica
 - Cambio di cadenza o di orizzonte e prorata (A5-D04): non implementati.
 - Rimborsi monetari vs credito in Token PF (A5-D07): non implementati; il wallet Token PF resta separato dal billing.
 - Acquisti in-app iOS/Android: il modello registra `purchaseChannel`, gli adapter degli store non esistono ancora.
-- Il checkout non verifica ancora lo stato `PAYWALL_READY` né che l'orizzonte pagato sia quello scelto (`AthleteDiscovery.programHorizon`, vedi `scenari-orizzonte.md`).

@@ -10,6 +10,11 @@ import { ScenariosReveal } from "./scenarios-reveal";
 import { DurationStep, PerformanceResult } from "./performance-result";
 import { useJourney } from "./use-journey";
 import "./journey.css";
+const HORIZON_MONTHS: Record<string, number> = {
+  PROGRAM_3M: 3,
+  PROGRAM_6M: 6,
+  PROGRAM_12M: 12,
+};
 export default function JourneyPage() {
   const {
     journey: j,
@@ -192,6 +197,24 @@ export default function JourneyPage() {
               />
             )}
           </>
+        )}
+        {j?.phase === "SUBSCRIBED" && (
+          <section className="pf4-body" aria-labelledby="pf4-subscribed-title">
+            <span className="pf4-badge">✓ Abbonamento attivo</span>
+            <h1 id="pf4-subscribed-title">Prepariamo il tuo programma.</h1>
+            <p>
+              Partiamo dalla tua R consolidata e dallo scenario a{" "}
+              {HORIZON_MONTHS[j.programHorizon ?? ""] ?? "—"} mesi che hai
+              scelto. Poi la Home ti accompagna sessione dopo sessione.
+            </p>
+            <button
+              className="pf4-cta"
+              disabled={busy}
+              onClick={() => void action("program")}
+            >
+              {busy ? "Prepariamo il programma…" : "Crea il mio programma →"}
+            </button>
+          </section>
         )}
         {j?.phase === "PROCESSING" && (
           <section className="pf4-body" role="status">

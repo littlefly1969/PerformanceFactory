@@ -7,6 +7,7 @@ import {
   getQuestionnaire,
   getStatus,
   saveSportSelection,
+  ProvidedBaseline,
   submit,
 } from './onboarding-assessment';
 import {
@@ -74,9 +75,10 @@ export class OnboardingService {
     actor: Actor,
     goalTextInput: string,
     answers: OnboardingAnswer[],
+    baseline?: ProvidedBaseline,
   ) {
     await assertProgramAllowed(this.prisma, actor.id);
-    return submit(this.prisma, actor, goalTextInput, answers);
+    return submit(this.prisma, actor, goalTextInput, answers, baseline);
   }
 
   async validateFinalGoal(
