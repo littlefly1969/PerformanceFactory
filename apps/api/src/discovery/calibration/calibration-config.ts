@@ -58,22 +58,32 @@ export async function assertProgramAllowed(
   userId: string,
   now = new Date(),
 ) {
-  const [evaluation, settings, subscriptions] = await Promise.all([
+  const [evaluation, settings, entitled] = await Promise.all([
     prisma.assessmentEvaluation.findFirst({
       where: { userId },
       select: { id: true },
     }),
     loadCalibrationSettings(prisma),
-    prisma.subscription.findMany({
-      where: { userId, status: { in: ['ACTIVE', 'PAYMENT_GRACE'] } },
-      select: { status: true, entitlementEndAt: true, graceEndsAt: true },
-    }),
+    hasProgramEntitlement(prisma, userId, now),
   ]);
   if (!evaluation || settings.programBeforePaywall) return;
-  if (subscriptions.some((s) => hasEntitlement(s, now))) return;
+  if (entitled) return;
   throw new ConflictException({
     code: 'PROGRAM_LOCKED_BEFORE_PAYWALL',
     message:
       'Il programma si sblocca dopo la scelta del percorso e l’abbonamento.',
   });
+}
+
+/** Abbonamento che dà accesso al programma: attivo, o in grace entro la scadenza. */
+export async function hasProgramEntitlement(
+  prisma: Pick<PrismaService, 'subscription'>,
+  userId: string,
+  now = new Date(),
+) {
+  const subscriptions = await prisma.subscription.findMany({
+    where: { userId, status: { in: ['ACTIVE', 'PAYMENT_GRACE'] } },
+    select: { status: true, entitlementEndAt: true, graceEndsAt: true },
+  });
+  return subscriptions.some((s) => hasEntitlement(s, now));
 }

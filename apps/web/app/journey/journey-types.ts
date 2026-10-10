@@ -119,6 +119,8 @@ export type Journey = {
     | "ASSESSMENT"
     | "PROCESSING"
     | "EVALUATION"
+    /** Abbonamento attivo con l'orizzonte scelto: il programma va creato. */
+    | "SUBSCRIBED"
     | "RESULT"
     | "DURATION"
     | "COMPLETE";
@@ -159,4 +161,6 @@ export type Journey = {
   } | null;
   durationOptions: { weeks: number; label: string; description: string }[];
   programDurationWeeks: number | null;
+  /** Orizzonte scelto nel reveal, e pagato una volta abbonati. */
+  programHorizon?: ProgramHorizon | null;
 };
