@@ -219,6 +219,15 @@ export async function generateCalibrationQuestions(
       message: 'Non siamo riusciti a preparare le nuove domande. Riprova.',
     });
   }
+  const ignored = (raw as { questions?: unknown }).questions;
+  if (
+    step.action === 'PROPOSE_MICRO_TEST' &&
+    Array.isArray(ignored) &&
+    ignored.length
+  )
+    logger.warn(
+      `MICRO_TEST_STEP_QUESTIONS_IGNORED ${provider}/${model}: ${ignored.length}`,
+    );
   return {
     provider,
     model,
@@ -265,7 +274,10 @@ const normalized = (text: string) => text.toLowerCase().replace(/\s+/g, ' ');
 /**
  * Contratto del passo: azione ammessa, numero di domande coerente con
  * l'azione (mai per area), solo driver in focus, opzioni nella scala, nessuna
- * domanda già fatta. Le aree del passo si ricavano dalle domande.
+ * domanda già fatta. Le aree del passo si ricavano dalle domande. Con
+ * PROPOSE_MICRO_TEST il test lo scrive il generatore dedicato: le domande che
+ * il motore scrive comunque (spesso il test stesso) si ignorano, non scartano
+ * il passo.
  */
 export function validateCalibrationStep(
   raw: unknown,
@@ -282,7 +294,7 @@ export function validateCalibrationStep(
   if (!action) problems.push(`azione non ammessa: ${String(body?.action)}`);
   const rationale = clean(body?.rationale, CALIBRATION_LIMITS.rationale);
   if (!rationale) problems.push('motivo del passo mancante');
-  const items = body?.questions;
+  const items = action === 'PROPOSE_MICRO_TEST' ? [] : body?.questions;
   if (!Array.isArray(items)) {
     problems.push('questions mancanti');
     return null;

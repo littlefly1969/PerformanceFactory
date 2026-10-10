@@ -63,7 +63,10 @@ Tutte in `apps/api/src/discovery/calibration/calibration-rules.ts`, senza I/O:
   focus, vedi sotto), con un motivo sintetico. Nessun numero di domande per
   driver; 6 è solo il limite di un passo a schermo. Il backend valida azione,
   numero di domande coerente con l'azione, driver in focus, da 3 a 5 opzioni con
-  score nella scala attiva, nessuna domanda già fatta. Azione, aree e motivo
+  score nella scala attiva, nessuna domanda già fatta. Con `PROPOSE_MICRO_TEST`
+  le domande che il motore scrive comunque (spesso il test stesso, in forma di
+  domanda) si ignorano con l'avviso `MICRO_TEST_STEP_QUESTIONS_IGNORED`, senza
+  scartare il passo: il test lo scrive il generatore. Azione, aree e motivo
   restano sul round (`action`, `targetAreas`, `rationale`, §10.2). Prontezza al
   reveal e alla lezione restano del server (regole versionate). All'atleta gli
   score delle opzioni e il motivo non arrivano mai.
