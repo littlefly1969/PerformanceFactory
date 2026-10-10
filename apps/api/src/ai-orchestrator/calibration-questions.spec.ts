@@ -164,11 +164,6 @@ describe('calibration questions', () => {
       'non in focus',
     ],
     [
-      'a micro-test with questions',
-      step([question()], 'PROPOSE_MICRO_TEST', 'tecnica'),
-      'da 0 a 0 domande',
-    ],
-    [
       'a micro-test area on a question step',
       step([question()], 'ASK_SINGLE', 'tecnica'),
       'solo con PROPOSE_MICRO_TEST',
@@ -208,6 +203,46 @@ describe('calibration questions', () => {
       targetAreas: ['tecnica'],
       questions: [],
     });
+  });
+
+  it('ignores the questions a model writes into a micro-test step', () => {
+    const problems: string[] = [];
+    const written = question({
+      text: 'Esegui uno squat lento a corpo libero. Descrivi il risultato:',
+    });
+    expect(
+      validateCalibrationStep(
+        step(
+          [written, question({ areaId: 'mental' })],
+          'PROPOSE_MICRO_TEST',
+          'tecnica',
+        ),
+        input,
+        problems,
+      ),
+    ).toMatchObject({ action: 'PROPOSE_MICRO_TEST', questions: [] });
+    expect(problems).toEqual([]);
+  });
+
+  it('logs the questions ignored on a micro-test step', async () => {
+    process.env.AI_PROVIDER = 'gemini';
+    jest.mocked(requestStructuredProposal).mockResolvedValueOnce({
+      outputText: JSON.stringify(
+        step([question()], 'PROPOSE_MICRO_TEST', 'tecnica'),
+      ),
+      usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
+    });
+    const logger = new Logger('test');
+    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+    const result = await generateCalibrationQuestions(logger, input);
+    expect(result).toMatchObject({
+      action: 'PROPOSE_MICRO_TEST',
+      targetAreas: ['tecnica'],
+      questions: [],
+    });
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining('MICRO_TEST_STEP_QUESTIONS_IGNORED'),
+    );
   });
 
   it('stub output passes its own contract, only on drivers in focus', () => {
