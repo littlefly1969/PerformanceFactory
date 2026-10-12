@@ -1,4 +1,5 @@
 import { AiProvider } from './proposal-provider-model';
+import { FIT_RANKING_RULE, FitRankingContext } from './fit-ranking-context';
 
 /** Tipo di prompt AI_ASSESSMENT in AiPromptVersion, separato dai prompt di coaching. */
 export const ASSESSMENT_PROMPT_TYPE = 'ASSESSMENT_EVALUATION';
@@ -10,6 +11,7 @@ export const DEFAULT_ASSESSMENT_PROMPT = [
   'Usa i punteggi delle opzioni come ancoraggio. Correggili quando le altre risposte (stesso driver, altri driver, disponibilità, frequenza, salute, obiettivo) indicano un quadro diverso, e spiega la correzione nella motivazione.',
   'Le risposte sono autovalutazioni. La confidenza misura quantità, coerenza e oggettività delle evidenze, non quanto è alto il punteggio. Con due domande di autovalutazione per driver resta bassa, indicativamente tra 15 e 40: alzala solo con risposte coerenti e specifiche, abbassala con risposte contraddittorie.',
   'Per ogni driver indica cosa servirebbe per aumentare la confidenza: domande di approfondimento, micro-test o il feedback di un coach.',
+  'Ricevi anche la classifica FIT dichiarata (padel e tennis, attuale e migliore di sempre): è un riferimento importante per il livello di gioco e per la tecnico-tattica, e la migliore di sempre dice da dove l’atleta può ripartire. Se la classifica e le risposte non tornano, scrivilo nella motivazione e tieni bassa la confidenza; una classifica cambiata è un nuovo dato da cui ripartire.',
   "Stima anche il livello complessivo dell'atleta nel suo sport e, per ogni driver, il commitment: quanto tempo, energia e risorse può dedicargli. Se le risposte non bastano usa UNKNOWN e una confidenza bassa.",
   'Nelle valutazioni successive ricevi anche le risposte dei round di calibrazione e la stima precedente: aggiorna score e confidenza in base alle nuove evidenze, senza ripartire da zero.',
   "Scrivi motivazioni brevi e concrete in italiano, rivolte all'atleta con il tu. Niente diagnosi mediche, niente promesse di risultato.",
@@ -59,6 +61,8 @@ export type AssessmentEvaluationInput = {
   promptVersionId: string | null;
   scale: { minScore: number; maxScore: number };
   athleteContext: AssessmentEvaluationAnswer[];
+  /** Classifica FIT dichiarata in vigore; null se non dichiarata. */
+  fitRanking?: FitRankingContext;
   availability: AssessmentEvaluationAnswer[];
   drivers: AssessmentEvaluationDriver[];
 };
@@ -124,6 +128,7 @@ export function assessmentFormatRules(input: AssessmentEvaluationInput) {
     `- summary: massimo ${ASSESSMENT_LIMITS.summary} caratteri; overallConfidence: intero tra 0 e 100.`,
     `- level: uno tra ${ATHLETE_LEVELS.join(', ')}; levelConfidence: intero tra 0 e 100.`,
     `- commitment: per ogni driver uno tra ${COMMITMENT_LEVELS.join(', ')}.`,
+    FIT_RANKING_RULE,
     `- anomaly: null, salvo risposte ripetutamente contraddittorie (CONTRADICTIONS), segni di compilazione automatica o opportunistica (AUTOMATED_PATTERN) o esiti dei micro-test incompatibili con le dichiarazioni (MICRO_TEST_MISMATCH). In quel caso priority LOW o HIGH ed evidence: i fatti osservabili in massimo ${ASSESSMENT_LIMITS.anomalyEvidence} caratteri, senza accuse né giudizi sulla persona. La segnalazione resta interna: summary e rationale non la citano, e la confidence non si alza per compensarla.`,
     ...(input.drivers.some((d) => !d.answers.length)
       ? [

@@ -190,11 +190,11 @@ Il livello si mostra all'atleta solo da `FREE_LEVEL_ESTIMATED` in poi.
 |---|---|
 | `AthleteCalibration` | stato, inizio, scadenza indicativa, `levelEstimatedAt`, `completedAt`, `completionReason`, `consolidationPolicyId`, lease |
 | `CalibrationRound` | `sequence`, `kind` (`ADAPTIVE`/`CLOSING`), `action`, `targetAreas`, `rationale`, stato (`OPEN`/`EVALUATING`/`EVALUATED`/`EXPIRED`), domande e risposte, `evaluationToken`, `evaluatedAt`, provider, modello, versione e hash del prompt, valutazione prodotta |
-| `CalibrationConfig` | riga `default` con i parametri dei round, `updatedById` con FK su `User` |
+| `CalibrationConfig` | riga `default` con i parametri dei round, `initialQuestionsPerArea` (domande conoscitive iniziali per driver, default 2), `updatedById` con FK su `User` |
 | `ConfidencePolicy` | regole versionate `R_CONSOLIDATION` e `LESSON_ELIGIBILITY`, autore e nota |
 | `AssessmentEvaluation` | nuovi campi `level`, `levelConfidence` |
 | `AssessmentEvaluationArea` | nuovo campo `commitment` |
-| `AiAssessmentPromptConfig` | nuovo campo `kind` (`EVALUATION`/`CALIBRATION`) |
+| `AiAssessmentPromptConfig` | nuovo campo `kind` (`INITIAL_QUESTIONS`/`EVALUATION`/`CALIBRATION`/...) |
 
 Migrazioni: `20261008090000_calibration_rounds`,
 `20261011090000_confidence_policies` (regole, rimozione di soglia, giorno di chiusura

@@ -6,6 +6,8 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TemplateRecord } from '../onboarding/onboarding-model';
+import { normalizeOptions } from '../onboarding/onboarding-answers';
+import { loadCalibrationSettings } from './calibration/calibration-config';
 import {
   loadEnabledDriverAreasForSelection,
   requireSportContext,
@@ -88,6 +90,46 @@ function operationalRecord(t: OnboardingQuestionTemplate): TemplateRecord {
   };
 }
 
+/** Aggiunge una voce al profilo letto da training e coaching. */
+export async function saveProfileEntry(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  key: string,
+  entry: { label: string; value: Prisma.InputJsonValue | null },
+) {
+  const assessment = await tx.userOnboardingAssessment.findUnique({
+    where: { userId },
+    select: { profileJson: true },
+  });
+  const profileJson = {
+    ...((assessment?.profileJson as Prisma.JsonObject | null) ?? {}),
+    [key]: entry,
+  } as Prisma.InputJsonValue;
+  await tx.userOnboardingAssessment.upsert({
+    where: { userId },
+    update: { profileJson },
+    create: { userId, profileJson },
+  });
+}
+
+/** Risposta operativa già validata: va subito nel profilo letto dal training. */
+export function saveOperationalAnswer(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  question: TemplateRecord,
+  value: unknown,
+) {
+  const option = (
+    normalizeOptions(question.optionsJson) as {
+      value: string | number;
+    }[]
+  ).find((o) => String(o.value) === String(value))!;
+  return saveProfileEntry(tx, userId, question.key, {
+    label: question.label,
+    value: option.value,
+  });
+}
+
 /** Domande operative attive, nell'ordine della loro sezione. */
 export async function loadOperationalTemplates(
   prisma: Pick<PrismaService, 'onboardingQuestionTemplate'>,
@@ -97,6 +139,19 @@ export async function loadOperationalTemplates(
     orderBy: [{ orderIndex: 'asc' }, { id: 'asc' }],
   });
   return rows.filter((t) => semanticRoleOf(t)).map(operationalRecord);
+}
+
+/** Esattamente una domanda operativa attiva per ruolo. */
+export function operationalProblems(operational: TemplateRecord[]) {
+  const problems: string[] = [];
+  for (const [role, key] of Object.entries(OPERATIONAL_ROLES)) {
+    const found = operational.filter((q) => q.key === key).length;
+    if (found !== 1)
+      problems.push(
+        `Domanda operativa ${role}: expected 1 active question, found ${found}`,
+      );
+  }
+  return problems;
 }
 
 /**
@@ -109,14 +164,7 @@ export function assessmentProblems(
   areas: { id: string; name: string }[],
   areaTemplates: OnboardingQuestionTemplate[],
 ) {
-  const problems: string[] = [];
-  for (const [role, key] of Object.entries(OPERATIONAL_ROLES)) {
-    const found = operational.filter((q) => q.key === key).length;
-    if (found !== 1)
-      problems.push(
-        `Domanda operativa ${role}: expected 1 active question, found ${found}`,
-      );
-  }
+  const problems = operationalProblems(operational);
   if (
     areas.length &&
     !areas.some((a) => areaTemplates.some((t) => t.areaId === a.id))
@@ -190,12 +238,36 @@ export type AssessmentConfiguration = Awaited<
   ReturnType<typeof buildAssessmentConfiguration>
 >;
 
+/**
+ * Configurazione del percorso PF5: domande operative e driver attivi dello
+ * sport dell'atleta. Le domande dei driver non sono configurate: le scrive
+ * l'AI dopo la classifica FIT, `perArea` per driver (back office).
+ */
 export async function loadAssessmentConfiguration(
   prisma: PrismaService,
   userId: string,
 ) {
-  const { selection, areas } = await requireSportContext(prisma, userId);
-  return buildAssessmentConfiguration(prisma, selection.sportKey, areas);
+  const [{ selection, areas }, operational, settings] = await Promise.all([
+    requireSportContext(prisma, userId),
+    loadOperationalTemplates(prisma),
+    loadCalibrationSettings(prisma),
+  ]);
+  const problems = operationalProblems(operational);
+  if (!areas.length) problems.push('Anamnesi: expected at least 1 driver');
+  const perArea = settings.initialQuestionsPerArea;
+  const areaQuestionCount = areas.length * perArea;
+  const count = operational.length + areaQuestionCount;
+  return {
+    sportKey: selection.sportKey,
+    operational,
+    areas: areas.map((a) => ({ id: a.id, name: a.name })),
+    perArea,
+    problems,
+    fixedQuestionCount: operational.length,
+    areaQuestionCount,
+    count,
+    estimatedMinutes: estimatedMinutes(count),
+  };
 }
 
 /** Configurazione della specializzazione PF4 corrente, per l'editor admin. */

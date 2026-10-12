@@ -13,6 +13,7 @@ import { performanceDriverName as driverName } from '../performance/performance-
 import { PrismaService } from '../prisma/prisma.service';
 import { AnalyticsEventName } from '../analytics/analytics-events';
 import { discoveryContext } from './discovery-context';
+import { loadFitRankingContext } from './fit-ranking/fit-ranking';
 import type { MeaningfulSource } from '../engagement/engagement-rules';
 import { recordMeaningfulInteraction } from '../engagement/meaningful-interaction';
 
@@ -30,10 +31,11 @@ export async function buildAssessmentEvaluationInput(
   answers: Record<string, unknown>,
   areas: { id: string; name: string }[],
 ): Promise<AssessmentEvaluationInput> {
-  const [prompt, scale, discovery] = await Promise.all([
+  const [prompt, scale, discovery, fitRanking] = await Promise.all([
     loadActiveAssessmentPrompt(prisma),
     loadScaleConfig(prisma),
     discoveryContext(prisma, userId),
+    loadFitRankingContext(prisma, userId),
   ]);
   // Risposte già validate contro le opzioni: stringhe o numeri.
   const raw = (q: TemplateRecord) =>
@@ -78,6 +80,7 @@ export async function buildAssessmentEvaluationInput(
       question: t.label,
       answer: discovery!.answers[i]?.value ?? null,
     })),
+    fitRanking,
     availability: questions
       .filter((q) => !q.areaId)
       .map((q) => ({

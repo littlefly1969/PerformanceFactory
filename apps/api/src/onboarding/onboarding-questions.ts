@@ -107,6 +107,11 @@ export async function loadActiveGeneralTemplates(
   ];
 }
 
+/** Domande conoscitive iniziali scritte dall'AI dopo la classifica FIT. */
+export const INITIAL_QUESTIONS_KIND = 'INITIAL_QUESTIONS';
+const isInitial = (q: { inputJson: unknown }) =>
+  (q.inputJson as { kind?: unknown } | null)?.kind === INITIAL_QUESTIONS_KIND;
+
 export async function loadSpecialistQuestionRecords(
   prisma: PrismaService,
   userId: string,
@@ -121,11 +126,13 @@ export async function loadSpecialistQuestionRecords(
       inputType: true,
       optionsJson: true,
       orderIndex: true,
+      inputJson: true,
       area: { select: { id: true, name: true } },
     },
     orderBy: [{ area: { name: 'asc' } }, { orderIndex: 'asc' }],
   });
-  if (questions.every((q) => q.provider === 'configuration'))
+  // Banche del percorso PF5 (configurate o iniziali AI): vale la posizione salvata.
+  if (questions.every((q) => q.provider === 'configuration' || isInitial(q)))
     questions.sort((a, b) => a.orderIndex - b.orderIndex);
   return questions.map((question) => ({
     id: question.id,

@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { validateDiscovery } from '../../src/discovery/discovery-validation';
 import { deleteOnboardingTemplate } from '../../src/admin/admin-onboarding';
+import { deleteAthleteCompletely } from '../../src/admin/admin-athletes';
 import {
   loadActiveAssessmentPrompt,
   upsertAssessmentPromptConfig,
@@ -21,6 +22,7 @@ type JourneyResponse = {
   areaQuestionCount: number;
   estimatedMinutes: number;
   assessmentComplete: boolean;
+  questionsPending?: boolean;
   firstName: string;
   trial: { days: number; daysLeft: number };
   currentQuestion: number;
@@ -49,7 +51,11 @@ type JourneyResponse = {
 };
 import { ConsentsService } from '../../src/consents/consents.service';
 import { Test } from '@nestjs/testing';
-import { ConflictException, ValidationPipe } from '@nestjs/common';
+import {
+  BadGatewayException,
+  ConflictException,
+  ValidationPipe,
+} from '@nestjs/common';
 import { AthleteJourneyService } from '../../src/discovery/athlete-journey.service';
 import { CalibrationService } from '../../src/discovery/calibration/calibration.service';
 import { OnboardingService } from '../../src/onboarding/onboarding.service';
@@ -228,7 +234,7 @@ describe('PF4 discovery to authenticated journey', () => {
         await prisma.consent.deleteMany({ where: { userId } });
         await prisma.userPerformanceGoal.deleteMany({ where: { userId } });
         await prisma.userOnboardingAssessment.deleteMany({ where: { userId } });
-        await prisma.user.delete({ where: { id: userId } });
+        await prisma.user.deleteMany({ where: { id: userId } });
       }
       await prisma.onboardingQuestionTemplate.deleteMany({
         where: { id: { in: templateIds } },
@@ -477,20 +483,20 @@ describe('PF4 discovery to authenticated journey', () => {
       })
     ).json<JourneyResponse>();
 
-  it('does not start an invalid configuration and never falls back to AI questions', async () => {
-    // Una domanda del driver Nutrizione perde i punteggi delle opzioni.
-    const nutrition = await prisma.onboardingQuestionTemplate.findFirstOrThrow({
-      where: { id: { in: templateIds }, area: { name: 'Nutrizione' } },
-    });
-    const optionsJson = nutrition.optionsJson as Prisma.JsonObject;
-    await prisma.onboardingQuestionTemplate.update({
-      where: { id: nutrition.id },
-      data: {
+  it('does not start an invalid configuration and never writes questions', async () => {
+    // Una domanda operativa disattivata: il percorso non parte.
+    const duration = await prisma.onboardingQuestionTemplate.findFirstOrThrow({
+      where: {
+        isActive: true,
         optionsJson: {
-          ...optionsJson,
-          options: [{ value: 'x', label: 'Senza punteggio' }],
+          path: ['semanticRole'],
+          equals: 'TRAINING_SESSION_DURATION',
         },
       },
+    });
+    await prisma.onboardingQuestionTemplate.update({
+      where: { id: duration.id },
+      data: { isActive: false },
     });
     try {
       expect((await state()).phase).toBe('ASSESSMENT_UNAVAILABLE');
@@ -504,21 +510,22 @@ describe('PF4 discovery to authenticated journey', () => {
       ).toBe(0);
     } finally {
       await prisma.onboardingQuestionTemplate.update({
-        where: { id: nutrition.id },
-        data: { optionsJson },
+        where: { id: duration.id },
+        data: { isActive: true },
       });
     }
   });
 
-  it('starts two operational questions and twelve configured driver questions', async () => {
+  it('starts with availability and the FIT ranking, the driver questions come later', async () => {
     expect((await post('duration', { weeks: 12 })).statusCode).toBe(409);
     const intro = await state();
     expect(intro).toMatchObject({
       phase: 'ASSESSMENT_INTRO',
-      fixedQuestionCount: 2,
+      // Due operative, quattro classifiche FIT e la tessera facoltativa.
+      fixedQuestionCount: 7,
       areaQuestionCount: 12,
-      count: 14,
-      estimatedMinutes: 5,
+      count: 19,
+      estimatedMinutes: 7,
       trial: { days: 7, daysLeft: 7 },
     });
     // Giorni e durata non sono piu domande della discovery.
@@ -532,24 +539,29 @@ describe('PF4 discovery to authenticated journey', () => {
     const start = await post('start');
     expect(start.statusCode).toBe(201);
     const started = start.json<JourneyResponse>();
-    expect(started.count).toBe(14);
-    expect(started.questions.slice(0, 2).map((q) => q.kind)).toEqual([
-      'OPERATIONAL',
-      'OPERATIONAL',
-    ]);
-    expect(started.questions.slice(2).every((q) => q.kind === 'AREA')).toBe(
-      true,
-    );
-    expect(new Set(started.questions.slice(2).map((q) => q.areaId)).size).toBe(
-      6,
-    );
+    expect(started.count).toBe(19);
+    // Le domande dei driver non esistono finché l'AI non le scrive.
+    expect(started.questions).toHaveLength(7);
+    expect(started.questionsPending).toBe(false);
     expect(
-      start
-        .json<JourneyResponse>()
-        .questions.every(
-          (q: { id: string }) => !config.questions.some((d) => d.id === q.id),
-        ),
-    ).toBe(true);
+      await prisma.userOnboardingQuestion.count({ where: { userId } }),
+    ).toBe(0);
+    expect(started.questions.slice(0, 7).map((q) => q.kind)).toEqual([
+      'OPERATIONAL',
+      'OPERATIONAL',
+      'RANKING',
+      'RANKING',
+      'RANKING',
+      'RANKING',
+      'RANKING',
+    ]);
+    expect(started.questions.slice(2, 7).map((q) => q.id)).toEqual([
+      'fit:padelCurrent',
+      'fit:padelBest',
+      'fit:tennisCurrent',
+      'fit:tennisBest',
+      'fit:cardNumber',
+    ]);
     expect((await post('start')).json<JourneyResponse>().questions).toEqual(
       start.json<JourneyResponse>().questions,
     );
@@ -584,7 +596,90 @@ describe('PF4 discovery to authenticated journey', () => {
     ).toBe(409);
     await post('back');
     expect((await state()).currentQuestion).toBe(0);
-    for (const question of before.questions) {
+    // Migliore più bassa dell'attuale: rifiutata.
+    const ranking = (id: string) => before.questions.find((q) => q.id === id)!;
+    for (const question of before.questions.slice(0, 3)) {
+      const response = await post('answer', {
+        questionId: question.id,
+        value: question.options[1].value,
+      });
+      expect(response.statusCode).toBe(201);
+    }
+    expect(
+      (
+        await post('answer', {
+          questionId: 'fit:padelBest',
+          value: ranking('fit:padelBest').options.at(-1)!.value,
+        })
+      ).statusCode,
+    ).toBe(400);
+    for (const question of before.questions.slice(3)) {
+      const response = await post('answer', {
+        questionId: question.id,
+        value: question.options[1]?.value ?? ' 12345/AB ',
+      });
+      expect(response.statusCode).toBe(201);
+    }
+    // Disponibilità e classifica date: l'AI scrive le domande dei driver.
+    const pending = await state();
+    expect(pending).toMatchObject({
+      currentQuestion: 7,
+      questionsPending: true,
+      assessmentComplete: false,
+    });
+    // Se l'AI non risponde l'atleta riprova: nessuna domanda di riserva.
+    const failing = jest
+      .spyOn(app.get(AiProposalProviderService), 'generateInitialQuestions')
+      .mockRejectedValueOnce(
+        new BadGatewayException({ code: 'INITIAL_QUESTIONS_UNAVAILABLE' }),
+      );
+    expect((await post('questions')).statusCode).toBe(502);
+    failing.mockRestore();
+    expect(
+      await prisma.userOnboardingQuestion.count({ where: { userId } }),
+    ).toBe(0);
+    expect((await state()).questionsPending).toBe(true);
+    const prepared = (await post('questions')).json<JourneyResponse>();
+    expect(prepared.questionsPending).toBe(false);
+    expect(prepared.questions).toHaveLength(19);
+    const bank = prepared.questions.slice(7);
+    expect(bank.every((q) => q.kind === 'AREA')).toBe(true);
+    // Due per driver, raggruppate nell'ordine dei driver.
+    expect(new Set(bank.map((q) => q.areaId)).size).toBe(6);
+    for (let i = 0; i < bank.length; i += 2)
+      expect(bank[i].areaId).toBe(bank[i + 1].areaId);
+    const stored = await prisma.userOnboardingQuestion.findMany({
+      where: { userId },
+    });
+    expect(stored.every((q) => q.provider === 'stub')).toBe(true);
+    expect(stored[0].inputJson).toMatchObject({ kind: 'INITIAL_QUESTIONS' });
+    // Una seconda richiesta non riscrive le domande.
+    expect((await post('questions')).json<JourneyResponse>().questions).toEqual(
+      prepared.questions,
+    );
+    // Classifica corretta dopo: le domande erano su misura per la vecchia,
+    // quindi l'AI le riscrive.
+    await post('back');
+    await post('back');
+    expect((await state()).currentQuestion).toBe(5);
+    expect(
+      (
+        await post('answer', {
+          questionId: 'fit:tennisBest',
+          value: ranking('fit:tennisBest').options[0].value,
+        })
+      ).statusCode,
+    ).toBe(201);
+    expect(
+      await prisma.userOnboardingQuestion.count({ where: { userId } }),
+    ).toBe(0);
+    await post('answer', { questionId: 'fit:cardNumber', value: '12345/AB' });
+    expect((await state()).questionsPending).toBe(true);
+    const regenerated = (await post('questions')).json<JourneyResponse>();
+    expect(regenerated.questions).toHaveLength(19);
+    expect(regenerated.questions[7].id).not.toBe(bank[0].id);
+    bank.splice(0, bank.length, ...regenerated.questions.slice(7));
+    for (const question of bank) {
       const response = await post('answer', {
         questionId: question.id,
         value: question.options[1].value,
@@ -592,7 +687,30 @@ describe('PF4 discovery to authenticated journey', () => {
       expect(response.statusCode).toBe(201);
     }
     const complete = await state();
-    expect(complete.currentQuestion).toBe(14);
+    expect(complete.currentQuestion).toBe(19);
+    // La classifica completa entra nello storico e nel profilo, senza tessera verso l'AI.
+    const declared = await prisma.athleteFitRanking.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+    });
+    expect(declared.at(-1)).toMatchObject({
+      source: 'JOURNEY',
+      padelCurrent: '2',
+      padelBest: '2',
+      tennisCurrent: '2.1',
+      tennisBest: '1',
+      cardNumber: '12345/AB',
+    });
+    const profile = (
+      await prisma.userOnboardingAssessment.findUniqueOrThrow({
+        where: { userId },
+      })
+    ).profileJson as Record<string, { value: unknown }>;
+    expect(profile.fit_ranking.value).toMatchObject({
+      padel: { current: '2ª fascia', best: '2ª fascia' },
+      tennis: { current: '2.1', best: '1ª categoria' },
+    });
+    expect(JSON.stringify(profile.fit_ranking)).not.toContain('12345');
     expect(complete).toMatchObject({
       phase: 'ASSESSMENT',
       assessmentComplete: true,
@@ -679,6 +797,7 @@ describe('PF4 discovery to authenticated journey', () => {
       (await post('answer', { questionId: q.id, value: q.options[1].value }))
         .statusCode,
     ).toBe(201);
+    expect((await state()).assessmentComplete).toBe(true);
   });
 
   it('evaluates the answers once with the AI and shows a provisional R per driver', async () => {
@@ -734,6 +853,24 @@ describe('PF4 discovery to authenticated journey', () => {
     expect(
       (saved.inputJson as { prompt: { system: string } }).prompt.system,
     ).toContain(active.basePrompt);
+    // La classifica FIT arriva all'AI come dato a sé, mai tra la disponibilità
+    // e mai con il numero di tessera.
+    const prompt = (
+      saved.inputJson as {
+        prompt: {
+          system: string;
+          user: { fitRanking: unknown; availability: unknown[] };
+        };
+      }
+    ).prompt;
+    expect(prompt.user.fitRanking).toMatchObject({
+      source: 'SELF_DECLARED',
+      padel: { current: '2ª fascia' },
+      tennis: { current: '2.1' },
+    });
+    expect(prompt.user.availability).toHaveLength(2);
+    expect(prompt.system).toContain('fitRanking');
+    expect(JSON.stringify(saved.inputJson)).not.toContain('12345');
 
     // Una sola valutazione: le risposte sono bloccate.
     expect(
@@ -1514,6 +1651,87 @@ describe('PF4 discovery to authenticated journey', () => {
         })
       ).profileJson,
     ).toHaveProperty('program_duration_weeks.value', 12);
+  });
+
+  it('lets the athlete correct the FIT ranking at any time and recalculates R', async () => {
+    const view = () =>
+      app.inject({
+        method: 'GET',
+        url: '/api/athlete-journey/fit-ranking',
+        headers: { cookie },
+      });
+    const current = (await view()).json<{
+      ranking: Record<string, string | null>;
+      options: Record<string, unknown[]>;
+      recalculationPending: boolean;
+    }>();
+    expect(current.ranking).toMatchObject({
+      padelCurrent: '2',
+      cardNumber: '12345/AB',
+    });
+    expect(current.options.PADEL.length).toBeGreaterThan(0);
+    expect(current.recalculationPending).toBe(false);
+    const declared = {
+      padelCurrent: '3',
+      padelBest: '2',
+      tennisCurrent: '4.NC',
+      tennisBest: '3.1',
+      cardNumber: '12345/AB',
+    };
+    // Migliore più bassa dell'attuale: nessuna scrittura.
+    expect(
+      (await post('fit-ranking', { ...declared, padelBest: 'NONE' }))
+        .statusCode,
+    ).toBe(400);
+    const evaluations = () =>
+      prisma.assessmentEvaluation.findMany({
+        where: { userId },
+        orderBy: { sequence: 'asc' },
+      });
+    const before = await evaluations();
+    const saved = await post('fit-ranking', declared);
+    expect(saved.statusCode).toBe(201);
+    expect(saved.json()).toMatchObject({ recalculationPending: false });
+    const after = await evaluations();
+    expect(after).toHaveLength(before.length + 1);
+    const recalculated = after.at(-1)!;
+    expect(recalculated.source).toBe('FIT_RANKING_UPDATE');
+    expect(
+      (recalculated.inputJson as { prompt: { user: { fitRanking: unknown } } })
+        .prompt.user.fitRanking,
+    ).toMatchObject({
+      padel: { current: '3ª fascia', best: '2ª fascia' },
+      tennis: { current: '4.NC', best: '3.1' },
+    });
+    // Calibrazione chiusa: resta consolidata solo se regge la regola.
+    expect(['CONSOLIDATED', 'PROVISIONAL']).toContain(recalculated.status);
+    // Stessa classifica o solo la tessera: nessun nuovo ricalcolo.
+    await post('fit-ranking', declared);
+    await post('fit-ranking', { ...declared, cardNumber: '' });
+    expect(await evaluations()).toHaveLength(after.length);
+    const history = await prisma.athleteFitRanking.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+    });
+    expect(history.at(-1)).toMatchObject({
+      source: 'PROFILE',
+      cardNumber: null,
+    });
+    expect(history.at(-1)!.recalculatedAt).not.toBeNull();
+    expect(
+      (
+        await prisma.userOnboardingAssessment.findUniqueOrThrow({
+          where: { userId },
+        })
+      ).profileJson,
+    ).toHaveProperty('fit_ranking.value.padel.current', '3ª fascia');
+  });
+
+  it('lets an admin delete a test athlete with the whole journey', async () => {
+    const result = await deleteAthleteCompletely(prisma, userId);
+    expect(result.deleted).toBe(true);
+    expect(await prisma.user.count({ where: { id: userId } })).toBe(0);
+    expect(await prisma.athleteFitRanking.count({ where: { userId } })).toBe(0);
   });
 
   it('preserves discovery through verified Google OIDC and creates the same active domain state', async () => {

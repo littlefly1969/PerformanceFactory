@@ -118,7 +118,9 @@ API (`AI_TUNER`; lettura anche `ADMIN`):
 | `POST /ai-tuning/assessment-prompt/test` | `{ basePrompt, evaluationId?, kind? }`, nessun salvataggio |
 
 `GET /ai-tuning/assessment-prompts?kind=CALIBRATION` e `kind` nel salvataggio
-gestiscono il prompt delle domande di calibrazione con la stessa logica.
+gestiscono il prompt delle domande di calibrazione con la stessa logica;
+`kind=INITIAL_QUESTIONS` quello delle domande conoscitive iniziali (vedi
+[Assessment PF5](assessment-pf5.md)).
 
 ## Sviluppo e test
 

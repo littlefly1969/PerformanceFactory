@@ -217,6 +217,8 @@ export class AiTuningController {
   })
   @Roles(UserRole.AI_TUNER)
   testAssessmentPrompt(@Body() body: TestAssessmentPromptDto) {
+    if (body.kind === 'INITIAL_QUESTIONS')
+      return this.tuning.testInitialQuestionsPrompt(body.basePrompt);
     if (body.kind === 'CALIBRATION')
       return this.tuning.testCalibrationPrompt(body.basePrompt);
     if (body.kind === 'MICRO_TEST')

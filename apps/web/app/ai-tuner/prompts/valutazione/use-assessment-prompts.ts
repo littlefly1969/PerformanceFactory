@@ -4,6 +4,7 @@ import { readError } from "../prompt-management-model";
 
 export type AssessmentPromptKind =
   | "EVALUATION"
+  | "INITIAL_QUESTIONS"
   | "CALIBRATION"
   | "MICRO_TEST"
   | "POTENTIAL";
@@ -190,7 +191,9 @@ export function useAssessmentPrompts(
     setMessage(
       kind === "EVALUATION"
         ? "Prompt attivato: le prossime valutazioni useranno questa versione."
-        : "Prompt attivato: i prossimi round di domande useranno questa versione.",
+        : kind === "INITIAL_QUESTIONS"
+          ? "Prompt attivato: le domande iniziali dei prossimi atleti useranno questa versione."
+          : "Prompt attivato: i prossimi round di domande useranno questa versione.",
     );
   }
 

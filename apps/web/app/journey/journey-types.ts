@@ -133,6 +133,8 @@ export type Journey = {
   currentQuestion: number;
   /** Tutte le risposte date: confine prima del passo successivo. */
   assessmentComplete?: boolean;
+  /** Disponibilità e classifica date: l'AI deve scrivere le domande dei driver. */
+  questionsPending?: boolean;
   evaluation?: Evaluation | null;
   calibration?: Calibration | null;
   /** PENDING mentre l'AI scrive gli scenari, UNAVAILABLE se va riprovato. */
@@ -145,7 +147,9 @@ export type Journey = {
   answers: Record<string, string | number>;
   questions: {
     id: string;
-    kind?: "OPERATIONAL" | "AREA";
+    kind?: "OPERATIONAL" | "RANKING" | "AREA";
+    /** TEXT per il numero di tessera FIT, facoltativo; altrimenti opzioni. */
+    inputType?: string;
     /** Etichetta mostrata sopra la domanda: Disponibilità o nome del driver. */
     section?: string;
     title: string;

@@ -52,6 +52,7 @@ model User {
   abilityPlanOperations AbilityPlanOperation[]
   areaSessions AreaSession[]
   discovery AthleteDiscovery?
+  fitRankings AthleteFitRanking[]
   assessmentEvaluations AssessmentEvaluation[]
   assessmentAnomalies   AssessmentAnomaly[]
   reviewedAnomalies     AssessmentAnomaly[]    @relation("AnomalyReviewer")
@@ -1684,6 +1685,30 @@ model BetaTesterChange {
   @@index([actorId])
 }
 
+/// Classifica FIT dichiarata dall'atleta (padel e tennis, attuale e migliore di
+/// sempre), con il numero di tessera facoltativo. Solo inserimenti: l'ultima
+/// riga è la classifica in vigore, le precedenti sono lo storico. Ogni prompt
+/// AI la riceve come contesto; il numero di tessera non esce mai verso l'AI.
+model AthleteFitRanking {
+  id             String    @id @default(uuid())
+  userId         String
+  padelCurrent   String
+  padelBest      String
+  tennisCurrent  String
+  tennisBest     String
+  cardNumber     String?
+  /// JOURNEY durante il percorso, PROFILE da una correzione dell'atleta.
+  source         String
+  /// Correzione dal profilo: quando la R è stata ricalcolata. Null finché il
+  /// ricalcolo non riesce, così un nuovo salvataggio lo riprova.
+  recalculatedAt DateTime?
+  createdAt      DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
 /// Calibrazione gratuita (A4.3, A4.6): dopo la prima valutazione R e confidence si
 /// affinano a round finché la regola di consolidamento è soddisfatta. Scadenza e
 /// fine dei round non consolidano R (PF-FS-PREPAYWALL §7.2).
@@ -1833,6 +1858,8 @@ model CalibrationConfig {
   programBeforePaywall     Boolean  @default(false)
   /// Indicazione per il motore: una micro-prova ogni N domande; 0 = nessuna.
   questionsPerMicroTest    Int      @default(0)
+  /// Domande conoscitive iniziali per driver, scritte dall'AI dopo la classifica FIT.
+  initialQuestionsPerArea  Int      @default(2)
   updatedAt                DateTime @updatedAt
   updatedById              String?
 

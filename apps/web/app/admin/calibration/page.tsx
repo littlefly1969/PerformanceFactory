@@ -10,6 +10,7 @@ type Settings = {
   maxDays: number;
   programBeforePaywall: boolean;
   questionsPerMicroTest: number;
+  initialQuestionsPerArea: number;
 };
 
 /** Campi modificabili: valori provvisori finché A4-D01 non è deciso. */
@@ -30,6 +31,11 @@ const FIELDS: { key: NumericKey; label: string; hint: string }[] = [
     key: "questionsPerMicroTest",
     label: "Domande per ogni micro-prova",
     hint: "Indicazione per l'AI: in media una micro-prova ogni N domande. L'AI ne tiene conto ma decide passo per passo. 0 = nessuna indicazione.",
+  },
+  {
+    key: "initialQuestionsPerArea",
+    label: "Domande iniziali per driver",
+    hint: "Quante domande conoscitive scrive l'AI per ogni driver dopo la classifica FIT, da 1 a 4. Vale per i nuovi assessment.",
   },
 ];
 

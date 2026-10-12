@@ -20,6 +20,7 @@ import { PROGRAM_HORIZON_MONTHS as HORIZON_MONTHS } from '../../payments/payment
 import { AiProposalProviderService } from '../../ai-orchestrator/proposal-provider.service';
 import { loadActiveAssessmentPrompt } from '../../ai-orchestrator/assessment-prompts';
 import { POTENTIAL_CRITERIA } from '../../ai-orchestrator/potential-generation';
+import { loadFitRankingContext } from '../fit-ranking/fit-ranking';
 import { requireAiConsent } from '../assessment-evaluation';
 import { revealGaps } from './reveal-gap';
 
@@ -326,9 +327,10 @@ export class ScenariosService {
     if (!claimed.count) return 'PENDING';
     try {
       await requireAiConsent(this.prisma, userId);
-      const [prompt, daysPerWeek] = await Promise.all([
+      const [prompt, daysPerWeek, fitRanking] = await Promise.all([
         loadActiveAssessmentPrompt(this.prisma, 'POTENTIAL'),
         this.daysPerWeek(userId),
+        loadFitRankingContext(this.prisma, userId),
       ]);
       const result = await this.ai.generatePotential({
         ...prompt,
@@ -336,6 +338,7 @@ export class ScenariosService {
         level: evaluation.level,
         levelConfidence: evaluation.levelConfidence,
         daysPerWeek,
+        fitRanking,
         drivers: evaluation.areas.map((a) => ({
           areaId: a.areaId,
           name: driverName(a.area.name),

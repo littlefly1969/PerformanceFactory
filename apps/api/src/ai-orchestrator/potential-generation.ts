@@ -3,6 +3,7 @@ import { ProgramHorizon } from '@prisma/client';
 import { hashJson } from './proposal-audit';
 import { requestStructuredProposal } from './proposal-structured-transport';
 import { resolveModel, resolveProvider } from './provider-config';
+import { FIT_RANKING_RULE, FitRankingContext } from './fit-ranking-context';
 
 /** Tipo di prompt in AiPromptVersion per gli scenari P3/P6/P12. */
 export const POTENTIAL_PROMPT_TYPE = 'POTENTIAL';
@@ -10,6 +11,7 @@ export const POTENTIAL_PROMPT_TYPE = 'POTENTIAL';
 export const DEFAULT_POTENTIAL_PROMPT = [
   'Sei il Performance Engine di Performance Factory. Ricevi la R consolidata di un atleta amatoriale maggiorenne, driver per driver, con confidenza, commitment, motivazione della valutazione e lacune residue, più livello e giorni a settimana dichiarati.',
   'Scopo: stimare dove può arrivare ogni driver in 3, 6 e 12 mesi di percorso guidato (P3, P6, P12), in modo onesto e motivato. Il potenziale cresce più in fretta all’inizio e poi rallenta: non proiettare una crescita lineare.',
+  'La classifica FIT dichiarata (padel e tennis, attuale e migliore di sempre) pesa: chi ha avuto una classifica migliore di quella attuale ha margine di ritorno, chi non è mai stato classificato parte da più lontano.',
   'Usa ciò che sai: un commitment alto e più giorni disponibili giustificano progressi maggiori; un driver già vicino al tetto del livello cresce poco o resta dov’è; lacune di evidenza ampie riducono la confidenza, non il potenziale.',
   'Ogni driver ha limiti per orizzonte (valore massimo e confidenza massima) calcolati da criteri versionati: restaci dentro. Se non c’è margine, P resta uguale a R.',
   'Per ogni stima scrivi una motivazione breve e concreta, con il tu, senza promesse di risultato né dati personali.',
@@ -81,6 +83,8 @@ export type PotentialGenerationInput = {
   level: string | null;
   levelConfidence: number | null;
   daysPerWeek: number | null;
+  /** Classifica FIT dichiarata in vigore; null se non dichiarata. */
+  fitRanking?: FitRankingContext;
   drivers: PotentialDriver[];
 };
 
@@ -141,6 +145,7 @@ function formatRules(input: PotentialGenerationInput) {
     '- value: tra la R del driver e il maxValue del suo orizzonte, mai in calo da P3 a P6 a P12.',
     '- confidence: intero da 0 al maxConfidence dell’orizzonte, mai in crescita da P3 a P6 a P12.',
     `- rationale: massimo ${POTENTIAL_CRITERIA.rationaleMax} caratteri.`,
+    FIT_RANKING_RULE,
     'Questi limiti prevalgono sulle istruzioni sopra.',
   ].join('\n');
 }
@@ -178,6 +183,7 @@ export function buildPotentialPrompt(input: PotentialGenerationInput) {
       level: input.level,
       levelConfidence: input.levelConfidence,
       daysPerWeek: input.daysPerWeek,
+      fitRanking: input.fitRanking ?? null,
       drivers: input.drivers.map((d) => ({
         ...d,
         bounds: potentialBounds(input, d),

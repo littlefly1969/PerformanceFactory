@@ -4,6 +4,7 @@ import { requestStructuredProposal } from './proposal-structured-transport';
 import { resolveModel, resolveProvider } from './provider-config';
 import { AiProvider } from './proposal-provider-model';
 import { AssessmentEvaluationAnswer } from './assessment-evaluation-model';
+import { FIT_RANKING_RULE, FitRankingContext } from './fit-ranking-context';
 
 /** Tipo di prompt in AiPromptVersion per i micro-test su misura. */
 export const MICRO_TEST_PROMPT_TYPE = 'MICRO_TESTS';
@@ -12,7 +13,7 @@ export const DEFAULT_MICRO_TEST_PROMPT = [
   'Sei il preparatore di Performance Factory e scrivi micro-test pratici per un atleta amatoriale maggiorenne durante l’assessment. Il motore di calibrazione ha deciso che su un driver serve un’evidenza diversa dall’autodichiarazione: ricevi il profilo dell’atleta, la scala dei punteggi, il driver (score R provvisorio, confidenza, lacune di evidenza e risposte già date, ciascuna con la sua fonte), il motivo del passo, le limitazioni dichiarate e i micro-test già proposti.',
   'Scopo: ogni micro-test produce l’evidenza che manca alla valutazione di quel driver. Parti dalle lacune indicate e dalle risposte già date; verifica con un esercizio ciò che l’atleta ha dichiarato e che la valutazione non sa ancora confermare. Non chiedere di nuovo ciò che è già chiaro.',
   'Forma: un esercizio da 5-10 minuti che l’atleta svolge da solo o con un compagno, in campo o a casa, con un risultato che può contare (quante riuscite su 10, quanti secondi, quante volte di fila, quanti punti su 5 scambi). Per i driver non tecnici (preparazione, mental, nutrizione) usa una prova osservabile o un diario di un giorno con un conteggio preciso, non un’autovalutazione generica.',
-  'Su misura: adatta difficoltà, contesto e soglie a ciò che sai dell’atleta (esperienza, frequenza di gioco, obiettivo, limiti dichiarati). Un principiante non riceve esercizi da agonista; chi gioca spesso riceve soglie più alte. Se l’atleta ha dichiarato dolori o limitazioni, scegli una prova senza carico fisico o a basso impatto.',
+  'Su misura: adatta difficoltà, contesto e soglie a ciò che sai dell’atleta (classifica FIT dichiarata, esperienza, frequenza di gioco, obiettivo, limiti dichiarati). Un principiante non riceve esercizi da agonista; chi gioca spesso riceve soglie più alte. Se l’atleta ha dichiarato dolori o limitazioni, scegli una prova senza carico fisico o a basso impatto.',
   'Obiettivo informativo: dichiara in una frase quale lacuna del driver il test chiude. Indica la durata solo se si può stimare con buon senso.',
   'Istruzioni: cosa preparare, cosa fare passo per passo, cosa contare. Solo racchetta, palline, un muro o un campo, un cronometro: niente attrezzi particolari, niente salti ripetuti, carichi, sprint massimali o altri rischi.',
   'Esiti: fasce del risultato contato, mutuamente esclusive, in ordine crescente, che coprono tutti i casi. Lo score di ogni esito è il livello reale che quella fascia indica sulla scala ricevuta, dal più basso al più alto: non premiare l’esito descritto meglio.',
@@ -45,6 +46,8 @@ export type MicroTestInput = {
   promptVersionId: string | null;
   scale: { minScore: number; maxScore: number };
   athleteContext: AssessmentEvaluationAnswer[];
+  /** Classifica FIT dichiarata in vigore; null se non dichiarata. */
+  fitRanking?: FitRankingContext;
   targets: MicroTestTarget[];
   proposedTitles: string[];
   /** Perché il motore chiede un micro-test, senza dati personali. */
@@ -109,6 +112,7 @@ function formatRules(input: MicroTestInput) {
     '- niente diagnosi, terapie, farmaci, integratori, diete, prove massimali, sprint o salti ripetuti. Questa regola prevale sulle istruzioni sopra.',
     '- l’esito lo riporta l’atleta: descrivi fasce che può contare da solo, senza strumenti di misura.',
     `- options: da ${l.minOptions} a ${l.maxOptions} esiti in ordine crescente, label di massimo ${l.option} caratteri, score crescenti tra ${input.scale.minScore} e ${input.scale.maxScore}.`,
+    FIT_RANKING_RULE,
   ].join('\n');
 }
 
@@ -166,6 +170,7 @@ export function buildMicroTestPrompt(input: MicroTestInput) {
       reason: input.reason ?? null,
       scale: input.scale,
       athleteContext: input.athleteContext,
+      fitRanking: input.fitRanking ?? null,
       declaredLimitations: input.declaredLimitations ?? [],
       drivers: input.targets,
       proposedTitles: input.proposedTitles,
