@@ -1,6 +1,7 @@
 import { Prisma } from '@prisma/client';
 import { validateDiscovery } from '../../src/discovery/discovery-validation';
 import { deleteOnboardingTemplate } from '../../src/admin/admin-onboarding';
+import { deleteAthleteCompletely } from '../../src/admin/admin-athletes';
 import {
   loadActiveAssessmentPrompt,
   upsertAssessmentPromptConfig,
@@ -233,7 +234,7 @@ describe('PF4 discovery to authenticated journey', () => {
         await prisma.consent.deleteMany({ where: { userId } });
         await prisma.userPerformanceGoal.deleteMany({ where: { userId } });
         await prisma.userOnboardingAssessment.deleteMany({ where: { userId } });
-        await prisma.user.delete({ where: { id: userId } });
+        await prisma.user.deleteMany({ where: { id: userId } });
       }
       await prisma.onboardingQuestionTemplate.deleteMany({
         where: { id: { in: templateIds } },
@@ -1724,6 +1725,13 @@ describe('PF4 discovery to authenticated journey', () => {
         })
       ).profileJson,
     ).toHaveProperty('fit_ranking.value.padel.current', '3ª fascia');
+  });
+
+  it('lets an admin delete a test athlete with the whole journey', async () => {
+    const result = await deleteAthleteCompletely(prisma, userId);
+    expect(result.deleted).toBe(true);
+    expect(await prisma.user.count({ where: { id: userId } })).toBe(0);
+    expect(await prisma.athleteFitRanking.count({ where: { userId } })).toBe(0);
   });
 
   it('preserves discovery through verified Google OIDC and creates the same active domain state', async () => {
