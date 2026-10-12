@@ -106,7 +106,11 @@ Il prompt è «Domande conoscitive iniziali» (`INITIAL_QUESTIONS`), il primo in
 **AI Tuner › Prompt** (`/ai-tuner/prompts/domande-iniziali`): si modifica, si
 versiona e si prova sul caso sintetico come gli altri. Le regole di formato sono
 fisse e si aggiungono al testo modificabile: esattamente N domande per driver,
-da 3 a 5 opzioni con uno score nella scala attiva, testi brevi e mai ripetuti.
+da 3 a 5 opzioni, testi brevi e mai ripetuti. Gli score delle opzioni di una
+domanda sono tutti diversi, in ordine crescente o decrescente, e vanno dal
+minimo al massimo della scala attiva: una domanda con score uguali (`[20, 20,
+20]`) o che non tocca gli estremi (`[20, 50, 80]`) non distingue i livelli e
+fa scartare il lotto.
 
 Le domande sono salvate nella banca per atleta (`UserOnboardingQuestion`, con
 `inputJson.kind = INITIAL_QUESTIONS`, provider, modello, versione del prompt) e

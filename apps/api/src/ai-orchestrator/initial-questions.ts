@@ -58,7 +58,7 @@ function formatRules(input: InitialQuestionsInput) {
     `- questions: esattamente ${input.questionsPerArea} per ciascuno dei ${input.drivers.length} driver ricevuti (${input.questionsPerArea * input.drivers.length} in tutto), con il loro areaId, raggruppate per driver nell’ordine ricevuto.`,
     `- text: massimo ${l.question} caratteri, mai uguale a un’altra domanda.`,
     '- le domande sono solo su comportamenti, frequenze e situazioni di gioco già vissute: niente esercizi o prove da svolgere.',
-    `- options: da ${l.minOptions} a ${l.maxOptions}, label di massimo ${l.option} caratteri e diverse fra loro, score tra ${input.scale.minScore} e ${input.scale.maxScore}.`,
+    `- options: da ${l.minOptions} a ${l.maxOptions}, label di massimo ${l.option} caratteri e diverse fra loro, score tutti diversi, in ordine crescente o decrescente, con la prima o l’ultima opzione a ${input.scale.minScore} e l’altra a ${input.scale.maxScore}.`,
     FIT_RANKING_RULE,
     'Questi vincoli prevalgono sulle istruzioni sopra.',
   ].join('\n');
@@ -200,6 +200,24 @@ function clean(value: unknown, max: number) {
 }
 
 /**
+ * Una risposta serve alla stima di R solo se le opzioni hanno score tutti
+ * diversi, in ordine crescente o decrescente, dal minimo al massimo della scala.
+ */
+function scoresSpanScale(
+  options: { score: number }[],
+  scale: InitialQuestionsInput['scale'],
+) {
+  const scores = options.map((o) => o.score);
+  const steps = scores.slice(1).map((score, i) => score - scores[i]);
+  const monotonic = steps.every((s) => s > 0) || steps.every((s) => s < 0);
+  return (
+    monotonic &&
+    Math.min(...scores) === scale.minScore &&
+    Math.max(...scores) === scale.maxScore
+  );
+}
+
+/**
  * Contratto del lotto: esattamente N domande per ogni driver ricevuto, nessun
  * driver estraneo, testi unici, opzioni nella scala. Le domande tornano
  * nell'ordine dei driver ricevuti.
@@ -249,6 +267,8 @@ export function validateInitialQuestions(
     });
     if (new Set(parsed.map((o) => o.label)).size !== parsed.length)
       problems.push(`opzioni duplicate (${index + 1})`);
+    if (!scoresSpanScale(parsed, input.scale))
+      problems.push(`score che non distinguono le opzioni (${index + 1})`);
     questions.push({ areaId, text: text ?? '', options: parsed });
   });
   for (const driver of input.drivers) {

@@ -141,10 +141,55 @@ describe('initial questions', () => {
       ],
       'numero di opzioni non valido (1)',
     ],
+    [
+      'identical scores',
+      [
+        question('tecnica', 'T1', [20, 20, 20]),
+        question('tecnica', 'T2'),
+        question('mental', 'M1'),
+        question('mental', 'M2'),
+      ],
+      'score che non distinguono le opzioni (1)',
+    ],
+    [
+      'scores missing both scale ends',
+      [
+        question('tecnica', 'T1', [20, 50, 80]),
+        question('tecnica', 'T2'),
+        question('mental', 'M1'),
+        question('mental', 'M2'),
+      ],
+      'score che non distinguono le opzioni (1)',
+    ],
+    [
+      'scores out of order',
+      [
+        question('tecnica', 'T1', [0, 100, 50]),
+        question('tecnica', 'T2'),
+        question('mental', 'M1'),
+        question('mental', 'M2'),
+      ],
+      'score che non distinguono le opzioni (1)',
+    ],
   ])('rejects %s', (_, questions, problem) => {
     const problems: string[] = [];
     expect(validateInitialQuestions({ questions }, input, problems)).toBeNull();
     expect(problems).toContain(problem);
+  });
+
+  it('accepts descending scores from the top to the bottom of the scale', () => {
+    const questions = validateInitialQuestions(
+      {
+        questions: [
+          question('tecnica', 'T1', [100, 60, 0]),
+          question('tecnica', 'T2'),
+          question('mental', 'M1'),
+          question('mental', 'M2'),
+        ],
+      },
+      input,
+    );
+    expect(questions?.[0].options.map((o) => o.score)).toEqual([100, 60, 0]);
   });
 
   it('retries an invalid output once, then asks the athlete to retry', async () => {

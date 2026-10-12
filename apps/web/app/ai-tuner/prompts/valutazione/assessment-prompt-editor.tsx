@@ -25,7 +25,7 @@ const COPY = {
     usedBy: "tutti i nuovi assessment",
     instructions: "Istruzioni per le domande iniziali (modificabili)",
     rules:
-      "esattamente le domande per driver impostate nel back office (Calibrazione), da 3 a 5 opzioni con uno score nella scala attiva, testi brevi e mai ripetuti",
+      "esattamente le domande per driver impostate nel back office (Calibrazione), da 3 a 5 opzioni con score tutti diversi, in ordine, dal minimo al massimo della scala attiva, testi brevi e mai ripetuti",
     activation: "Le domande iniziali dei prossimi atleti useranno",
   },
   EVALUATION: {
