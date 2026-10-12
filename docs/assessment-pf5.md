@@ -7,7 +7,8 @@ PF5 e un unico questionario continuo, seguito dalla prima valutazione AI delle
 risposte.
 
 ```
-login → consensi → intro PF5 → domande operative → classifica FIT → domande dei driver
+login → consensi → intro PF5 → domande operative → classifica FIT
+      → l'AI scrive le domande dei driver → domande dei driver
       → ultima risposta salvata (assessmentComplete)
       → Analizza le mie risposte → valutazione AI (R provvisoria)
 ```
@@ -38,12 +39,14 @@ di domande è scritto nel frontend.
 conteggi:
 
 ```
-count = domande operative + 5 della classifica FIT + somma delle domande dei driver attivi
+count = domande operative + 5 della classifica FIT + driver attivi × domande per driver
 estimatedMinutes = max(1, ceil(count / 3))
 ```
 
-Con la configurazione padel attuale: 2 domande operative + 5 della classifica
-FIT + 6 driver × 2 domande = 19 domande, circa 7 minuti. `fixedQuestionCount`
+Le domande per driver sono `initialQuestionsPerArea` del back office
+(`/admin/calibration`, default 2, da 1 a 4). Con la configurazione padel
+attuale: 2 domande operative + 5 della classifica FIT + 6 driver × 2 domande =
+19 domande, circa 7 minuti. `fixedQuestionCount`
 comprende operative e classifica. Le risposte `GET /auth/journey` e
 `POST /athlete-journey/start` riportano `fixedQuestionCount`,
 `areaQuestionCount`, `count` ed `estimatedMinutes`.
@@ -54,8 +57,8 @@ Ordine obbligatorio:
 2. **Classifica FIT**, sezione «Classifica FIT»: padel attuale e migliore di
    sempre, tennis attuale e migliore di sempre, numero di tessera facoltativo.
    Vedi [Classifica FIT](classifica-fit.md).
-3. **Domande dei driver**, nell'ordine configurato dei driver (quello della loro
-   prima domanda) e, dentro ogni driver, per `orderIndex`.
+3. **Domande dei driver**, scritte dall'AI per questo atleta, raggruppate
+   nell'ordine dei driver.
 
 Il progressivo mostra `n / count` e, sopra ogni domanda, la sezione
 («Disponibilità», «Classifica FIT» o il nome del driver).
@@ -85,34 +88,47 @@ risponde una volta sola, nell'assessment. La frequenza abituale
 (`general_training_frequency`) resta nella discovery. Il questionario legacy
 (`loadActiveGeneralTemplates`) esclude le domande operative e resta invariato.
 
-## Domande dei driver (configurabili)
+## Domande dei driver (scritte dall'AI)
 
-Restano template `scope = AREA` con `areaId` e `optionsJson.sportKey`, e opzioni
-`{ value, label, score }`. L'anamnesi iniziale non ha un numero fisso di domande
-per driver: ogni driver attivo ne ha da 0 a `MAX_AREA_QUESTIONS` = 4, ciascuna
-con opzioni a punteggio, e l'anamnesi ne ha almeno una in tutto. Un driver senza
-domande entra comunque nella prima valutazione AI, con `answers` vuoto e
-confidence bassa; i round di calibrazione lo approfondiscono. Nella vista
-dell'atleta i driver senza domande vengono dopo quelli della sequenza.
-Le risposte continuano a produrre lo score del driver, il `realR` e il
-Performance Index come prima.
+Non ci sono più domande di driver preconfezionate. Quando l'atleta ha risposto
+alle domande operative e alla classifica FIT, il percorso risponde con
+`questionsPending: true` e la pagina mostra «Prepariamo le tue domande…». La
+pagina chiama da sola `POST /athlete-journey/questions`, che in un'unica
+richiesta all'AI fa scrivere `initialQuestionsPerArea` domande per ogni driver
+attivo, su misura per:
 
-Una configurazione fuori da questi limiti è un errore, non un caso da aggiustare:
+- le risposte del funnel (obiettivo, esperienza, frequenza, salute);
+- la disponibilità all'allenamento;
+- la classifica FIT di padel e tennis, attuale e migliore di sempre (mai il
+  numero di tessera).
+
+Il prompt è «Domande conoscitive iniziali» (`INITIAL_QUESTIONS`), il primo in
+**AI Tuner › Prompt** (`/ai-tuner/prompts/domande-iniziali`): si modifica, si
+versiona e si prova sul caso sintetico come gli altri. Le regole di formato sono
+fisse e si aggiungono al testo modificabile: esattamente N domande per driver,
+da 3 a 5 opzioni con uno score nella scala attiva, testi brevi e mai ripetuti.
+
+Le domande sono salvate nella banca per atleta (`UserOnboardingQuestion`, con
+`inputJson.kind = INITIAL_QUESTIONS`, provider, modello, versione del prompt) e
+non si riscrivono: una seconda richiesta restituisce le stesse. Le risposte
+continuano a produrre lo score del driver, il `realR` e il Performance Index.
+
+**Se l'AI non risponde** o risponde fuori contratto, il backend riprova in
+automatico (`INITIAL_QUESTIONS_ATTEMPTS` = 2), poi risponde 502
+`INITIAL_QUESTIONS_UNAVAILABLE` e l'atleta vede «Le tue domande non sono
+pronte.» con **Riprova**. Non ci sono domande di riserva: senza AI i passaggi
+successivi (valutazione, calibrazione, scenari) non possono comunque partire.
+
+**Se l'atleta corregge la classifica** tornando indietro dopo che le domande
+sono state scritte, le domande e le loro risposte si cancellano e l'AI le
+riscrive per la classifica nuova.
+
+Una configurazione senza driver o senza domande operative è un errore:
 
 - `GET /auth/journey` restituisce la fase `ASSESSMENT_UNAVAILABLE` e l'atleta vede
   «Il questionario non è ancora disponibile».
 - `POST /athlete-journey/start` risponde 409 `ASSESSMENT_CONFIGURATION_INVALID` e
   non crea domande.
-- Il log tecnico riporta il dettaglio, per esempio
-  `ASSESSMENT_CONFIGURATION_INVALID Area "Nutrizione": expected at most 4 active questions, found 5`.
-
-Il journey PF5 non usa più il fallback storico (`QUESTIONS_PER_AREA` = 3 e
-generazione AI delle domande specialistiche). Quel codice resta per il flusso
-legacy.
-
-All'avvio le domande dei driver vengono copiate nella banca per atleta
-(`UserOnboardingQuestion`) con la loro posizione nella sequenza. Le modifiche
-successive dell'editor valgono solo per i nuovi assessment.
 
 ## Dopo l'ultima risposta
 
@@ -128,6 +144,9 @@ restano nel codice per gli atleti che le hanno già raggiunte; il nuovo percorso
 vi arriva.
 
 ## Editor admin (`/admin/assessment`)
+
+Le domande di driver di questo editor non entrano più nel percorso, che le fa
+scrivere all'AI. Restano le domande operative, bloccate.
 
 Riusa i componenti della Discovery: l'editor delle opzioni
 (`app/admin/components/option-list-editor.tsx`, ora condiviso), le schede, le
@@ -165,10 +184,16 @@ descritta in [Gestione admin della discovery](discovery-admin.md).
   driver; driver con 1 o 3 domande; opzioni senza punteggio; altri sport
   ignorati; operativa mancante; operative in testa con chiave semantica; ordine
   dei driver.
+- **API unit** (`initial-questions.spec.ts`): contratto delle domande
+  dell'AI (N per driver, driver estranei, doppioni, score fuori scala, opzioni),
+  riprova automatica ed errore da riprovare.
 - **PostgreSQL** (`test/db/discovery.integration-spec.ts`): configurazione
-  invalida che non parte e non genera domande; 2 operative in testa più 12 di
-  driver; profilo scritto alla prima risposta; stop con `assessmentComplete`;
-  profilo e baseline all'invio esistente.
+  invalida che non parte e non genera domande; 2 operative e 5 di classifica in
+  testa; AI che non risponde (502, nessuna domanda di riserva) e riprova; 12
+  domande dell'AI a coppie per driver; classifica corretta che fa riscrivere le
+  domande; profilo scritto alla prima risposta; stop con `assessmentComplete`.
+- **Web** (`questions-preparing.test.tsx`, `ai-tuner/prompts/domande-iniziali`):
+  richiesta automatica una volta sola, Riprova, prova del prompt.
 - **PostgreSQL** (`test/db/assessment-editor.integration-spec.ts`): operative
   bloccate, modifica di testo e punteggi, vincolo di 2 domande, bozze, riordino
   interno al driver.

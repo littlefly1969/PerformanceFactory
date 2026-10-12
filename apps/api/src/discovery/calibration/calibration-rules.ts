@@ -34,6 +34,8 @@ export type CalibrationSettings = {
    * ma decide passo per passo; 0 significa nessuna indicazione.
    */
   questionsPerMicroTest: number;
+  /** Domande conoscitive iniziali per driver, scritte dall'AI dopo la classifica FIT. */
+  initialQuestionsPerArea: number;
 };
 
 export const DEFAULT_CALIBRATION_SETTINGS: CalibrationSettings = {
@@ -41,6 +43,7 @@ export const DEFAULT_CALIBRATION_SETTINGS: CalibrationSettings = {
   maxDays: 30,
   programBeforePaywall: false,
   questionsPerMicroTest: 0,
+  initialQuestionsPerArea: 2,
 };
 
 export type EvaluatedDriver = {
@@ -150,5 +153,7 @@ export function settingsProblems(s: CalibrationSettings) {
   if (s.maxDays < 1) problems.push('La durata deve essere positiva');
   if (s.questionsPerMicroTest < 0 || s.questionsPerMicroTest > 50)
     problems.push('Le domande per micro-prova vanno da 0 a 50');
+  if (s.initialQuestionsPerArea < 1 || s.initialQuestionsPerArea > 4)
+    problems.push('Le domande iniziali per driver vanno da 1 a 4');
   return problems;
 }

@@ -12,6 +12,10 @@ import {
 } from './calibration-questions';
 import { generateMicroTests, MicroTestInput } from './micro-test-generation';
 import {
+  generateInitialQuestions,
+  InitialQuestionsInput,
+} from './initial-questions';
+import {
   generatePotential,
   PotentialGenerationInput,
 } from './potential-generation';
@@ -89,6 +93,10 @@ export class AiProposalProviderService {
 
   generateCalibrationQuestions(input: CalibrationQuestionsInput) {
     return generateCalibrationQuestions(this.logger, input);
+  }
+
+  generateInitialQuestions(input: InitialQuestionsInput) {
+    return generateInitialQuestions(this.logger, input);
   }
 
   generateMicroTests(input: MicroTestInput) {

@@ -77,6 +77,52 @@ export async function testAssessmentPrompt(
   };
 }
 
+/** Classifica dichiarata del caso sintetico: ex tennista, oggi padel di 3ª fascia. */
+const SYNTHETIC_FIT_RANKING = {
+  source: 'SELF_DECLARED' as const,
+  declaredAt: '2026-01-01T00:00:00.000Z',
+  padel: { current: '3ª fascia', best: '3ª fascia' },
+  tennis: { current: 'Nessuna classifica', best: '3.2' },
+};
+
+/** Prova le domande conoscitive iniziali sul caso sintetico, due per driver. */
+export async function testInitialQuestionsPrompt(
+  ai: AiProposalProviderService,
+  basePrompt: string,
+) {
+  const input = SYNTHETIC_ASSESSMENT_CASE;
+  const drivers = input.drivers.map((d) => ({
+    areaId: d.areaId,
+    name: d.name,
+  }));
+  const result = await ai.generateInitialQuestions({
+    basePrompt,
+    promptVersionId: null,
+    scale: input.scale,
+    athleteContext: input.athleteContext,
+    availability: input.availability,
+    fitRanking: SYNTHETIC_FIT_RANKING,
+    drivers,
+    questionsPerArea: 2,
+  });
+  return {
+    caseEvaluationId: null,
+    provider: result.provider,
+    model: result.model,
+    latencyMs: result.latencyMs,
+    output: {
+      action: 'ASK_GROUP',
+      rationale: `Domande iniziali su misura per la classifica del caso sintetico (padel ${SYNTHETIC_FIT_RANKING.padel.current}, migliore tennis ${SYNTHETIC_FIT_RANKING.tennis.best}).`,
+      questions: result.questions.map((q, i) => ({
+        ...q,
+        id: `q${i + 1}`,
+        name: drivers.find((d) => d.areaId === q.areaId)?.name,
+      })),
+    },
+    previousOutput: null,
+  };
+}
+
 /** Prova il passo di calibrazione sul caso sintetico: due driver in focus a confidence bassa. */
 export async function testCalibrationPrompt(
   ai: AiProposalProviderService,

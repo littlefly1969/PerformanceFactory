@@ -46,6 +46,14 @@ export class AthleteJourneyController {
   start(@Req() req: { user: { id: string } }) {
     return this.journey.start(req.user.id);
   }
+  @ApiOperation({
+    summary:
+      "Dopo disponibilità e classifica FIT l'AI scrive le domande dei driver",
+  })
+  @Post('questions')
+  prepareQuestions(@Req() req: { user: { id: string } }) {
+    return this.journey.prepareQuestions(req.user.id);
+  }
   @ApiOperation({ summary: 'Salva risposta e avanzamento' })
   @Post('answer')
   answer(@Req() req: { user: { id: string } }, @Body() body: AnswerDto) {

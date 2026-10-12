@@ -14,17 +14,22 @@ import {
   MICRO_TEST_PROMPT_TYPE,
 } from './micro-test-generation';
 import {
+  DEFAULT_INITIAL_QUESTIONS_PROMPT,
+  INITIAL_QUESTIONS_PROMPT_TYPE,
+} from './initial-questions';
+import {
   DEFAULT_POTENTIAL_PROMPT,
   POTENTIAL_PROMPT_TYPE,
 } from './potential-generation';
 
 /**
- * Quattro famiglie di prompt con lo stesso ciclo di vita (bozze, attivazione,
- * versioni): la valutazione delle risposte, le domande di calibrazione, i
- * micro-test su misura e gli scenari P3/P6/P12. Al massimo un prompt attivo
- * per famiglia.
+ * Cinque famiglie di prompt con lo stesso ciclo di vita (bozze, attivazione,
+ * versioni): le domande conoscitive iniziali, la valutazione delle risposte,
+ * le domande di calibrazione, i micro-test su misura e gli scenari
+ * P3/P6/P12. Al massimo un prompt attivo per famiglia.
  */
 export const ASSESSMENT_PROMPT_KINDS = [
+  'INITIAL_QUESTIONS',
   'EVALUATION',
   'CALIBRATION',
   'MICRO_TEST',
@@ -32,6 +37,12 @@ export const ASSESSMENT_PROMPT_KINDS = [
 ] as const;
 export type AssessmentPromptKind = (typeof ASSESSMENT_PROMPT_KINDS)[number];
 const KINDS = {
+  INITIAL_QUESTIONS: {
+    defaultId: 'initial-questions-prompt-default',
+    defaultName: 'domande conoscitive iniziali',
+    defaultPrompt: DEFAULT_INITIAL_QUESTIONS_PROMPT,
+    promptType: INITIAL_QUESTIONS_PROMPT_TYPE,
+  },
   EVALUATION: {
     defaultId: 'assessment-prompt-default',
     defaultName: 'valutazione assessment',

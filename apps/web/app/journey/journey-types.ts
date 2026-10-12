@@ -133,6 +133,8 @@ export type Journey = {
   currentQuestion: number;
   /** Tutte le risposte date: confine prima del passo successivo. */
   assessmentComplete?: boolean;
+  /** Disponibilità e classifica date: l'AI deve scrivere le domande dei driver. */
+  questionsPending?: boolean;
   evaluation?: Evaluation | null;
   calibration?: Calibration | null;
   /** PENDING mentre l'AI scrive gli scenari, UNAVAILABLE se va riprovato. */

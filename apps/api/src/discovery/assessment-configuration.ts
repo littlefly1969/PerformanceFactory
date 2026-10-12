@@ -7,6 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { TemplateRecord } from '../onboarding/onboarding-model';
 import { normalizeOptions } from '../onboarding/onboarding-answers';
+import { loadCalibrationSettings } from './calibration/calibration-config';
 import {
   loadEnabledDriverAreasForSelection,
   requireSportContext,
@@ -140,6 +141,19 @@ export async function loadOperationalTemplates(
   return rows.filter((t) => semanticRoleOf(t)).map(operationalRecord);
 }
 
+/** Esattamente una domanda operativa attiva per ruolo. */
+export function operationalProblems(operational: TemplateRecord[]) {
+  const problems: string[] = [];
+  for (const [role, key] of Object.entries(OPERATIONAL_ROLES)) {
+    const found = operational.filter((q) => q.key === key).length;
+    if (found !== 1)
+      problems.push(
+        `Domanda operativa ${role}: expected 1 active question, found ${found}`,
+      );
+  }
+  return problems;
+}
+
 /**
  * Problemi che impediscono di pubblicare l'assessment. Nessuna correzione
  * silenziosa: niente domande mancanti colmate dall'AI, niente domande in eccesso
@@ -150,14 +164,7 @@ export function assessmentProblems(
   areas: { id: string; name: string }[],
   areaTemplates: OnboardingQuestionTemplate[],
 ) {
-  const problems: string[] = [];
-  for (const [role, key] of Object.entries(OPERATIONAL_ROLES)) {
-    const found = operational.filter((q) => q.key === key).length;
-    if (found !== 1)
-      problems.push(
-        `Domanda operativa ${role}: expected 1 active question, found ${found}`,
-      );
-  }
+  const problems = operationalProblems(operational);
   if (
     areas.length &&
     !areas.some((a) => areaTemplates.some((t) => t.areaId === a.id))
@@ -231,12 +238,36 @@ export type AssessmentConfiguration = Awaited<
   ReturnType<typeof buildAssessmentConfiguration>
 >;
 
+/**
+ * Configurazione del percorso PF5: domande operative e driver attivi dello
+ * sport dell'atleta. Le domande dei driver non sono configurate: le scrive
+ * l'AI dopo la classifica FIT, `perArea` per driver (back office).
+ */
 export async function loadAssessmentConfiguration(
   prisma: PrismaService,
   userId: string,
 ) {
-  const { selection, areas } = await requireSportContext(prisma, userId);
-  return buildAssessmentConfiguration(prisma, selection.sportKey, areas);
+  const [{ selection, areas }, operational, settings] = await Promise.all([
+    requireSportContext(prisma, userId),
+    loadOperationalTemplates(prisma),
+    loadCalibrationSettings(prisma),
+  ]);
+  const problems = operationalProblems(operational);
+  if (!areas.length) problems.push('Anamnesi: expected at least 1 driver');
+  const perArea = settings.initialQuestionsPerArea;
+  const areaQuestionCount = areas.length * perArea;
+  const count = operational.length + areaQuestionCount;
+  return {
+    sportKey: selection.sportKey,
+    operational,
+    areas: areas.map((a) => ({ id: a.id, name: a.name })),
+    perArea,
+    problems,
+    fixedQuestionCount: operational.length,
+    areaQuestionCount,
+    count,
+    estimatedMinutes: estimatedMinutes(count),
+  };
 }
 
 /** Configurazione della specializzazione PF4 corrente, per l'editor admin. */

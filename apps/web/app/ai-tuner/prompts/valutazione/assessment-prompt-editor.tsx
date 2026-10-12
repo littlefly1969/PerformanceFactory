@@ -18,6 +18,16 @@ const ACTION_LABEL = {
 
 /** Testi delle famiglie di prompt: valutazione, calibrazione, micro-test e scenari P. */
 const COPY = {
+  INITIAL_QUESTIONS: {
+    title: "Domande conoscitive iniziali",
+    description:
+      "Prompt che, dopo la disponibilità e la classifica FIT, scrive le prime domande di ogni driver su misura per l'atleta: funnel, disponibilità e classifica di padel e tennis. Le risposte alimentano la prima stima della R.",
+    usedBy: "tutti i nuovi assessment",
+    instructions: "Istruzioni per le domande iniziali (modificabili)",
+    rules:
+      "esattamente le domande per driver impostate nel back office (Calibrazione), da 3 a 5 opzioni con uno score nella scala attiva, testi brevi e mai ripetuti",
+    activation: "Le domande iniziali dei prossimi atleti useranno",
+  },
   EVALUATION: {
     title: "Valutazione dell'assessment",
     description:

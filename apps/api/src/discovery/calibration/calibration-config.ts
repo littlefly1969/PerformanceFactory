@@ -13,6 +13,7 @@ const select = {
   maxDays: true,
   programBeforePaywall: true,
   questionsPerMicroTest: true,
+  initialQuestionsPerArea: true,
 } as const;
 
 /** Parametri correnti; la riga nasce con i valori di default alla prima lettura. */

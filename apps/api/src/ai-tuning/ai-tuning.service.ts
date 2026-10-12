@@ -17,6 +17,7 @@ import {
   listAssessmentTestCases,
   testAssessmentPrompt,
   testCalibrationPrompt,
+  testInitialQuestionsPrompt,
   testMicroTestPrompt,
   testPotentialPrompt,
 } from './assessment-prompt-test';
@@ -92,6 +93,10 @@ export class AiTuningService {
 
   listAssessmentTestCases() {
     return listAssessmentTestCases(this.prisma);
+  }
+
+  testInitialQuestionsPrompt(basePrompt: string) {
+    return testInitialQuestionsPrompt(this.proposalProvider, basePrompt);
   }
 
   testCalibrationPrompt(basePrompt: string) {

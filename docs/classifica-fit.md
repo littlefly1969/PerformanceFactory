@@ -39,7 +39,8 @@ profilo letto dal coaching.
 
 ## Chi la usa
 
-Ogni prompt dell'assessment riceve `fitRanking`: valutazione della R,
+Ogni prompt dell'assessment riceve `fitRanking`: domande conoscitive iniziali
+dei driver, valutazione della R,
 domande di calibrazione, micro-test e scenari P3/P6/P12. Il coaching la legge dal
 profilo. Ai prompt arrivano solo le etichette leggibili e la data della
 dichiarazione: **mai il numero di tessera**. Una regola fissa

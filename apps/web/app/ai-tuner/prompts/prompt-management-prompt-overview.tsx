@@ -15,6 +15,20 @@ export function renderPromptOverview(model: PromptManagementModel) {
       <section className="pf-panel pf-prompt-current-panel">
         <div className="pf-panel-header pf-prompt-current-header">
           <div>
+            <h2>Domande conoscitive iniziali</h2>
+            <p className="pf-muted">
+              Prompt che, dopo disponibilità e classifica FIT, scrive le prime
+              domande di ogni driver su misura per funnel e classifica.
+            </p>
+          </div>
+          <Link className="pf-button" href="/ai-tuner/prompts/domande-iniziali">
+            Apri prompt
+          </Link>
+        </div>
+      </section>
+      <section className="pf-panel pf-prompt-current-panel">
+        <div className="pf-panel-header pf-prompt-current-header">
+          <div>
             <h2>Valutazione dell&apos;assessment</h2>
             <p className="pf-muted">
               Prompt AI_ASSESSMENT che, finite le risposte, stima la R

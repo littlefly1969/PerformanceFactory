@@ -10,6 +10,7 @@ import { ScenariosReveal } from "./scenarios-reveal";
 import { DurationStep, PerformanceResult } from "./performance-result";
 import { useJourney } from "./use-journey";
 import { CardNumberStep } from "./card-number-step";
+import { QuestionsPreparing } from "./questions-preparing";
 import { FitRankingEditor } from "../components/fit-ranking-editor";
 import "./journey.css";
 const HORIZON_MONTHS: Record<string, number> = {
@@ -139,6 +140,13 @@ export default function JourneyPage() {
               </div>
             )}
           </section>
+        )}
+        {j?.phase === "ASSESSMENT" && j.questionsPending && (
+          <QuestionsPreparing
+            busy={busy}
+            failed={!!error}
+            onPrepare={() => action("questions")}
+          />
         )}
         {/* Tutte le risposte date: l'atleta conferma e parte la prima valutazione AI. */}
         {j?.phase === "ASSESSMENT" && j.assessmentComplete && (

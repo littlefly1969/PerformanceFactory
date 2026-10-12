@@ -57,6 +57,14 @@ export class UpdateCalibrationConfigDto {
   @Min(0)
   @Max(50)
   questionsPerMicroTest?: number;
+
+  /** Domande conoscitive iniziali per driver, scritte dall'AI. */
+  @ApiPropertyOptional({ minimum: 1, maximum: 4 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(4)
+  initialQuestionsPerArea?: number;
 }
 
 /** Nuova versione di una regola di confidence; null = criterio non applicato. */

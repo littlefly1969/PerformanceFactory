@@ -12,13 +12,17 @@ import { ConsentsService } from '../consents/consents.service';
 import { OnboardingService } from '../onboarding/onboarding.service';
 import { loadSpecialistQuestionRecords } from '../onboarding/onboarding-questions';
 import { discoveryContext } from './discovery-context';
-import { configuredAssessment } from './configured-assessment';
+import {
+  dropStaleBank,
+  generateInitialQuestionBank,
+} from './initial-question-bank';
 import {
   estimatedMinutes,
   logAssessmentProblems,
   loadAssessmentConfiguration,
   loadOperationalTemplates,
   saveOperationalAnswer,
+  assessmentConfigurationError,
 } from './assessment-configuration';
 import {
   OnboardingAnswer,
@@ -84,19 +88,20 @@ export class AthleteJourneyService {
       }),
       pendingWakeup(this.prisma, userId),
     ]);
-    const started = bank.length > 0;
+    // Avviato: le domande dei driver arrivano dopo la classifica FIT.
+    const started = bank.length > 0 || saved.phase === 'ASSESSMENT';
     const answers = saved.assessmentAnswers as Record<
       string,
       OnboardingAnswer['value']
     >;
     const ranking = fitRankingQuestions(answers);
-    // Prima dell'avvio l'intro legge la configurazione; dopo fa fede la banca copiata.
-    const config = started
+    // Finché le domande dei driver non ci sono vale la configurazione; poi la banca.
+    const config = bank.length
       ? null
       : await loadAssessmentConfiguration(this.prisma, userId);
     if (config?.problems.length) logAssessmentProblems(config.problems);
     const questions = started ? [...operational, ...ranking, ...bank] : [];
-    const drivers = started
+    const drivers = bank.length
       ? [...new Set(bank.map((q) => q.areaId!))].map((id) => {
           const area = bank.find((q) => q.areaId === id)!.area!;
           return {
@@ -108,11 +113,14 @@ export class AthleteJourneyService {
       : config!.areas.map((a) => ({
           id: a.id,
           name: a.name,
-          count: a.templates.length,
+          count: config!.perArea,
         }));
     const orderedAreas = drivers.map((d) => d.id);
     const driverList = drivers.map((d) => ({ ...d, name: driverName(d.name) }));
-    const count = started ? questions.length : config!.count + ranking.length;
+    const count = bank.length
+      ? questions.length
+      : config!.count + ranking.length;
+    const fixedCount = operational.length + ranking.length;
     const processing =
       saved.operationAt && Date.now() - saved.operationAt.getTime() < LEASE_MS;
     const evaluation = started
@@ -183,7 +191,11 @@ export class AthleteJourneyService {
       },
       currentQuestion: Math.min(saved.currentQuestion, questions.length),
       // Tutte le risposte date: l'atleta può correggerle fino alla valutazione AI.
-      assessmentComplete: started && saved.currentQuestion >= questions.length,
+      assessmentComplete:
+        bank.length > 0 && saved.currentQuestion >= questions.length,
+      // Finite disponibilità e classifica: l'AI scrive le domande dei driver.
+      questionsPending:
+        started && !bank.length && saved.currentQuestion >= fixedCount,
       evaluation,
       calibration,
       scenarios,
@@ -207,10 +219,8 @@ export class AthleteJourneyService {
         required: q.required,
         inputType: q.inputType,
       })),
-      fixedQuestionCount:
-        (started ? operational.length : config!.fixedQuestionCount) +
-        ranking.length,
-      areaQuestionCount: started ? bank.length : config!.areaQuestionCount,
+      fixedQuestionCount: fixedCount,
+      areaQuestionCount: bank.length || config!.areaQuestionCount,
       count,
       driverList,
       estimatedMinutes: estimatedMinutes(count),
@@ -231,24 +241,28 @@ export class AthleteJourneyService {
   async start(userId: string) {
     await this.allowed(userId);
     const saved = await this.record(userId);
-    if (
-      saved.baselineId ||
-      (await this.prisma.userOnboardingQuestion.count({ where: { userId } }))
-    )
+    if (saved.baselineId || saved.phase === 'ASSESSMENT')
       return this.state(userId);
+    // Configurazione invalida: l'avvio si ferma, nessuna domanda di riserva.
+    const config = await loadAssessmentConfiguration(this.prisma, userId);
+    if (config.problems.length)
+      throw assessmentConfigurationError(config.problems);
+    await this.prisma.athleteDiscovery.updateMany({
+      where: { userId, phase: { not: 'ASSESSMENT' }, baselineId: null },
+      data: { phase: 'ASSESSMENT', currentQuestion: 0 },
+    });
+    return this.state(userId);
+  }
+
+  /**
+   * Dopo disponibilità e classifica FIT l'AI scrive le domande dei driver, in
+   * un solo lotto. Se non risponde l'atleta riprova: nessuna riserva.
+   */
+  async prepareQuestions(userId: string) {
+    await this.allowed(userId);
     await this.claim(userId);
     try {
-      // A second start may have waited for the first to finish claiming work.
-      if (
-        !(await this.prisma.userOnboardingQuestion.count({ where: { userId } }))
-      ) {
-        // Solo domande configurate e valide: un errore ferma l'avvio.
-        await configuredAssessment(this.prisma, userId);
-        await this.prisma.athleteDiscovery.update({
-          where: { userId },
-          data: { phase: 'ASSESSMENT', currentQuestion: 0 },
-        });
-      }
+      await generateInitialQuestionBank(this.prisma, this.ai, userId);
     } finally {
       await this.release(userId);
     }
@@ -281,7 +295,11 @@ export class AthleteJourneyService {
         ...(saved.assessmentAnswers as object),
         [questionId]: value,
       };
-      if (fit) answers = alignBest(answers);
+      if (fit) {
+        answers = alignBest(answers);
+        // Classifica cambiata: le domande dei driver vanno riscritte.
+        answers = await dropStaleBank(tx, userId, saved, answers, questions);
+      }
       await tx.athleteDiscovery.update({
         where: { userId },
         data: {
@@ -338,7 +356,7 @@ export class AthleteJourneyService {
         const questions = await this.sequence(userId);
         const stored = claimed.assessmentAnswers as Record<string, unknown>;
         if (
-          !questions.length ||
+          !questions.some((q) => q.areaId) ||
           questions.some((q) => !this.valid(q, stored[q.id]))
         )
           throw new BadRequestException('Completa tutte le domande');
@@ -476,7 +494,7 @@ export class AthleteJourneyService {
       );
       const stored = claimed.assessmentAnswers as Record<string, unknown>;
       if (
-        !questions.length ||
+        !questions.some((q) => q.areaId) ||
         questions.some((q) => !this.valid(q, stored[q.id]))
       )
         throw new BadRequestException('Completa tutte le domande');
@@ -547,8 +565,8 @@ export class AthleteJourneyService {
    */
   private async sequence(userId: string) {
     const bank = await loadSpecialistQuestionRecords(this.prisma, userId);
-    if (!bank.length) return [];
     const saved = await this.record(userId);
+    if (!bank.length && saved.phase !== 'ASSESSMENT') return [];
     return [
       ...(await loadOperationalTemplates(this.prisma)),
       ...fitRankingQuestions(

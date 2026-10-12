@@ -1858,6 +1858,8 @@ model CalibrationConfig {
   programBeforePaywall     Boolean  @default(false)
   /// Indicazione per il motore: una micro-prova ogni N domande; 0 = nessuna.
   questionsPerMicroTest    Int      @default(0)
+  /// Domande conoscitive iniziali per driver, scritte dall'AI dopo la classifica FIT.
+  initialQuestionsPerArea  Int      @default(2)
   updatedAt                DateTime @updatedAt
   updatedById              String?
 
