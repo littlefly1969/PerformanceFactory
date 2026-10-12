@@ -42,5 +42,7 @@ export const MEANINGFUL_SOURCES = [
   'ASSESSMENT_SUBMITTED',
   'CALIBRATION_ROUND',
   'COACH_FEEDBACK',
+  /** Correzione della classifica FIT: la R si ricalcola. */
+  'FIT_RANKING_UPDATE',
 ] as const;
 export type MeaningfulSource = (typeof MEANINGFUL_SOURCES)[number];

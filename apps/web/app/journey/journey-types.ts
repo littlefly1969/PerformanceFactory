@@ -145,7 +145,9 @@ export type Journey = {
   answers: Record<string, string | number>;
   questions: {
     id: string;
-    kind?: "OPERATIONAL" | "AREA";
+    kind?: "OPERATIONAL" | "RANKING" | "AREA";
+    /** TEXT per il numero di tessera FIT, facoltativo; altrimenti opzioni. */
+    inputType?: string;
     /** Etichetta mostrata sopra la domanda: Disponibilità o nome del driver. */
     section?: string;
     title: string;

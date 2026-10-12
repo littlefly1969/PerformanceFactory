@@ -22,6 +22,7 @@ import { loadCalibrationSettings } from './calibration-config';
 import { completeCalibration } from './calibration-completion';
 import { addLessonEvidence, lockCalibration } from './lesson-evidence';
 import { evaluatePendingFeedback, linkFeedback } from './lesson-feedback';
+import { reevaluateForRanking } from '../fit-ranking/ranking-reevaluation';
 import {
   CalibrationStatus,
   dayOf,
@@ -268,6 +269,7 @@ export class CalibrationService {
         promptVersionId: prompt.promptVersionId,
         scale: input.scale,
         athleteContext: input.athleteContext,
+        fitRanking: input.fitRanking,
         targets: drivers.map((d) => ({
           ...d,
           askedQuestions: asked.get(d.areaId) ?? [],
@@ -505,6 +507,20 @@ export class CalibrationService {
     const input = await this.evaluationInput(userId, rounds);
     await addLessonEvidence(this.prisma, userId, input);
     return input;
+  }
+
+  /** Classifica FIT corretta: la R si ricalcola sulle stesse evidenze. */
+  async reevaluateForRanking(userId: string) {
+    if (!(await this.ensureStarted(userId))) return false;
+    const lease = await this.claim(userId);
+    try {
+      await requireAiConsent(this.prisma, userId);
+      return await reevaluateForRanking(this.prisma, this.ai, userId, (r) =>
+        this.evaluationInput(userId, r),
+      );
+    } finally {
+      await this.release(userId, lease);
+    }
   }
 
   /** Va chiamata sotto il lease dell'atleta. */

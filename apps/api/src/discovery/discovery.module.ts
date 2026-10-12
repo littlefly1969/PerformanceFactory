@@ -17,6 +17,9 @@ import { CalibrationAdminController } from './calibration/calibration-admin.cont
 import { ConfidencePolicyAdminController } from './calibration/confidence-policy-admin.controller';
 import { AssessmentAnomalyAdminController } from './calibration/assessment-anomaly-admin.controller';
 
+import { FitRankingController } from './fit-ranking/fit-ranking.controller';
+import { FitRankingService } from './fit-ranking/fit-ranking.service';
+
 @Module({
   imports: [
     AiProposalModule,
@@ -32,6 +35,7 @@ import { AssessmentAnomalyAdminController } from './calibration/assessment-anoma
     CalibrationAdminController,
     ConfidencePolicyAdminController,
     AssessmentAnomalyAdminController,
+    FitRankingController,
   ],
   providers: [
     DiscoveryService,
@@ -40,6 +44,7 @@ import { AssessmentAnomalyAdminController } from './calibration/assessment-anoma
     AthleteJourneyService,
     CalibrationService,
     ScenariosService,
+    FitRankingService,
   ],
   exports: [
     AthleteRegistrationService,

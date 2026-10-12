@@ -4,6 +4,7 @@ import { requestStructuredProposal } from './proposal-structured-transport';
 import { resolveModel, resolveProvider } from './provider-config';
 import { AiProvider } from './proposal-provider-model';
 import { AssessmentEvaluationAnswer } from './assessment-evaluation-model';
+import { FIT_RANKING_RULE, FitRankingContext } from './fit-ranking-context';
 
 /** Tipo di prompt in AiPromptVersion per le domande dei round di calibrazione. */
 export const CALIBRATION_PROMPT_TYPE = 'CALIBRATION_QUESTIONS';
@@ -11,6 +12,7 @@ export const CALIBRATION_PROMPT_TYPE = 'CALIBRATION_QUESTIONS';
 export const DEFAULT_CALIBRATION_PROMPT = [
   'Sei il motore di calibrazione di Performance Factory. Dopo la prima valutazione di un atleta amatoriale maggiorenne ricevi tutti i driver con score R provvisorio, confidenza, lacune di evidenza e domande già fatte; i driver ancora sotto la regola di consolidamento sono marcati come focus.',
   'A ogni passo decidi tu la prossima azione: una sola domanda quando la risposta cambierà la domanda successiva, un gruppo di domande indipendenti quando si possono rispondere insieme, un chiarimento neutro quando due risposte si contraddicono. Non c’è un numero fisso di domande per driver: chiedi solo ciò che riduce davvero una lacuna, e non coprire un driver le cui evidenze bastano già.',
+  'Tieni conto della classifica FIT dichiarata (padel e tennis, attuale e migliore di sempre): tara difficoltà, situazioni di gioco e lessico sul livello che indica, e chiedi conferma quando le risposte non tornano con la classifica.',
   'Domande a scelta singola su comportamenti concreti, frequenze, situazioni di gioco, risultati misurabili. Evita domande già fatte o equivalenti.',
   'Puoi proporre un micro-test quando una prova pratica breve darebbe su un driver un’evidenza diversa e più affidabile delle dichiarazioni: lo scrive il preparatore, tu indichi solo il driver e il perché. Ricevi quanti micro-test l’atleta ha già svolto e saltato e a quante domande ha risposto, e un’indicazione di quante domande vorremmo, in media, per ogni micro-test. Tienila in considerazione per bilanciare prove pratiche e domande, ma decidi tu passo per passo e puoi discostartene quando la situazione dell’atleta lo giustifica. Se l’indicazione è 0 non c’è indicazione: scegli liberamente. Non riproporre micro-test già fatti o saltati.',
   'Ogni opzione ha uno score di riferimento sulla scala ricevuta: deve ancorare la risposta al livello reale, non premiare la risposta più lunga. Le opzioni coprono tutta la scala e sono mutuamente esclusive.',
@@ -62,6 +64,8 @@ export type CalibrationQuestionsInput = {
   promptVersionId: string | null;
   scale: { minScore: number; maxScore: number };
   athleteContext: AssessmentEvaluationAnswer[];
+  /** Classifica FIT dichiarata in vigore; null se non dichiarata. */
+  fitRanking?: FitRankingContext;
   targets: CalibrationTarget[];
   /** Conteggi della calibrazione e indicazione del back office (0 = nessuna). */
   microTestBalance?: MicroTestBalance;
@@ -128,6 +132,7 @@ function formatRules() {
     `- text: massimo ${l.question} caratteri.`,
     '- le domande sono solo su comportamenti, frequenze e situazioni di gioco già vissute: niente micro-test, esercizi o prove da svolgere dentro una domanda; una prova pratica si propone solo con PROPOSE_MICRO_TEST. Questa regola prevale sulle istruzioni sopra.',
     `- options: da ${l.minOptions} a ${l.maxOptions}, label di massimo ${l.option} caratteri, score tra la scala minima e massima ricevute.`,
+    FIT_RANKING_RULE,
   ].join('\n');
 }
 
@@ -173,6 +178,7 @@ export function buildCalibrationPrompt(input: CalibrationQuestionsInput) {
       task: 'Decidi il prossimo passo sui driver con focus: una domanda, un gruppo, un chiarimento o un micro-test.',
       scale: input.scale,
       athleteContext: input.athleteContext,
+      fitRanking: input.fitRanking ?? null,
       drivers: input.targets,
       ...(input.microTestBalance && {
         microTestBalance: input.microTestBalance,

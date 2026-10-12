@@ -510,15 +510,16 @@ describe('PF4 discovery to authenticated journey', () => {
     }
   });
 
-  it('starts two operational questions and twelve configured driver questions', async () => {
+  it('starts two operational questions, the FIT ranking and twelve configured driver questions', async () => {
     expect((await post('duration', { weeks: 12 })).statusCode).toBe(409);
     const intro = await state();
     expect(intro).toMatchObject({
       phase: 'ASSESSMENT_INTRO',
-      fixedQuestionCount: 2,
+      // Due operative, quattro classifiche FIT e la tessera facoltativa.
+      fixedQuestionCount: 7,
       areaQuestionCount: 12,
-      count: 14,
-      estimatedMinutes: 5,
+      count: 19,
+      estimatedMinutes: 7,
       trial: { days: 7, daysLeft: 7 },
     });
     // Giorni e durata non sono piu domande della discovery.
@@ -532,15 +533,27 @@ describe('PF4 discovery to authenticated journey', () => {
     const start = await post('start');
     expect(start.statusCode).toBe(201);
     const started = start.json<JourneyResponse>();
-    expect(started.count).toBe(14);
-    expect(started.questions.slice(0, 2).map((q) => q.kind)).toEqual([
+    expect(started.count).toBe(19);
+    expect(started.questions.slice(0, 7).map((q) => q.kind)).toEqual([
       'OPERATIONAL',
       'OPERATIONAL',
+      'RANKING',
+      'RANKING',
+      'RANKING',
+      'RANKING',
+      'RANKING',
     ]);
-    expect(started.questions.slice(2).every((q) => q.kind === 'AREA')).toBe(
+    expect(started.questions.slice(2, 7).map((q) => q.id)).toEqual([
+      'fit:padelCurrent',
+      'fit:padelBest',
+      'fit:tennisCurrent',
+      'fit:tennisBest',
+      'fit:cardNumber',
+    ]);
+    expect(started.questions.slice(7).every((q) => q.kind === 'AREA')).toBe(
       true,
     );
-    expect(new Set(started.questions.slice(2).map((q) => q.areaId)).size).toBe(
+    expect(new Set(started.questions.slice(7).map((q) => q.areaId)).size).toBe(
       6,
     );
     expect(
@@ -584,15 +597,55 @@ describe('PF4 discovery to authenticated journey', () => {
     ).toBe(409);
     await post('back');
     expect((await state()).currentQuestion).toBe(0);
-    for (const question of before.questions) {
+    // Migliore più bassa dell'attuale: rifiutata.
+    const ranking = (id: string) => before.questions.find((q) => q.id === id)!;
+    for (const question of before.questions.slice(0, 3)) {
       const response = await post('answer', {
         questionId: question.id,
         value: question.options[1].value,
       });
       expect(response.statusCode).toBe(201);
     }
+    expect(
+      (
+        await post('answer', {
+          questionId: 'fit:padelBest',
+          value: ranking('fit:padelBest').options.at(-1)!.value,
+        })
+      ).statusCode,
+    ).toBe(400);
+    for (const question of before.questions.slice(3)) {
+      const response = await post('answer', {
+        questionId: question.id,
+        value: question.options[1]?.value ?? ' 12345/AB ',
+      });
+      expect(response.statusCode).toBe(201);
+    }
     const complete = await state();
-    expect(complete.currentQuestion).toBe(14);
+    expect(complete.currentQuestion).toBe(19);
+    // La classifica completa entra nello storico e nel profilo, senza tessera verso l'AI.
+    const declared = await prisma.athleteFitRanking.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+    });
+    expect(declared.at(-1)).toMatchObject({
+      source: 'JOURNEY',
+      padelCurrent: '2',
+      padelBest: '2',
+      tennisCurrent: '2.1',
+      tennisBest: '2.1',
+      cardNumber: '12345/AB',
+    });
+    const profile = (
+      await prisma.userOnboardingAssessment.findUniqueOrThrow({
+        where: { userId },
+      })
+    ).profileJson as Record<string, { value: unknown }>;
+    expect(profile.fit_ranking.value).toMatchObject({
+      padel: { current: '2ª fascia', best: '2ª fascia' },
+      tennis: { current: '2.1', best: '2.1' },
+    });
+    expect(JSON.stringify(profile.fit_ranking)).not.toContain('12345');
     expect(complete).toMatchObject({
       phase: 'ASSESSMENT',
       assessmentComplete: true,
@@ -679,6 +732,7 @@ describe('PF4 discovery to authenticated journey', () => {
       (await post('answer', { questionId: q.id, value: q.options[1].value }))
         .statusCode,
     ).toBe(201);
+    expect((await state()).assessmentComplete).toBe(true);
   });
 
   it('evaluates the answers once with the AI and shows a provisional R per driver', async () => {
@@ -734,6 +788,24 @@ describe('PF4 discovery to authenticated journey', () => {
     expect(
       (saved.inputJson as { prompt: { system: string } }).prompt.system,
     ).toContain(active.basePrompt);
+    // La classifica FIT arriva all'AI come dato a sé, mai tra la disponibilità
+    // e mai con il numero di tessera.
+    const prompt = (
+      saved.inputJson as {
+        prompt: {
+          system: string;
+          user: { fitRanking: unknown; availability: unknown[] };
+        };
+      }
+    ).prompt;
+    expect(prompt.user.fitRanking).toMatchObject({
+      source: 'SELF_DECLARED',
+      padel: { current: '2ª fascia' },
+      tennis: { current: '2.1' },
+    });
+    expect(prompt.user.availability).toHaveLength(2);
+    expect(prompt.system).toContain('fitRanking');
+    expect(JSON.stringify(saved.inputJson)).not.toContain('12345');
 
     // Una sola valutazione: le risposte sono bloccate.
     expect(
@@ -1514,6 +1586,80 @@ describe('PF4 discovery to authenticated journey', () => {
         })
       ).profileJson,
     ).toHaveProperty('program_duration_weeks.value', 12);
+  });
+
+  it('lets the athlete correct the FIT ranking at any time and recalculates R', async () => {
+    const view = () =>
+      app.inject({
+        method: 'GET',
+        url: '/api/athlete-journey/fit-ranking',
+        headers: { cookie },
+      });
+    const current = (await view()).json<{
+      ranking: Record<string, string | null>;
+      options: Record<string, unknown[]>;
+      recalculationPending: boolean;
+    }>();
+    expect(current.ranking).toMatchObject({
+      padelCurrent: '2',
+      cardNumber: '12345/AB',
+    });
+    expect(current.options.PADEL.length).toBeGreaterThan(0);
+    expect(current.recalculationPending).toBe(false);
+    const declared = {
+      padelCurrent: '3',
+      padelBest: '2',
+      tennisCurrent: '4.NC',
+      tennisBest: '3.1',
+      cardNumber: '12345/AB',
+    };
+    // Migliore più bassa dell'attuale: nessuna scrittura.
+    expect(
+      (await post('fit-ranking', { ...declared, padelBest: 'NONE' }))
+        .statusCode,
+    ).toBe(400);
+    const evaluations = () =>
+      prisma.assessmentEvaluation.findMany({
+        where: { userId },
+        orderBy: { sequence: 'asc' },
+      });
+    const before = await evaluations();
+    const saved = await post('fit-ranking', declared);
+    expect(saved.statusCode).toBe(201);
+    expect(saved.json()).toMatchObject({ recalculationPending: false });
+    const after = await evaluations();
+    expect(after).toHaveLength(before.length + 1);
+    const recalculated = after.at(-1)!;
+    expect(recalculated.source).toBe('FIT_RANKING_UPDATE');
+    expect(
+      (recalculated.inputJson as { prompt: { user: { fitRanking: unknown } } })
+        .prompt.user.fitRanking,
+    ).toMatchObject({
+      padel: { current: '3ª fascia', best: '2ª fascia' },
+      tennis: { current: '4.NC', best: '3.1' },
+    });
+    // Calibrazione chiusa: resta consolidata solo se regge la regola.
+    expect(['CONSOLIDATED', 'PROVISIONAL']).toContain(recalculated.status);
+    // Stessa classifica o solo la tessera: nessun nuovo ricalcolo.
+    await post('fit-ranking', declared);
+    await post('fit-ranking', { ...declared, cardNumber: '' });
+    expect(await evaluations()).toHaveLength(after.length);
+    const history = await prisma.athleteFitRanking.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'asc' },
+    });
+    expect(history.at(-1)).toMatchObject({
+      source: 'PROFILE',
+      cardNumber: null,
+    });
+    expect(history.at(-1)!.recalculatedAt).not.toBeNull();
+    expect(
+      (
+        await prisma.userOnboardingAssessment.findUniqueOrThrow({
+          where: { userId },
+        })
+      ).profileJson,
+    ).toHaveProperty('fit_ranking.value.padel.current', '3ª fascia');
   });
 
   it('preserves discovery through verified Google OIDC and creates the same active domain state', async () => {

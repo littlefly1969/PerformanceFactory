@@ -7,7 +7,7 @@ PF5 e un unico questionario continuo, seguito dalla prima valutazione AI delle
 risposte.
 
 ```
-login → consensi → intro PF5 → domande operative → domande dei driver
+login → consensi → intro PF5 → domande operative → classifica FIT → domande dei driver
       → ultima risposta salvata (assessmentComplete)
       → Analizza le mie risposte → valutazione AI (R provvisoria)
 ```
@@ -38,23 +38,27 @@ di domande è scritto nel frontend.
 conteggi:
 
 ```
-count = domande operative + somma delle domande dei driver attivi
+count = domande operative + 5 della classifica FIT + somma delle domande dei driver attivi
 estimatedMinutes = max(1, ceil(count / 3))
 ```
 
-Con la configurazione padel attuale: 2 domande operative + 6 driver × 2 domande
-= 14 domande, circa 5 minuti. Le risposte `GET /auth/journey` e
+Con la configurazione padel attuale: 2 domande operative + 5 della classifica
+FIT + 6 driver × 2 domande = 19 domande, circa 7 minuti. `fixedQuestionCount`
+comprende operative e classifica. Le risposte `GET /auth/journey` e
 `POST /athlete-journey/start` riportano `fixedQuestionCount`,
 `areaQuestionCount`, `count` ed `estimatedMinutes`.
 
 Ordine obbligatorio:
 
 1. **Domande operative**, sezione «Disponibilità».
-2. **Domande dei driver**, nell'ordine configurato dei driver (quello della loro
+2. **Classifica FIT**, sezione «Classifica FIT»: padel attuale e migliore di
+   sempre, tennis attuale e migliore di sempre, numero di tessera facoltativo.
+   Vedi [Classifica FIT](classifica-fit.md).
+3. **Domande dei driver**, nell'ordine configurato dei driver (quello della loro
    prima domanda) e, dentro ogni driver, per `orderIndex`.
 
 Il progressivo mostra `n / count` e, sopra ogni domanda, la sezione
-(«Disponibilità» o il nome del driver).
+(«Disponibilità», «Classifica FIT» o il nome del driver).
 
 ## Domande operative (bloccate)
 

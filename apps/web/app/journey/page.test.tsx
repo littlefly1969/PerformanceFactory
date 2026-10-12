@@ -56,6 +56,25 @@ afterEach(() => {
   sessionStorage.clear();
   window.history.replaceState(null, "", "/journey");
 });
+/** Classifica FIT dichiarata, letta dall'editor sempre presente dopo la valutazione. */
+const FIT_RANKING = {
+  ranking: {
+    padelCurrent: "3",
+    padelBest: "2",
+    tennisCurrent: "NONE",
+    tennisBest: "NONE",
+    cardNumber: null,
+  },
+  options: {
+    PADEL: [
+      { value: "2", label: "2ª fascia" },
+      { value: "3", label: "3ª fascia" },
+    ],
+    TENNIS: [{ value: "NONE", label: "Nessuna classifica" }],
+  },
+  recalculationPending: false,
+};
+
 describe("PF4 authenticated journey functions", () => {
   it("lets the athlete log out during the journey", async () => {
     const requests: string[] = [];
@@ -337,6 +356,8 @@ describe("PF5 assessment intro and questions", () => {
       "fetch",
       vi.fn(async (url: string) => {
         requests.push(url);
+        if (url.endsWith("/fit-ranking"))
+          return new Response(JSON.stringify(FIT_RANKING));
         if (url.endsWith("/evaluate"))
           state = {
             ...state,
@@ -458,6 +479,8 @@ describe("Scenarios being prepared", () => {
       "fetch",
       vi.fn(async (url: string) => {
         requests.push(url);
+        if (url.endsWith("/fit-ranking"))
+          return new Response(JSON.stringify(FIT_RANKING));
         return new Response(
           JSON.stringify({
             ...base,

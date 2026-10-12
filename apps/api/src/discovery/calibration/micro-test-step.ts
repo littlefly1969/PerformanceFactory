@@ -118,6 +118,7 @@ export async function generateMicroTest(
     promptVersionId: prompt.promptVersionId,
     scale: input.scale,
     athleteContext: input.athleteContext,
+    fitRanking: input.fitRanking,
     declaredLimitations: input.athleteContext.filter(isDeclaredLimitation),
     reason: step.rationale,
     targets: [

@@ -9,6 +9,8 @@ import { FreeLessonPanel } from "./free-lesson-panel";
 import { ScenariosReveal } from "./scenarios-reveal";
 import { DurationStep, PerformanceResult } from "./performance-result";
 import { useJourney } from "./use-journey";
+import { CardNumberStep } from "./card-number-step";
+import { FitRankingEditor } from "../components/fit-ranking-editor";
 import "./journey.css";
 const HORIZON_MONTHS: Record<string, number> = {
   PROGRAM_3M: 3,
@@ -109,22 +111,33 @@ export default function JourneyPage() {
               {j.currentQuestion + 1} / {j.count} · {q.section ?? q.areaName}
             </span>
             <h1>{q.title}</h1>
-            <div className="pf4-options">
-              {q.options.map((o) => (
-                <button
-                  disabled={busy}
-                  aria-pressed={String(j.answers[q.id]) === String(o.value)}
-                  className={`pf4-option ${String(j.answers[q.id]) === String(o.value) ? "is-selected" : ""}`}
-                  key={String(o.value)}
-                  onClick={() =>
-                    action("answer", { questionId: q.id, value: o.value })
-                  }
-                >
-                  <span>{o.label}</span>
-                  <span className="pf4-dot" />
-                </button>
-              ))}
-            </div>
+            {q.inputType === "TEXT" ? (
+              <CardNumberStep
+                key={q.id}
+                initial={String(j.answers[q.id] ?? "")}
+                busy={busy}
+                onSubmit={(value) =>
+                  action("answer", { questionId: q.id, value })
+                }
+              />
+            ) : (
+              <div className="pf4-options">
+                {q.options.map((o) => (
+                  <button
+                    disabled={busy}
+                    aria-pressed={String(j.answers[q.id]) === String(o.value)}
+                    className={`pf4-option ${String(j.answers[q.id]) === String(o.value) ? "is-selected" : ""}`}
+                    key={String(o.value)}
+                    onClick={() =>
+                      action("answer", { questionId: q.id, value: o.value })
+                    }
+                  >
+                    <span>{o.label}</span>
+                    <span className="pf4-dot" />
+                  </button>
+                ))}
+              </div>
+            )}
           </section>
         )}
         {/* Tutte le risposte date: l'atleta conferma e parte la prima valutazione AI. */}
@@ -196,6 +209,7 @@ export default function JourneyPage() {
                 onSelect={(horizon) => void action("horizon", { horizon })}
               />
             )}
+            <FitRankingEditor onSaved={() => void refresh()} />
           </>
         )}
         {j?.phase === "SUBSCRIBED" && (

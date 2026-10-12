@@ -6,6 +6,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { TemplateRecord } from '../onboarding/onboarding-model';
+import { normalizeOptions } from '../onboarding/onboarding-answers';
 import {
   loadEnabledDriverAreasForSelection,
   requireSportContext,
@@ -86,6 +87,46 @@ function operationalRecord(t: OnboardingQuestionTemplate): TemplateRecord {
     orderIndex: t.orderIndex,
     area: null,
   };
+}
+
+/** Aggiunge una voce al profilo letto da training e coaching. */
+export async function saveProfileEntry(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  key: string,
+  entry: { label: string; value: Prisma.InputJsonValue | null },
+) {
+  const assessment = await tx.userOnboardingAssessment.findUnique({
+    where: { userId },
+    select: { profileJson: true },
+  });
+  const profileJson = {
+    ...((assessment?.profileJson as Prisma.JsonObject | null) ?? {}),
+    [key]: entry,
+  } as Prisma.InputJsonValue;
+  await tx.userOnboardingAssessment.upsert({
+    where: { userId },
+    update: { profileJson },
+    create: { userId, profileJson },
+  });
+}
+
+/** Risposta operativa già validata: va subito nel profilo letto dal training. */
+export function saveOperationalAnswer(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  question: TemplateRecord,
+  value: unknown,
+) {
+  const option = (
+    normalizeOptions(question.optionsJson) as {
+      value: string | number;
+    }[]
+  ).find((o) => String(o.value) === String(value))!;
+  return saveProfileEntry(tx, userId, question.key, {
+    label: question.label,
+    value: option.value,
+  });
 }
 
 /** Domande operative attive, nell'ordine della loro sezione. */

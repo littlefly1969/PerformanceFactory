@@ -26,6 +26,7 @@ export function buildAssessmentPrompt(input: AssessmentEvaluationInput) {
         : 'Stima la R provvisoria di ogni driver dal primo set di risposte.',
       scale: input.scale,
       athleteContext: input.athleteContext,
+      fitRanking: input.fitRanking ?? null,
       availability: input.availability,
       drivers: input.drivers,
     },
