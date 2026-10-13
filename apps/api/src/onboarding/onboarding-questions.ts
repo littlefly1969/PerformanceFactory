@@ -127,6 +127,7 @@ export async function loadSpecialistQuestionRecords(
       optionsJson: true,
       orderIndex: true,
       inputJson: true,
+      multiple: true,
       area: { select: { id: true, name: true } },
     },
     orderBy: [{ area: { name: 'asc' } }, { orderIndex: 'asc' }],
@@ -146,6 +147,7 @@ export async function loadSpecialistQuestionRecords(
     required: true,
     orderIndex: 1000 + question.orderIndex,
     area: question.area,
+    multiple: question.multiple,
   }));
 }
 

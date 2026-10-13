@@ -25,7 +25,6 @@ const MICRO_TEST_TITLES = 20;
 const MICRO_TEST_EVIDENCE = 6;
 
 type MicroTest = NonNullable<CalibrationQuestion['microTest']>;
-type Option = CalibrationQuestion['options'][number];
 
 /**
  * Risposta del profilo che dichiara dolori, infortuni o limitazioni: con
@@ -200,7 +199,10 @@ export const publicMicroTest = (test: MicroTest | undefined) =>
     : {};
 
 /** Evidenza di una voce del round: l'esito del micro-test è riportato dall'atleta. */
-export const roundEvidence = (q: CalibrationQuestion, option: Option) =>
+export const roundEvidence = (
+  q: CalibrationQuestion,
+  option: { label: string },
+) =>
   q.microTest
     ? {
         question: `Micro-test «${q.text}»: ${q.microTest.instructions}`,

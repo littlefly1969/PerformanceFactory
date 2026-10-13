@@ -222,4 +222,29 @@ describe("free calibration panel", () => {
       screen.getByRole("button", { name: "Nuove domande →" }),
     ).toBeEnabled();
   });
+  it("sends a multiple-choice answer as a list of values", async () => {
+    const multi: NonNullable<Calibration["round"]> = {
+      ...round,
+      action: "ASK_SINGLE",
+      questions: [
+        {
+          id: "q1",
+          areaId: "a",
+          text: "Dove senti fastidio dopo aver giocato?",
+          multiple: true,
+          options: [
+            { value: "0", label: "Da nessuna parte", exclusive: true },
+            { value: "1", label: "Gomito" },
+            { value: "2", label: "Schiena" },
+          ],
+        },
+      ],
+    };
+    const { onAnswer } = renderPanel({ ...base, round: multi });
+    const send = screen.getByRole("button", { name: "Invia la risposta →" });
+    await userEvent.click(screen.getByRole("button", { name: "Gomito" }));
+    await userEvent.click(screen.getByRole("button", { name: "Schiena" }));
+    await userEvent.click(send);
+    expect(onAnswer).toHaveBeenCalledWith("r1", { q1: ["1", "2"] });
+  });
 });

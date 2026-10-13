@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { AiProposalProviderService } from '../../ai-orchestrator/proposal-provider.service';
 import { loadActiveAssessmentPrompt } from '../../ai-orchestrator/assessment-prompts';
 import { CalibrationQuestion } from '../../ai-orchestrator/calibration-questions';
+import { chosenOptions, choiceEvidence } from '../choice-answers';
 import { AnalyticsService } from '../../analytics/analytics.service';
 import { loadOperationalTemplates } from '../assessment-configuration';
 import {
@@ -45,7 +46,8 @@ import {
 const LEASE_MS = 10 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-type Answers = Record<string, string>;
+/** Id domanda → valore scelto, o elenco di valori se la domanda è multipla. */
+type Answers = Record<string, string | string[]>;
 
 /** Annulla la transazione quando il round non è più di questa richiesta. */
 class RoundNotOwned extends Error {}
@@ -175,9 +177,11 @@ export class CalibrationService {
                 id: q.id,
                 areaId: q.areaId,
                 text: q.text,
-                options: q.options.map(({ value, label }) => ({
+                multiple: q.multiple ?? false,
+                options: q.options.map(({ value, label, exclusive }) => ({
                   value,
                   label,
+                  ...(exclusive ? { exclusive } : {}),
                 })),
                 ...publicMicroTest(q.microTest),
               }),
@@ -346,7 +350,7 @@ export class CalibrationService {
       throw new ConflictException('La calibrazione è scaduta');
     const questions = round.questionsJson as CalibrationQuestion[];
     const invalid = questions.some(
-      (q) => !q.options.some((o) => o.value === answers[q.id]),
+      (q) => !chosenOptions(q.options, answers[q.id], q.multiple),
     );
     if (invalid || Object.keys(answers).length !== questions.length)
       throw new BadRequestException('Rispondi a tutte le domande del round');
@@ -569,12 +573,13 @@ export class CalibrationService {
       const answers = round.answersJson as Answers;
       for (const q of round.questionsJson as CalibrationQuestion[]) {
         const driver = input.drivers.find((d) => d.areaId === q.areaId);
-        const option = q.options.find((o) => o.value === answers[q.id]);
-        if (!driver || !option) continue;
+        const chosen = chosenOptions(q.options, answers[q.id], q.multiple);
+        if (!driver || !chosen) continue;
         const scores = q.options.map((o) => o.score);
+        const { answer, ...evidence } = choiceEvidence(chosen, q.multiple);
         driver.answers.push({
-          ...roundEvidence(q, option),
-          optionScore: option.score,
+          ...roundEvidence(q, { label: answer }),
+          ...evidence,
           optionScoreRange: {
             min: Math.min(...scores),
             max: Math.max(...scores),

@@ -46,6 +46,7 @@ import { hasProgramEntitlement } from './calibration/calibration-config';
 import type { ProvidedBaseline } from '../onboarding/onboarding-assessment';
 import { recordMeaningfulInteraction } from '../engagement/meaningful-interaction';
 import { pendingWakeup } from '../engagement/engagement.service';
+import { baselineValue, chosenOptions, roundAnswers } from './choice-answers';
 import {
   alignBest,
   fitRankingFromAnswers,
@@ -218,6 +219,7 @@ export class AthleteJourneyService {
         options: normalizeOptions(q.optionsJson),
         required: q.required,
         inputType: q.inputType,
+        multiple: q.multiple ?? false,
       })),
       fixedQuestionCount: fixedCount,
       areaQuestionCount: bank.length || config!.areaQuestionCount,
@@ -409,10 +411,7 @@ export class AthleteJourneyService {
     answers: Record<string, unknown>,
   ) {
     await this.allowed(userId);
-    const values = Object.fromEntries(
-      Object.entries(answers).map(([id, value]) => [id, String(value)]),
-    );
-    await this.calibration.answerRound(userId, roundId, values);
+    await this.calibration.answerRound(userId, roundId, roundAnswers(answers));
     return this.state(userId);
   }
 
@@ -503,7 +502,7 @@ export class AthleteJourneyService {
         ...general!.answers,
         ...questions.map((q) => ({
           questionId: q.id,
-          value: stored[q.id] as OnboardingAnswer['value'],
+          value: baselineValue(q, stored[q.id]),
         })),
       ];
       const goal = revisedGoal?.trim() || (await this.goal(userId));
@@ -578,10 +577,7 @@ export class AthleteJourneyService {
   private valid(q: TemplateRecord, value: unknown) {
     if (isFitQuestion(q.id)) return validFitAnswer(q, value);
     const options = normalizeOptions(q.optionsJson) as { value: unknown }[];
-    return (
-      (typeof value === 'string' || typeof value === 'number') &&
-      options.some((o) => String(o.value) === String(value))
-    );
+    return chosenOptions(options, value, q.multiple) !== null;
   }
   private async allowed(userId: string) {
     // A crashed worker must not leave the athlete unable to edit/retry forever.

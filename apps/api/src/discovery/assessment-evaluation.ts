@@ -12,6 +12,7 @@ import { normalizeOptions } from '../onboarding/onboarding-answers';
 import { performanceDriverName as driverName } from '../performance/performance-display';
 import { PrismaService } from '../prisma/prisma.service';
 import { AnalyticsEventName } from '../analytics/analytics-events';
+import { chosenOptions, choiceEvidence } from './choice-answers';
 import { discoveryContext } from './discovery-context';
 import { loadFitRankingContext } from './fit-ranking/fit-ranking';
 import type { MeaningfulSource } from '../engagement/engagement-rules';
@@ -37,13 +38,14 @@ export async function buildAssessmentEvaluationInput(
     discoveryContext(prisma, userId),
     loadFitRankingContext(prisma, userId),
   ]);
-  // Risposte già validate contro le opzioni: stringhe o numeri.
+  // Risposte già validate contro le opzioni: stringhe, numeri o, per le
+  // domande multiple, elenchi di valori.
   const raw = (q: TemplateRecord) =>
     String((answers[q.id] as string | number | undefined) ?? '');
   const chosen = (q: TemplateRecord) => {
     const options = normalizeOptions(q.optionsJson) as Option[];
-    const option = options.find((o) => String(o.value) === raw(q));
-    return { options, option };
+    const picked = chosenOptions(options, answers[q.id], q.multiple) ?? [];
+    return { options, option: picked[0], picked };
   };
   const drivers: AssessmentEvaluationInput['drivers'] = areas.map((a) => ({
     areaId: a.id,
@@ -51,7 +53,7 @@ export async function buildAssessmentEvaluationInput(
     answers: [],
   }));
   for (const q of questions.filter((item) => item.areaId)) {
-    const { options, option } = chosen(q);
+    const { options, picked } = chosen(q);
     const scores = options.map((o) => Number(o.score)).filter(Number.isFinite);
     let driver = drivers.find((d) => d.areaId === q.areaId);
     if (!driver) {
@@ -62,11 +64,11 @@ export async function buildAssessmentEvaluationInput(
       };
       drivers.push(driver);
     }
-    const score = Number(option?.score);
+    const evidence = choiceEvidence(picked, q.multiple);
     driver.answers.push({
       question: q.label,
-      answer: option?.label ?? raw(q),
-      optionScore: Number.isFinite(score) ? score : null,
+      ...evidence,
+      answer: picked.length ? evidence.answer : raw(q),
       optionScoreRange: scores.length
         ? { min: Math.min(...scores), max: Math.max(...scores) }
         : null,

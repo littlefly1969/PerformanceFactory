@@ -75,6 +75,7 @@ export async function generateInitialQuestionBank(
           orderIndex: ++position,
           inputType: 'SELECT',
           optionsJson: question.options as Prisma.InputJsonValue,
+          multiple: question.multiple ?? false,
           provider: result.provider,
           model: result.model,
           promptVersion: prompt.promptVersionId ?? 'default',

@@ -16,7 +16,13 @@ import {
 } from './calibration/dto/calibration.dto';
 class AnswerDto {
   @ApiProperty() @IsString() @MaxLength(100) questionId!: string;
-  @ApiProperty({ oneOf: [{ type: 'string' }, { type: 'number' }] })
+  @ApiProperty({
+    oneOf: [
+      { type: 'string' },
+      { type: 'number' },
+      { type: 'array', items: { type: 'string' } },
+    ],
+  })
   @Allow()
   value!: unknown;
 }

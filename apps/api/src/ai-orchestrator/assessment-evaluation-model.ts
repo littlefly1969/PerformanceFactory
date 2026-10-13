@@ -43,6 +43,8 @@ export type AssessmentEvaluationDriver = {
     AssessmentEvaluationAnswer & {
       optionScore: number | null;
       optionScoreRange: { min: number; max: number } | null;
+      /** Domanda a scelta multipla: ogni opzione scelta con il suo score. */
+      selectedOptions?: { label: string; score: number }[];
       /**
        * ASSESSMENT per il primo set, CALIBRATION per i round successivi,
        * MICRO_TEST per gli esiti riportati dall'atleta, COACH_LESSON per il
@@ -133,6 +135,11 @@ export function assessmentFormatRules(input: AssessmentEvaluationInput) {
     ...(input.drivers.some((d) => !d.answers.length)
       ? [
           '- Un driver con answers vuoto non ha ancora evidenze: valutalo comunque, con confidence molto bassa, e indica in evidenceGaps cosa chiedere.',
+        ]
+      : []),
+    ...(input.drivers.some((d) => d.answers.some((a) => a.selectedOptions))
+      ? [
+          '- Una risposta con selectedOptions è a scelta multipla: ogni opzione scelta ha il suo score di riferimento e optionScore è solo la loro media. Pesale tu sul driver: più criticità insieme possono contare più della media.',
         ]
       : []),
     ...(hasSource(input, 'MICRO_TEST', 'COACH_LESSON')
