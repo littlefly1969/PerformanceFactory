@@ -91,7 +91,7 @@ export type ChoiceOption = {
  * e ai round di calibrazione: prevale sul prompt modificabile.
  */
 export const MULTIPLE_CHOICE_RULE =
-  '- multiple: true solo quando l’atleta può riconoscersi in più opzioni insieme (per esempio dove sente fastidio o quali routine segue), altrimenti false. In una domanda multipla ogni opzione ha comunque il suo score di riferimento e un’opzione come «Nessuna» ha exclusive true; in tutte le altre opzioni exclusive è false. Questa regola prevale sulle istruzioni sopra.';
+  '- multiple: true solo quando l’atleta può riconoscersi in più opzioni insieme (per esempio dove sente fastidio o quali routine segue), altrimenti false. In una domanda multipla ogni opzione ha comunque il suo score di riferimento e al massimo un’opzione, come «Nessuna», ha exclusive true; in tutte le altre opzioni exclusive è false. Questa regola prevale sulle istruzioni sopra.';
 
 export const CHOICE_OPTIONS_SCHEMA = {
   type: 'array',
@@ -145,6 +145,8 @@ export function parseChoiceOptions(
   });
   if (new Set(parsed.map((o) => o.label)).size !== parsed.length)
     problems.push(`opzioni duplicate (${index + 1})`);
+  if (parsed.filter((o) => o.exclusive).length > 1)
+    problems.push(`più di un'opzione esclusiva (${index + 1})`);
   return parsed;
 }
 

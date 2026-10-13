@@ -125,6 +125,22 @@ describe('calibration questions', () => {
     expect(single?.questions[0].options.some((o) => o.exclusive)).toBe(false);
   });
 
+  it('allows at most one exclusive option per question', () => {
+    const problems: string[] = [];
+    const twice = question({
+      multiple: true,
+      options: [
+        { label: 'Nessuno', score: 100, exclusive: true },
+        { label: 'Non so', score: 50, exclusive: true },
+        { label: 'Gomito', score: 40, exclusive: false },
+      ],
+    });
+    expect(
+      validateCalibrationStep(step([twice], 'ASK_SINGLE'), input, problems),
+    ).toBeNull();
+    expect(problems).toContain("più di un'opzione esclusiva (1)");
+  });
+
   it('keeps a clarification single-choice', () => {
     const problems: string[] = [];
     expect(
