@@ -23,9 +23,11 @@ const json = (method: string, body: unknown) => ({
 /** Solo i campi del contratto: il codice e lo scope non passano dalla modifica. */
 function payload(t: Template) {
   const meta = { ...t.optionsJson };
-  meta.options = (meta.options ?? []).map((o) => ({
+  meta.options = (meta.options ?? []).map(({ exclusive, ...o }) => ({
     ...o,
     value: o.value === "" ? o.label : o.value,
+    // Solo la scelta multipla ha opzioni esclusive.
+    ...(exclusive && meta.type === "multi_choice" ? { exclusive } : {}),
   }));
   for (const key of ["contextKey", "visibleWhen", "step", "target"] as const)
     if (meta[key] === undefined || meta[key] === "") delete meta[key];

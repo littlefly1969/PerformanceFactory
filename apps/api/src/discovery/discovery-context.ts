@@ -22,7 +22,8 @@ export async function discoveryContext(prisma: PrismaService, userId: string) {
     const value = Array.isArray(raw)
       ? raw
           .map((v) => q.options.find((o) => o.id === v)?.label ?? String(v))
-          .join(', ')
+          // Punto e virgola: le etichette possono contenere virgole.
+          .join('; ')
       : (q.options.find((o) => o.id === raw)?.value ?? raw ?? null);
     templates.push({
       id: q.id,

@@ -178,6 +178,15 @@ export function DiscoveryQuestionForm({
                   maxLength: 2000,
                   parse: (raw) => raw || undefined,
                 },
+                ...(meta.type === "multi_choice"
+                  ? [
+                      {
+                        key: "exclusive" as const,
+                        label: "Esclusiva: se scelta, deseleziona le altre",
+                        type: "checkbox" as const,
+                      },
+                    ]
+                  : []),
               ]}
               onChange={(next) => metadata({ options: next })}
             />

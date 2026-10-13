@@ -12,6 +12,8 @@ export type DiscoveryOption = {
   description?: string;
   value: string | number | boolean;
   parentId?: string;
+  /** Scelta multipla: esclude le altre opzioni (es. «Nessuna»). */
+  exclusive?: boolean;
 };
 export type DiscoveryQuestion = {
   id: string;

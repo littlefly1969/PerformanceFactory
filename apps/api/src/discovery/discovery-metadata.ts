@@ -104,6 +104,13 @@ export function assertDiscoveryMetadata(value: unknown, required: boolean) {
         (typeof o.description !== 'string' || o.description.length > 2000)
       )
         return fail();
+      // Esclusiva («Nessuna»): ha senso solo dove si possono sceglierne più.
+      if (
+        o.exclusive !== undefined &&
+        (typeof o.exclusive !== 'boolean' ||
+          (o.exclusive && m.type !== 'multi_choice'))
+      )
+        return fail();
       ids.add(o.id);
     }
     if (

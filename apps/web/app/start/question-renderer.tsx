@@ -91,7 +91,15 @@ export function DiscoveryQuestionRenderer({
                 multiple
                   ? selected
                     ? (value as unknown[]).filter((v) => v !== optionValue)
-                    : [...(Array.isArray(value) ? value : []), optionValue]
+                    : option.exclusive
+                      ? [optionValue]
+                      : [
+                          ...(Array.isArray(value) ? value : []).filter(
+                            (v) =>
+                              !options.some((o) => o.exclusive && o.id === v),
+                          ),
+                          optionValue,
+                        ]
                   : optionValue,
               )
             }

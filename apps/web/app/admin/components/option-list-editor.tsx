@@ -3,7 +3,7 @@ import { moveItem } from "../discovery/discovery-types";
 export type OptionField<T> = {
   key: keyof T & string;
   label: string;
-  type?: "text" | "number";
+  type?: "text" | "number" | "checkbox";
   required?: boolean;
   maxLength?: number;
   min?: number;
@@ -43,30 +43,46 @@ export function OptionListEditor<T>({
       {options.map((option, index) => (
         <fieldset className="pf-stack" key={index}>
           <legend>Opzione {index + 1}</legend>
-          {fields.map((field) => (
-            <label className="pf-field" key={field.key}>
-              {field.label}
-              <input
-                className="pf-input"
-                type={field.type ?? "text"}
-                step={field.type === "number" ? "any" : undefined}
-                required={field.required}
-                maxLength={field.maxLength}
-                min={field.min}
-                max={field.max}
-                placeholder={field.placeholder}
-                disabled={field.disabled?.(option)}
-                value={String(option[field.key] ?? "")}
-                onChange={(e) =>
-                  set(
-                    index,
-                    field.key,
-                    field.parse ? field.parse(e.target.value) : e.target.value,
-                  )
-                }
-              />
-            </label>
-          ))}
+          {fields.map((field) =>
+            field.type === "checkbox" ? (
+              <label key={field.key}>
+                <input
+                  type="checkbox"
+                  disabled={field.disabled?.(option)}
+                  checked={option[field.key] === true}
+                  onChange={(e) =>
+                    set(index, field.key, e.target.checked || undefined)
+                  }
+                />
+                {field.label}
+              </label>
+            ) : (
+              <label className="pf-field" key={field.key}>
+                {field.label}
+                <input
+                  className="pf-input"
+                  type={field.type ?? "text"}
+                  step={field.type === "number" ? "any" : undefined}
+                  required={field.required}
+                  maxLength={field.maxLength}
+                  min={field.min}
+                  max={field.max}
+                  placeholder={field.placeholder}
+                  disabled={field.disabled?.(option)}
+                  value={String(option[field.key] ?? "")}
+                  onChange={(e) =>
+                    set(
+                      index,
+                      field.key,
+                      field.parse
+                        ? field.parse(e.target.value)
+                        : e.target.value,
+                    )
+                  }
+                />
+              </label>
+            ),
+          )}
           <div className="pf-actions">
             <button
               type="button"
