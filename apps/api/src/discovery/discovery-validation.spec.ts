@@ -55,6 +55,20 @@ describe('Discovery registration boundary', () => {
     for (const value of [[], ['one', 'one'], ['removed'], 'one'])
       expect(validAnswer(q, value)).toBe(false);
   });
+  it('keeps an exclusive option alone in a multi-choice answer', () => {
+    const q: DiscoveryQuestion = {
+      ...question,
+      type: 'multi_choice',
+      options: [
+        { id: 'none', label: 'Nessuna', value: 'Nessuna', exclusive: true },
+        { id: 'back', label: 'Schiena', value: 'Schiena' },
+        { id: 'foot', label: 'Piede', value: 'Piede' },
+      ],
+    };
+    expect(validAnswer(q, ['none'])).toBe(true);
+    expect(validAnswer(q, ['back', 'foot'])).toBe(true);
+    expect(validAnswer(q, ['none', 'back'])).toBe(false);
+  });
   it.each(['number', 'scale'] as const)(
     'checks %s bounds, increments and JSON numeric type',
     (type) => {
@@ -104,6 +118,27 @@ describe('Discovery registration boundary', () => {
         true,
       ),
     ).not.toThrow();
+  });
+  it('accepts exclusive options only on multi-choice questions', () => {
+    const options = [
+      { id: 'none', label: 'Nessuna', value: 'Nessuna', exclusive: true },
+      { id: 'back', label: 'Schiena', value: 'Schiena' },
+    ];
+    expect(() =>
+      assertDiscoveryMetadata({ type: 'multi_choice', options }, true),
+    ).not.toThrow();
+    expect(() =>
+      assertDiscoveryMetadata({ type: 'single_choice', options }, true),
+    ).toThrow();
+    expect(() =>
+      assertDiscoveryMetadata(
+        {
+          type: 'multi_choice',
+          options: [{ ...options[0], exclusive: 'yes' }],
+        },
+        true,
+      ),
+    ).toThrow();
   });
 });
 

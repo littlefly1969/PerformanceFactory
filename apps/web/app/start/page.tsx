@@ -305,6 +305,9 @@ export default function StartPage() {
               {question.title}
             </h1>
             {question.description && <p>{question.description}</p>}
+            {question.type === "multi_choice" && (
+              <p>Puoi scegliere più risposte.</p>
+            )}
             <DiscoveryQuestionRenderer
               question={question}
               options={optionsFor(question, draft)}

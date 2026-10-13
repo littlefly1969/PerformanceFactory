@@ -36,12 +36,14 @@ export function answerValid(
       Math.abs(units - Math.round(units)) < 1e-8
     );
   }
-  const allowed = (id: unknown) =>
-    optionsFor(question, draft).some((option) => option.id === id);
+  const options = optionsFor(question, draft);
+  const allowed = (id: unknown) => options.some((option) => option.id === id);
   return question.type === "multi_choice"
     ? Array.isArray(value) &&
         (!question.required || value.length > 0) &&
         value.every(allowed) &&
-        new Set(value).size === value.length
+        new Set(value).size === value.length &&
+        (value.length < 2 ||
+          !options.some((o) => o.exclusive && value.includes(o.id)))
     : allowed(value);
 }

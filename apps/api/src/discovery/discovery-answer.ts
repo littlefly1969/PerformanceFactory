@@ -32,7 +32,9 @@ export function validAnswer(
       Array.isArray(value) &&
       (!question.required || value.length > 0) &&
       new Set(value).size === value.length &&
-      value.every(allowed)
+      value.every(allowed) &&
+      (value.length < 2 ||
+        !options.some((o) => o.exclusive && value.includes(o.id)))
     );
   return allowed(value);
 }

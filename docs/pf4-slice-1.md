@@ -32,6 +32,7 @@ Example `optionsJson` for a configurable question:
 
 Supported types: `single_choice`, `multi_choice`, `number`, `scale`, `boolean`.
 For numeric controls provide finite `min < max` and optional positive `step` (default 1); `ui.unit` is optional. A boolean question needs two options with values `true` and `false`. Selection answers use option **IDs**, numeric answers use numbers, booleans use booleans.
+A `multi_choice` option may set `"exclusive": true` (e.g. «Nessuna»): choosing it clears the other selections, and the server rejects it combined with others. Only multi-choice options may be exclusive. The AI receives a multi-choice answer as the chosen labels joined with `; `.
 `inputType` remains the existing Prisma enum: use `SELECT`, `NUMBER`, or `SCORE`; discovery rendering uses `optionsJson.type`.
 
 Three required single-choice templates have `target: sportId`, `specializationId`, or `goalId`. Keep exactly one of each active. Sport and specialization options are filled from active domain records; specialization options include their parent sport ID. Goal options are configured in the goal template and the selected label initializes `UserPerformanceGoal.goalText`; no AI validation/freeze is claimed. Configure sport before specialization. No additional goal catalog existed to reuse.

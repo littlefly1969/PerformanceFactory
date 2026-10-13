@@ -61,6 +61,7 @@ export class DiscoveryService {
         label: o.label,
         description: o.description,
         value: o.value,
+        exclusive: o.exclusive || undefined,
       }));
       if (metadata.target === 'sportId')
         options = sports.map((s) => ({

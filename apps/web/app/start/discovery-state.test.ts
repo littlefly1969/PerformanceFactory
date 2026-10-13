@@ -68,6 +68,20 @@ describe("Discovery browser draft", () => {
       ),
     ).toBe(true);
   });
+  it("rejects an exclusive option chosen together with others", () => {
+    const multi = {
+      ...question,
+      type: "multi_choice" as const,
+      options: [
+        { id: "none", label: "Nessuna", value: "none", exclusive: true },
+        { id: "back", label: "Schiena", value: "back" },
+      ],
+    };
+    const answered = (q: string[]) => ({ ...emptyDraft(8), answers: { q } });
+    expect(answerValid(multi, answered(["none"]))).toBe(true);
+    expect(answerValid(multi, answered(["back"]))).toBe(true);
+    expect(answerValid(multi, answered(["none", "back"]))).toBe(false);
+  });
   it("only maps backend steps; rejects arbitrary URLs", () => {
     expect(journeyHref("CONSENTS")).toBe("/journey?step=CONSENTS");
     expect(() => journeyHref("https://attacker.test")).toThrow();

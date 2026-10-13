@@ -54,6 +54,36 @@ describe("PF4 configured controls", () => {
     );
     expect(onChange).toHaveBeenCalledWith([]);
   });
+  it("keeps an exclusive option alone in a multi-choice selection", async () => {
+    const options = [
+      { id: "none", label: "Nessuna", value: "none", exclusive: true },
+      ...question.options,
+    ];
+    const multi = { ...question, type: "multi_choice" as const, options };
+    const onChange = vi.fn();
+    const { rerender } = render(
+      <DiscoveryQuestionRenderer
+        question={multi}
+        options={options}
+        value={["a", "b"]}
+        onChange={onChange}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Nessuna" }));
+    expect(onChange).toHaveBeenLastCalledWith(["none"]);
+    rerender(
+      <DiscoveryQuestionRenderer
+        question={multi}
+        options={options}
+        value={["none"]}
+        onChange={onChange}
+      />,
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Prima opzione" }),
+    );
+    expect(onChange).toHaveBeenLastCalledWith(["a"]);
+  });
   it("uses the configured boolean labels and boolean values", async () => {
     const onChange = vi.fn();
     render(
