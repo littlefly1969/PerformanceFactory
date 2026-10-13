@@ -38,6 +38,8 @@ export type TemplateRecord = {
   required: boolean;
   orderIndex: number;
   area: { id: string; name: string } | null;
+  /** Domanda dell'AI a scelta multipla: la risposta è un elenco di valori. */
+  multiple?: boolean;
 };
 
 export type OnboardingAnswer = {

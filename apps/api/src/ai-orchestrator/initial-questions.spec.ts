@@ -59,6 +59,58 @@ describe('initial questions', () => {
     });
   });
 
+  it('accepts a multiple-choice question without ordered scores', () => {
+    const multi = {
+      ...question('tecnica', 'Quali colpi ti mettono in difficoltà?'),
+      multiple: true,
+      options: [
+        { label: 'Nessuno', score: 100, exclusive: true },
+        { label: 'Bandeja', score: 40, exclusive: false },
+        { label: 'Víbora', score: 30, exclusive: false },
+        { label: 'Volée bassa', score: 50, exclusive: false },
+      ],
+    };
+    const questions = validateInitialQuestions(
+      {
+        questions: [
+          multi,
+          question('tecnica', 'T2'),
+          question('mental', 'M1'),
+          question('mental', 'M2'),
+        ],
+      },
+      input,
+    );
+    expect(questions?.[0]).toMatchObject({ multiple: true });
+    expect(questions?.[0].options[0]).toMatchObject({ exclusive: true });
+    expect(questions?.[1].multiple).toBeUndefined();
+  });
+
+  it('keeps at least one single-choice question per driver', () => {
+    const problems: string[] = [];
+    const multi = (text: string) => ({
+      ...question('tecnica', text),
+      multiple: true,
+    });
+    expect(
+      validateInitialQuestions(
+        {
+          questions: [
+            multi('T1'),
+            multi('T2'),
+            question('mental', 'M1'),
+            question('mental', 'M2'),
+          ],
+        },
+        input,
+        problems,
+      ),
+    ).toBeNull();
+    expect(problems).toContain(
+      'Tecnica: serve almeno una domanda a scelta singola',
+    );
+  });
+
   it('stub writes N questions per driver that pass the contract', () => {
     const stub = stubInitialQuestions(input);
     const questions = validateInitialQuestions(stub, input);

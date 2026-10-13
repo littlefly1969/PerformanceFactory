@@ -679,7 +679,39 @@ describe('PF4 discovery to authenticated journey', () => {
     expect(regenerated.questions).toHaveLength(19);
     expect(regenerated.questions[7].id).not.toBe(bank[0].id);
     bank.splice(0, bank.length, ...regenerated.questions.slice(7));
-    for (const question of bank) {
+    // L'AI può marcare una domanda come multipla: la risposta è un elenco e
+    // un'opzione esclusiva resta da sola.
+    const multi = await prisma.userOnboardingQuestion.findUniqueOrThrow({
+      where: { id: bank[0].id },
+    });
+    const choices = multi.optionsJson as { value: string }[];
+    await prisma.userOnboardingQuestion.update({
+      where: { id: multi.id },
+      data: {
+        multiple: true,
+        optionsJson: choices.map((o, i) =>
+          i === 0 ? { ...o, exclusive: true } : o,
+        ),
+      },
+    });
+    expect((await state()).questions[7]).toMatchObject({ multiple: true });
+    for (const value of [
+      choices[1].value,
+      [choices[0].value, choices[1].value],
+      [],
+    ])
+      expect(
+        (await post('answer', { questionId: multi.id, value })).statusCode,
+      ).toBe(400);
+    expect(
+      (
+        await post('answer', {
+          questionId: multi.id,
+          value: [choices[1].value, choices[2].value],
+        })
+      ).statusCode,
+    ).toBe(201);
+    for (const question of bank.slice(1)) {
       const response = await post('answer', {
         questionId: question.id,
         value: question.options[1].value,
@@ -870,6 +902,16 @@ describe('PF4 discovery to authenticated journey', () => {
     });
     expect(prompt.user.availability).toHaveLength(2);
     expect(prompt.system).toContain('fitRanking');
+    // La risposta multipla arriva con ogni opzione scelta e il suo score.
+    const multiAnswer = (
+      prompt.user as unknown as {
+        drivers: { answers: { selectedOptions?: unknown[] }[] }[];
+      }
+    ).drivers
+      .flatMap((d) => d.answers)
+      .find((a) => a.selectedOptions);
+    expect(multiAnswer?.selectedOptions).toHaveLength(2);
+    expect(prompt.system).toContain('Una risposta con selectedOptions');
     expect(JSON.stringify(saved.inputJson)).not.toContain('12345');
 
     // Una sola valutazione: le risposte sono bloccate.

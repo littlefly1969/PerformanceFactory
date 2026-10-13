@@ -1,6 +1,10 @@
 import { useState } from "react";
 import type { Calibration, Evaluation } from "./journey-types";
 import { confidenceLabel } from "./provisional-evaluation";
+import { MultiChoiceOptions } from "./choice-options";
+
+/** Id domanda → valore scelto, o elenco se la domanda è multipla. */
+type Answers = Record<string, string | string[]>;
 
 const LEVELS: Record<string, string> = {
   BEGINNER: "Principiante",
@@ -89,12 +93,12 @@ function RoundForm({
 }: {
   round: NonNullable<Calibration["round"]>;
   busy: boolean;
-  onSubmit: (answers: Record<string, string>) => void;
+  onSubmit: (answers: Answers) => void;
 }) {
-  const [answers, setAnswers] = useState<Record<string, string>>(
-    round.answers ?? {},
+  const [answers, setAnswers] = useState<Answers>(round.answers ?? {});
+  const complete = round.questions.every((q) =>
+    q.multiple ? !!answers[q.id]?.length : answers[q.id] !== undefined,
   );
-  const complete = round.questions.every((q) => answers[q.id] !== undefined);
   return (
     <form
       className="pf4-calibration-round"
@@ -112,21 +116,30 @@ function RoundForm({
             {round.questions.length > 1 ? `${index + 1}. ` : ""}
             {q.text}
           </legend>
-          <div className="pf4-options">
-            {q.options.map((o) => (
-              <button
-                type="button"
-                key={o.value}
-                disabled={busy}
-                aria-pressed={answers[q.id] === o.value}
-                className={`pf4-option ${answers[q.id] === o.value ? "is-selected" : ""}`}
-                onClick={() => setAnswers({ ...answers, [q.id]: o.value })}
-              >
-                <span>{o.label}</span>
-                <span className="pf4-dot" />
-              </button>
-            ))}
-          </div>
+          {q.multiple ? (
+            <MultiChoiceOptions
+              options={q.options}
+              selected={[answers[q.id] ?? []].flat()}
+              busy={busy}
+              onChange={(next) => setAnswers({ ...answers, [q.id]: next })}
+            />
+          ) : (
+            <div className="pf4-options">
+              {q.options.map((o) => (
+                <button
+                  type="button"
+                  key={o.value}
+                  disabled={busy}
+                  aria-pressed={answers[q.id] === o.value}
+                  className={`pf4-option ${answers[q.id] === o.value ? "is-selected" : ""}`}
+                  onClick={() => setAnswers({ ...answers, [q.id]: o.value })}
+                >
+                  <span>{o.label}</span>
+                  <span className="pf4-dot" />
+                </button>
+              ))}
+            </div>
+          )}
         </fieldset>
       ))}
       <button className="pf4-cta" disabled={busy || !complete}>
@@ -157,7 +170,7 @@ export function CalibrationPanel({
   evaluation: Evaluation;
   busy: boolean;
   onOpenRound: () => void;
-  onAnswer: (roundId: string, answers: Record<string, string>) => void;
+  onAnswer: (roundId: string, answers: Answers) => void;
   onSkip: (roundId: string) => void;
 }) {
   const completed =

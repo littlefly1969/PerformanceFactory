@@ -18,10 +18,10 @@ export class CalibrationAnswersDto {
   @IsUUID()
   roundId: string;
 
-  /** Id domanda → valore dell'opzione scelta. */
+  /** Id domanda → valore dell'opzione scelta, o elenco se la domanda è multipla. */
   @ApiProperty({ type: Object })
   @IsObject()
-  answers: Record<string, string>;
+  answers: Record<string, string | string[]>;
 }
 
 export class CalibrationRoundDto {

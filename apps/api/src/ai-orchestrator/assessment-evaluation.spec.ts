@@ -211,6 +211,34 @@ describe('assessment evaluation', () => {
     expect(prompt.user.drivers).toBe(input.drivers);
   });
 
+  it('explains multiple-choice answers only when the input has them', () => {
+    const rule = 'Una risposta con selectedOptions';
+    expect(buildAssessmentPrompt(input).system).not.toContain(rule);
+    const [first, ...rest] = input.drivers;
+    const multi: AssessmentEvaluationInput = {
+      ...input,
+      drivers: [
+        {
+          ...first,
+          answers: [
+            {
+              question: 'Dove senti fastidio?',
+              answer: 'Gomito; Schiena',
+              optionScore: 30,
+              optionScoreRange: range,
+              selectedOptions: [
+                { label: 'Gomito', score: 40 },
+                { label: 'Schiena', score: 20 },
+              ],
+            },
+          ],
+        },
+        ...rest,
+      ],
+    };
+    expect(buildAssessmentPrompt(multi).system).toContain(rule);
+  });
+
   it('runs the deterministic stub without calling an external provider', async () => {
     process.env.AI_PROVIDER = 'stub';
     const result = await evaluateAssessment(new Logger('test'), input);

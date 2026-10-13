@@ -112,6 +112,19 @@ minimo al massimo della scala attiva: una domanda con score uguali (`[20, 20,
 20]`) o che non tocca gli estremi (`[20, 50, 80]`) non distingue i livelli e
 fa scartare il lotto.
 
+**Domande a scelta multipla.** L'AI decide quando una domanda ammette più
+risposte (`multiple: true`, per esempio dove si sente fastidio) e può marcare
+un'opzione come esclusiva (`exclusive: true`, per esempio «Nessuno»), che non
+si combina con le altre. Una domanda multipla non ha l'ordine di score delle
+singole, ma ogni opzione resta nella scala; ogni driver mantiene almeno una
+domanda a scelta singola. La risposta è un elenco di valori. Alla valutazione
+arrivano tutte le opzioni scelte, ciascuna con il suo score
+(`selectedOptions`), e `optionScore` è la loro media, usata solo dal calcolo di
+riserva senza AI. Lo stesso vale per le domande dei round di calibrazione,
+tranne i chiarimenti, che restano a scelta singola. Il flag è salvato in
+`UserOnboardingQuestion.multiple` e, nei round, nella domanda dentro
+`questionsJson`.
+
 Le domande sono salvate nella banca per atleta (`UserOnboardingQuestion`, con
 `inputJson.kind = INITIAL_QUESTIONS`, provider, modello, versione del prompt) e
 non si riscrivono: una seconda richiesta restituisce le stesse. Le risposte

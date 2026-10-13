@@ -100,7 +100,9 @@ export type Calibration = {
       id: string;
       areaId: string;
       text: string;
-      options: { value: string; label: string }[];
+      /** Scelta multipla decisa dall'AI: la risposta è un elenco di valori. */
+      multiple?: boolean;
+      options: { value: string; label: string; exclusive?: boolean }[];
       /** Solo nel micro-test: l'esito lo riporta l'atleta. */
       microTest?: {
         instructions: string;
@@ -108,7 +110,7 @@ export type Calibration = {
         safetyNotes: string;
       };
     }[];
-    answers: Record<string, string>;
+    answers: Record<string, string | string[]>;
   } | null;
 };
 export type Journey = {
@@ -144,7 +146,7 @@ export type Journey = {
   estimatedMinutes: number;
   documents?: ConsentDocument[];
   driverList: { id: string; name: string; count: number }[];
-  answers: Record<string, string | number>;
+  answers: Record<string, string | number | string[]>;
   questions: {
     id: string;
     kind?: "OPERATIONAL" | "RANKING" | "AREA";
@@ -155,7 +157,9 @@ export type Journey = {
     title: string;
     areaId: string | null;
     areaName: string | null;
-    options: { value: string | number; label: string }[];
+    options: { value: string | number; label: string; exclusive?: boolean }[];
+    /** Scelta multipla decisa dall'AI: la risposta è un elenco di valori. */
+    multiple?: boolean;
   }[];
   result: {
     snapshotId: string;

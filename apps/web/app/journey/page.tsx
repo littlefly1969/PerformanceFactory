@@ -10,6 +10,7 @@ import { ScenariosReveal } from "./scenarios-reveal";
 import { DurationStep, PerformanceResult } from "./performance-result";
 import { useJourney } from "./use-journey";
 import { CardNumberStep } from "./card-number-step";
+import { MultiChoiceStep } from "./choice-options";
 import { QuestionsPreparing } from "./questions-preparing";
 import { FitRankingEditor } from "../components/fit-ranking-editor";
 import "./journey.css";
@@ -116,6 +117,16 @@ export default function JourneyPage() {
               <CardNumberStep
                 key={q.id}
                 initial={String(j.answers[q.id] ?? "")}
+                busy={busy}
+                onSubmit={(value) =>
+                  action("answer", { questionId: q.id, value })
+                }
+              />
+            ) : q.multiple ? (
+              <MultiChoiceStep
+                key={q.id}
+                options={q.options}
+                initial={j.answers[q.id]}
                 busy={busy}
                 onSubmit={(value) =>
                   action("answer", { questionId: q.id, value })

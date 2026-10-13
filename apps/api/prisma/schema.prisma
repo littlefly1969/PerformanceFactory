@@ -276,6 +276,8 @@ model UserOnboardingQuestion {
   orderIndex    Int
   inputType     OnboardingInputType   @default(SCORE)
   optionsJson   Json?
+  /// Domanda scritta dall'AI a scelta multipla: la risposta è un elenco di valori.
+  multiple      Boolean               @default(false)
   provider      String
   model         String
   promptVersion String

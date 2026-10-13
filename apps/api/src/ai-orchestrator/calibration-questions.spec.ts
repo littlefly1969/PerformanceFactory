@@ -96,6 +96,47 @@ describe('calibration questions', () => {
     ).toHaveLength(1);
   });
 
+  it('accepts a multiple-choice question with an exclusive option', () => {
+    const multi = question({
+      text: 'Dove senti fastidio dopo aver giocato?',
+      multiple: true,
+      options: [
+        { label: 'Da nessuna parte', score: 100, exclusive: true },
+        { label: 'Gomito', score: 40, exclusive: false },
+        { label: 'Schiena', score: 30, exclusive: false },
+      ],
+    });
+    const result = validateCalibrationStep(step([multi], 'ASK_SINGLE'), input);
+    expect(result?.questions[0]).toMatchObject({ multiple: true });
+    expect(result?.questions[0].options.map((o) => o.exclusive)).toEqual([
+      true,
+      undefined,
+      undefined,
+    ]);
+    // Su una domanda singola il flag esclusivo non ha senso e si scarta.
+    const single = validateCalibrationStep(
+      step(
+        [question({ options: multi.options, multiple: false })],
+        'ASK_SINGLE',
+      ),
+      input,
+    );
+    expect(single?.questions[0].multiple).toBeUndefined();
+    expect(single?.questions[0].options.some((o) => o.exclusive)).toBe(false);
+  });
+
+  it('keeps a clarification single-choice', () => {
+    const problems: string[] = [];
+    expect(
+      validateCalibrationStep(
+        step([question({ multiple: true })], 'REQUEST_CLARIFICATION'),
+        input,
+        problems,
+      ),
+    ).toBeNull();
+    expect(problems).toContain('chiarimento a scelta multipla (1)');
+  });
+
   it.each([
     ['a group of one', step([question()]), 'ASK_GROUP: da 2'],
     [

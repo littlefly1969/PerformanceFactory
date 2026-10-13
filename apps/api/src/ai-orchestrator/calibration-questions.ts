@@ -13,9 +13,9 @@ export const DEFAULT_CALIBRATION_PROMPT = [
   'Sei il motore di calibrazione di Performance Factory. Dopo la prima valutazione di un atleta amatoriale maggiorenne ricevi tutti i driver con score R provvisorio, confidenza, lacune di evidenza e domande già fatte; i driver ancora sotto la regola di consolidamento sono marcati come focus.',
   'A ogni passo decidi tu la prossima azione: una sola domanda quando la risposta cambierà la domanda successiva, un gruppo di domande indipendenti quando si possono rispondere insieme, un chiarimento neutro quando due risposte si contraddicono. Non c’è un numero fisso di domande per driver: chiedi solo ciò che riduce davvero una lacuna, e non coprire un driver le cui evidenze bastano già.',
   'Tieni conto della classifica FIT dichiarata (padel e tennis, attuale e migliore di sempre): tara difficoltà, situazioni di gioco e lessico sul livello che indica, e chiedi conferma quando le risposte non tornano con la classifica.',
-  'Domande a scelta singola su comportamenti concreti, frequenze, situazioni di gioco, risultati misurabili. Evita domande già fatte o equivalenti.',
+  'Domande su comportamenti concreti, frequenze, situazioni di gioco, risultati misurabili: di norma a scelta singola, a scelta multipla solo quando l’atleta può riconoscersi in più opzioni insieme. Evita domande già fatte o equivalenti.',
   'Puoi proporre un micro-test quando una prova pratica breve darebbe su un driver un’evidenza diversa e più affidabile delle dichiarazioni: lo scrive il preparatore, tu indichi solo il driver e il perché. Ricevi quanti micro-test l’atleta ha già svolto e saltato e a quante domande ha risposto, e un’indicazione di quante domande vorremmo, in media, per ogni micro-test. Tienila in considerazione per bilanciare prove pratiche e domande, ma decidi tu passo per passo e puoi discostartene quando la situazione dell’atleta lo giustifica. Se l’indicazione è 0 non c’è indicazione: scegli liberamente. Non riproporre micro-test già fatti o saltati.',
-  'Ogni opzione ha uno score di riferimento sulla scala ricevuta: deve ancorare la risposta al livello reale, non premiare la risposta più lunga. Le opzioni coprono tutta la scala e sono mutuamente esclusive.',
+  'Ogni opzione ha uno score di riferimento sulla scala ricevuta: deve ancorare la risposta al livello reale, non premiare la risposta più lunga. Nelle domande a scelta singola le opzioni coprono tutta la scala e sono mutuamente esclusive.',
   'Scrivi in italiano, con il tu, frasi brevi. Niente diagnosi mediche, niente dati personali, niente promesse di risultato. Un chiarimento non accusa e non rivela sospetti.',
 ].join('\n');
 
@@ -78,11 +78,83 @@ export type MicroTestBalance = {
   questionsAnswered: number;
 };
 
+/** Opzione di una domanda scritta dall'AI; `exclusive` solo nelle multiple. */
+export type ChoiceOption = {
+  value: string;
+  label: string;
+  score: number;
+  exclusive?: true;
+};
+
+/**
+ * Regola fissa delle domande a scelta multipla, comune alle domande iniziali
+ * e ai round di calibrazione: prevale sul prompt modificabile.
+ */
+export const MULTIPLE_CHOICE_RULE =
+  '- multiple: true solo quando l’atleta può riconoscersi in più opzioni insieme (per esempio dove sente fastidio o quali routine segue), altrimenti false. In una domanda multipla ogni opzione ha comunque il suo score di riferimento e un’opzione come «Nessuna» ha exclusive true; in tutte le altre opzioni exclusive è false. Questa regola prevale sulle istruzioni sopra.';
+
+export const CHOICE_OPTIONS_SCHEMA = {
+  type: 'array',
+  items: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['label', 'score', 'exclusive'],
+    properties: {
+      label: { type: 'string' },
+      score: { type: 'number' },
+      exclusive: { type: 'boolean' },
+    },
+  },
+};
+
+/**
+ * Opzioni di una domanda dell'AI: numero, etichette uniche, score nella
+ * scala. `exclusive` vale solo nelle domande multiple e si scarta altrove.
+ */
+export function parseChoiceOptions(
+  raw: unknown,
+  multiple: boolean,
+  scale: { minScore: number; maxScore: number },
+  index: number,
+  problems: string[],
+): ChoiceOption[] {
+  const l = CALIBRATION_LIMITS;
+  const options = Array.isArray(raw) ? raw : [];
+  if (options.length < l.minOptions || options.length > l.maxOptions)
+    problems.push(`numero di opzioni non valido (${index + 1})`);
+  const parsed = options.map((option, k) => {
+    const o = option as Partial<Record<string, unknown>> | null;
+    const label = clean(o?.label, l.option);
+    const score = o?.score;
+    if (
+      !label ||
+      typeof score !== 'number' ||
+      !Number.isFinite(score) ||
+      score < scale.minScore ||
+      score > scale.maxScore
+    )
+      problems.push(`opzione non valida (${index + 1}.${k + 1})`);
+    return {
+      value: String(k),
+      label: label ?? '',
+      score: Number(score),
+      ...(multiple && o?.exclusive === true
+        ? { exclusive: true as const }
+        : {}),
+    };
+  });
+  if (new Set(parsed.map((o) => o.label)).size !== parsed.length)
+    problems.push(`opzioni duplicate (${index + 1})`);
+  return parsed;
+}
+
 export type CalibrationQuestion = {
   id: string;
   areaId: string;
   text: string;
-  options: { value: string; label: string; score: number }[];
+  options: ChoiceOption[];
+  /** Più opzioni insieme; assente sulle domande a scelta singola. */
+  multiple?: true;
   /**
    * Micro-test del motore: `text` è il titolo, l'esito lo riporta l'atleta
    * (self-report). Assente sulle domande.
@@ -132,6 +204,8 @@ function formatRules() {
     `- text: massimo ${l.question} caratteri.`,
     '- le domande sono solo su comportamenti, frequenze e situazioni di gioco già vissute: niente micro-test, esercizi o prove da svolgere dentro una domanda; una prova pratica si propone solo con PROPOSE_MICRO_TEST. Questa regola prevale sulle istruzioni sopra.',
     `- options: da ${l.minOptions} a ${l.maxOptions}, label di massimo ${l.option} caratteri, score tra la scala minima e massima ricevute.`,
+    MULTIPLE_CHOICE_RULE,
+    '- un chiarimento (REQUEST_CLARIFICATION) è sempre a scelta singola.',
     FIT_RANKING_RULE,
   ].join('\n');
 }
@@ -149,22 +223,12 @@ const schema = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['areaId', 'text', 'options'],
+        required: ['areaId', 'text', 'multiple', 'options'],
         properties: {
           areaId: { type: 'string' },
           text: { type: 'string' },
-          options: {
-            type: 'array',
-            items: {
-              type: 'object',
-              additionalProperties: false,
-              required: ['label', 'score'],
-              properties: {
-                label: { type: 'string' },
-                score: { type: 'number' },
-              },
-            },
-          },
+          multiple: { type: 'boolean' },
+          options: CHOICE_OPTIONS_SCHEMA,
         },
       },
     },
@@ -342,33 +406,22 @@ export function validateCalibrationStep(
         problems.push(`domanda già fatta (${index + 1})`);
       seen.add(key);
     }
-    const options = Array.isArray(entry.options) ? entry.options : [];
-    if (
-      options.length < CALIBRATION_LIMITS.minOptions ||
-      options.length > CALIBRATION_LIMITS.maxOptions
-    )
-      problems.push(`numero di opzioni non valido (${index + 1})`);
-    const parsed = options.map((option, k) => {
-      const o = option as Partial<Record<string, unknown>>;
-      const label = clean(o?.label, CALIBRATION_LIMITS.option);
-      const score = o?.score;
-      if (
-        !label ||
-        typeof score !== 'number' ||
-        !Number.isFinite(score) ||
-        score < input.scale.minScore ||
-        score > input.scale.maxScore
-      )
-        problems.push(`opzione non valida (${index + 1}.${k + 1})`);
-      return { value: String(k), label: label ?? '', score: Number(score) };
-    });
-    if (new Set(parsed.map((o) => o.label)).size !== parsed.length)
-      problems.push(`opzioni duplicate (${index + 1})`);
+    const multiple = entry.multiple === true;
+    if (multiple && action === 'REQUEST_CLARIFICATION')
+      problems.push(`chiarimento a scelta multipla (${index + 1})`);
+    const parsed = parseChoiceOptions(
+      entry.options,
+      multiple,
+      input.scale,
+      index,
+      problems,
+    );
     questions.push({
       id: `q${index + 1}`,
       areaId,
       text: text ?? '',
       options: parsed,
+      ...(multiple ? { multiple: true as const } : {}),
     });
   });
   if (problems.length || !action || !rationale) return null;

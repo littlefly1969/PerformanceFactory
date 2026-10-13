@@ -4,7 +4,13 @@ import { requestStructuredProposal } from './proposal-structured-transport';
 import { resolveModel, resolveProvider } from './provider-config';
 import { AiProvider } from './proposal-provider-model';
 import { AssessmentEvaluationAnswer } from './assessment-evaluation-model';
-import { CALIBRATION_LIMITS } from './calibration-questions';
+import {
+  CALIBRATION_LIMITS,
+  CHOICE_OPTIONS_SCHEMA,
+  ChoiceOption,
+  MULTIPLE_CHOICE_RULE,
+  parseChoiceOptions,
+} from './calibration-questions';
 import { FIT_RANKING_RULE, FitRankingContext } from './fit-ranking-context';
 
 /** Tipo di prompt in AiPromptVersion per le domande conoscitive iniziali. */
@@ -14,8 +20,8 @@ export const DEFAULT_INITIAL_QUESTIONS_PROMPT = [
   'Sei il motore delle domande conoscitive iniziali di Performance Factory. Un atleta amatoriale maggiorenne si è appena registrato: ricevi le sue risposte al funnel (obiettivo, esperienza, frequenza di gioco, salute), la disponibilità all’allenamento, la classifica FIT dichiarata di padel e di tennis (attuale e migliore di sempre) e i driver della performance da conoscere.',
   'Scrivi le prime domande per ogni driver: servono alla prima stima della Performance Reale (R), quindi devono far emergere il livello reale dell’atleta su quel driver, non le sue opinioni.',
   'Su misura: parti dalla classifica e dal funnel. Chi ha o ha avuto una classifica alta riceve situazioni di gioco e soglie da agonista; chi non è mai stato classificato riceve situazioni da amatore. Tieni conto dell’obiettivo e di eventuali limitazioni dichiarate. Non chiedere di nuovo ciò che il funnel o la classifica dicono già.',
-  'Le domande di uno stesso driver guardano aspetti diversi del driver e non si sovrappongono. Domande a scelta singola su comportamenti concreti, frequenze, situazioni di gioco, risultati misurabili.',
-  'Ogni opzione ha uno score di riferimento sulla scala ricevuta: deve ancorare la risposta al livello reale, non premiare la risposta più lunga. Le opzioni coprono tutta la scala e sono mutuamente esclusive.',
+  'Le domande di uno stesso driver guardano aspetti diversi del driver e non si sovrappongono. Domande su comportamenti concreti, frequenze, situazioni di gioco, risultati misurabili: di norma a scelta singola, a scelta multipla solo quando l’atleta può riconoscersi in più opzioni insieme (per esempio dove sente fastidio o quali routine segue).',
+  'Ogni opzione ha uno score di riferimento sulla scala ricevuta: deve ancorare la risposta al livello reale, non premiare la risposta più lunga. Nelle domande a scelta singola le opzioni coprono tutta la scala e sono mutuamente esclusive.',
   'Scrivi in italiano, con il tu, frasi brevi. Niente diagnosi mediche, niente dati personali, niente promesse di risultato.',
 ].join('\n');
 
@@ -39,7 +45,9 @@ export type InitialQuestionsInput = {
 export type InitialQuestion = {
   areaId: string;
   text: string;
-  options: { value: string; label: string; score: number }[];
+  options: ChoiceOption[];
+  /** Più opzioni insieme; assente sulle domande a scelta singola. */
+  multiple?: true;
 };
 
 export type InitialQuestionsResult = {
@@ -58,7 +66,9 @@ function formatRules(input: InitialQuestionsInput) {
     `- questions: esattamente ${input.questionsPerArea} per ciascuno dei ${input.drivers.length} driver ricevuti (${input.questionsPerArea * input.drivers.length} in tutto), con il loro areaId, raggruppate per driver nell’ordine ricevuto.`,
     `- text: massimo ${l.question} caratteri, mai uguale a un’altra domanda.`,
     '- le domande sono solo su comportamenti, frequenze e situazioni di gioco già vissute: niente esercizi o prove da svolgere.',
-    `- options: da ${l.minOptions} a ${l.maxOptions}, label di massimo ${l.option} caratteri e diverse fra loro, score tutti diversi, in ordine crescente o decrescente, con la prima o l’ultima opzione a ${input.scale.minScore} e l’altra a ${input.scale.maxScore}.`,
+    `- options: da ${l.minOptions} a ${l.maxOptions}, label di massimo ${l.option} caratteri e diverse fra loro. Con multiple false: score tutti diversi, in ordine crescente o decrescente, con la prima o l’ultima opzione a ${input.scale.minScore} e l’altra a ${input.scale.maxScore}.`,
+    MULTIPLE_CHOICE_RULE,
+    '- ogni driver ha almeno una domanda con multiple false.',
     FIT_RANKING_RULE,
     'Questi vincoli prevalgono sulle istruzioni sopra.',
   ].join('\n');
@@ -74,22 +84,12 @@ const schema = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['areaId', 'text', 'options'],
+        required: ['areaId', 'text', 'multiple', 'options'],
         properties: {
           areaId: { type: 'string' },
           text: { type: 'string' },
-          options: {
-            type: 'array',
-            items: {
-              type: 'object',
-              additionalProperties: false,
-              required: ['label', 'score'],
-              properties: {
-                label: { type: 'string' },
-                score: { type: 'number' },
-              },
-            },
-          },
+          multiple: { type: 'boolean' },
+          options: CHOICE_OPTIONS_SCHEMA,
         },
       },
     },
@@ -248,34 +248,34 @@ export function validateInitialQuestions(
     else if (seen.has(normalized(text)))
       problems.push(`domanda ripetuta (${index + 1})`);
     else seen.add(normalized(text));
-    const options = Array.isArray(entry?.options) ? entry.options : [];
-    if (options.length < l.minOptions || options.length > l.maxOptions)
-      problems.push(`numero di opzioni non valido (${index + 1})`);
-    const parsed = options.map((option, k) => {
-      const o = option as Partial<Record<string, unknown>> | null;
-      const label = clean(o?.label, l.option);
-      const score = o?.score;
-      if (
-        !label ||
-        typeof score !== 'number' ||
-        !Number.isFinite(score) ||
-        score < input.scale.minScore ||
-        score > input.scale.maxScore
-      )
-        problems.push(`opzione non valida (${index + 1}.${k + 1})`);
-      return { value: String(k), label: label ?? '', score: Number(score) };
-    });
-    if (new Set(parsed.map((o) => o.label)).size !== parsed.length)
-      problems.push(`opzioni duplicate (${index + 1})`);
-    if (!scoresSpanScale(parsed, input.scale))
+    const multiple = entry?.multiple === true;
+    const parsed = parseChoiceOptions(
+      entry?.options,
+      multiple,
+      input.scale,
+      index,
+      problems,
+    );
+    // Le domande multiple non hanno un ordine di score: ogni opzione pesa da sé.
+    if (!multiple && !scoresSpanScale(parsed, input.scale))
       problems.push(`score che non distinguono le opzioni (${index + 1})`);
-    questions.push({ areaId, text: text ?? '', options: parsed });
+    questions.push({
+      areaId,
+      text: text ?? '',
+      options: parsed,
+      ...(multiple ? { multiple: true as const } : {}),
+    });
   });
   for (const driver of input.drivers) {
-    const count = questions.filter((q) => q.areaId === driver.areaId).length;
-    if (count !== input.questionsPerArea)
+    const own = questions.filter((q) => q.areaId === driver.areaId);
+    if (own.length !== input.questionsPerArea)
       problems.push(
-        `${driver.name}: attese ${input.questionsPerArea} domande, ricevute ${count}`,
+        `${driver.name}: attese ${input.questionsPerArea} domande, ricevute ${own.length}`,
+      );
+    // Almeno un ancoraggio a scelta singola per driver.
+    else if (own.every((q) => q.multiple))
+      problems.push(
+        `${driver.name}: serve almeno una domanda a scelta singola`,
       );
   }
   if (problems.length) return null;
