@@ -718,10 +718,36 @@ describe('Free lesson with PostgreSQL', () => {
     expect(await athletes.view(id)).toMatchObject({ phase: 'ELIGIBLE' });
   });
 
+  it('presents the gift with the clubs offering the lesson and the Real areas', async () => {
+    const id = await athlete([1, 100]);
+    const updatedAt = new Date('2026-10-25T10:00:00Z');
+    await prisma.partner.update({
+      where: { id: partnerId },
+      data: {
+        logoImage: 'data:image/png;base64,AA==',
+        logoUpdatedAt: updatedAt,
+      },
+    });
+    const gift = await athletes.gift(id);
+    expect(gift).toMatchObject({ enabled: true, attributedClubId: null });
+    if (!gift.enabled) throw new Error('gift disabled');
+    expect(gift.clubs.find((c) => c.id === partnerId)).toEqual({
+      id: partnerId,
+      name: 'Circolo test',
+      city: null,
+      logoUrl: `/partners/${partnerId}/logo?v=${updatedAt.getTime()}`,
+      photoUrl: null,
+    });
+    expect(
+      AREAS.map((areaId) => gift.areas.find((a) => a.id === areaId)?.real),
+    ).toEqual([false, true]);
+  });
+
   it('hides everything while the feature flag is off', async () => {
     const id = await athlete([40, 50]);
     await flags.update('free_lesson', { enabled: false }, adminId);
     expect(await athletes.view(id)).toEqual({ enabled: false });
+    expect(await athletes.gift(id)).toEqual({ enabled: false });
     await expect(athletes.request(id, partnerId, true)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
