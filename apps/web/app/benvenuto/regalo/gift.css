@@ -1,0 +1,301 @@
+@font-face {
+  font-family: "PF Gift Sans";
+  src: url("/fonts/public-sans-300.ttf") format("truetype");
+  font-weight: 300;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PF Gift Sans";
+  src: url("/fonts/public-sans-400.ttf") format("truetype");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "PF Gift Sans";
+  src: url("/fonts/public-sans-600.ttf") format("truetype");
+  font-weight: 600;
+  font-display: swap;
+}
+
+.pf-gift {
+  --gift-ink: #0b0b0c;
+  --gift-text: #f7f7f4;
+  --gift-muted: #a6a6ab;
+  --gift-faint: #2a2a2d;
+  --gift-lime: #c8f02e;
+  min-height: 100dvh;
+  background: var(--gift-ink);
+  color: var(--gift-text);
+  font-family: "PF Gift Sans", sans-serif;
+  display: flex;
+  justify-content: center;
+}
+.pf-gift *,
+.pf-gift *::before,
+.pf-gift *::after {
+  box-sizing: border-box;
+}
+.pf-gift button {
+  font-family: inherit;
+  cursor: pointer;
+}
+.pf-gift button:focus-visible,
+.pf-gift-track:focus-visible {
+  outline: 2px solid var(--gift-lime);
+  outline-offset: 4px;
+}
+
+/* Colonna da telefono anche su desktop: la sequenza è pensata mobile first. */
+.pf-gift-column {
+  width: 100%;
+  max-width: 440px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: max(20px, env(safe-area-inset-top)) 0
+    max(24px, env(safe-area-inset-bottom));
+}
+.pf-gift-header,
+.pf-gift-kicker,
+.pf-gift-offer,
+.pf-gift-continue {
+  margin-left: 24px;
+  margin-right: 24px;
+}
+
+.pf-gift-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+}
+.pf-gift-steps {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pf-gift-steps li {
+  width: 12px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--gift-faint);
+}
+.pf-gift-steps li.is-done {
+  background: var(--gift-lime);
+}
+.pf-gift-steps li.is-current {
+  width: 22px;
+  background: var(--gift-lime);
+}
+.pf-gift-skip {
+  min-height: 44px;
+  padding: 0 0 0 16px;
+  border: 0;
+  background: none;
+  color: var(--gift-muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.pf-gift-kicker {
+  margin-top: 28px;
+  margin-bottom: 20px;
+  color: var(--gift-lime);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.pf-gift-track {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  /* Il circolo attivo resta al centro, i vicini spuntano ai lati. */
+  --card: min(268px, 66vw);
+  padding: 0 calc((100% - var(--card)) / 2);
+  overscroll-behavior-x: contain;
+}
+.pf-gift-track::-webkit-scrollbar {
+  display: none;
+}
+.pf-gift-club {
+  position: relative;
+  flex: 0 0 var(--card);
+  aspect-ratio: 4 / 3;
+  scroll-snap-align: center;
+  border: 1px solid #ffffff14;
+  border-radius: 22px;
+  overflow: hidden;
+  background: #161618;
+  opacity: 0.45;
+  transform: scale(0.94);
+  transition:
+    opacity 0.4s ease,
+    transform 0.4s ease;
+}
+.pf-gift-club.is-active {
+  opacity: 1;
+  transform: none;
+}
+.pf-gift-photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pf-gift-photo-empty {
+  background: linear-gradient(160deg, #26262a, #121214);
+}
+/* Velo per leggere nome e città sopra la foto. */
+.pf-gift-club::after {
+  content: "";
+  position: absolute;
+  inset: 45% 0 0;
+  background: linear-gradient(transparent, #0b0b0ccc);
+}
+.pf-gift-club-id {
+  position: absolute;
+  z-index: 1;
+  left: 14px;
+  right: 14px;
+  bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.pf-gift-logo {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #ffffff;
+  object-fit: contain;
+  padding: 3px;
+}
+.pf-gift-logo-empty {
+  display: grid;
+  place-items: center;
+  color: var(--gift-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+.pf-gift-club-id div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+.pf-gift-club-id strong,
+.pf-gift-club-id span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pf-gift-club-id strong {
+  font-size: 16px;
+  font-weight: 600;
+}
+.pf-gift-club-id div span {
+  color: var(--gift-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.pf-gift-offer {
+  margin-top: 40px;
+  margin-bottom: 32px;
+}
+.pf-gift-offer h1 {
+  margin: 0;
+  font-size: clamp(34px, 10vw, 42px);
+  font-weight: 300;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+}
+.pf-gift-one {
+  display: block;
+  color: var(--gift-lime);
+  font-size: clamp(76px, 24vw, 104px);
+  font-weight: 300;
+  line-height: 1;
+  margin-bottom: 18px;
+}
+.pf-gift-offer p {
+  margin: 16px 0 0;
+  color: #d6d6d1;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.pf-gift-areas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 6px;
+  margin: 28px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.pf-gift-areas li {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.pf-gift-areas li span {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--gift-faint);
+}
+.pf-gift-areas li.is-real span {
+  background: var(--gift-lime);
+}
+.pf-gift-areas abbr {
+  color: var(--gift-muted);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+}
+.pf-gift-offer .pf-gift-count {
+  margin-top: 14px;
+  color: var(--gift-text);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.pf-gift-continue {
+  margin-top: auto;
+  min-height: 56px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--gift-lime);
+  color: var(--gift-ink);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.pf-gift-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-gift-club {
+    transition: none;
+  }
+}

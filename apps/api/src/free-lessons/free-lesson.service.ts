@@ -19,6 +19,7 @@ import {
 import { FeatureFlagsService } from '../features/feature-flags.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { loadFreeLessonSettings, syncCredits } from './free-lesson-config';
+import { loadGift } from './free-lesson-gift';
 import { lessonEligibility } from './free-lesson-rules';
 import { holdCalibration, releaseCalibration } from './lesson-hold';
 
@@ -88,6 +89,13 @@ export class FreeLessonService {
   private async requireEnabled(userId: string) {
     if (!(await this.flags.isEnabled('free_lesson', userId)))
       throw new ForbiddenException('La lezione gratuita non è attiva');
+  }
+
+  /** Regalo presentato dopo la registrazione; spento con il flag della lezione. */
+  async gift(userId: string) {
+    if (!(await this.flags.isEnabled('free_lesson', userId)))
+      return { enabled: false as const };
+    return loadGift(this.prisma, userId);
   }
 
   async view(userId: string) {
