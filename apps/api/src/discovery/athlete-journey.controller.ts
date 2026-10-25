@@ -9,6 +9,8 @@ import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { IsInt, IsOptional, IsString, MaxLength, Allow } from 'class-validator';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { AthleteJourneyService } from './athlete-journey.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { markWelcomeCompleted } from './welcome';
 import { SelectHorizonDto } from './scenarios/select-horizon.dto';
 import {
   CalibrationAnswersDto,
@@ -41,10 +43,21 @@ class DurationDto {
 @Controller('athlete-journey')
 @UseGuards(AuthenticatedGuard)
 export class AthleteJourneyController {
-  constructor(private readonly journey: AthleteJourneyService) {}
+  constructor(
+    private readonly journey: AthleteJourneyService,
+    private readonly prisma: PrismaService,
+  ) {}
   @ApiOperation({ summary: 'Stato del percorso PF4' })
   @Get()
   state(@Req() req: { user: { id: string } }) {
+    return this.journey.state(req.user.id);
+  }
+  @ApiOperation({
+    summary: 'Chiude la sequenza di benvenuto dopo la registrazione',
+  })
+  @Post('welcome')
+  async welcome(@Req() req: { user: { id: string } }) {
+    await markWelcomeCompleted(this.prisma, req.user.id);
     return this.journey.state(req.user.id);
   }
   @ApiOperation({ summary: 'Prepara assessment specialistico' })

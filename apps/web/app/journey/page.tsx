@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
+import { useEffect } from "react";
 import { PF4Shell } from "../start/pf4-shell";
-import { AssessmentIntro } from "./assessment-intro";
+import { WelcomeHome } from "./welcome-home";
 import { ConsentStep } from "./consent-step";
 import { ProvisionalEvaluation } from "./provisional-evaluation";
 import { CalibrationPanel } from "./calibration-panel";
@@ -31,6 +32,23 @@ export default function JourneyPage() {
     refresh,
   } = useJourney();
   const q = j?.questions?.[j.currentQuestion];
+  // Prima dell'assessment: la prima volta il benvenuto (foto, Spider, regalo,
+  // app), poi la home, che è anche dove riapre l'app installata.
+  const intro = j?.phase === "ASSESSMENT_INTRO";
+  const welcome = intro && !j.welcomeCompleted;
+  useEffect(() => {
+    if (welcome) window.location.replace("/benvenuto/foto");
+  }, [welcome]);
+  if (welcome) return null;
+  if (intro)
+    return (
+      <WelcomeHome
+        journey={j}
+        busy={busy}
+        error={error}
+        onStart={() => void action("start")}
+      />
+    );
   // L'intro PF5 e chiara, come /start; il questionario resta sullo stage scuro.
   const assessment = j?.phase === "ASSESSMENT" || j?.phase === "PROCESSING";
   return (
@@ -86,13 +104,6 @@ export default function JourneyPage() {
             busy={busy}
             onAccept={accept}
             askAdult={google}
-          />
-        )}
-        {j?.phase === "ASSESSMENT_INTRO" && (
-          <AssessmentIntro
-            journey={j}
-            busy={busy}
-            onStart={() => void action("start")}
           />
         )}
         {j?.phase === "ASSESSMENT_UNAVAILABLE" && (
