@@ -81,6 +81,8 @@ model User {
   createdAt DateTime @default(now())
   /// Dichiarazione di maggiore eta raccolta alla registrazione (Blueprint A2.6-A2.7).
   adultConfirmedAt DateTime?
+  /// Foto profilo facoltativa: data URL ridimensionata dal client (benvenuto 01).
+  avatarImage      String?
   /// Tester selezionati per i feature flag in beta.
   isBetaTester     Boolean   @default(false)
   /// Codice personale da condividere per il referral (A8.19).
