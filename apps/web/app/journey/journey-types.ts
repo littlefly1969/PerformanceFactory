@@ -128,6 +128,8 @@ export type Journey = {
     | "COMPLETE";
   nextStep: string;
   firstName?: string | null;
+  /** Sequenza di benvenuto (foto, Spider, regalo, app) già vista. */
+  welcomeCompleted?: boolean;
   /** Risveglio in-app dopo 10 giorni senza interazioni significative. */
   wakeup?: boolean;
   /** Prova mostrata all'atleta, calcolata dal backend. */

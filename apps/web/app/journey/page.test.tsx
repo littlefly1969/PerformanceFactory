@@ -1,10 +1,4 @@
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import JourneyPage from "./page";
@@ -245,6 +239,7 @@ describe("PF5 assessment intro and questions", () => {
     phase: "ASSESSMENT_INTRO",
     questions: [],
     firstName: "Stefano",
+    welcomeCompleted: true,
     trial: { days: 7, daysLeft: 5 },
     ...extra,
   });
@@ -260,36 +255,36 @@ describe("PF5 assessment intro and questions", () => {
     return requests;
   }
 
-  it.each([
-    [12, 4, "dodici domande, quattro minuti."],
-    [14, 5, "quattordici domande, cinque minuti."],
-    [16, 6, "sedici domande, sei minuti."],
-  ])(
-    "shows the backend count %i in the PF5 intro",
-    async (count, estimatedMinutes, text) => {
-      serve(journey({ count, estimatedMinutes }));
-      render(<JourneyPage />);
-      expect(
-        await screen.findByRole("heading", { name: "Ciao Stefano." }),
-      ).toBeInTheDocument();
-      expect(screen.getByText("Percorso gratuito")).toBeInTheDocument();
-      expect(screen.queryByText("5 giorni rimasti")).not.toBeInTheDocument();
-      // I numeri arrivano dal backend e sono scritti in lettere, come nel PF5.
-      expect(
-        screen.getByText(
-          `Prima di programmare qualcosa misuriamo dove sei: ${text}`,
-        ),
-      ).toBeInTheDocument();
-      const later = screen.getByRole("region", { name: "Cosa si attiva dopo" });
-      expect(within(later).getAllByText("Bloccato")).toHaveLength(3);
-      expect(later).toHaveTextContent("Scenari a 3, 6 e 12 mesi");
-      expect(later).not.toHaveTextContent("settimane");
-      expect(
-        screen.getByRole("button", { name: "Scopri la tua performance" }),
-      ).toBeEnabled();
-      cleanup();
-    },
-  );
+  it("sends a new athlete to the welcome sequence first", async () => {
+    const replace = vi.fn();
+    vi.stubGlobal("location", { ...window.location, replace });
+    serve(journey({ count: 12, welcomeCompleted: false }));
+    const { container } = render(<JourneyPage />);
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith("/benvenuto/foto"),
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("lands on the home after the welcome, with the backend count", async () => {
+    const requests = serve(journey({ count: 12 }));
+    render(<JourneyPage />);
+    expect(
+      await screen.findByRole("heading", { name: "Ciao Stefano." }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Profilo da iniziare")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: "Assessment al 0%" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/0 di 12 domande · poi un posto/),
+    ).toBeInTheDocument();
+    expect(screen.getByText("R —")).toBeInTheDocument();
+    // La foto del benvenuto, se c'è, va nell'avatar.
+    await waitFor(() =>
+      expect(requests).toContain("/api/athlete/profile/photo"),
+    );
+  });
 
   it("starts from the intro and shows the operational section first", async () => {
     const requests = serve(journey({ count: 14, estimatedMinutes: 5 }));
@@ -317,7 +312,7 @@ describe("PF5 assessment intro and questions", () => {
       }),
     );
     await userEvent.click(
-      await screen.findByRole("button", { name: "Scopri la tua performance" }),
+      await screen.findByRole("button", { name: "Inizia l’assessment" }),
     );
     expect(requests.at(-1)).toBe("/api/athlete-journey/start");
     expect(await screen.findByText("1 / 14 · Disponibilità")).toBeVisible();

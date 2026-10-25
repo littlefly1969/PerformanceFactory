@@ -12,6 +12,7 @@ import cookieParser from 'cookie-parser';
 import passport from 'passport';
 import { randomBytes } from 'crypto';
 import { setupOpenApi } from './common/openapi/openapi';
+import { refreshAthleteSession } from './auth/athlete-session';
 
 function warnIfAiPromptLogEnabled(isProduction: boolean) {
   if (process.env.AI_DEBUG_PROMPT_LOG !== 'true') {
@@ -184,6 +185,7 @@ async function bootstrap() {
     }),
   );
 
+  app.use(refreshAthleteSession);
   app.use(passport.initialize());
   app.use(passport.session());
 
