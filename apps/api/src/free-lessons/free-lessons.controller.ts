@@ -67,6 +67,7 @@ export class FreeLessonController {
       req.user.id,
       body.partnerId,
       body.shareWithCoach,
+      body.lessonId,
     );
   }
 

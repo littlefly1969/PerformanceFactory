@@ -35,12 +35,13 @@ import { loadActivePolicy } from './confidence-policy';
 import { lessonGate, settleCalibration } from './lesson-gate';
 import {
   generateMicroTest,
-  microTestQuestion,
+  microTestQuestions,
   microTestBalance,
   microTestsByArea,
   publicMicroTest,
   roundEvidence,
   skipMicroTest,
+  validRoundAnswers,
 } from './micro-test-step';
 
 const LEASE_MS = 10 * 60 * 1000;
@@ -183,7 +184,7 @@ export class CalibrationService {
                   label,
                   ...(exclusive ? { exclusive } : {}),
                 })),
-                ...publicMicroTest(q.microTest),
+                ...publicMicroTest(q, open.answersJson),
               }),
             ),
             answers: open.answersJson as Answers,
@@ -292,7 +293,7 @@ export class CalibrationService {
           : null;
       await this.prisma.$transaction(async (tx) => {
         const questions = test
-          ? [await microTestQuestion(tx, userId, test)]
+          ? await microTestQuestions(tx, userId, test)
           : result.questions;
         await tx.calibrationRound.create({
           data: {
@@ -348,11 +349,7 @@ export class CalibrationService {
     if (round.status === 'EVALUATED') return;
     if (round.status === 'EXPIRED')
       throw new ConflictException('La calibrazione è scaduta');
-    const questions = round.questionsJson as CalibrationQuestion[];
-    const invalid = questions.some(
-      (q) => !chosenOptions(q.options, answers[q.id], q.multiple),
-    );
-    if (invalid || Object.keys(answers).length !== questions.length)
+    if (!validRoundAnswers(round, answers))
       throw new BadRequestException('Rispondi a tutte le domande del round');
     await requireAiConsent(this.prisma, userId);
     const lease = await this.claim(userId);

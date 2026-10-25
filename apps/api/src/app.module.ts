@@ -29,6 +29,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { PartnersModule } from './partners/partners.module';
 import { FreeLessonsModule } from './free-lessons/free-lessons.module';
 import { EngagementModule } from './engagement/engagement.module';
+import { CoachingVideosModule } from './coaching-videos/coaching-videos.module';
 
 function buildThrottlerStorage() {
   const redisUrl = process.env.REDIS_URL;
@@ -91,6 +92,7 @@ function buildThrottlerStorage() {
     PartnersModule,
     FreeLessonsModule,
     EngagementModule,
+    CoachingVideosModule,
   ],
   controllers: [AppController],
   providers: [AppService],

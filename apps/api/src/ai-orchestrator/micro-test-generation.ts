@@ -5,6 +5,18 @@ import { resolveModel, resolveProvider } from './provider-config';
 import { AiProvider } from './proposal-provider-model';
 import { AssessmentEvaluationAnswer } from './assessment-evaluation-model';
 import { FIT_RANKING_RULE, FitRankingContext } from './fit-ranking-context';
+import {
+  MICRO_TEST_FORMATS,
+  MicroTestFormat,
+  MicroTestSituation,
+  SITUATIONS_SCHEMA,
+  VideoChoice,
+  situationRules,
+  situationsText,
+  stubSituations,
+  validateSituations,
+  validateVideo,
+} from './micro-test-situations';
 
 /** Tipo di prompt in AiPromptVersion per i micro-test su misura. */
 export const MICRO_TEST_PROMPT_TYPE = 'MICRO_TESTS';
@@ -17,6 +29,8 @@ export const DEFAULT_MICRO_TEST_PROMPT = [
   'Obiettivo informativo: dichiara in una frase quale lacuna del driver il test chiude. Indica la durata solo se si può stimare con buon senso.',
   'Istruzioni: cosa preparare, cosa fare passo per passo, cosa contare. Solo racchetta, palline, un muro o un campo, un cronometro: niente attrezzi particolari, niente salti ripetuti, carichi, sprint massimali o altri rischi.',
   'Esiti: fasce del risultato contato, mutuamente esclusive, in ordine crescente, che coprono tutti i casi. Lo score di ogni esito è il livello reale che quella fascia indica sulla scala ricevuta, dal più basso al più alto: non premiare l’esito descritto meglio.',
+  'Situazioni di gioco: quando la lacuna riguarda come l’atleta legge il gioco o cosa sceglie di fare (tattica, posizionamento, gestione del punto), al posto della prova pratica proponi tre situazioni reali, ciascuna con una sola risposta corretta e la spiegazione del coach per ogni risposta: l’atleta impara mentre ci dice come ragiona.',
+  'Video: dopo il test l’atleta guarda un video di approfondimento. Scegli dall’archivio quello più utile per il driver e per gli errori possibili; se l’archivio non ha un video adatto, descrivi con un titolo il video che servirebbe.',
   'Non ripetere micro-test già proposti né esercizi equivalenti.',
   'Scrivi in italiano, con il tu, frasi brevi e concrete. Niente diagnosi mediche, niente dati personali, niente promesse di risultato.',
 ].join('\n');
@@ -54,6 +68,8 @@ export type MicroTestInput = {
   reason?: string;
   /** Risposte del profilo che dichiarano dolori, infortuni o limitazioni. */
   declaredLimitations?: AssessmentEvaluationAnswer[];
+  /** Archivio dei video attivi per il driver, curato dal back office. */
+  videos?: { id: string; title: string; description: string }[];
 };
 
 /** Impegno fisico dichiarato dall'AI: mai alto, mai moderato con limitazioni. */
@@ -68,7 +84,13 @@ export type GeneratedMicroTest = {
   durationMinutes: number | null;
   physicalLoad: PhysicalLoad;
   safetyNotes: string;
+  /** Esiti della prova pratica; vuoto nelle situazioni di gioco. */
   options: { value: string; label: string; score: number }[];
+  format: MicroTestFormat;
+  /** Situazioni di gioco; vuoto nella prova pratica. */
+  situations: MicroTestSituation[];
+  /** Video da guardare dopo il test, scelto dall'AI. */
+  video: VideoChoice | null;
 };
 
 /**
@@ -111,7 +133,8 @@ function formatRules(input: MicroTestInput) {
     `- physicalLoad: NONE, LOW oppure MODERATE${input.declaredLimitations?.length ? '; con le limitazioni dichiarate solo NONE o LOW' : ''}. safetyNotes: condizioni di sicurezza in massimo ${l.safetyNotes} caratteri, obbligatorie se physicalLoad non è NONE, altrimenti stringa vuota.`,
     '- niente diagnosi, terapie, farmaci, integratori, diete, prove massimali, sprint o salti ripetuti. Questa regola prevale sulle istruzioni sopra.',
     '- l’esito lo riporta l’atleta: descrivi fasce che può contare da solo, senza strumenti di misura.',
-    `- options: da ${l.minOptions} a ${l.maxOptions} esiti in ordine crescente, label di massimo ${l.option} caratteri, score crescenti tra ${input.scale.minScore} e ${input.scale.maxScore}.`,
+    `- options (solo PRACTICAL): da ${l.minOptions} a ${l.maxOptions} esiti in ordine crescente, label di massimo ${l.option} caratteri, score crescenti tra ${input.scale.minScore} e ${input.scale.maxScore}.`,
+    situationRules(input),
     FIT_RANKING_RULE,
   ].join('\n');
 }
@@ -135,8 +158,12 @@ const schema = {
           'physicalLoad',
           'safetyNotes',
           'options',
+          'format',
+          'situations',
+          'video',
         ],
         properties: {
+          ...SITUATIONS_SCHEMA,
           areaId: { type: 'string' },
           title: { type: 'string' },
           instructions: { type: 'string' },
@@ -174,6 +201,7 @@ export function buildMicroTestPrompt(input: MicroTestInput) {
       declaredLimitations: input.declaredLimitations ?? [],
       drivers: input.targets,
       proposedTitles: input.proposedTitles,
+      videos: input.videos ?? [],
     },
   };
 }
@@ -225,24 +253,55 @@ export async function generateMicroTests(
   };
 }
 
-/** Stub deterministico per sviluppo e test: un conteggio su 10 per driver. */
+/**
+ * Stub deterministico per sviluppo e test: un conteggio su 10 per driver, e
+ * dal secondo micro-test in poi alterna le situazioni di gioco.
+ */
 export function stubMicroTests(input: MicroTestInput) {
   const { minScore, maxScore } = input.scale;
   const step = (maxScore - minScore) / 3;
+  const video = input.videos?.[0];
+  const situational = input.proposedTitles.length % 2 === 1;
   return {
-    tests: input.targets.map((target) => ({
-      areaId: target.areaId,
-      title: `${target.name}: prova ${input.proposedTitles.length + 1}`,
-      instructions: `Ripeti 10 volte l'esercizio su ${target.name.toLowerCase()} e conta quante riescono.`,
-      informationGoal: `Confermare con un conteggio il livello dichiarato su ${target.name.toLowerCase()}.`,
-      durationMinutes: 10,
-      physicalLoad: 'LOW',
-      safetyNotes: 'Fermati se senti fastidio.',
-      options: ['0-3', '4-6', '7-8', '9-10'].map((label, k) => ({
-        label: `${label} su 10`,
-        score: Math.round(minScore + step * k),
-      })),
-    })),
+    tests: input.targets.map((target) =>
+      situational
+        ? {
+            areaId: target.areaId,
+            title: `${target.name}: situazioni ${input.proposedTitles.length + 1}`,
+            instructions:
+              'Tre situazioni di gioco reali. Rispondi come faresti in campo, poi ti spiego perché il coach farebbe diversamente.',
+            informationGoal: `Capire come leggi il gioco su ${target.name.toLowerCase()}.`,
+            durationMinutes: 2,
+            physicalLoad: 'NONE',
+            safetyNotes: '',
+            options: [],
+            format: 'SITUATIONAL',
+            situations: stubSituations(input, target.name),
+            video: {
+              videoId: video?.id ?? null,
+              title: video?.title ?? `${target.name}: la lezione di un coach`,
+            },
+          }
+        : {
+            areaId: target.areaId,
+            title: `${target.name}: prova ${input.proposedTitles.length + 1}`,
+            instructions: `Ripeti 10 volte l'esercizio su ${target.name.toLowerCase()} e conta quante riescono.`,
+            informationGoal: `Confermare con un conteggio il livello dichiarato su ${target.name.toLowerCase()}.`,
+            durationMinutes: 10,
+            physicalLoad: 'LOW',
+            safetyNotes: 'Fermati se senti fastidio.',
+            options: ['0-3', '4-6', '7-8', '9-10'].map((label, k) => ({
+              label: `${label} su 10`,
+              score: Math.round(minScore + step * k),
+            })),
+            format: 'PRACTICAL',
+            situations: [],
+            video: {
+              videoId: video?.id ?? null,
+              title: video?.title ?? `${target.name}: come si allena`,
+            },
+          },
+    ),
   };
 }
 
@@ -267,6 +326,7 @@ export function validateMicroTests(
   const targets = new Set(input.targets.map((t) => t.areaId));
   const seen = new Set<string>();
   const titles = new Set(input.proposedTitles.map(normalize));
+  const catalog = new Set((input.videos ?? []).map((v) => v.id));
   const tests: GeneratedMicroTest[] = [];
   items.forEach((item, index) => {
     const n = index + 1;
@@ -295,7 +355,24 @@ export function validateMicroTests(
         duration > l.maxDurationMinutes)
     )
       problems.push(`durata non valida (${n})`);
+    // Senza forma dichiarata vale la prova pratica, come nei test storici.
+    const format: MicroTestFormat =
+      entry.format === undefined
+        ? 'PRACTICAL'
+        : (MICRO_TEST_FORMATS.find((f) => f === entry.format) ?? 'PRACTICAL');
+    if (
+      entry.format !== undefined &&
+      !MICRO_TEST_FORMATS.includes(entry.format as MicroTestFormat)
+    )
+      problems.push(`forma del micro-test non valida (${n})`);
+    const situational = format === 'SITUATIONAL';
+    const situations = situational
+      ? validateSituations(entry.situations, input, catalog, problems, n)
+      : [];
+    const video = validateVideo(entry.video, catalog, problems, String(n));
     const physicalLoad = PHYSICAL_LOADS.find((p) => p === entry.physicalLoad);
+    if (situational && physicalLoad !== 'NONE')
+      problems.push(`le situazioni di gioco non hanno impegno fisico (${n})`);
     const safetyNotes =
       typeof entry.safetyNotes === 'string' ? entry.safetyNotes.trim() : '';
     if (!physicalLoad) problems.push(`impegno fisico non valido (${n})`);
@@ -306,12 +383,22 @@ export function validateMicroTests(
     if (safetyNotes.length > l.safetyNotes)
       problems.push(`condizioni di sicurezza troppo lunghe (${n})`);
     const text = normalize(
-      [title, instructions, informationGoal, safetyNotes].join(' '),
+      [
+        title,
+        instructions,
+        informationGoal,
+        safetyNotes,
+        situationsText(situations),
+      ].join(' '),
     );
     const unsafe = UNSAFE_MICRO_TEST_TERMS.find((term) => text.includes(term));
     if (unsafe) problems.push(`contenuto non sicuro: ${unsafe} (${n})`);
-    const options = Array.isArray(entry.options) ? entry.options : [];
-    if (options.length < l.minOptions || options.length > l.maxOptions)
+    const options =
+      !situational && Array.isArray(entry.options) ? entry.options : [];
+    if (
+      !situational &&
+      (options.length < l.minOptions || options.length > l.maxOptions)
+    )
       problems.push(`numero di esiti non valido (${n})`);
     const parsed = options.map((option, k) => {
       const o = option as Partial<Record<string, unknown>>;
@@ -340,6 +427,9 @@ export function validateMicroTests(
       physicalLoad: physicalLoad ?? 'NONE',
       safetyNotes,
       options: parsed,
+      format,
+      situations,
+      video,
     });
   });
   for (const areaId of targets)

@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import {
   BadGatewayException,
   BadRequestException,
+  ConflictException,
   NotFoundException,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
@@ -13,6 +14,7 @@ import { PrismaModule } from '../../src/prisma/prisma.module';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { DiscoveryModule } from '../../src/discovery/discovery.module';
 import { CalibrationService } from '../../src/discovery/calibration/calibration.service';
+import { MicroTestSessionService } from '../../src/discovery/calibration/micro-test-session';
 import { FeatureFlagsService } from '../../src/features/feature-flags.service';
 import { AiProposalProviderService } from '../../src/ai-orchestrator/proposal-provider.service';
 import { CalibrationQuestionsInput } from '../../src/ai-orchestrator/calibration-questions';
@@ -32,6 +34,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 describe('Micro-test engine step with PostgreSQL', () => {
   let prisma: PrismaService;
   let calibration: CalibrationService;
+  let session: MicroTestSessionService;
   let flags: FeatureFlagsService;
   let ai: AiProposalProviderService;
   let stepSpy: jest.SpiedFunction<
@@ -176,6 +179,7 @@ describe('Micro-test engine step with PostgreSQL', () => {
     await module.init();
     prisma = module.get(PrismaService);
     calibration = module.get(CalibrationService);
+    session = module.get(MicroTestSessionService);
     flags = module.get(FeatureFlagsService);
     ai = module.get(AiProposalProviderService);
     const step = ai.generateCalibrationQuestions.bind(ai);
@@ -202,6 +206,9 @@ describe('Micro-test engine step with PostgreSQL', () => {
   });
 
   afterAll(async () => {
+    await prisma.coachingVideo.deleteMany({
+      where: { title: { startsWith: 'Archivio di prova' } },
+    });
     await prisma.featureFlagChange.deleteMany({
       where: { actorId: { in: users } },
     });
@@ -256,6 +263,7 @@ describe('Micro-test engine step with PostgreSQL', () => {
     expect(view!.round).toMatchObject({ action: 'PROPOSE_MICRO_TEST' });
     const shown = view!.round!.questions[0];
     expect(shown.microTest).toEqual({
+      title: question.text,
       instructions: expect.any(String) as string,
       durationMinutes: 10,
       safetyNotes: expect.any(String) as string,
@@ -341,5 +349,81 @@ describe('Micro-test engine step with PostgreSQL', () => {
     await expect(
       calibration.skipMicroTest(await athlete(), round.id),
     ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('explains each game situation once answered, keeps the answer and closes with the result and the video', async () => {
+    const id = await athlete();
+    const video = await prisma.coachingVideo.create({
+      data: { title: 'Archivio di prova: la vibora', areaId: AREAS[0] },
+    });
+    proposeMicroTest();
+    // Dal secondo micro-test lo stub propone le situazioni di gioco.
+    const generate = testSpy.getMockImplementation()!;
+    testSpy.mockImplementationOnce((input) =>
+      generate({ ...input, proposedTitles: ['Prova precedente'] }),
+    );
+    await calibration.openRound(id);
+    expect(tests.at(-1)!.videos).toContainEqual(
+      expect.objectContaining({ id: video.id }),
+    );
+    const round = await openRound(id);
+    const questions = round.questionsJson as { id: string }[];
+    expect(questions.map((q) => q.id)).toEqual(['t1', 't2', 't3']);
+
+    // Prima della risposta l'atleta non vede la corretta.
+    const view = await calibration.view(id);
+    expect(view!.round!.questions[0].microTest).toMatchObject({
+      format: 'SITUATIONAL',
+      situation: { index: 0, total: 3, label: 'Uscita dal fondo' },
+    });
+    expect(JSON.stringify(view!.round)).not.toMatch(/correct|feedback/);
+
+    await expect(
+      session.answerSituation(id, round.id, 't1', 'o1'),
+    ).resolves.toMatchObject({ correct: false, correctValue: 'o2' });
+    // Stessa risposta: stessa spiegazione; un'altra risposta non si accetta.
+    await expect(
+      session.answerSituation(id, round.id, 't1', 'o1'),
+    ).resolves.toMatchObject({ correct: false });
+    await expect(
+      session.answerSituation(id, round.id, 't1', 'o2'),
+    ).rejects.toBeInstanceOf(ConflictException);
+    await expect(
+      session.answerSituation(await athlete(), round.id, 't1', 'o1'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(
+      (await calibration.view(id))!.round!.questions[0].microTest,
+    ).toMatchObject({ feedback: { value: 'o1', correctValue: 'o2' } });
+    await expect(
+      calibration.answerRound(id, round.id, { t1: 'o2', t2: 'o2', t3: 'o2' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(await session.result(id, round.id)).toMatchObject({
+      status: 'OPEN',
+      format: 'SITUATIONAL',
+    });
+    await calibration.answerRound(id, round.id, {
+      t1: 'o1',
+      t2: 'o2',
+      t3: 'o2',
+    });
+    const evidence = evaluations
+      .at(-1)!
+      .drivers.find((d) => d.areaId === AREAS[0])!
+      .answers.filter((a) => a.source === 'MICRO_TEST');
+    expect(evidence.map((e) => e.answer)).toEqual([
+      expect.stringContaining('(risposta non corretta)'),
+      expect.stringContaining('(risposta corretta)'),
+      expect.stringContaining('(risposta corretta)'),
+    ]);
+    const result = await session.result(id, round.id);
+    expect(result).toMatchObject({
+      status: 'EVALUATED',
+      correct: 2,
+      total: 3,
+      confidence: { before: 30 },
+      // La situazione sbagliata porta il suo video; l'archivio non lo ha ancora.
+      video: { title: 'Uscita dal fondo: come lo gioca un coach', url: null },
+    });
   });
 });
