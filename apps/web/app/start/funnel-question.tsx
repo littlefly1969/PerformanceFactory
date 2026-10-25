@@ -4,7 +4,7 @@ import { DiscoveryQuestionRenderer } from "./question-renderer";
 import { NumberGauge } from "./number-gauge";
 
 /** Illustrazione vettoriale del riquadro scuro: un campo in prospettiva. */
-function CourtIllustration() {
+export function CourtIllustration() {
   return (
     <svg className="pf4-illustration" viewBox="0 0 320 150" aria-hidden="true">
       <path d="M60 140 110 22h100l50 118Z" />

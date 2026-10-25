@@ -9,8 +9,7 @@ import { FreeLessonPanel } from "./free-lesson-panel";
 import { ScenariosReveal } from "./scenarios-reveal";
 import { DurationStep, PerformanceResult } from "./performance-result";
 import { useJourney } from "./use-journey";
-import { CardNumberStep } from "./card-number-step";
-import { MultiChoiceStep } from "./choice-options";
+import { AssessmentQuestion } from "./assessment-question";
 import { QuestionsPreparing } from "./questions-preparing";
 import { FitRankingEditor } from "../components/fit-ranking-editor";
 import "./journey.css";
@@ -33,10 +32,13 @@ export default function JourneyPage() {
   const q = j?.questions?.[j.currentQuestion];
   // L'intro PF5 e chiara, come /start; il questionario resta sullo stage scuro.
   const assessment = j?.phase === "ASSESSMENT" || j?.phase === "PROCESSING";
+  // Le domande (disponibilità e classifica FIT per prime) hanno il look del funnel.
+  const asking = j?.phase === "ASSESSMENT" && !j.assessmentComplete && !!q;
   return (
-    <div className={assessment ? "pf4-assessment" : undefined}>
+    <div className={assessment && !asking ? "pf4-assessment" : undefined}>
       <PF4Shell
         showLogout
+        funnel={asking ? { tone: "dark" } : undefined}
         label={
           assessment
             ? `Assessment · ${j?.count ?? ""} domande`
@@ -107,50 +109,16 @@ export default function JourneyPage() {
             </button>
           </section>
         )}
-        {j?.phase === "ASSESSMENT" && !j.assessmentComplete && q && (
-          <section className="pf4-body pf4-question" key={q.id}>
-            <span className="pf4-kicker">
-              {j.currentQuestion + 1} / {j.count} · {q.section ?? q.areaName}
-            </span>
-            <h1>{q.title}</h1>
-            {q.inputType === "TEXT" ? (
-              <CardNumberStep
-                key={q.id}
-                initial={String(j.answers[q.id] ?? "")}
-                busy={busy}
-                onSubmit={(value) =>
-                  action("answer", { questionId: q.id, value })
-                }
-              />
-            ) : q.multiple ? (
-              <MultiChoiceStep
-                key={q.id}
-                options={q.options}
-                initial={j.answers[q.id]}
-                busy={busy}
-                onSubmit={(value) =>
-                  action("answer", { questionId: q.id, value })
-                }
-              />
-            ) : (
-              <div className="pf4-options">
-                {q.options.map((o) => (
-                  <button
-                    disabled={busy}
-                    aria-pressed={String(j.answers[q.id]) === String(o.value)}
-                    className={`pf4-option ${String(j.answers[q.id]) === String(o.value) ? "is-selected" : ""}`}
-                    key={String(o.value)}
-                    onClick={() =>
-                      action("answer", { questionId: q.id, value: o.value })
-                    }
-                  >
-                    <span>{o.label}</span>
-                    <span className="pf4-dot" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </section>
+        {asking && q && (
+          <AssessmentQuestion
+            key={q.id}
+            question={q}
+            position={j.currentQuestion + 1}
+            count={j.count}
+            answer={j.answers[q.id]}
+            busy={busy}
+            onAnswer={(value) => action("answer", { questionId: q.id, value })}
+          />
         )}
         {j?.phase === "ASSESSMENT" && j.questionsPending && (
           <QuestionsPreparing
