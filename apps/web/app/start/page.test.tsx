@@ -279,9 +279,7 @@ describe("PF5 pre-account experience", () => {
     start("processing");
     await act(() => vi.advanceTimersByTimeAsync(0));
     const phase = () => screen.getByRole("heading", { level: 1 });
-    const header = () => document.querySelector(".pf4-header");
     expect(phase()).toHaveTextContent("Raccogliamo le tue risposte…");
-    expect(header()).toHaveTextContent("Misure");
     await act(() => vi.advanceTimersByTimeAsync(1300));
     expect(phase()).toHaveTextContent(
       "Mettiamo in ordine i dati che ci hai dato…",
@@ -300,7 +298,6 @@ describe("PF5 pre-account experience", () => {
     expect(
       screen.getByRole("button", { name: "Crea il tuo account" }),
     ).toBeInTheDocument();
-    expect(header()).toHaveTextContent("Misure");
   });
 
   it("separates the free start from the athlete constraints", async () => {
@@ -308,19 +305,13 @@ describe("PF5 pre-account experience", () => {
     const offer = await screen.findByRole("complementary", {
       name: "Come si parte",
     });
-    expect(within(offer).getByText("Si parte gratis")).toBeInTheDocument();
-    // Gerarchia PF5: numero e etichetta sono elementi distinti.
-    expect(within(offer).getByText("0 €")).toHaveClass("pf4-offer-days");
-    expect(within(offer).getByText("per iniziare")).toHaveClass(
-      "pf4-offer-label",
-    );
-    // Blueprint: nessuna prova a giorni e nessun programma prima della scelta.
-    expect(offer).not.toHaveTextContent(/giorni gratis|Tutto sbloccato/);
+    expect(within(offer).getByText("Fase gratuita")).toBeInTheDocument();
     expect(offer).toHaveTextContent(
-      "Il programma lo scegli dopo, quando vedi dove puoi arrivare.",
+      "Gratis finché non ti conosciamo abbastanza.",
     );
-    expect(within(offer).getByText("Nessuna carta")).toBeInTheDocument();
-    expect(within(offer).getByText("Nessun impegno")).toBeInTheDocument();
+    // Blueprint: nessuna carta, gratis fino alla chiusura della calibrazione.
+    expect(offer).toHaveTextContent(/senza carta/);
+    expect(offer).not.toHaveTextContent(/Tutto sbloccato/);
     // L'offerta e marketing: non riporta le risposte dell'atleta.
     expect(offer).not.toHaveTextContent("Aumentare la resistenza");
     expect(offer).not.toHaveTextContent("Padel");
@@ -329,7 +320,7 @@ describe("PF5 pre-account experience", () => {
       "Questi sono i tuoi vincoli.",
     );
     expect(
-      screen.getByText(/Ora serve la misura: crea l’account/),
+      screen.getByText(/Ora crea l’account: il tuo profilo parte da qui/),
     ).toBeInTheDocument();
     // 90 kg / 1,80 m²: BMI derivato dalle misure dichiarate.
     expect(screen.getByText("27.8")).toBeInTheDocument();
@@ -348,6 +339,56 @@ describe("PF5 pre-account experience", () => {
     expect(
       screen.getByRole("heading", { name: "Crea il tuo account." }),
     ).toBeInTheDocument();
+  });
+
+  it("asks height and weight on one screen and confirms the proposed values", async () => {
+    mockConfig(pf5);
+    sessionStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        version: pf5.version,
+        // Una bozza ferma sul peso riprende dalla schermata comune.
+        currentStep: "weight",
+        goalId: "endurance",
+        answers: { experience: "mid" },
+      }),
+    );
+    render(<StartPage />);
+    await screen.findByRole("heading", {
+      name: "Quanto sei alto e quanto pesi?",
+    });
+    expect(screen.getByRole("progressbar")).toHaveAttribute(
+      "aria-valuemax",
+      "3",
+    );
+    expect(document.querySelector(".pf4-counter")).toHaveTextContent("03 / 03");
+    const figure = () => document.querySelector(".pf4-figure")!;
+    const girth = figure().getAttribute("data-girth");
+    fireEvent.change(screen.getByRole("slider", { name: "Peso — cursore" }), {
+      target: { value: "110" },
+    });
+    expect(figure().getAttribute("data-girth")).not.toBe(girth);
+    expect(screen.getByLabelText("Altezza")).toHaveValue(175);
+    await userEvent.click(screen.getByRole("button", { name: "Continua" }));
+    await screen.findByRole("heading", {
+      name: "Raccogliamo le tue risposte…",
+    });
+    expect(JSON.parse(sessionStorage.getItem(DRAFT_KEY)!).answers).toEqual({
+      experience: "mid",
+      height: 175,
+      weight: 110,
+    });
+  });
+
+  it("keeps Continua off while a measure is cleared", async () => {
+    start("height");
+    const height = await screen.findByLabelText("Altezza");
+    expect(height).toHaveValue(180);
+    fireEvent.change(height, { target: { value: "" } });
+    expect(height).toHaveValue(null);
+    expect(screen.getByRole("button", { name: "Continua" })).toBeDisabled();
+    fireEvent.change(height, { target: { value: "500" } });
+    expect(screen.getByRole("button", { name: "Continua" })).toBeDisabled();
   });
 
   it("omits the BMI when height or weight are not part of the path", async () => {

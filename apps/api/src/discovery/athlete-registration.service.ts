@@ -15,6 +15,12 @@ import { PartnersService } from '../partners/partners.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { AttributionInput } from '../partners/attribution';
 
+type ConsentAudit = {
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  source: string;
+};
+
 export const ADULT_REQUIRED_MESSAGE =
   'Performance Factory è riservata ai maggiorenni: conferma di avere almeno 18 anni.';
 
@@ -28,8 +34,24 @@ export class AthleteRegistrationService {
     private readonly analytics: AnalyticsService,
   ) {}
 
-  async register(input: RegisterAthleteDto) {
-    return this.createAthlete(input);
+  async register(
+    input: RegisterAthleteDto,
+    audit: { ipAddress?: string | null; userAgent?: string | null } = {},
+  ) {
+    // Consensi dati nel modulo: verificati sui documenti correnti prima di
+    // ogni scrittura. Senza, si danno dopo l'account (passo CONSENTS).
+    const given =
+      input.privacyAccepted !== undefined ||
+      input.aiAssistantAccepted !== undefined ||
+      input.acceptedDocuments !== undefined;
+    const consents = given
+      ? {
+          documents: await this.consents.assertAcceptedCurrentDocuments(input),
+          marketingAccepted: input.marketingAccepted,
+          audit: { ...audit, source: 'register' },
+        }
+      : undefined;
+    return this.createAthlete(input, undefined, consents);
   }
 
   async createAthlete(
@@ -51,7 +73,19 @@ export class AthleteRegistrationService {
       marketingAccepted?: boolean;
       audit: { ipAddress?: string | null; userAgent?: string | null };
     },
+    consents?: {
+      documents: Awaited<ReturnType<ConsentsService['requiredDocuments']>>;
+      marketingAccepted?: boolean;
+      audit: ConsentAudit;
+    },
   ) {
+    const accepted = google
+      ? {
+          documents: google.documents,
+          marketingAccepted: google.marketingAccepted,
+          audit: { ...google.audit, source: 'google_register' },
+        }
+      : consents;
     // Age gate MVP 18+ (A2-D01): dichiarazione esplicita, prima di ogni scrittura.
     if (input.adultConfirmed !== true)
       throw new BadRequestException(ADULT_REQUIRED_MESSAGE);
@@ -144,17 +178,21 @@ export class AthleteRegistrationService {
               createdAt: true,
             },
           });
-          if (google) {
-            for (const document of google.documents)
-              await this.consents.createConsent(tx, created.id, document, {
-                ...google.audit,
-                source: 'google_register',
-              });
-            if (google.marketingAccepted === true)
-              await this.consents.setMarketing(tx, created.id, true, {
-                ...google.audit,
-                source: 'google_register',
-              });
+          if (accepted) {
+            for (const document of accepted.documents)
+              await this.consents.createConsent(
+                tx,
+                created.id,
+                document,
+                accepted.audit,
+              );
+            if (accepted.marketingAccepted === true)
+              await this.consents.setMarketing(
+                tx,
+                created.id,
+                true,
+                accepted.audit,
+              );
           }
           const origin = await this.partners.recordAttribution(
             tx,
@@ -180,7 +218,8 @@ export class AthleteRegistrationService {
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
-      return { user, journey: { phase: 'CONSENTS', nextStep: 'CONSENTS' } };
+      const nextStep = accepted ? 'ASSESSMENT_INTRO' : 'CONSENTS';
+      return { user, journey: { phase: nextStep, nextStep } };
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&

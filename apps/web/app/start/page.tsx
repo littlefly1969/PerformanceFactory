@@ -22,7 +22,9 @@ import {
   restoreDraft,
   setAnswer,
 } from "./discovery-state";
-import { DiscoveryQuestionRenderer } from "./question-renderer";
+import { FunnelQuestion } from "./funnel-question";
+import { BodyMeasures } from "./body-measures";
+import { measurePair, screenIds } from "./funnel-screens";
 import { PF4Shell } from "./pf4-shell";
 import { Registration } from "./registration";
 import { pruneHiddenAnswers, visibleQuestions } from "./discovery-branches";
@@ -43,7 +45,20 @@ const SAVE_DELAY_MS = 800;
 
 /** Primo passaggio dopo l'intro: le campagne entrano dritte nel quiz (AT-01). */
 const firstStep = (config: DiscoveryConfiguration, draft: DiscoveryDraft) =>
-  visibleQuestions(config.questions, draft)[0]?.id ?? "processing";
+  screenIds(visibleQuestions(config.questions, draft))[0] ?? "processing";
+
+/** La schermata dopo `step`, ricalcolata sui rami visibili ora. */
+const nextScreen = (
+  config: DiscoveryConfiguration,
+  draft: DiscoveryDraft,
+  step: string,
+) => {
+  const screens = [
+    ...screenIds(visibleQuestions(config.questions, draft)),
+    "processing",
+  ];
+  return screens[screens.indexOf(step) + 1];
+};
 
 /**
  * Crea la bozza sul server lasciando l'intro e congela la versione del quiz.
@@ -199,7 +214,7 @@ export default function StartPage() {
   };
   if (!config || !draft)
     return (
-      <PF4Shell>
+      <PF4Shell funnel={{ tone: "light" }}>
         <div className="pf4-body">
           <h1>{error || "Prepariamo il tuo percorso…"}</h1>
           {error && (
@@ -214,15 +229,14 @@ export default function StartPage() {
       </PF4Shell>
     );
   const questions = visibleQuestions(config.questions, draft);
-  const steps = [
-    "intro",
-    ...questions.map((q) => q.id),
-    "processing",
-    "result",
-    "registration",
-  ];
+  const screens = screenIds(questions);
+  const pair = measurePair(questions);
+  const steps = ["intro", ...screens, "processing", "result", "registration"];
   const index = steps.indexOf(draft.currentStep);
-  const question = questions.find((q) => q.id === draft.currentStep);
+  const measures = pair?.screenId === draft.currentStep ? pair : undefined;
+  const question = measures
+    ? undefined
+    : questions.find((q) => q.id === draft.currentStep);
   const move = (delta: number) => {
     timers.current.forEach(clearTimeout);
     timers.current.clear();
@@ -230,18 +244,20 @@ export default function StartPage() {
   };
   const autoAdvance =
     question && ["single_choice", "boolean"].includes(question.type);
-  const label = question
-    ? `${String(index).padStart(2, "0")} / ${String(questions.length).padStart(2, "0")} · Discovery`
-    : draft.currentStep === "registration"
-      ? "Il tuo percorso"
-      : ["processing", "result"].includes(draft.currentStep)
-        ? "Misure"
-        : "Performance Factory";
+  const onScreen = question || measures;
+  const pad = (n: number) => String(n).padStart(2, "0");
   return (
     <PF4Shell
-      label={label}
-      progress={Math.min(index, questions.length)}
-      total={index > 0 ? questions.length : 0}
+      funnel={{
+        tone: question || draft.currentStep === "intro" ? "dark" : "light",
+        counter: onScreen
+          ? `${pad(index)} / ${pad(screens.length)}`
+          : undefined,
+      }}
+      progress={Math.min(index, screens.length)}
+      total={
+        index > 0 && draft.currentStep !== "registration" ? screens.length : 0
+      }
       onBack={
         index > 0 && !registering
           ? () => move(draft.currentStep === "result" ? -2 : -1)
@@ -256,18 +272,6 @@ export default function StartPage() {
       )}
       {draft.currentStep === "intro" && (
         <div className="pf4-intro pf4-body">
-          <svg
-            aria-label="Performance Factory"
-            role="img"
-            viewBox="0 0 50.762 42.004"
-            width="54"
-            height="45"
-          >
-            <path
-              d="M6.21 42 9.518 25.148H36.27c.782 0 1.454-.553 1.606-1.32l2.407-12.274c.136-.704-.403-1.356-1.119-1.356H0L1.174 4.221A5.23 5.23 0 0 1 6.31 0h34.272c6.405 0 11.22 5.84 9.987 12.119L47.63 27.094a10.247 10.247 0 0 1-10.042 8.255H17.91l-1.307 6.655Z"
-              fill="currentColor"
-            />
-          </svg>
           <p className="pf4-kicker">Performance Factory</p>
           <h1 ref={heading} tabIndex={-1}>
             Eleva la tua performance.
@@ -299,67 +303,94 @@ export default function StartPage() {
         </div>
       )}
       {question && (
-        <>
-          <section className="pf4-body pf4-question" key={question.id}>
-            <h1 ref={heading} tabIndex={-1}>
-              {question.title}
-            </h1>
-            {question.description && <p>{question.description}</p>}
-            {question.type === "multi_choice" && (
-              <p>Puoi scegliere più risposte.</p>
-            )}
-            <DiscoveryQuestionRenderer
-              question={question}
-              options={optionsFor(question, draft)}
-              value={questionValue(draft, question)}
-              onChange={(value) => {
-                const updated = pruneHiddenAnswers(
-                  config.questions,
-                  setAnswer(draft, question, value),
+        <FunnelQuestion
+          key={question.id}
+          question={question}
+          options={optionsFor(question, draft)}
+          value={questionValue(draft, question)}
+          headingRef={heading}
+          onChange={(value) => {
+            const updated = pruneHiddenAnswers(
+              config.questions,
+              setAnswer(draft, question, value),
+            );
+            setDraft(updated);
+            timers.current.forEach(clearTimeout);
+            timers.current.clear();
+            if (autoAdvance && answerValid(question, updated)) {
+              const timer = setTimeout(() => {
+                timers.current.delete(timer);
+                setDraft((current) =>
+                  current?.currentStep === question.id
+                    ? {
+                        ...current,
+                        currentStep: nextScreen(config, current, question.id),
+                      }
+                    : current,
                 );
-                setDraft(updated);
-                timers.current.forEach(clearTimeout);
-                timers.current.clear();
-                if (autoAdvance && answerValid(question, updated)) {
-                  const timer = setTimeout(() => {
-                    timers.current.delete(timer);
-                    setDraft((current) =>
-                      current?.currentStep === question.id
-                        ? {
-                            ...current,
-                            currentStep: [
-                              ...visibleQuestions(
-                                config.questions,
-                                current,
-                              ).map((q) => q.id),
-                              "processing",
-                            ][
-                              visibleQuestions(
-                                config.questions,
-                                current,
-                              ).findIndex((q) => q.id === question.id) + 1
-                            ],
-                          }
-                        : current,
-                    );
-                  }, 240);
-                  timers.current.add(timer);
-                }
-              }}
-            />
-          </section>
-          {(!autoAdvance || !question.required) && (
-            <footer className="pf4-footer">
-              <button
-                className="pf4-cta"
-                disabled={!answerValid(question, draft)}
-                onClick={() => move(1)}
-              >
-                Continua
-              </button>
-            </footer>
-          )}
-        </>
+              }, 240);
+              timers.current.add(timer);
+            }
+          }}
+          footer={
+            (!autoAdvance || !question.required) && (
+              <footer className="pf4-footer">
+                <button
+                  className="pf4-cta"
+                  disabled={!answerValid(question, draft)}
+                  onClick={() => move(1)}
+                >
+                  Continua
+                </button>
+              </footer>
+            )
+          }
+        />
+      )}
+      {measures && (
+        <BodyMeasures
+          key={measures.screenId}
+          height={measures.height}
+          weight={measures.weight}
+          values={{
+            height: questionValue(draft, measures.height),
+            weight: questionValue(draft, measures.weight),
+          }}
+          headingRef={heading}
+          valid={(values) => {
+            const filled = setAnswer(
+              setAnswer(draft, measures.height, values.height),
+              measures.weight,
+              values.weight,
+            );
+            return (
+              answerValid(measures.height, filled) &&
+              answerValid(measures.weight, filled)
+            );
+          }}
+          onChange={(target, value) =>
+            setDraft(
+              pruneHiddenAnswers(
+                config.questions,
+                setAnswer(draft, target, value),
+              ),
+            )
+          }
+          onContinue={(values) => {
+            const filled = pruneHiddenAnswers(
+              config.questions,
+              setAnswer(
+                setAnswer(draft, measures.height, values.height),
+                measures.weight,
+                values.weight,
+              ),
+            );
+            setDraft({
+              ...filled,
+              currentStep: nextScreen(config, filled, measures.screenId),
+            });
+          }}
+        />
       )}
       {draft.currentStep === "processing" && <AnalysisTransition />}
       {draft.currentStep === "result" && (

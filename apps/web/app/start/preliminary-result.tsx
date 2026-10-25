@@ -1,16 +1,27 @@
 import { visibleQuestions } from "./discovery-branches";
 import type { DiscoveryConfiguration, DiscoveryDraft } from "./discovery-types";
 import { optionsFor, questionValue } from "./discovery-state";
+import { HEIGHT_KEY, WEIGHT_KEY } from "./funnel-screens";
 
 /** Fasce OMS del BMI; la scala visiva copre l'intervallo 15-40. */
 const BMI_SCALE = { min: 15, max: 40 };
 const BMI_BANDS = [
   { upTo: 18.5, label: "Sottopeso" },
-  { upTo: 25, label: "Normopeso" },
+  { upTo: 25, label: "Nella norma" },
   { upTo: 30, label: "Sovrappeso" },
   { upTo: Infinity, label: "Obesità" },
 ];
-const MEASURES = ["general_height_cm", "general_weight_kg"];
+const MEASURES = [HEIGHT_KEY, WEIGHT_KEY];
+/** Tacche sotto la scala BMI. */
+const BMI_TICKS = [15, 25, 40];
+const bmiPosition = (value: number) =>
+  Math.min(
+    100,
+    Math.max(
+      0,
+      ((value - BMI_SCALE.min) / (BMI_SCALE.max - BMI_SCALE.min)) * 100,
+    ),
+  );
 
 export function PreliminaryResult({
   config,
@@ -47,8 +58,8 @@ export function PreliminaryResult({
     const q = questions.find((q) => q.contextKey === key);
     return q ? Number(questionValue(draft, q)) : NaN;
   };
-  const weight = measure("general_weight_kg");
-  const height = measure("general_height_cm");
+  const weight = measure(WEIGHT_KEY);
+  const height = measure(HEIGHT_KEY);
   const bmi = weight > 0 && height > 0 ? weight / (height / 100) ** 2 : null;
   const band = bmi === null ? null : BMI_BANDS.find((b) => bmi < b.upTo)!;
   const sport =
@@ -83,30 +94,21 @@ export function PreliminaryResult({
   return (
     <>
       <section className="pf4-body pf4-result">
-        {/* Fase gratuita del Blueprint (A3/A4): misura e stima, il programma si sceglie dopo. */}
-        <aside className="pf4-highlight pf4-offer" aria-label="Come si parte">
-          <span className="pf4-badge">Si parte gratis</span>
+        {/* Fase gratuita del Blueprint (A3/A4): profilo e calibrazione, il programma si sceglie dopo. */}
+        <aside className="pf4-offer" aria-label="Come si parte">
+          <span className="pf4-kicker">Fase gratuita</span>
           <p className="pf4-offer-title">
-            <span className="pf4-offer-days">0 €</span>{" "}
-            <span className="pf4-offer-label">per iniziare</span>
+            Gratis finché non ti conosciamo abbastanza.
           </p>
           <p>
-            Assessment sui sei driver e prima stima del tuo livello, che si
-            affina con le tue risposte.
-            <br />
-            Il programma lo scegli dopo, quando vedi dove puoi arrivare.
+            Profilo, micro-test e coach AI senza carta, fino alla chiusura della
+            calibrazione (al massimo circa 30 giorni).
           </p>
-          <ul className="pf4-highlight-meta pf4-offer-terms">
-            <li>Nessuna carta</li>
-            <li>Nessun impegno</li>
-          </ul>
         </aside>
-        <h1>
-          Questi sono <br />i tuoi vincoli.
-        </h1>
+        <h1>Questi sono i tuoi vincoli.</h1>
         <p>
-          Ora serve la misura: crea l’account e fai l’assessment sui sei
-          driver.
+          Ora crea l’account: il tuo profilo parte da qui e si definisce mentre
+          ti alleni.
         </p>
         {bmi !== null && band && (
           <div className="pf4-bmi">
@@ -116,26 +118,15 @@ export function PreliminaryResult({
               <span>{band.label}</span>
             </div>
             <div className="pf4-bmi-scale" aria-hidden="true">
-              {BMI_BANDS.map((b, index) => {
-                const from = index ? BMI_BANDS[index - 1].upTo : BMI_SCALE.min;
-                return (
-                  <span
-                    key={b.label}
-                    className={b === band ? "is-active" : undefined}
-                    style={{ flexGrow: Math.min(b.upTo, BMI_SCALE.max) - from }}
-                  />
-                );
-              })}
-              <i
-                style={{
-                  left: `${Math.min(100, Math.max(0, ((bmi - BMI_SCALE.min) / (BMI_SCALE.max - BMI_SCALE.min)) * 100))}%`,
-                }}
-              />
+              <i style={{ left: `${bmiPosition(bmi)}%` }} />
             </div>
-            <p className="pf4-note">
-              Calcolato da peso e altezza dichiarati. È un indicatore
-              preliminare, non il tuo Performance Index.
-            </p>
+            <div className="pf4-bmi-ticks" aria-hidden="true">
+              {BMI_TICKS.map((tick) => (
+                <span key={tick} style={{ left: `${bmiPosition(tick)}%` }}>
+                  {tick}
+                </span>
+              ))}
+            </div>
           </div>
         )}
         <dl className="pf4-profile">
@@ -147,8 +138,8 @@ export function PreliminaryResult({
           ))}
         </dl>
         <p className="pf4-note">
-          Questo è un riepilogo preliminare delle tue risposte, non un
-          Performance Index né una previsione di risultato.
+          Riepilogo preliminare delle tue risposte: il BMI viene da peso e
+          altezza dichiarati e non è il tuo Performance Index.
         </p>
       </section>
       <footer className="pf4-footer">

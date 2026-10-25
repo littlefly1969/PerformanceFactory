@@ -112,6 +112,47 @@ describe("PF4 configured controls", () => {
       expect(screen.getByRole("spinbutton")).toHaveValue(null);
     },
   );
+  it("steps a number within its bounds, starting from the minimum", async () => {
+    const onChange = vi.fn();
+    const numeric = {
+      ...question,
+      type: "number" as const,
+      min: 0,
+      max: 1,
+      step: 0.5,
+    };
+    const { rerender } = render(
+      <DiscoveryQuestionRenderer
+        question={numeric}
+        options={[]}
+        value={undefined}
+        onChange={onChange}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Aumenta" }));
+    expect(onChange).toHaveBeenLastCalledWith(0);
+    rerender(
+      <DiscoveryQuestionRenderer
+        question={numeric}
+        options={[]}
+        value={0.5}
+        onChange={onChange}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Aumenta" }));
+    expect(onChange).toHaveBeenLastCalledWith(1);
+    await userEvent.click(screen.getByRole("button", { name: "Diminuisci" }));
+    expect(onChange).toHaveBeenLastCalledWith(0);
+    rerender(
+      <DiscoveryQuestionRenderer
+        question={numeric}
+        options={[]}
+        value={1}
+        onChange={onChange}
+      />,
+    );
+    expect(screen.getByRole("button", { name: "Aumenta" })).toBeDisabled();
+  });
 });
 
 afterEach(cleanup);
