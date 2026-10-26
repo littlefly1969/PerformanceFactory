@@ -60,7 +60,7 @@ export class GeocodingService {
 
   async locate(address: PostalAddress): Promise<Coordinates | null> {
     if (!this.configured) return null;
-    const url = new URL(process.env.GEOCODING_URL ?? DEFAULT_URL);
+    const url = new URL(process.env.GEOCODING_URL || DEFAULT_URL);
     url.searchParams.set('q', addressQuery(address));
     url.searchParams.set('format', 'json');
     url.searchParams.set('limit', '1');
@@ -76,7 +76,7 @@ export class GeocodingService {
         headers: {
           accept: 'application/json',
           'user-agent':
-            process.env.GEOCODING_USER_AGENT ??
+            process.env.GEOCODING_USER_AGENT ||
             'PerformanceFactory/1.0 (+https://performancefactory.littlefly.it)',
         },
       });

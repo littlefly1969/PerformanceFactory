@@ -5,6 +5,7 @@ import { TrainingLifecycleModule } from '../training-lifecycle/training-lifecycl
 import { Module } from '@nestjs/common';
 import { AthleteController } from './athlete.controller';
 import { AthleteService } from './athlete.service';
+import { ProfilePhotoService } from './profile-photo';
 @Module({
   imports: [TrainingLifecycleModule, GeoModule],
   controllers: [AthleteController],
@@ -12,6 +13,7 @@ import { AthleteService } from './athlete.service';
     AthleteService,
     TrainingAvailabilityService,
     AthleteAddressService,
+    ProfilePhotoService,
   ],
 })
 export class AthleteModule {}

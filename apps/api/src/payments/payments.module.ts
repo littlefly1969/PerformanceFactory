@@ -16,6 +16,6 @@ import { SubscriptionsService } from './subscriptions.service';
     PaymentWebhooksService,
     PaymentProviderRegistry,
   ],
-  exports: [SubscriptionsService],
+  exports: [SubscriptionsService, CheckoutService],
 })
 export class PaymentsModule {}

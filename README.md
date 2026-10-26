@@ -116,7 +116,7 @@ pnpm --filter api prisma:migrate:dev
 pnpm --filter api prisma:seed
 ```
 
-Il seed crea anche i dieci circoli di padel in Abruzzo con la lezione gratuita
+Il seed crea anche i quattordici circoli di padel in Abruzzo con la lezione gratuita
 accesa e le prime lezioni in calendario (vedi `docs/lezione-gratuita.md`).
 
 Account demo principali creati dal seed:

@@ -1,5 +1,6 @@
 import { InternalServerErrorException } from '@nestjs/common';
 import { Session } from 'express-session';
+import { markAthleteSession } from '../auth/athlete-session';
 
 export type RegistrationRequest = {
   session?: Session;
@@ -28,6 +29,8 @@ export async function registrationSession(
   if (!fresh)
     throw new InternalServerErrorException('Sessione non disponibile');
   (fresh as Session & { userId: string }).userId = userId;
+  // La registrazione crea sempre un atleta: sessione lunga per l'app installata.
+  markAthleteSession(fresh);
   if (req.session) req.session = fresh;
   await new Promise<void>((resolve, reject) =>
     fresh.save((error) =>

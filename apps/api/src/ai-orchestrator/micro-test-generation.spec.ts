@@ -86,6 +86,9 @@ describe('micro-test generation', () => {
           { value: 'o2', label: '4-7 su 10', score: 50 },
           { value: 'o3', label: '8-10 su 10', score: 80 },
         ],
+        format: 'PRACTICAL',
+        situations: [],
+        video: null,
       },
     ]);
   });
@@ -198,8 +201,134 @@ describe('micro-test generation', () => {
     expect(buildMicroTestPrompt(limited).system).toContain('solo NONE o LOW');
   });
 
-  it('produces valid stub tests', () => {
-    expect(validateMicroTests(stubMicroTests(input), input)).toHaveLength(1);
+  it('produces valid stub tests, practical first and then game situations', () => {
+    const first = { ...input, proposedTitles: [] };
+    expect(validateMicroTests(stubMicroTests(first), first)).toMatchObject([
+      { format: 'PRACTICAL' },
+    ]);
+    expect(
+      validateMicroTests(stubMicroTests(withVideos), withVideos),
+    ).toMatchObject([
+      {
+        format: 'SITUATIONAL',
+        situations: [{}, {}, {}],
+        video: { videoId: 'video-1', title: 'La vibora di un coach' },
+      },
+    ]);
+  });
+
+  const withVideos: MicroTestInput = {
+    ...input,
+    proposedTitles: ['Bandeja su 10'],
+    videos: [
+      { id: 'video-1', title: 'La vibora di un coach', description: '' },
+    ],
+  };
+  const situation = (extra: object = {}) => ({
+    label: 'Uscita dal fondo',
+    question: 'La palla ti arriva sul vetro di fondo, lenta e alta. Cosa fai?',
+    context: 'Sei in posizione arretrata, gli avversari sono a rete.',
+    options: [
+      {
+        label: 'Colpisco forte cercando il passante',
+        correct: false,
+        feedback: 'Da dietro il passante raramente passa.',
+        score: 30,
+      },
+      {
+        label: 'Aspetto il rimbalzo sul vetro e alzo lungo',
+        correct: true,
+        feedback: 'Esatto: il vetro è un alleato.',
+        score: 80,
+      },
+    ],
+    video: { videoId: null, title: 'Uscire dal vetro di fondo' },
+    ...extra,
+  });
+  const situational = (extra: object = {}) =>
+    test({
+      title: 'Il terzo colpo decide il punto.',
+      instructions: 'Tre situazioni di gioco reali.',
+      physicalLoad: 'NONE',
+      safetyNotes: '',
+      durationMinutes: 2,
+      options: [],
+      format: 'SITUATIONAL',
+      situations: [situation(), situation({ label: 'Posizionamento' })],
+      video: { videoId: 'video-1', title: 'La vibora di un coach' },
+      ...extra,
+    });
+
+  it('accepts game situations with one correct answer and a video from the archive', () => {
+    const [ok] = validateMicroTests({ tests: [situational()] }, withVideos)!;
+    expect(ok.format).toBe('SITUATIONAL');
+    expect(ok.options).toEqual([]);
+    expect(ok.situations[0].options[1]).toEqual({
+      value: 'o2',
+      label: 'Aspetto il rimbalzo sul vetro e alzo lungo',
+      score: 80,
+      correct: true,
+      feedback: 'Esatto: il vetro è un alleato.',
+    });
+    expect(ok.situations[0].video).toEqual({
+      videoId: null,
+      title: 'Uscire dal vetro di fondo',
+    });
+    expect(buildMicroTestPrompt(withVideos).user.videos).toHaveLength(1);
+    expect(buildMicroTestPrompt(withVideos).system).toContain('SITUATIONAL');
+  });
+
+  it.each([
+    ['a single situation', { situations: [situation()] }],
+    [
+      'two correct answers',
+      {
+        situations: [
+          situation({
+            options: situation().options.map((o) => ({ ...o, correct: true })),
+          }),
+          situation(),
+        ],
+      },
+    ],
+    [
+      'a correct answer worth less than a wrong one',
+      {
+        situations: [
+          situation({
+            options: [
+              { ...situation().options[0], score: 90 },
+              situation().options[1],
+            ],
+          }),
+          situation(),
+        ],
+      },
+    ],
+    [
+      'an answer without the coach explanation',
+      {
+        situations: [
+          situation({
+            options: [
+              { ...situation().options[0], feedback: '' },
+              situation().options[1],
+            ],
+          }),
+          situation(),
+        ],
+      },
+    ],
+    ['a physical load', { physicalLoad: 'LOW', safetyNotes: 'Scaldati.' }],
+    [
+      'a video outside the archive',
+      { video: { videoId: 'inventato', title: 'Video' } },
+    ],
+    ['a video without title', { video: { videoId: null, title: ' ' } }],
+  ])('rejects game situations with %s', (_, extra) => {
+    expect(
+      validateMicroTests({ tests: [situational(extra)] }, withVideos),
+    ).toBeNull();
   });
 
   it('refuses an invalid provider output instead of showing it', async () => {

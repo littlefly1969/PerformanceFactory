@@ -51,6 +51,15 @@ export class FreeLessonController {
     return this.lessons.view(req.user.id);
   }
 
+  @Get('gift')
+  @ApiOperation({
+    summary:
+      'Regalo dopo la registrazione: circoli con logo e foto, aree Reali',
+  })
+  gift(@Req() req: AuthRequest) {
+    return this.lessons.gift(req.user.id);
+  }
+
   @Post('request')
   @ApiOperation({ summary: 'Richiede il posto nella lezione gratuita' })
   request(@Req() req: AuthRequest, @Body() body: RequestFreeLessonDto) {
@@ -58,6 +67,7 @@ export class FreeLessonController {
       req.user.id,
       body.partnerId,
       body.shareWithCoach,
+      body.lessonId,
     );
   }
 

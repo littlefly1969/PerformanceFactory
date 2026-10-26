@@ -23,6 +23,9 @@ import {
 } from './athlete-views';
 import { finishAreaSession } from './area-sessions';
 import { dueCheckIn } from './athlete-check-in';
+import { normalizeObjectives } from '../ai-orchestrator/session-content';
+
+const HISTORY_LIMIT = 60;
 
 @Injectable()
 export class AthleteService {
@@ -119,6 +122,62 @@ export class AthleteService {
   checkIn(userId: string) {
     return dueCheckIn(this.prisma, userId);
   }
+  /** Storico delle sessioni concluse, delle due tracce, con i totali. */
+  async history(userId: string) {
+    const today = athleteDate();
+    const where = {
+      userId,
+      status: { in: ['COMPLETED' as const, 'SKIPPED' as const] },
+    };
+    const order = [
+      { scheduledDate: 'desc' as const },
+      { sequence: 'desc' as const },
+    ];
+    const [sessions, areaSessions] = await Promise.all([
+      this.prisma.trainingSession.findMany({
+        where,
+        include: sessionInclude,
+        orderBy: order,
+        take: HISTORY_LIMIT,
+      }),
+      this.prisma.areaSession.findMany({
+        where,
+        include: areaSessionInclude,
+        orderBy: order,
+        take: HISTORY_LIMIT,
+      }),
+    ]);
+    const all = [
+      ...sessions.map((s) => sessionView(s, today)),
+      ...areaSessions.map((s) => areaSessionView(s, today)),
+    ];
+    const completed = all.filter((s) => s.status === 'COMPLETED');
+    return {
+      completed: completed.length,
+      minutes: completed.reduce((sum, s) => sum + (s.durationMinutes ?? 0), 0),
+      sessions: all
+        .sort((a, b) => b.date.localeCompare(a.date) || b.sequence - a.sequence)
+        .slice(0, HISTORY_LIMIT),
+    };
+  }
+  /** Prossima lezione di ogni area a calendario, da oggi in avanti. */
+  private async areaLessons(userId: string, today: string) {
+    const upcoming = await this.prisma.areaSession.findMany({
+      where: {
+        userId,
+        status: 'SCHEDULED',
+        scheduledDate: { gte: dateOnly(today) },
+        planRelease: { status: 'ACTIVE' },
+      },
+      include: areaSessionInclude,
+      orderBy: [{ scheduledDate: 'asc' }, { sequence: 'asc' }],
+      take: 50,
+    });
+    const seen = new Set<string>();
+    return upcoming
+      .filter((s) => !seen.has(s.areaId) && Boolean(seen.add(s.areaId)))
+      .map((s) => areaSessionView(s, today));
+  }
   async home(userId: string) {
     const today = athleteDate();
     const [user, snapshot, plan, checkIn, completed, order] = await Promise.all(
@@ -168,6 +227,7 @@ export class AthleteService {
         this.driverOrder(userId),
       ],
     );
+    const lessons = await this.areaLessons(userId, today);
     const lifecycle = await this.lifecycle.current(userId);
     const sessions = plan?.sessions.map((s) => sessionView(s, today)) ?? [];
     const due = sessions.find(
@@ -235,6 +295,14 @@ export class AthleteService {
       },
       primaryAction,
       nextSession: next,
+      objectives: normalizeObjectives(
+        plan?.outputJson &&
+          typeof plan.outputJson === 'object' &&
+          !Array.isArray(plan.outputJson)
+          ? plan.outputJson.objectives
+          : null,
+      ),
+      lessons,
       checkIn: checkIn
         ? {
             id: checkIn.id,

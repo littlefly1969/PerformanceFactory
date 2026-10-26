@@ -90,6 +90,33 @@ describe('buildPaywallOffers', () => {
     expect(listed[0].billingOptions[0].amountCents).toBe(6000);
   });
 
+  it('totals the horizon from the real installments, not the rounded month', () => {
+    const [annual] = buildPaywallOffers(prices, [
+      {
+        horizon: 'PROGRAM_12M',
+        billingCycle: 'ANNUAL',
+        isActive: true,
+        amountCents: 10000,
+        currency: 'eur',
+      },
+    ]);
+    expect([annual.monthlyCents, annual.horizonTotalCents]).toEqual([
+      833, 10000,
+    ]);
+    const [quarterly] = buildPaywallOffers(prices, [
+      {
+        horizon: 'PROGRAM_6M',
+        billingCycle: 'QUARTERLY',
+        isActive: true,
+        amountCents: 2999,
+        currency: 'eur',
+      },
+    ]);
+    expect([quarterly.monthlyCents, quarterly.horizonTotalCents]).toEqual([
+      1000, 5998,
+    ]);
+  });
+
   it('hides inactive combinations, missing prices and empty horizons', () => {
     const offers = buildPaywallOffers(
       prices.filter((price) => price.billingCycle !== 'QUARTERLY'),

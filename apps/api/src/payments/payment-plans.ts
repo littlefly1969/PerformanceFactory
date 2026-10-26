@@ -84,7 +84,11 @@ export type PaywallOffer = {
   potential: string;
   /** Prezzo al mese dell'orizzonte, dalla cadenza mensile o dalla piu corta attiva. */
   monthlyCents: number;
-  /** Costo di tutto il percorso al prezzo al mese dell'orizzonte. */
+  /**
+   * Costo di tutto il percorso: la rata di riferimento per il numero di rate,
+   * cosi coincide con quanto si paga davvero anche quando il prezzo al mese
+   * e arrotondato.
+   */
   horizonTotalCents: number;
   currency: string;
   /**
@@ -142,12 +146,15 @@ export function buildPaywallOffers(
     const reference = billingOptions[0];
     const horizonMonths = PROGRAM_HORIZON_MONTHS[horizon];
     const monthlyCents = reference?.monthlyEquivalentCents ?? 0;
+    const installments = reference
+      ? Math.ceil(horizonMonths / reference.billingMonths)
+      : 0;
     return {
       horizon,
       horizonMonths,
       potential: PROGRAM_HORIZON_POTENTIAL[horizon],
       monthlyCents,
-      horizonTotalCents: monthlyCents * horizonMonths,
+      horizonTotalCents: (reference?.amountCents ?? 0) * installments,
       currency: reference?.currency ?? '',
       savingPercent: 0,
       billingOptions,

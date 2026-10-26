@@ -1,5 +1,9 @@
 import { Test } from '@nestjs/testing';
-import { ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
@@ -623,6 +627,29 @@ describe('Free lesson with PostgreSQL', () => {
     ).toBe(1);
   });
 
+  it('shows the free days and times and keeps the preferred one, while the admin composes the group', async () => {
+    const full = await lesson(1);
+    const open = await lesson(4);
+    await admin.assign(full, await requested([40, 50]));
+    const id = await athlete([60, 50]);
+    const view = await athletes.view(id);
+    const slots = view.enabled ? view.slots.map((s) => s.id) : [];
+    // La lezione al completo non si propone.
+    expect(slots).toContain(open);
+    expect(slots).not.toContain(full);
+    await expect(
+      athletes.request(id, partnerId, true, full),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(await athletes.request(id, partnerId, true, open)).toMatchObject({
+      phase: 'REQUESTED',
+      seat: { status: 'REQUESTED', preferredLessonId: open },
+    });
+    // La preferenza si cambia finché il posto non è assegnato.
+    expect(await athletes.request(id, partnerId, true)).toMatchObject({
+      seat: { preferredLessonId: null },
+    });
+  });
+
   it('AT-15/AT-16/AT-18: with a lesson possible R waits for it or for an explicit decline', async () => {
     // Regola di consolidamento soddisfatta, livello stimato, circolo che offre
     // la lezione: è la lezione a chiudere R, il paywall aspetta.
@@ -760,10 +787,36 @@ describe('Free lesson with PostgreSQL', () => {
     expect(await athletes.view(id)).toMatchObject({ phase: 'ELIGIBLE' });
   });
 
+  it('presents the gift with the clubs offering the lesson and the Real areas', async () => {
+    const id = await athlete([1, 100]);
+    const updatedAt = new Date('2026-10-25T10:00:00Z');
+    await prisma.partner.update({
+      where: { id: partnerId },
+      data: {
+        logoImage: 'data:image/png;base64,AA==',
+        logoUpdatedAt: updatedAt,
+      },
+    });
+    const gift = await athletes.gift(id);
+    expect(gift).toMatchObject({ enabled: true, attributedClubId: null });
+    if (!gift.enabled) throw new Error('gift disabled');
+    expect(gift.clubs.find((c) => c.id === partnerId)).toEqual({
+      id: partnerId,
+      name: 'Circolo test',
+      city: null,
+      logoUrl: `/partners/${partnerId}/logo?v=${updatedAt.getTime()}`,
+      photoUrl: null,
+    });
+    expect(
+      AREAS.map((areaId) => gift.areas.find((a) => a.id === areaId)?.real),
+    ).toEqual([false, true]);
+  });
+
   it('hides everything while the feature flag is off', async () => {
     const id = await athlete([40, 50]);
     await flags.update('free_lesson', { enabled: false }, adminId);
     expect(await athletes.view(id)).toEqual({ enabled: false });
+    expect(await athletes.gift(id)).toEqual({ enabled: false });
     await expect(athletes.request(id, partnerId, true)).rejects.toBeInstanceOf(
       ForbiddenException,
     );

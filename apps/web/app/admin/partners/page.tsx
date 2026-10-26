@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ProductShell, StatusBadge } from "@/app/components/product-shell";
 import { adminRequest } from "../components/admin-request";
+import { ClubImages, resizeClubImage } from "./club-images";
 
 type Partner = {
   id: string;
@@ -13,9 +14,11 @@ type Partner = {
   address: string | null;
   postalCode: string | null;
   website: string | null;
-  logoUrl: string | null;
+  located: boolean;
   isActive: boolean;
   freeLessonsEnabled: boolean;
+  logoUrl: string | null;
+  photoUrl: string | null;
   attributedUsers: number;
 };
 type Funnel = {
@@ -41,7 +44,6 @@ const DETAIL_FIELDS = [
   ["address", "Indirizzo", false],
   ["postalCode", "CAP", false],
   ["website", "Sito o pagina social", false],
-  ["logoUrl", "URL del logo", false],
 ] as const;
 
 type DetailField = (typeof DETAIL_FIELDS)[number][0];
@@ -54,7 +56,6 @@ const emptyDetails: Details = {
   address: "",
   postalCode: "",
   website: "",
-  logoUrl: "",
 };
 const emptyDraft = { ...emptyDetails, code: "" };
 
@@ -71,7 +72,6 @@ function detailsOf(partner: Partner): Details {
     address: partner.address ?? "",
     postalCode: partner.postalCode ?? "",
     website: partner.website ?? "",
-    logoUrl: partner.logoUrl ?? "",
   };
 }
 
@@ -100,23 +100,6 @@ function filledDetails(details: Details) {
 function patchDetails(details: Details) {
   return Object.fromEntries(
     DETAIL_FIELDS.map(([field]) => [field, details[field].trim()] as const),
-  );
-}
-
-/** Logo del circolo; se l'immagine non carica resta solo il nome. */
-function PartnerLogo({ partner }: { partner: Partner }) {
-  const [failed, setFailed] = useState(false);
-  if (!partner.logoUrl || failed) return null;
-  return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={partner.logoUrl}
-      alt={`Logo di ${partner.name}`}
-      width={40}
-      height={40}
-      style={{ width: 40, height: 40, objectFit: "contain" }}
-      onError={() => setFailed(true)}
-    />
   );
 }
 
@@ -171,7 +154,7 @@ export default function AdminPartnersPage() {
     <ProductShell
       eyebrow="Amministrazione circoli"
       title="Circoli e provenienza"
-      description="Ogni circolo ha un codice da usare nel link o nel QR. Chi si registra da quel link resta collegato al circolo; la prima provenienza vale sulle successive."
+      description="Ogni circolo ha un codice da usare nel link o nel QR. Chi si registra da quel link resta collegato al circolo; la prima provenienza vale sulle successive. Logo e foto compaiono nel carosello del regalo per i circoli che offrono la lezione gratuita."
       actions={
         <button className="pf-button-secondary" type="button" onClick={load}>
           Aggiorna
@@ -207,14 +190,11 @@ export default function AdminPartnersPage() {
             {partners.map((partner) => (
               <article className="pf-card" key={partner.id}>
                 <div className="pf-card-top">
-                  <div className="pf-row">
-                    <PartnerLogo partner={partner} />
-                    <div>
-                      <h3>{partner.name}</h3>
-                      <p className="pf-muted">
-                        {placeOf(partner)} · {partner.code}
-                      </p>
-                    </div>
+                  <div>
+                    <h3>{partner.name}</h3>
+                    <p className="pf-muted">
+                      {placeOf(partner)} · {partner.code}
+                    </p>
                   </div>
                   <StatusBadge tone={partner.isActive ? "success" : "neutral"}>
                     {partner.isActive ? "Attivo" : "Sospeso"}
@@ -236,8 +216,32 @@ export default function AdminPartnersPage() {
                   Link per QR: {clubLink(partner.code, origin)}
                 </p>
                 <p className="pf-muted">
+                  {partner.located
+                    ? "Sede riconosciuta: agli atleti mostriamo la distanza."
+                    : "Sede non riconosciuta: agli atleti diciamo che la distanza non si può calcolare."}
+                </p>
+                <p className="pf-muted">
                   Atleti registrati: {partner.attributedUsers}
                 </p>
+                <ClubImages
+                  name={partner.name}
+                  logoUrl={partner.logoUrl}
+                  photoUrl={partner.photoUrl}
+                  busy={busy}
+                  onChange={(kind, file) =>
+                    void run(
+                      async () =>
+                        adminRequest(`/admin/partners/${partner.id}`, "PATCH", {
+                          [`${kind}Image`]: file
+                            ? await resizeClubImage(file, kind)
+                            : null,
+                        }),
+                      file
+                        ? "Immagine aggiornata: la vedono gli atleti nel regalo."
+                        : "Immagine rimossa.",
+                    )
+                  }
+                />
                 <label className="pf-checkbox">
                   <input
                     type="checkbox"

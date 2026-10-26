@@ -20,8 +20,10 @@ import { FeatureFlagsService } from '../features/feature-flags.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { distanceBetween } from '../geo/distance';
 import { loadFreeLessonSettings, syncCredits } from './free-lesson-config';
+import { loadGift } from './free-lesson-gift';
 import { lessonEligibility } from './free-lesson-rules';
 import { holdCalibration, releaseCalibration } from './lesson-hold';
+import { checkPreferredLesson, lessonSlots } from './lesson-slots';
 
 type Db = PrismaService | Prisma.TransactionClient;
 
@@ -91,17 +93,25 @@ export class FreeLessonService {
       throw new ForbiddenException('La lezione gratuita non è attiva');
   }
 
+  /** Regalo presentato dopo la registrazione; spento con il flag della lezione. */
+  async gift(userId: string) {
+    if (!(await this.flags.isEnabled('free_lesson', userId)))
+      return { enabled: false as const };
+    return loadGift(this.prisma, userId);
+  }
+
   async view(userId: string) {
     if (!(await this.flags.isEnabled('free_lesson', userId)))
       return { enabled: false as const };
     const settings = await loadFreeLessonSettings(this.prisma);
     const credits = await syncCredits(this.prisma, userId, settings);
-    const [attribution, check, address] = await Promise.all([
+    const [attribution, check, slots, address] = await Promise.all([
       this.prisma.userAttribution.findUnique({
         where: { userId },
         select: { partnerId: true },
       }),
       checkLesson(this.prisma, userId),
+      lessonSlots(this.prisma),
       this.prisma.userAddress.findUnique({
         where: { userId },
         select: { latitude: true, longitude: true },
@@ -156,11 +166,14 @@ export class FreeLessonService {
       },
       clubs: clubsWithDistance,
       distance,
+      // Giorni e orari in calendario: l'atleta indica il preferito.
+      slots,
       attributedClubId: clubId,
       seat: seat
         ? {
             status: seat.status,
             club: seat.partner,
+            preferredLessonId: seat.preferredLessonId,
             lesson:
               seat.lesson && seat.status !== 'WITHDRAWN'
                 ? {
@@ -178,7 +191,12 @@ export class FreeLessonService {
    * con il consenso a mostrare al coach nome, livello e driver. Ripetere la
    * richiesta non crea un secondo posto.
    */
-  async request(userId: string, partnerId: string, shareWithCoach: boolean) {
+  async request(
+    userId: string,
+    partnerId: string,
+    shareWithCoach: boolean,
+    lessonId?: string,
+  ) {
     await this.requireEnabled(userId);
     if (!shareWithCoach)
       throw new BadRequestException(
@@ -191,16 +209,20 @@ export class FreeLessonService {
     if (!club) throw new BadRequestException('Circolo non disponibile');
     await this.prisma.$transaction(async (tx) => {
       await lockCalibration(tx, userId);
-      const { seat, phase, missing, policy, evaluationId } = await checkLesson(
+      const { phase, missing, policy, evaluationId } = await checkLesson(
         tx,
         userId,
       );
-      if (seat?.status === 'REQUESTED' && seat.partnerId === partnerId) return;
+      const preferredLessonId = await checkPreferredLesson(
+        tx,
+        lessonId,
+        partnerId,
+      );
       if (phase === 'REQUESTED')
-        // Cambio di circolo finché il posto non è assegnato.
+        // Cambio di circolo o di orario finché il posto non è assegnato.
         return void (await tx.freeLessonSeat.update({
           where: { userId },
-          data: { partnerId },
+          data: { partnerId, preferredLessonId },
         }));
       // Dopo un ritiro o una rinuncia l'atleta può ancora cambiare idea.
       if (phase !== 'ELIGIBLE' && phase !== 'DECLINED')
@@ -219,6 +241,7 @@ export class FreeLessonService {
         requestedAt: new Date(),
         eligibilityPolicyId: policy.id,
         eligibilityEvaluationId: evaluationId,
+        preferredLessonId,
       };
       await tx.freeLessonSeat.upsert({
         where: { userId },

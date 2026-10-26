@@ -1,0 +1,153 @@
+.pf-welcome {
+  min-height: 100dvh;
+  display: flex;
+  justify-content: center;
+  background: #0b0b0c;
+  color: #f4f4f1;
+  font-family: "PF4 Public Sans", sans-serif;
+}
+.pf-welcome *,
+.pf-welcome *::before,
+.pf-welcome *::after {
+  box-sizing: border-box;
+}
+.pf-welcome-frame {
+  width: 100%;
+  max-width: 440px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: max(24px, env(safe-area-inset-top)) 24px
+    max(24px, env(safe-area-inset-bottom));
+}
+.pf-welcome-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.pf-welcome-steps {
+  display: flex;
+  gap: 6px;
+}
+.pf-welcome-steps span {
+  width: 10px;
+  height: 3px;
+  border-radius: 2px;
+  background: #c8f02e;
+}
+.pf-welcome-steps .is-current {
+  width: 22px;
+}
+.pf-welcome-top button,
+.pf-welcome-link {
+  border: 0;
+  background: none;
+  color: #c9c9c4;
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 8px 0;
+}
+.pf-welcome-body {
+  flex: 1;
+  padding-top: 44px;
+}
+.pf-welcome-kicker {
+  color: #c8f02e;
+  font-size: 12px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+}
+.pf-welcome h1 {
+  margin: 14px 0 0;
+  font-size: 40px;
+  line-height: 1.05;
+  font-weight: 400;
+  letter-spacing: -1px;
+}
+.pf-welcome-body > p {
+  margin: 16px 0 0;
+  color: #c9c9c4;
+  font-size: 15px;
+  line-height: 1.45;
+}
+.pf-welcome-app {
+  margin: 36px auto 0;
+  width: max-content;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #c9c9c4;
+}
+.pf-welcome-app img {
+  border-radius: 22px;
+  box-shadow: 0 0 0 1px #ffffff24;
+}
+.pf-welcome-guide {
+  list-style: none;
+  margin: 32px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.pf-welcome-guide li {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid #ffffff1f;
+  border-radius: 14px;
+  background: #ffffff0a;
+}
+.pf-welcome-guide li > span {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #c8f02e;
+  color: #0b0b0c;
+  font-size: 13px;
+}
+.pf-welcome-guide p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.pf-welcome-guide svg {
+  display: inline;
+  vertical-align: -3px;
+}
+.pf-welcome-note {
+  font-size: 13px !important;
+  color: #8f8f8a !important;
+}
+.pf-welcome-actions {
+  display: grid;
+  gap: 6px;
+  padding-top: 24px;
+}
+.pf-welcome-cta {
+  width: 100%;
+  min-height: 56px;
+  border: 0;
+  border-radius: 28px;
+  background: #c8f02e;
+  color: #0b0b0c;
+  font: inherit;
+  font-size: 13px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.pf-welcome-cta:disabled {
+  opacity: 0.5;
+}
+.pf-welcome button:focus-visible {
+  outline: 2px solid #c8f02e;
+  outline-offset: 3px;
+}

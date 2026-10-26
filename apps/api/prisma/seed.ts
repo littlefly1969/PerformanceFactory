@@ -7,6 +7,8 @@ import {
   UserRole,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { createHash } from 'crypto';
+import { GeocodingService } from '../src/geo/geocoding.service';
 
 const prisma = new PrismaClient();
 
@@ -47,7 +49,6 @@ const defaultGoalPrompt = [
   'Se status e diverso da OK, area_prompts deve contenere valori null per tutte le aree richieste nel contesto.',
   'Se status e OK, compila tutti i prompt delle aree richieste nel contesto. Ogni prompt area deve contenere role, objective, required_inputs, initial_questionnaire, exercise_generation_rules, feedback_questions, progression_rules, measurement_indicators, safety_limits, output_format.',
 ].join('\n');
-
 
 /**
  * Circoli di padel reali in Abruzzo, per il primo lancio territoriale: nome,
@@ -216,7 +217,29 @@ const abruzzoClubs: Array<{
  * Prossima occorrenza del giorno della settimana indicato, all'ora indicata
  * (UTC): il calendario della lezione gratuita resta nel futuro a ogni seed.
  */
-function nextWeekdayAt(from: Date, weekday: number, hour: number, weeksAhead = 0) {
+/**
+ * UUID stabile (versione 5, SHA-1) per i record del seed che non hanno una
+ * chiave naturale: rieseguire il seed ritrova lo stesso record e gli id
+ * passano la validazione UUID delle API.
+ */
+function seedUuid(name: string) {
+  const hex = createHash('sha1')
+    .update(`performancefactory-seed:${name}`)
+    .digest('hex')
+    .slice(0, 32)
+    .split('');
+  hex[12] = '5';
+  hex[16] = ((parseInt(hex[16], 16) & 0x3) | 0x8).toString(16);
+  const h = hex.join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
+function nextWeekdayAt(
+  from: Date,
+  weekday: number,
+  hour: number,
+  weeksAhead = 0,
+) {
   const result = new Date(
     Date.UTC(
       from.getUTCFullYear(),
@@ -594,7 +617,9 @@ async function main() {
     const questions = areaQuestionText[area.name] ?? [];
     for (const [index, label] of questions.entries()) {
       await prisma.onboardingQuestionTemplate.upsert({
-        where: { key: `area_${area.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_${index + 1}` },
+        where: {
+          key: `area_${area.name.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_${index + 1}`,
+        },
         update: {
           scope: OnboardingQuestionScope.AREA,
           areaId: area.id,
@@ -653,9 +678,9 @@ async function main() {
     });
   }
 
-
   // Circoli partner in Abruzzo con la lezione gratuita accesa e il calendario
-  // delle prime lezioni: il seed si puo rieseguire, le date si rinfrescano.
+  // delle prime lezioni. Il seed crea solo cio che manca: circoli e lezioni
+  // gia presenti restano come li ha lasciati il back office.
   const padelCoach = await prisma.user.upsert({
     where: { email: 'coach_padel@example.it' },
     update: { role: UserRole.PROFESSIONAL, isActive: true },
@@ -670,42 +695,72 @@ async function main() {
   });
 
   const seedNow = new Date();
+  const geocoding = new GeocodingService();
   for (const [clubIndex, club] of abruzzoClubs.entries()) {
-    const partnerData = {
-      name: club.name,
-      city: club.city,
-      province: club.province,
-      address: club.address,
-      postalCode: club.postalCode,
-      website: club.website,
-      isActive: true,
-      freeLessonsEnabled: true,
-    };
-    const partner = await prisma.partner.upsert({
+    const existing = await prisma.partner.findUnique({
       where: { code: club.code },
-      update: partnerData,
-      create: { code: club.code, kind: 'CLUB', ...partnerData },
-      select: { id: true },
+      select: { id: true, latitude: true },
     });
+    // Coordinate dall'indirizzo, solo se mancano: senza rete restano vuote e
+    // all'atleta si dice che la distanza non si puo calcolare.
+    const located =
+      existing?.latitude == null
+        ? await geocoding.locate({
+            street: club.address,
+            postalCode: club.postalCode,
+            city: club.city,
+            province: club.province,
+          })
+        : null;
+    // Nominatim chiede al massimo una richiesta al secondo.
+    if (existing?.latitude == null && geocoding.configured)
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+    const coordinates = located ? { ...located, geocodedAt: new Date() } : {};
+    const partner = existing
+      ? located
+        ? await prisma.partner.update({
+            where: { id: existing.id },
+            data: coordinates,
+            select: { id: true },
+          })
+        : existing
+      : await prisma.partner.create({
+          data: {
+            code: club.code,
+            kind: 'CLUB',
+            name: club.name,
+            city: club.city,
+            province: club.province,
+            address: club.address,
+            postalCode: club.postalCode,
+            website: club.website,
+            isActive: true,
+            freeLessonsEnabled: true,
+            ...coordinates,
+          },
+          select: { id: true },
+        });
 
     for (const [lessonIndex, levelLabel] of club.lessonLevels.entries()) {
       // Una lezione a settimana per livello, a rotazione fra i giorni liberi
       // dei circoli: martedi, giovedi e sabato alle 18, 19 e 10 UTC.
       const slot = (clubIndex + lessonIndex) % 3;
-      const startsAt = nextWeekdayAt(
-        seedNow,
-        [2, 4, 6][slot],
-        [18, 19, 10][slot],
-        lessonIndex,
-      );
+      const id = seedUuid(`free-lesson:${club.code}:${lessonIndex + 1}`);
       await prisma.freeLesson.upsert({
-        where: { id: `free-lesson-${club.code}-${lessonIndex + 1}` },
-        update: { startsAt, levelLabel, status: 'SCHEDULED' },
+        where: { id },
+        // Una lezione gia creata e del back office: data, stato e posti
+        // assegnati non si toccano.
+        update: {},
         create: {
-          id: `free-lesson-${club.code}-${lessonIndex + 1}`,
+          id,
           partnerId: partner.id,
           coachId: padelCoach.id,
-          startsAt,
+          startsAt: nextWeekdayAt(
+            seedNow,
+            [2, 4, 6][slot],
+            [18, 19, 10][slot],
+            lessonIndex,
+          ),
           durationMinutes: 60,
           capacity: 4,
           levelLabel,
@@ -743,18 +798,17 @@ async function main() {
     goalPromptConfigCount,
     partnerCount,
     freeLessonCount,
-  ] =
-    await Promise.all([
-      prisma.user.count(),
-      prisma.area.count(),
-      prisma.professionalAreaCompetence.count(),
-      prisma.professionalUserLink.count(),
-      prisma.performanceScaleConfig.count(),
-      prisma.onboardingQuestionTemplate.count(),
-      prisma.aiGoalPromptConfig.count(),
-      prisma.partner.count(),
-      prisma.freeLesson.count(),
-    ]);
+  ] = await Promise.all([
+    prisma.user.count(),
+    prisma.area.count(),
+    prisma.professionalAreaCompetence.count(),
+    prisma.professionalUserLink.count(),
+    prisma.performanceScaleConfig.count(),
+    prisma.onboardingQuestionTemplate.count(),
+    prisma.aiGoalPromptConfig.count(),
+    prisma.partner.count(),
+    prisma.freeLesson.count(),
+  ]);
 
   console.log(
     `[seed] done users=${userCount} areas=${areaCount} competences=${competenceCount} links=${linkCount} scales=${scaleCount} onboardingTemplates=${onboardingTemplateCount} goalPromptConfigs=${goalPromptConfigCount} partners=${partnerCount} freeLessons=${freeLessonCount} admin=${admin.email}`,

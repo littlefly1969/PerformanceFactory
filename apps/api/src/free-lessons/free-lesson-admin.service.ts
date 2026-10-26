@@ -105,6 +105,8 @@ export class FreeLessonAdminService {
           partnerId: r.partnerId,
           club: r.partner.name,
           requestedAt: r.requestedAt,
+          // Giorno e orario scelti dall'atleta: una preferenza, non un vincolo.
+          preferredLessonId: r.preferredLessonId,
         }))
         .sort(
           (a, b) =>

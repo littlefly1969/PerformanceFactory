@@ -37,7 +37,7 @@ describe("Google registration entry points", () => {
     };
     render(<GoogleRegistrationButton draft={draft} onError={vi.fn()} />);
     fireEvent.click(
-      screen.getByRole("button", { name: "Registrati con Google" }),
+      screen.getByRole("button", { name: "Continua con Google" }),
     );
     expect(assign).toHaveBeenCalledWith(googleRegistrationHref);
     expect(JSON.parse(sessionStorage.getItem(DRAFT_KEY)!)).toEqual(draft);
@@ -95,7 +95,7 @@ describe("Google registration entry points", () => {
     });
     render(<GoogleRegistrationButton onError={error} />);
     fireEvent.click(
-      screen.getByRole("button", { name: "Registrati con Google" }),
+      screen.getByRole("button", { name: "Continua con Google" }),
     );
     expect(error).toHaveBeenCalled();
     expect(assign).not.toHaveBeenCalled();

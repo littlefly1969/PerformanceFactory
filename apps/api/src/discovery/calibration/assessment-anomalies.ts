@@ -21,23 +21,44 @@ export async function lessonSuspended(db: Db, userId: string) {
   );
 }
 
-/** Coda di revisione per l'admin, le aperte per prime. */
+const ANOMALY_PAGE = 200;
+const anomalyInclude = {
+  user: { select: { email: true, firstName: true, lastName: true } },
+  evaluation: { select: { sequence: true, source: true } },
+  reviewedBy: { select: { email: true } },
+} satisfies Prisma.AssessmentAnomalyInclude;
+
+/**
+ * Coda di revisione per l'admin, le aperte per prime. Il limite si applica
+ * dopo la priorità: le OPEN si leggono da sole, così uno storico recente di
+ * revisionate o archiviate non può nascondere una segnalazione da esaminare.
+ */
 export async function listAnomalies(
   prisma: PrismaService,
   status?: AnomalyStatus,
 ) {
-  const rows = await prisma.assessmentAnomaly.findMany({
-    where: status ? { status } : {},
-    orderBy: [{ createdAt: 'desc' }],
-    take: 200,
-    include: {
-      user: { select: { email: true, firstName: true, lastName: true } },
-      evaluation: { select: { sequence: true, source: true } },
-      reviewedBy: { select: { email: true } },
-    },
-  });
+  const page = (where: Prisma.AssessmentAnomalyWhereInput, take: number) =>
+    take > 0
+      ? prisma.assessmentAnomaly.findMany({
+          where,
+          orderBy: [{ createdAt: 'desc' }],
+          take,
+          include: anomalyInclude,
+        })
+      : Promise.resolve([]);
+  const open =
+    !status || status === 'OPEN'
+      ? await page({ status: 'OPEN' }, ANOMALY_PAGE)
+      : [];
+  const rest =
+    status === 'OPEN'
+      ? []
+      : await page(
+          status ? { status } : { status: { not: 'OPEN' } },
+          ANOMALY_PAGE - open.length,
+        );
   const rank = (s: string) => ANOMALY_STATUSES.indexOf(s as AnomalyStatus);
-  return rows
+  return [...open, ...rest]
     .sort((a, b) => rank(a.status) - rank(b.status))
     .map((a) => ({
       id: a.id,

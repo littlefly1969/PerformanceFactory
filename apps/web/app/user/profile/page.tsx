@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { TrainingAvailability } from "./training-availability";
-import { AthleteAddress } from "./athlete-address";
+import { AthleteAddress } from "../../components/athlete-address";
 import { FitRankingEditor } from "../../components/fit-ranking-editor";
 import { MarketingPreference, ReferralCard } from "./marketing-and-referral";
 import { AthleteShell } from "../_components/athlete-shell";

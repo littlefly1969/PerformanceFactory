@@ -16,6 +16,13 @@ import {
 import { resolveProvider, resolveModel } from './provider-config';
 import { requestStructuredProposal } from './proposal-structured-transport';
 import { validateTrainingSchedule } from './training-schedule';
+import {
+  normalizeObjectives,
+  normalizeSessionContent,
+  OBJECTIVE_RULES,
+  SESSION_CONTENT_RULES,
+  stubSessionContent,
+} from './session-content';
 
 export function buildTrainingProposalPreview(input: TrainingProposalInput) {
   const provider = resolveProvider();
@@ -32,6 +39,8 @@ export function buildTrainingProposalPreview(input: TrainingProposalInput) {
         'Le due settimane possono avere frequenze diverse: sessionsPerWeek è il maggiore dei due conteggi. Il massimo settimanale vale anche per ogni intervallo di sette giorni consecutivi.',
         'Non superare la disponibilità di durata; considera skip, note, rating e check-in precedenti.',
         'Il nuovo macroblocco continua il percorso, senza azzerare lo storico.',
+        ...SESSION_CONTENT_RULES,
+        ...OBJECTIVE_RULES,
       ],
     },
     responseJsonSchema: buildTrainingProposalJsonSchema(input),
@@ -97,6 +106,7 @@ export function normalizeTrainingProposal(
       sets: item.sets ?? null,
       reps: item.reps ?? null,
       restSeconds: item.restSeconds ?? null,
+      content: normalizeSessionContent(item),
     } as TrainingSessionProposal;
   });
   const sessionsPerWeek = raw.sessionsPerWeek as number;
@@ -126,6 +136,7 @@ export function normalizeTrainingProposal(
     summaryText: raw.summaryText as string,
     sessionsPerWeek,
     planItems,
+    objectives: normalizeObjectives(raw.objectives),
     questions,
     trainingConstraints: input.trainingConstraints,
     trainingWindow: input.trainingWindow,
@@ -170,6 +181,10 @@ export async function generateTrainingProposal(
         body: 'Riscaldamento, lavoro tecnico controllato e recupero.',
         dayOffset: week + days[Math.floor((i * days.length) / count)],
         durationMinutes: Math.min(45, availability.sessionDurationMinutes),
+        ...stubSessionContent(
+          'Spinta laterale e primi due passi',
+          Math.min(45, availability.sessionDurationMinutes),
+        ),
       })),
     );
     return normalizeTrainingProposal(

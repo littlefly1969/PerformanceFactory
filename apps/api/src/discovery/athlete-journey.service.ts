@@ -42,7 +42,10 @@ import {
   PROGRAM_HORIZON_WEEKS,
   horizonForWeeks,
 } from './program-horizon';
-import { hasProgramEntitlement } from './calibration/calibration-config';
+import {
+  entitledHorizon,
+  hasProgramEntitlement,
+} from './calibration/calibration-config';
 import type { ProvidedBaseline } from '../onboarding/onboarding-assessment';
 import { recordMeaningfulInteraction } from '../engagement/meaningful-interaction';
 import { pendingWakeup } from '../engagement/engagement.service';
@@ -180,6 +183,7 @@ export class AthleteJourneyService {
       phase,
       nextStep: phase,
       firstName: user.firstName,
+      welcomeCompleted: !!saved.welcomeCompletedAt,
       // Bentornato dopo 10 giorni: riprende dal profilo esistente (§8.4).
       wakeup,
       trial: {
@@ -436,14 +440,13 @@ export class AthleteJourneyService {
       where: { userId },
       select: { status: true },
     });
-    if (
-      calibration?.status !== 'PAYWALL_READY' ||
-      !(await hasProgramEntitlement(this.prisma, userId))
-    )
+    // L'orizzonte del programma è quello dell'abbonamento pagato.
+    const horizon = await entitledHorizon(this.prisma, userId);
+    if (calibration?.status !== 'PAYWALL_READY' || !horizon)
       throw new ConflictException(
         'Il programma si sblocca dopo la scelta del percorso e l’abbonamento.',
       );
-    const baseline = await this.scenarios.programBaseline(userId);
+    const baseline = await this.scenarios.programBaseline(userId, horizon);
     if (!baseline?.areas.length)
       throw new ConflictException('I tuoi scenari non sono ancora pronti.');
     await this.submitAnswers(userId, undefined, {
@@ -456,6 +459,7 @@ export class AthleteJourneyService {
         where: { userId },
         data: {
           phase: 'COMPLETE',
+          programHorizon: baseline.horizon,
           programDurationWeeks: weeks,
           durationSelectedAt: new Date(),
         },

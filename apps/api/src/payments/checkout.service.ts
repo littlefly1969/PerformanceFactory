@@ -184,6 +184,49 @@ export class CheckoutService {
     });
   }
 
+  /**
+   * Cambio di orizzonte dopo il reveal: chiude i checkout ancora aperti per
+   * un orizzonte diverso, così il vecchio link non si può più pagare. Se il
+   * pagamento risulta già completato il cambio è rifiutato. Un checkout che
+   * il provider sta ancora creando non ha un identificativo da chiudere: il
+   * cambio è rifiutato finché non c'è, o finché la preparazione non risulta
+   * interrotta (nessun link consegnato, nessuno può pagarlo).
+   */
+  async expireOtherHorizons(
+    userId: string,
+    horizon: ProgramHorizon,
+    now = new Date(),
+  ) {
+    const stale = await this.prisma.subscription.findMany({
+      where: {
+        userId,
+        status: SubscriptionStatus.CHECKOUT_PENDING,
+        horizon: { not: horizon },
+      },
+    });
+    for (const subscription of stale) {
+      if (!subscription.providerCheckoutId) {
+        if (
+          now.getTime() - subscription.createdAt.getTime() <
+          PREPARATION_TIMEOUT_MS
+        )
+          throw new ConflictException(
+            'Checkout gia in preparazione, riprova tra qualche secondo',
+          );
+        await this.prisma.subscription.updateMany({
+          where: {
+            id: subscription.id,
+            status: SubscriptionStatus.CHECKOUT_PENDING,
+            providerCheckoutId: null,
+          },
+          data: { status: SubscriptionStatus.CHECKOUT_FAILED },
+        });
+        continue;
+      }
+      await this.invalidate(subscription);
+    }
+  }
+
   /** Chiude il checkout precedente presso il provider prima di liberare il posto. */
   private async invalidate(subscription: Subscription) {
     if (subscription.providerCheckoutId) {
@@ -231,20 +274,30 @@ export class CheckoutService {
         expiresAt,
         ...checkoutReturnUrls(),
       });
-      await this.prisma.subscription.update({
-        where: { id: subscription.id },
+      const saved = await this.prisma.subscription.updateMany({
+        where: {
+          id: subscription.id,
+          status: SubscriptionStatus.CHECKOUT_PENDING,
+        },
         data: {
           providerCheckoutId: checkout.checkoutId,
           checkoutUrl: checkout.url,
           checkoutExpiresAt: expiresAt,
         },
       });
+      if (!saved.count) {
+        // Una preparazione lenta può essere stata liberata nel frattempo:
+        // il link appena arrivato non deve essere consegnato né restare pagabile.
+        await provider.expireCheckout(checkout.checkoutId);
+        throw new ConflictException('Checkout superato: riprova il pagamento');
+      }
       return {
         subscriptionId: subscription.id,
         provider: provider.kind,
         checkoutUrl: checkout.url,
       };
     } catch (error) {
+      if (error instanceof ConflictException) throw error;
       // Nessun record orfano: il posto si libera e l'utente puo riprovare.
       await this.prisma.subscription.updateMany({
         where: {

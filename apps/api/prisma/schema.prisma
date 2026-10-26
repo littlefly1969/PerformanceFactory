@@ -81,6 +81,8 @@ model User {
   createdAt DateTime @default(now())
   /// Dichiarazione di maggiore eta raccolta alla registrazione (Blueprint A2.6-A2.7).
   adultConfirmedAt DateTime?
+  /// Foto profilo facoltativa: data URL ridimensionata dal client (benvenuto 01).
+  avatarImage      String?
   /// Tester selezionati per i feature flag in beta.
   isBetaTester     Boolean   @default(false)
   /// Codice personale da condividere per il referral (A8.19).
@@ -500,6 +502,7 @@ model Area {
   microTests                  MicroTest[]
   lessonFeedback              CoachLessonFeedback[]
   potentialScenarios          PotentialScenario[]
+  coachingVideos              CoachingVideo[]
 }
 
 model FeedbackEntry {
@@ -1304,6 +1307,9 @@ model AthleteDiscovery {
   activatedAt DateTime?
   /// Prima apertura del paywall, dopo la scelta dell'orizzonte.
   paywallViewedAt DateTime?
+  /// Fine della sequenza di benvenuto (foto, Spider, regalo, installazione app):
+  /// lato server perché su iOS l'app installata non condivide lo storage con Safari.
+  welcomeCompletedAt DateTime?
   createdAt DateTime @default(now())
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -1604,8 +1610,6 @@ model Partner {
   postalCode String?
   /// Sito ufficiale o pagina social del circolo.
   website   String?
-  /// URL pubblico del logo mostrato all'atleta; nullo se non disponibile.
-  logoUrl   String?
   /// Coordinate della sede, risolte dall'indirizzo: servono per dire
   /// all'atleta quanto dista il circolo. Nulle se non risolte.
   latitude  Float?
@@ -1614,6 +1618,11 @@ model Partner {
   isActive  Boolean  @default(true)
   /// Il circolo offre la lezione gratuita di gruppo (A4.8, A7.2); spento di default.
   freeLessonsEnabled Boolean @default(false)
+  /// Logo e foto del circolo per il carosello del regalo: data URL PNG, JPEG o WebP già ridimensionati dal back office.
+  logoImage      String?
+  logoUpdatedAt  DateTime?
+  photoImage     String?
+  photoUpdatedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -2005,6 +2014,25 @@ model MicroTestCompletion {
   @@index([userId, completedAt])
 }
 
+/// Archivio dei video di approfondimento curato dal back office: l'AI sceglie
+/// quale mostrare dopo un micro-test, in base al test e alle risposte.
+model CoachingVideo {
+  id          String   @id @default(uuid())
+  /// Driver a cui il video si riferisce; nullo se vale per tutti.
+  areaId      String?
+  title       String
+  description String   @default("")
+  /// Indirizzo del video; nullo finché il file non è pronto (si mostra il titolo).
+  url         String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  area Area? @relation(fields: [areaId], references: [id], onDelete: SetNull)
+
+  @@index([areaId, isActive])
+}
+
 /// Lezione di padel di un'ora in gruppo da 4 presso un circolo partner (A4.8).
 model FreeLesson {
   id              String   @id @default(uuid())
@@ -2023,7 +2051,9 @@ model FreeLesson {
 
   partner  Partner               @relation(fields: [partnerId], references: [id])
   coach    User?                 @relation("FreeLessonCoach", fields: [coachId], references: [id], onDelete: SetNull)
-  seats    FreeLessonSeat[]
+  seats    FreeLessonSeat[]      @relation("FreeLessonSeatLesson")
+  /// Posti che indicano questa lezione come preferita: il gruppo lo compone l'admin.
+  preferredBy FreeLessonSeat[]   @relation("FreeLessonSeatPreference")
   feedback CoachLessonFeedback[]
 
   @@index([partnerId, startsAt])
@@ -2045,11 +2075,14 @@ model FreeLessonSeat {
   /// §10.3): versione della regola e valutazione su cui è stata presa.
   eligibilityPolicyId     String?
   eligibilityEvaluationId String?
+  /// Giorno e orario indicati dall'atleta fra le lezioni in calendario; il gruppo lo compone l'admin.
+  preferredLessonId      String?
   updatedAt              DateTime  @updatedAt
 
   user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   partner              Partner               @relation(fields: [partnerId], references: [id])
-  lesson               FreeLesson?           @relation(fields: [lessonId], references: [id], onDelete: Restrict)
+  lesson               FreeLesson?           @relation("FreeLessonSeatLesson", fields: [lessonId], references: [id], onDelete: Restrict)
+  preferredLesson      FreeLesson?           @relation("FreeLessonSeatPreference", fields: [preferredLessonId], references: [id], onDelete: SetNull)
   eligibilityPolicy    ConfidencePolicy?     @relation(fields: [eligibilityPolicyId], references: [id], onDelete: Restrict)
   eligibilityEvaluation AssessmentEvaluation? @relation(fields: [eligibilityEvaluationId], references: [id], onDelete: SetNull)
 

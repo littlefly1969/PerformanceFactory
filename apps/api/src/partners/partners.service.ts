@@ -14,6 +14,7 @@ import {
   sanitizeTouch,
 } from './attribution';
 import { CreatePartnerDto, UpdatePartnerDto } from './dto/partner.dto';
+import { ClubImageKind, clubImagePath, decodeClubImage } from './club-image';
 import { GeocodingService } from '../geo/geocoding.service';
 
 const REFERRAL_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -29,16 +30,54 @@ const partnerSelect = {
   address: true,
   postalCode: true,
   website: true,
-  logoUrl: true,
   latitude: true,
   longitude: true,
   isActive: true,
   freeLessonsEnabled: true,
+  logoUpdatedAt: true,
+  photoUpdatedAt: true,
   createdAt: true,
 } as const;
 
+type PartnerRow = Prisma.PartnerGetPayload<{ select: typeof partnerSelect }>;
+
+/**
+ * Il back office vede i percorsi delle immagini, non i data URL, e se la sede
+ * e stata riconosciuta: senza coordinate la distanza dall'atleta non si calcola.
+ */
+function partnerView({
+  logoUpdatedAt,
+  photoUpdatedAt,
+  latitude,
+  longitude,
+  ...partner
+}: PartnerRow) {
+  return {
+    ...partner,
+    located: latitude !== null && longitude !== null,
+    logoUrl: clubImagePath(partner.id, 'logo', logoUpdatedAt),
+    photoUrl: clubImagePath(partner.id, 'photo', photoUpdatedAt),
+  };
+}
+
 /** Campo di testo opzionale: senza contenuto resta null invece di stringa vuota. */
 const text = (value: string | undefined) => value?.trim() || null;
+
+type Sede = {
+  address: string | null;
+  postalCode: string | null;
+  city: string | null;
+  province: string | null;
+};
+
+/** Un'immagine nuova aggiorna la sua versione; null la rimuove. */
+function imageUpdate(kind: ClubImageKind, value: string | null | undefined) {
+  if (value === undefined) return {};
+  return {
+    [`${kind}Image`]: value,
+    [`${kind}UpdatedAt`]: value === null ? null : new Date(),
+  };
+}
 
 @Injectable()
 export class PartnersService {
@@ -52,21 +91,16 @@ export class PartnersService {
    * parti. Un tentativo, non un obbligo: senza risposta restano nulle e
    * all'atleta si dice che la distanza non si puo calcolare.
    */
-  private async locate(sede: {
-    street: string | null;
-    postalCode: string | null;
-    city: string | null;
-    province: string | null;
-  }) {
-    const { street, postalCode, city, province } = sede;
-    if (!street || !postalCode || !city || !province)
-      return { latitude: null, longitude: null, geocodedAt: null };
-    const located = await this.geocoding.locate({
-      street,
-      postalCode,
-      city,
-      province,
-    });
+  private async locate({ address, postalCode, city, province }: Sede) {
+    const located =
+      address && postalCode && city && province
+        ? await this.geocoding.locate({
+            street: address,
+            postalCode,
+            city,
+            province,
+          })
+        : null;
     return {
       latitude: located?.latitude ?? null,
       longitude: located?.longitude ?? null,
@@ -90,33 +124,33 @@ export class PartnersService {
       counts.map((row) => [row.partnerId, row._count._all]),
     );
     return partners.map((partner) => ({
-      ...partner,
+      ...partnerView(partner),
       attributedUsers: byPartner.get(partner.id) ?? 0,
     }));
   }
 
   async create(input: CreatePartnerDto) {
-    const sede = {
-      city: text(input.city),
-      province: text(input.province)?.toUpperCase() ?? null,
+    const sede: Sede = {
       address: text(input.address),
       postalCode: text(input.postalCode),
+      city: text(input.city),
+      province: text(input.province)?.toUpperCase() ?? null,
     };
     try {
-      return await this.prisma.partner.create({
+      const partner = await this.prisma.partner.create({
         data: {
           code: input.code,
           name: input.name.trim(),
           ...sede,
           website: text(input.website),
-          logoUrl: text(input.logoUrl),
-          ...(await this.locate({ ...sede, street: sede.address })),
+          ...(await this.locate(sede)),
           ...(input.freeLessonsEnabled !== undefined && {
             freeLessonsEnabled: input.freeLessonsEnabled,
           }),
         },
         select: partnerSelect,
       });
+      return partnerView(partner);
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -139,36 +173,50 @@ export class PartnersService {
       },
     });
     if (!existing) throw new NotFoundException('Circolo non trovato');
-    const sede = {
-      ...(input.city !== undefined && { city: text(input.city) }),
-      ...(input.province !== undefined && {
-        province: text(input.province)?.toUpperCase() ?? null,
-      }),
+    const changes: Partial<Sede> = {
       ...(input.address !== undefined && { address: text(input.address) }),
       ...(input.postalCode !== undefined && {
         postalCode: text(input.postalCode),
       }),
+      ...(input.city !== undefined && { city: text(input.city) }),
+      ...(input.province !== undefined && {
+        province: text(input.province)?.toUpperCase() ?? null,
+      }),
     };
     // Le coordinate si rifanno solo quando la sede cambia davvero.
-    const next = { ...existing, ...sede };
-    const moved = (['address', 'postalCode', 'city', 'province'] as const).some(
-      (field) => next[field] !== existing[field],
+    const sede: Sede = { ...existing, ...changes };
+    const moved = (Object.keys(changes) as Array<keyof Sede>).some(
+      (field) => sede[field] !== existing[field],
     );
-    return this.prisma.partner.update({
+    const partner = await this.prisma.partner.update({
       where: { id },
       data: {
         ...(input.name !== undefined && { name: input.name.trim() }),
-        ...sede,
+        ...changes,
         ...(input.website !== undefined && { website: text(input.website) }),
-        ...(input.logoUrl !== undefined && { logoUrl: text(input.logoUrl) }),
-        ...(moved ? await this.locate({ ...next, street: next.address }) : {}),
+        ...(moved ? await this.locate(sede) : {}),
         ...(input.freeLessonsEnabled !== undefined && {
           freeLessonsEnabled: input.freeLessonsEnabled,
         }),
         ...(input.isActive !== undefined && { isActive: input.isActive }),
+        ...imageUpdate('logo', input.logoImage),
+        ...imageUpdate('photo', input.photoImage),
       },
       select: partnerSelect,
     });
+    return partnerView(partner);
+  }
+
+  /** Logo o foto di un circolo attivo, già decodificati per la risposta HTTP. */
+  async image(id: string, kind: ClubImageKind) {
+    const partner = await this.prisma.partner.findFirst({
+      where: { id, isActive: true },
+      select: { logoImage: true, photoImage: true },
+    });
+    const dataUrl = kind === 'logo' ? partner?.logoImage : partner?.photoImage;
+    const image = dataUrl ? decodeClubImage(dataUrl) : null;
+    if (!image) throw new NotFoundException('Immagine non trovata');
+    return image;
   }
 
   /**

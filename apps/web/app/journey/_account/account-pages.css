@@ -1,0 +1,497 @@
+/* Coach e micro-test. */
+.pf-acc-coach-head h1 {
+  margin: 10px 0 22px;
+  font-size: 30px;
+  line-height: 1.15;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+}
+.pf-acc-tabs {
+  display: flex;
+  margin: 0 -22px 26px;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--acc-line);
+}
+.pf-acc-tabs button {
+  position: relative;
+  flex: 1;
+  padding: 10px 0 14px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--acc-muted);
+  font-size: 11px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+}
+.pf-acc-tabs button.is-active {
+  border-bottom-color: var(--acc-ink);
+  color: var(--acc-ink);
+}
+.pf-acc-tab-dot {
+  top: 6px;
+  right: 2px;
+  width: 7px;
+  height: 7px;
+}
+.pf-acc-micro h2 {
+  margin: 10px 0 14px;
+  font-size: 26px;
+  line-height: 1.2;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+.pf-acc-micro h3 {
+  margin: 24px 0 8px;
+  font-size: 17px;
+  font-weight: 500;
+}
+.pf-acc-line {
+  display: block;
+  width: 40px;
+  height: 3px;
+  margin-bottom: 22px;
+  background: var(--acc-lime);
+}
+.pf-acc-chip {
+  display: inline-block;
+  padding: 6px 10px;
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+}
+.pf-acc-facts {
+  margin: 22px 0 10px;
+}
+.pf-acc-facts div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--acc-line);
+}
+.pf-acc-facts dt {
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: var(--acc-muted);
+}
+.pf-acc-facts dd {
+  margin: 0;
+  font-size: 14px;
+  text-align: right;
+}
+.pf-acc-steps {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+.pf-acc-steps span {
+  flex: 1;
+  height: 4px;
+  background: var(--acc-line);
+}
+.pf-acc-steps .is-done {
+  background: var(--acc-lime);
+}
+.pf-acc-steps .is-current {
+  background: var(--acc-ink);
+}
+.pf-acc-answers {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0 22px;
+}
+.pf-acc-answer {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  width: 100%;
+  padding: 18px 18px 18px 20px;
+  border: 1px solid #e2e2de;
+  border-radius: 26px;
+  background: #fff;
+  color: var(--acc-ink);
+  text-align: left;
+}
+.pf-acc-answer:disabled {
+  color: var(--acc-ink);
+}
+.pf-acc-answer.is-selected {
+  border-color: var(--acc-ink);
+}
+.pf-acc-answer.is-correct {
+  border-color: var(--acc-lime);
+  background: var(--acc-lime-soft);
+}
+.pf-acc-answer.is-wrong {
+  border-color: var(--acc-ink);
+}
+.pf-acc-letter {
+  padding-top: 3px;
+  font-size: 10px;
+  color: var(--acc-muted);
+}
+.pf-acc-answer-body {
+  flex: 1;
+  display: grid;
+  gap: 10px;
+}
+.pf-acc-answer-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pf-acc-answer b {
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+.pf-acc-answer em {
+  flex: none;
+  padding-top: 3px;
+  font-size: 11px;
+  font-style: normal;
+}
+.pf-acc-answer-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #3f3f42;
+}
+.pf-acc-confidence {
+  margin: 18px 0 6px;
+}
+.pf-acc-confidence b {
+  font-size: 15px;
+  font-weight: 400;
+}
+.pf-acc-video {
+  margin: 22px 0;
+}
+.pf-acc-video video,
+.pf-acc-video-box {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 24px;
+  background: #121214;
+}
+.pf-acc-video-box {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 20px;
+  color: #fff;
+  text-align: center;
+}
+.pf-acc-video-box span:not(.pf-acc-play) {
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: #a6a6ab;
+}
+.pf-acc-video-box strong {
+  font-size: 16px;
+  font-weight: 400;
+}
+.pf-acc-play {
+  width: 52px;
+  height: 52px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px var(--acc-lime);
+  color: var(--acc-lime);
+}
+.pf-acc-video figcaption {
+  margin-top: 12px;
+}
+.pf-acc-video figcaption strong,
+.pf-acc-video figcaption a {
+  display: block;
+  margin-top: 4px;
+  font-size: 16px;
+  font-weight: 400;
+  color: var(--acc-ink);
+}
+
+/* Stato di calibrazione. */
+.pf-acc-calib-head {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin: 18px 0 24px;
+}
+.pf-acc-calib-head p {
+  margin: 12px 0 0;
+}
+.pf-acc-progress {
+  margin-bottom: 18px;
+}
+.pf-acc-progress b {
+  font-size: 15px;
+  font-weight: 400;
+}
+.pf-acc-areas {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.pf-acc-areas li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px 0;
+  border-bottom: 1px solid var(--acc-line);
+  font-size: 16px;
+}
+.pf-acc-areas small {
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--acc-muted);
+}
+.pf-acc-areas small.is-ok {
+  color: var(--acc-ink);
+}
+
+/* Scelta del circolo. */
+.pf-acc-clubs {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0 24px;
+}
+.pf-acc-club {
+  display: grid;
+  gap: 4px;
+  padding: 20px;
+  border: 1px solid #e2e2de;
+  border-radius: 22px;
+  background: #fff;
+  color: var(--acc-ink);
+  text-align: left;
+}
+.pf-acc-club.is-selected {
+  border-color: var(--acc-ink);
+  box-shadow: inset 0 0 0 1px var(--acc-ink);
+}
+.pf-acc-club b {
+  font-size: 16px;
+  font-weight: 400;
+}
+.pf-acc-club small {
+  font-size: 13px;
+  color: var(--acc-muted);
+}
+.pf-acc-days,
+.pf-acc-times {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 22px;
+  overflow-x: auto;
+}
+.pf-acc-days button {
+  flex: none;
+  width: 62px;
+  padding: 12px 0;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  border: 1px solid #e2e2de;
+  border-radius: 16px;
+  background: #fff;
+  color: var(--acc-ink);
+}
+.pf-acc-days small {
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--acc-muted);
+}
+.pf-acc-days b {
+  font-size: 22px;
+  font-weight: 400;
+}
+.pf-acc-days button.is-selected {
+  border-color: var(--acc-ink);
+  background: var(--acc-ink);
+  color: #fff;
+}
+.pf-acc-times button {
+  flex: 1;
+  min-width: 90px;
+  min-height: 48px;
+  border: 1px solid #e2e2de;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--acc-ink);
+  font-size: 15px;
+}
+.pf-acc-times button.is-selected {
+  background: var(--acc-ink);
+  color: #fff;
+}
+.pf-acc-rules {
+  margin-top: 6px;
+  padding: 18px;
+  border: 1px solid var(--acc-line);
+  border-radius: 20px;
+}
+.pf-acc-rules p {
+  margin: 8px 0 12px;
+  font-size: 13px;
+}
+.pf-acc-rules label {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.pf-acc-rules input {
+  margin-top: 3px;
+  accent-color: var(--acc-ink);
+}
+
+/* Scenari, piano e checkout. */
+.pf-acc-scenario {
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid var(--acc-line);
+  border-radius: 26px;
+}
+.pf-acc-scenario.is-selected {
+  border-color: var(--acc-ink);
+}
+.pf-acc-scenario-body {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.pf-acc-scenario strong {
+  display: block;
+  margin: 6px 0;
+  font-size: 26px;
+  font-weight: 400;
+}
+.pf-acc-scenario p {
+  margin: 0;
+  font-size: 13px;
+}
+.pf-acc-plan-head {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  margin: 18px 0 22px;
+}
+.pf-acc-plan-head dl {
+  margin: 0;
+}
+.pf-acc-plan-head dt {
+  font-size: 13px;
+  color: var(--acc-text);
+}
+.pf-acc-plan-head dd {
+  margin: 0 0 10px;
+  font-size: 30px;
+}
+.pf-acc-unlocks {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.pf-acc-unlocks li {
+  display: grid;
+  gap: 2px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--acc-line);
+}
+.pf-acc-unlocks b {
+  font-size: 15px;
+  font-weight: 400;
+}
+.pf-acc-unlocks small {
+  font-size: 12px;
+  color: var(--acc-muted);
+}
+.pf-acc-segment {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 28px;
+}
+.pf-acc-segment button {
+  flex: 1;
+  min-height: 46px;
+  border: 1px solid #e2e2de;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--acc-ink);
+  font-size: 13px;
+}
+.pf-acc-segment button.is-selected {
+  border-color: var(--acc-lime);
+  background: var(--acc-lime);
+}
+.pf-acc-choices {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0 26px;
+}
+.pf-acc-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 18px;
+  border: 1px solid #e2e2de;
+  border-radius: 22px;
+  background: #fff;
+  color: var(--acc-ink);
+  font-size: 13px;
+  text-align: left;
+}
+.pf-acc-choice span:first-child {
+  display: grid;
+  gap: 2px;
+}
+.pf-acc-choice b {
+  font-size: 16px;
+  font-weight: 400;
+}
+.pf-acc-choice small {
+  font-size: 12px;
+  color: var(--acc-muted);
+}
+.pf-acc-choice.is-selected {
+  border-color: var(--acc-ink);
+  box-shadow: inset 0 0 0 1px var(--acc-ink);
+}
+.pf-acc-methods {
+  display: grid;
+  gap: 10px;
+  margin: 10px 0 16px;
+  padding: 0;
+  list-style: none;
+}
+.pf-acc-methods li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border: 1px solid #e2e2de;
+  border-radius: 18px;
+}
+.pf-acc-methods b {
+  font-size: 15px;
+  font-weight: 400;
+}
+.pf-acc-methods small {
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--acc-muted);
+}
+.pf-acc-footer .pf-acc-link {
+  margin-top: 10px;
+}
