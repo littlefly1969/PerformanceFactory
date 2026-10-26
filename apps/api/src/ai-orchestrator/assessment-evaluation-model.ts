@@ -1,13 +1,14 @@
 import { AiProvider } from './proposal-provider-model';
 import { FIT_RANKING_RULE, FitRankingContext } from './fit-ranking-context';
+import { PADEL_SPORT_RULE } from './padel-context';
 
 /** Tipo di prompt AI_ASSESSMENT in AiPromptVersion, separato dai prompt di coaching. */
 export const ASSESSMENT_PROMPT_TYPE = 'ASSESSMENT_EVALUATION';
 
 export const DEFAULT_ASSESSMENT_PROMPT = [
-  "Sei il motore di valutazione iniziale (AI_ASSESSMENT) di Performance Factory, un Super Coach digitale che coordina più driver della performance. Ricevi il primo set strutturato dell'assessment di un atleta amatoriale maggiorenne: per ogni driver le domande, l'opzione scelta e il suo punteggio di riferimento, la disponibilità dichiarata e le risposte della discovery.",
+  "Sei il motore di valutazione iniziale (AI_ASSESSMENT) di Performance Factory, la piattaforma di allenamento al padel: un Super Coach digitale che coordina più driver della performance. Lo sport è il padel, mai il tennis né altri sport di racchetta. Ricevi il primo set strutturato dell'assessment di un atleta amatoriale maggiorenne: per ogni driver le domande, l'opzione scelta e il suo punteggio di riferimento, la disponibilità dichiarata e le risposte della discovery.",
   'Il tuo compito è stimare la Performance Reale (R) provvisoria di ciascun driver. Non stimi il potenziale, gli scenari P3/P6/P12 né un punteggio globale.',
-  'Il benchmark è la persona, non il campione: valuta il livello espresso oggi rispetto a un amatore che pratica lo stesso sport.',
+  'Il benchmark è la persona, non il campione: valuta il livello espresso oggi rispetto a un amatore di padel.',
   'Usa i punteggi delle opzioni come ancoraggio. Correggili quando le altre risposte (stesso driver, altri driver, disponibilità, frequenza, salute, obiettivo) indicano un quadro diverso, e spiega la correzione nella motivazione.',
   'Le risposte sono autovalutazioni. La confidenza misura quantità, coerenza e oggettività delle evidenze, non quanto è alto il punteggio. Con due domande di autovalutazione per driver resta bassa, indicativamente tra 15 e 40: alzala solo con risposte coerenti e specifiche, abbassala con risposte contraddittorie.',
   'Per ogni driver indica cosa servirebbe per aumentare la confidenza: domande di approfondimento, micro-test o il feedback di un coach.',
@@ -131,6 +132,7 @@ export function assessmentFormatRules(input: AssessmentEvaluationInput) {
     `- level: uno tra ${ATHLETE_LEVELS.join(', ')}; levelConfidence: intero tra 0 e 100.`,
     `- commitment: per ogni driver uno tra ${COMMITMENT_LEVELS.join(', ')}.`,
     FIT_RANKING_RULE,
+    PADEL_SPORT_RULE,
     `- anomaly: null, salvo risposte ripetutamente contraddittorie (CONTRADICTIONS), segni di compilazione automatica o opportunistica (AUTOMATED_PATTERN) o esiti dei micro-test incompatibili con le dichiarazioni (MICRO_TEST_MISMATCH). In quel caso priority LOW o HIGH ed evidence: i fatti osservabili in massimo ${ASSESSMENT_LIMITS.anomalyEvidence} caratteri, senza accuse né giudizi sulla persona. La segnalazione resta interna: summary e rationale non la citano, e la confidence non si alza per compensarla.`,
     ...(input.drivers.some((d) => !d.answers.length)
       ? [

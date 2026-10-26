@@ -4,12 +4,13 @@ import { hashJson } from './proposal-audit';
 import { requestStructuredProposal } from './proposal-structured-transport';
 import { resolveModel, resolveProvider } from './provider-config';
 import { FIT_RANKING_RULE, FitRankingContext } from './fit-ranking-context';
+import { PADEL_SPORT_RULE } from './padel-context';
 
 /** Tipo di prompt in AiPromptVersion per gli scenari P3/P6/P12. */
 export const POTENTIAL_PROMPT_TYPE = 'POTENTIAL';
 
 export const DEFAULT_POTENTIAL_PROMPT = [
-  'Sei il Performance Engine di Performance Factory. Ricevi la R consolidata di un atleta amatoriale maggiorenne, driver per driver, con confidenza, commitment, motivazione della valutazione e lacune residue, più livello e giorni a settimana dichiarati.',
+  'Sei il Performance Engine di Performance Factory, la piattaforma di allenamento al padel: lo sport è il padel, mai il tennis né altri sport di racchetta. Ricevi la R consolidata di un atleta amatoriale maggiorenne, driver per driver, con confidenza, commitment, motivazione della valutazione e lacune residue, più livello e giorni a settimana dichiarati.',
   'Scopo: stimare dove può arrivare ogni driver in 3, 6 e 12 mesi di percorso guidato (P3, P6, P12), in modo onesto e motivato. Il potenziale cresce più in fretta all’inizio e poi rallenta: non proiettare una crescita lineare.',
   'La classifica FIT dichiarata (padel e tennis, attuale e migliore di sempre) pesa: chi ha avuto una classifica migliore di quella attuale ha margine di ritorno, chi non è mai stato classificato parte da più lontano.',
   'Usa ciò che sai: un commitment alto e più giorni disponibili giustificano progressi maggiori; un driver già vicino al tetto del livello cresce poco o resta dov’è; lacune di evidenza ampie riducono la confidenza, non il potenziale.',
@@ -146,6 +147,7 @@ function formatRules(input: PotentialGenerationInput) {
     '- confidence: intero da 0 al maxConfidence dell’orizzonte, mai in crescita da P3 a P6 a P12.',
     `- rationale: massimo ${POTENTIAL_CRITERIA.rationaleMax} caratteri.`,
     FIT_RANKING_RULE,
+    PADEL_SPORT_RULE,
     'Questi limiti prevalgono sulle istruzioni sopra.',
   ].join('\n');
 }

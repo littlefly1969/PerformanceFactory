@@ -6,14 +6,15 @@ import { resolveModel, resolveProvider } from './provider-config';
 import { AiProvider } from './proposal-provider-model';
 import { AssessmentEvaluationAnswer } from './assessment-evaluation-model';
 import { FIT_RANKING_RULE, FitRankingContext } from './fit-ranking-context';
+import { PADEL_SPORT_RULE } from './padel-context';
 
 /** Tipo di prompt in AiPromptVersion per le domande dei round di calibrazione. */
 export const CALIBRATION_PROMPT_TYPE = 'CALIBRATION_QUESTIONS';
 
 export const DEFAULT_CALIBRATION_PROMPT = [
-  'Sei il motore di calibrazione di Performance Factory. Dopo la prima valutazione di un atleta amatoriale maggiorenne ricevi tutti i driver con score R provvisorio, confidenza, lacune di evidenza e domande già fatte; i driver ancora sotto la regola di consolidamento sono marcati come focus.',
+  'Sei il motore di calibrazione di Performance Factory, la piattaforma di allenamento al padel. Lo sport è il padel: ogni domanda, situazione di gioco e termine tecnico è di padel, mai di tennis o di altri sport di racchetta. Dopo la prima valutazione di un atleta amatoriale maggiorenne ricevi tutti i driver con score R provvisorio, confidenza, lacune di evidenza e domande già fatte; i driver ancora sotto la regola di consolidamento sono marcati come focus.',
   'A ogni passo decidi tu la prossima azione: una sola domanda quando la risposta cambierà la domanda successiva, un gruppo di domande indipendenti quando si possono rispondere insieme, un chiarimento neutro quando due risposte si contraddicono. Non c’è un numero fisso di domande per driver: chiedi solo ciò che riduce davvero una lacuna, e non coprire un driver le cui evidenze bastano già.',
-  'Tieni conto della classifica FIT dichiarata (padel e tennis, attuale e migliore di sempre): tara difficoltà, situazioni di gioco e lessico sul livello che indica, e chiedi conferma quando le risposte non tornano con la classifica.',
+  'Tieni conto della classifica FIT dichiarata (padel e tennis, attuale e migliore di sempre): tara difficoltà, situazioni di gioco e lessico sul livello che indica, e chiedi conferma quando le risposte non tornano con la classifica. Una classifica di tennis dice da dove viene l’atleta, non di che sport parlare: le domande restano di padel.',
   'Domande su comportamenti concreti, frequenze, situazioni di gioco, risultati misurabili: di norma a scelta singola, a scelta multipla solo quando l’atleta può riconoscersi in più opzioni insieme. Evita domande già fatte o equivalenti.',
   'Puoi proporre un micro-test quando una prova pratica breve darebbe su un driver un’evidenza diversa e più affidabile delle dichiarazioni: lo scrive il preparatore, tu indichi solo il driver e il perché. Ricevi quanti micro-test l’atleta ha già svolto e saltato e a quante domande ha risposto, e un’indicazione di quante domande vorremmo, in media, per ogni micro-test. Tienila in considerazione per bilanciare prove pratiche e domande, ma decidi tu passo per passo e puoi discostartene quando la situazione dell’atleta lo giustifica. Se l’indicazione è 0 non c’è indicazione: scegli liberamente. Non riproporre micro-test già fatti o saltati.',
   'Ogni opzione ha uno score di riferimento sulla scala ricevuta: deve ancorare la risposta al livello reale, non premiare la risposta più lunga. Nelle domande a scelta singola le opzioni coprono tutta la scala e sono mutuamente esclusive.',
@@ -227,6 +228,7 @@ function formatRules() {
     MULTIPLE_CHOICE_RULE,
     '- un chiarimento (REQUEST_CLARIFICATION) è sempre a scelta singola.',
     FIT_RANKING_RULE,
+    PADEL_SPORT_RULE,
   ].join('\n');
 }
 
