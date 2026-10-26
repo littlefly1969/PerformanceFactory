@@ -1,13 +1,29 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { AthleteShell } from "../../../_components/athlete-shell";
+import { SubscriberShell } from "../../../_components/subscriber-shell";
 import { athleteRequest, useAthlete } from "../../../_components/use-athlete";
 import {
-  displayDate,
   sessionLabels,
   type Session,
 } from "../../../_components/athlete-types";
+import {
+  effortFromRating,
+  modeLabels,
+  sessionArea,
+  sessionMeta,
+  sessionSteps,
+  twoDigits,
+} from "../../../_components/session-format";
+
+function restBetween(session: Session) {
+  if (session.restSeconds) return session.restSeconds;
+  const rests = (session.exercises ?? []).flatMap((e) =>
+    e.restSeconds ? [e.restSeconds] : [],
+  );
+  return rests.length ? Math.max(...rests) : null;
+}
+
 export function SessionDetail({ id }: { id: string }) {
   const {
     data: session,
@@ -16,24 +32,18 @@ export function SessionDetail({ id }: { id: string }) {
   } = useAthlete<Session>(
     `/athlete/training/sessions/${encodeURIComponent(id)}`,
   );
-  const [stage, setStage] = useState<"detail" | "feedback" | "skip" | "done">(
-    "detail",
-  );
-  const [rating, setRating] = useState<number>();
-  const [notes, setNotes] = useState("");
+  const [confirmSkip, setConfirmSkip] = useState(false);
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState("");
-  async function finish(action: "complete" | "skip") {
+  async function skip() {
     setBusy(true);
     setFailure("");
     try {
       await athleteRequest(
-        `/athlete/training/sessions/${encodeURIComponent(id)}/${action}`,
-        action === "complete"
-          ? { completionRating: rating, completionNotes: notes || undefined }
-          : {},
+        `/athlete/training/sessions/${encodeURIComponent(id)}/skip`,
+        {},
       );
-      setStage("done");
+      setConfirmSkip(false);
       reload();
     } catch (e) {
       setFailure((e as Error).message);
@@ -41,157 +51,137 @@ export function SessionDetail({ id }: { id: string }) {
       setBusy(false);
     }
   }
+  const rest = session ? restBetween(session) : null;
+  const facts = session
+    ? ([
+        ["Obiettivo", session.goal],
+        [
+          "Durata",
+          session.durationMinutes ? `${session.durationMinutes} minuti` : null,
+        ],
+        ["Area", session.track === "AREA" ? sessionArea(session) : null],
+        ["Prerequisiti", session.prerequisites],
+        ["Recupero tra esercizi", rest ? `${rest} secondi` : null],
+        ["Come si esegue", session.mode ? modeLabels[session.mode] : null],
+        ["Attrezzatura", session.equipment],
+      ].filter(([, value]) => value) as [string, string][])
+    : [];
+  const steps = session ? sessionSteps(session) : [];
+  const effort = session ? effortFromRating(session.completionRating) : null;
   return (
-    <AthleteShell
-      label="Training · Sessione"
+    <SubscriberShell
+      back={
+        session
+          ? `/user/training?date=${session.date}&view=day`
+          : "/user/training"
+      }
+      kicker={
+        session
+          ? [
+              `Sessione ${twoDigits(session.sequence)}`,
+              session.week ? `Settimana ${twoDigits(session.week)}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")
+          : "Sessione"
+      }
       error={error}
       reload={reload}
       loading={!session}
+      footer={
+        session?.canAct && !confirmSkip ? (
+          <Link
+            className="pfs-cta"
+            href={`/user/training/sessions/${session.id}/esegui`}
+          >
+            Inizia la sessione
+          </Link>
+        ) : undefined
+      }
     >
       {session && (
-        <>
-          <Link
-            className="pf4-text-link"
-            href={`/user/training?date=${session.date}`}
-          >
-            ← Calendario
-          </Link>
-          <div className="pf4-session-heading">
-            <span className="pf4-kicker">
-              {displayDate(session.date)} ·{" "}
-              {sessionLabels[session.displayStatus]}
-            </span>
-            <h1>{session.title}</h1>
-            <p>{session.type}</p>
-          </div>
+        <article className="pfs-sheet">
+          <h1 className="pfs-title">{session.title}</h1>
+          {!!sessionMeta(session).length && (
+            <p className="pfs-meta">{sessionMeta(session).join(" · ")}</p>
+          )}
           {failure && (
-            <p className="pf4-error" role="alert">
+            <p className="pfs-alert" role="alert">
               {failure}
             </p>
           )}
-          {stage === "feedback" && session.canAct ? (
-            <section className="pf4-feedback">
-              <span className="pf4-kicker">Sessione conclusa</span>
-              <h2>Come è andata?</h2>
-              <p>Se vuoi, lascia una valutazione e una nota al tuo coach.</p>
-              <div className="pf4-rating" aria-label="Valutazione da 1 a 5">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    aria-pressed={rating === n}
-                    onClick={() => setRating(rating === n ? undefined : n)}
-                    disabled={busy}
-                  >
-                    {n}
-                  </button>
-                ))}
-              </div>
-              <label>
-                La tua nota (facoltativa)
-                <textarea
-                  maxLength={5000}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  disabled={busy}
-                  placeholder="Cosa hai sentito durante la sessione?"
-                />
-              </label>
-              <button
-                className="pf4-cta"
-                disabled={busy}
-                onClick={() => finish("complete")}
-              >
-                {busy ? "Salvataggio…" : "Salva e chiudi →"}
-              </button>
-              <button
-                className="pf4-text-link"
-                disabled={busy}
-                onClick={() => setStage("detail")}
-              >
-                Indietro
-              </button>
-            </section>
-          ) : stage === "skip" && session.canAct ? (
-            <section className="pf4-feedback">
-              <h2>Salti questa sessione?</h2>
-              <p>Resterà nel calendario come saltata.</p>
-              <button
-                className="pf4-cta"
-                disabled={busy}
-                onClick={() => finish("skip")}
-              >
-                {busy ? "Salvataggio…" : "Conferma: salta la sessione"}
-              </button>
-              <button
-                className="pf4-text-link"
-                disabled={busy}
-                onClick={() => setStage("detail")}
-              >
-                Torna alla sessione
-              </button>
-            </section>
-          ) : (
-            <>
-              {stage === "done" && (
-                <div className="pf4-saved" role="status">
-                  Sessione salvata.{" "}
-                  <Link href="/user">Scopri il prossimo passo →</Link>
+          <section className="pfs-sheet-section">
+            <span className="pfs-kicker">Perché questa sessione</span>
+            <p className="pfs-body">{session.body}</p>
+            {session.summary && <p className="pfs-small">{session.summary}</p>}
+          </section>
+          {!!facts.length && (
+            <dl className="pfs-grid">
+              {facts.map(([label, value]) => (
+                <div key={label}>
+                  <dt>{label}</dt>
+                  <dd>{value}</dd>
                 </div>
-              )}
-              {session.summary && (
-                <section className="pf4-athlete-section">
-                  <span className="pf4-kicker">Il tuo programma</span>
-                  <p>{session.summary}</p>
-                </section>
-              )}
-              {!!session.details.length && (
-                <dl className="pf4-profile">
-                  {session.details.map((d) => (
-                    <div key={d.label}>
-                      <dt>{d.label}</dt>
-                      <dd>{d.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              )}
-              <section className="pf4-athlete-section">
-                <span className="pf4-kicker">La sessione</span>
-                <div className="pf4-session-body">{session.body}</div>
-              </section>
-              {session.canAct && stage !== "done" ? (
-                <div className="pf4-session-actions">
-                  <button
-                    className="pf4-cta"
-                    onClick={() => setStage("feedback")}
-                  >
-                    Segna come completata ✓
-                  </button>
-                  <button
-                    className="pf4-text-link"
-                    onClick={() => setStage("skip")}
-                  >
-                    Salta la sessione
-                  </button>
-                </div>
-              ) : (
-                <section className="pf4-athlete-section">
-                  <span className="pf4-kicker">
-                    {sessionLabels[session.displayStatus]}
-                  </span>
-                  {session.completionRating !== null && (
-                    <p>La tua valutazione: {session.completionRating} / 5</p>
-                  )}
-                  {session.completionNotes && (
-                    <p className="pf4-session-body">
-                      {session.completionNotes}
-                    </p>
-                  )}
-                </section>
-              )}
-            </>
+              ))}
+            </dl>
           )}
-        </>
+          <button className="pfs-link pfs-print" onClick={() => window.print()}>
+            Stampa la scheda
+          </button>
+          <section className="pfs-sheet-section">
+            <span className="pfs-kicker">
+              {session.exercises?.length ? "Gli esercizi" : "La sessione"}
+            </span>
+            <ol className="pfs-exercises">
+              {steps.map((step, index) => (
+                <li key={`${step.name}-${index}`}>
+                  <small>{twoDigits(index + 1)}</small>
+                  <strong>{step.name}</strong>
+                  <span>{step.prescription}</span>
+                </li>
+              ))}
+            </ol>
+          </section>
+          {session.canAct ? (
+            confirmSkip ? (
+              <section className="pfs-card">
+                <h2>Salti questa sessione?</h2>
+                <p>Resterà nel calendario come saltata.</p>
+                <button className="pfs-cta" disabled={busy} onClick={skip}>
+                  {busy ? "Salvataggio…" : "Conferma: salta la sessione"}
+                </button>
+                <button
+                  className="pfs-link"
+                  disabled={busy}
+                  onClick={() => setConfirmSkip(false)}
+                >
+                  Torna alla sessione
+                </button>
+              </section>
+            ) : (
+              <button
+                className="pfs-link pfs-skip"
+                onClick={() => setConfirmSkip(true)}
+              >
+                Salta la sessione
+              </button>
+            )
+          ) : (
+            <section className="pfs-card pfs-outcome">
+              <span className="pfs-kicker">
+                {sessionLabels[session.displayStatus]}
+              </span>
+              {effort !== null && <p>Fatica percepita: {effort} / 5</p>}
+              {session.completionNotes && (
+                <p className="pfs-body">{session.completionNotes}</p>
+              )}
+              <Link className="pfs-row-link" href="/user">
+                Torna alla home <span aria-hidden="true">→</span>
+              </Link>
+            </section>
+          )}
+        </article>
       )}
-    </AthleteShell>
+    </SubscriberShell>
   );
 }

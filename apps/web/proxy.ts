@@ -26,7 +26,7 @@ export function proxy(request: NextRequest) {
   );
   response.headers.set(
     'Content-Security-Policy',
-    "default-src 'self'; connect-src 'self' https://performancefactory.littlefly.it http://127.0.0.1:4000 http://localhost:4000; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+    "default-src 'self'; connect-src 'self' https://performancefactory.littlefly.it http://127.0.0.1:4000 http://localhost:4000; img-src 'self' data: https://performancefactory.littlefly.it http://127.0.0.1:4000 http://localhost:4000; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
   );
 
   if (!isProtected) {

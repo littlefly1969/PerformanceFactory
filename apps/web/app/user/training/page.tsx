@@ -1,20 +1,31 @@
 "use client";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AthleteShell } from "../_components/athlete-shell";
+import { SubscriberShell } from "../_components/subscriber-shell";
 import { useAthlete } from "../_components/use-athlete";
-import {
-  CalendarLegend,
-  dayState,
-  SessionCard,
-} from "../_components/calendar-strip";
 import {
   addDays,
   displayDate,
   todayDate,
-  sessionLabels,
   type Calendar,
+  type History,
 } from "../_components/athlete-types";
+import { capitalized, downloadCalendar } from "../_components/session-format";
+import {
+  DayView,
+  HistoryList,
+  MonthView,
+  WeekView,
+  weekStart,
+} from "./calendar-views";
+
+type View = "month" | "week" | "day";
+const views: [View, string][] = [
+  ["month", "Mese"],
+  ["week", "Settimana"],
+  ["day", "Giorno"],
+];
+
 function monthRange(date: string) {
   const start = `${date.slice(0, 7)}-01`;
   const d = new Date(`${start}T12:00:00Z`);
@@ -22,134 +33,133 @@ function monthRange(date: string) {
   d.setUTCDate(0);
   return { from: start, to: d.toISOString().slice(0, 10) };
 }
+function validDate(value: string | null) {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) && !isNaN(Date.parse(value))
+    ? value
+    : null;
+}
+
 function TrainingCalendar() {
   const params = useSearchParams();
-  const initial = params.get("date");
   const [selected, setSelected] = useState(
-    initial &&
-      /^\d{4}-\d{2}-\d{2}$/.test(initial) &&
-      !isNaN(Date.parse(initial))
-      ? initial
-      : todayDate(),
+    validDate(params.get("date")) ?? todayDate(),
+  );
+  const [view, setView] = useState<View>(
+    (["week", "day"] as const).find((v) => v === params.get("view")) ?? "month",
   );
   const range = monthRange(selected);
+  // La settimana può scavalcare il mese: si carica l'unione dei due intervalli.
+  const start = weekStart(selected);
+  const from = start < range.from ? start : range.from;
+  const to = addDays(start, 6) > range.to ? addDays(start, 6) : range.to;
   const { data, error, reload } = useAthlete<Calendar>(
-    `/athlete/training/calendar?from=${range.from}&to=${range.to}`,
+    `/athlete/training/calendar?from=${from}&to=${to}`,
   );
-  const current = data?.from === range.from ? data : undefined;
-  const blanks = (new Date(`${range.from}T12:00:00Z`).getUTCDay() + 6) % 7;
+  const { data: history } = useAthlete<History>("/athlete/training/history");
+  const current = data?.from === from ? data : undefined;
+  const version = current?.sessions.find((s) => s.planVersion)?.planVersion;
   const move = (offset: number) => {
-    const d = new Date(`${range.from}T12:00:00Z`);
-    d.setUTCMonth(d.getUTCMonth() + offset);
-    setSelected(d.toISOString().slice(0, 10));
+    if (view === "month") {
+      const d = new Date(`${range.from}T12:00:00Z`);
+      d.setUTCMonth(d.getUTCMonth() + offset);
+      setSelected(d.toISOString().slice(0, 10));
+    } else setSelected(addDays(selected, offset * (view === "week" ? 7 : 1)));
   };
+  const unit = { month: "Mese", week: "Settimana", day: "Giorno" }[view];
   return (
-    <AthleteShell
-      label="Training · Calendario"
+    <SubscriberShell
+      back="/user"
+      kicker={`Calendario${version ? ` · Piano v${version}.0` : ""}`}
+      action={
+        <button
+          className="pfs-link"
+          disabled={!current?.sessions.length}
+          onClick={() =>
+            current &&
+            downloadCalendar(
+              current.sessions.filter(
+                (s) => s.date >= range.from && s.date <= range.to,
+              ),
+              `piano-${range.from.slice(0, 7)}.ics`,
+            )
+          }
+        >
+          Esporta
+        </button>
+      }
+      nav
       error={error}
       reload={reload}
       loading={!current}
     >
-      <div className="pf4-month-heading">
-        <h1>{displayDate(range.from, { month: "long", year: "numeric" })}</h1>
+      <div className="pfs-month-heading">
+        <h1 className="pfs-title">
+          {capitalized(
+            displayDate(range.from, { month: "long", year: "numeric" }),
+          )}
+        </h1>
         <div>
-          <button onClick={() => move(-1)} aria-label="Mese precedente">
+          <button
+            className="pfs-arrow"
+            onClick={() => move(-1)}
+            aria-label={`${unit} precedente`}
+          >
             ←
           </button>
-          <button onClick={() => setSelected(todayDate())}>Oggi</button>
-          <button onClick={() => move(1)} aria-label="Mese successivo">
+          <button
+            className="pfs-arrow"
+            onClick={() => move(1)}
+            aria-label={`${unit === "Settimana" ? "Settimana successiva" : `${unit} successivo`}`}
+          >
             →
           </button>
         </div>
       </div>
-      {current && (
-        <>
-          <div className="pf4-calendar-stats">
-            <div>
-              <strong>{current.sessions.length}</strong>
-              <span>Sessioni</span>
-            </div>
-            <div>
-              <strong>
-                {
-                  current.sessions.filter((s) => s.status === "COMPLETED")
-                    .length
-                }
-              </strong>
-              <span>Fatte</span>
-            </div>
-            <div>
-              <strong>
-                {current.sessions.filter((s) => s.status === "SKIPPED").length}
-              </strong>
-              <span>Saltate</span>
-            </div>
-          </div>
-          <div className="pf4-calendar-grid" aria-label="Giorni del mese">
-            {["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"].map((d) => (
-              <small key={d}>{d}</small>
-            ))}
-            {Array.from({ length: blanks }, (_, i) => (
-              <span key={`blank-${i}`} />
-            ))}
-            {Array.from({ length: Number(range.to.slice(-2)) }, (_, i) => {
-              const date = addDays(range.from, i),
-                sessions = current.sessions.filter((s) => s.date === date),
-                state = dayState(sessions, date, current.today);
-              return (
-                <button
-                  className={`pf4-calendar-cell ${date === selected ? "is-selected" : ""}`}
-                  key={date}
-                  onClick={() => setSelected(date)}
-                  aria-pressed={date === selected}
-                  aria-label={`${displayDate(date)} · ${sessions.length} sessioni${state !== "EMPTY" ? ` · ${sessionLabels[state]}` : ""}`}
-                >
-                  <span className={`pf4-calendar-day state-${state}`}>
-                    {i + 1}
-                  </span>
-                  <em>
-                    {sessions.length > 1
-                      ? sessions.length
-                      : sessions.length
-                        ? "·"
-                        : ""}
-                  </em>
-                </button>
-              );
-            })}
-          </div>
-          <CalendarLegend />
-          <section className="pf4-athlete-section pf4-selected-sessions">
-            <span className="pf4-kicker">
-              {selected === current.today ? "Oggi · " : ""}
-              {displayDate(selected)}
-            </span>
-            {current.sessions
-              .filter((s) => s.date === selected)
-              .map((s) => (
-                <SessionCard key={s.id} session={s} />
-              ))}
-            {!current.sessions.some((s) => s.date === selected) && (
-              <p>Nessuna sessione in questa data.</p>
-            )}
-          </section>
-          <section className="pf4-athlete-section">
-            <span className="pf4-kicker">Le sessioni del mese</span>
-            {current.sessions.map((s) => (
-              <SessionCard key={s.id} session={s} />
-            ))}
-            {!current.sessions.length && (
-              <p>
-                Le sessioni compariranno quando il programma sarà pubblicato.
-                Puoi esplorare gli altri mesi.
-              </p>
-            )}
-          </section>
-        </>
+      <div
+        className="pfs-tabs"
+        role="tablist"
+        aria-label="Vista del calendario"
+      >
+        {views.map(([value, label]) => (
+          <button
+            key={value}
+            role="tab"
+            aria-selected={view === value}
+            onClick={() => setView(value)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {current && view === "month" && (
+        <MonthView
+          from={range.from}
+          to={range.to}
+          today={current.today}
+          selected={selected}
+          sessions={current.sessions}
+          onSelect={setSelected}
+        />
       )}
-    </AthleteShell>
+      {current && view === "week" && (
+        <WeekView
+          start={start}
+          today={current.today}
+          sessions={current.sessions}
+        />
+      )}
+      {current && view === "day" && (
+        <DayView
+          date={selected}
+          today={current.today}
+          sessions={current.sessions}
+        />
+      )}
+      {current && <HistoryList history={history} expanded={view === "day"} />}
+    </SubscriberShell>
   );
 }
+
 export default function TrainingPage() {
   return (
     <Suspense>

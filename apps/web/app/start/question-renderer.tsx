@@ -23,21 +23,49 @@ export function DiscoveryQuestionRenderer({
         />
       </div>
     );
-  if (question.type === "number" || question.type === "scale")
+  if (question.type === "number" || question.type === "scale") {
+    const current = typeof value === "number" ? value : undefined;
+    const step = question.step ?? 1;
+    const decimals = String(step).split(".")[1]?.length ?? 0;
+    const nudge = (direction: 1 | -1) => {
+      const base = current ?? question.min ?? 0;
+      const next =
+        current === undefined
+          ? base
+          : Number((base + direction * step).toFixed(decimals));
+      onChange(
+        Math.min(
+          question.max ?? Infinity,
+          Math.max(question.min ?? -Infinity, next),
+        ),
+      );
+    };
     return (
-      <div className="pf4-number">
+      <div className="pf4-number pf4-stepper">
         <label htmlFor={question.id} className="pf4-sr">
           {question.title}
         </label>
         <div>
+          <button
+            type="button"
+            aria-label="Diminuisci"
+            disabled={
+              current !== undefined &&
+              question.min !== undefined &&
+              current <= question.min
+            }
+            onClick={() => nudge(-1)}
+          >
+            −
+          </button>
           <input
             id={question.id}
             type="number"
             inputMode="decimal"
             min={question.min}
             max={question.max}
-            step={question.step ?? 1}
-            value={typeof value === "number" ? value : ""}
+            step={step}
+            value={current ?? ""}
             placeholder="—"
             onChange={(e) =>
               onChange(
@@ -45,25 +73,30 @@ export function DiscoveryQuestionRenderer({
               )
             }
           />
-          <span>{question.ui?.unit}</span>
+          <button
+            type="button"
+            aria-label="Aumenta"
+            disabled={
+              current !== undefined &&
+              question.max !== undefined &&
+              current >= question.max
+            }
+            onClick={() => nudge(1)}
+          >
+            +
+          </button>
         </div>
-        {question.type === "scale" && (
-          <input
-            aria-label={`${question.title} — scala`}
-            type="range"
-            min={question.min ?? 0}
-            max={question.max ?? 10}
-            step={question.step ?? 1}
-            value={typeof value === "number" ? value : (question.min ?? 0)}
-            onChange={(e) => onChange(e.target.valueAsNumber)}
-          />
+        {(question.min !== undefined || question.max !== undefined) && (
+          <small>
+            {question.min !== undefined && `Min ${question.min}`}
+            {question.min !== undefined && question.max !== undefined && " · "}
+            {question.max !== undefined && `Max ${question.max}`}
+            {question.ui?.unit && ` ${question.ui.unit}`}
+          </small>
         )}
-        <small>
-          {question.min !== undefined && `Min ${question.min}`}{" "}
-          {question.max !== undefined && `· Max ${question.max}`}
-        </small>
       </div>
     );
+  }
   const multiple = question.type === "multi_choice";
   return (
     <div

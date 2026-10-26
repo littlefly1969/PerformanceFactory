@@ -1,3 +1,4 @@
+import type { MeasurableObjective, SessionContent } from './session-content';
 import type { ProgramWeeks } from '../discovery/program-horizon';
 export type AiScaleConfig = {
   minScore: number;
@@ -398,13 +399,15 @@ export type TrainingSessionProposal = {
   sets?: number | null;
   reps?: string | null;
   restSeconds?: number | null;
+  content?: SessionContent;
 };
 export type TrainingCycleProposal = Omit<CycleProposal, 'planItems'> & {
   sessionsPerWeek: number;
   planItems: TrainingSessionProposal[];
+  objectives?: MeasurableObjective[];
 };
-export const TRAINING_PROMPT_VERSION = 'training-rolling-v1';
-export const AREA_SCHEDULE_PROMPT_VERSION = 'area-schedule-v2';
+export const TRAINING_PROMPT_VERSION = 'training-rolling-v2';
+export const AREA_SCHEDULE_PROMPT_VERSION = 'area-schedule-v3';
 /** Finestra dell'area: ricalca quella sportiva a cui e agganciata. */
 export type AreaWindow = {
   startsOn: string;

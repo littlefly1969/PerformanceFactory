@@ -12,6 +12,8 @@ import {
 } from '../../ai-orchestrator/calibration-questions';
 import { AiProposalProviderService } from '../../ai-orchestrator/proposal-provider.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { videoCatalog } from '../../coaching-videos/coaching-videos';
+import { chosenOptions } from '../choice-answers';
 
 /**
  * Micro-test come passo del motore (PF-FS-PREPAYWALL §4.4): il motore sceglie
@@ -23,8 +25,6 @@ import { PrismaService } from '../../prisma/prisma.service';
 /** Titoli già proposti e risposte recenti del driver passati al generatore. */
 const MICRO_TEST_TITLES = 20;
 const MICRO_TEST_EVIDENCE = 6;
-
-type MicroTest = NonNullable<CalibrationQuestion['microTest']>;
 
 /**
  * Risposta del profilo che dichiara dolori, infortuni o limitazioni: con
@@ -48,12 +48,15 @@ export function microTestsByArea(
 ) {
   const tests = new Map<string, string[]>();
   for (const round of rounds)
-    for (const q of round.questionsJson as CalibrationQuestion[])
-      if (q.microTest)
-        tests.set(q.areaId, [
-          ...(tests.get(q.areaId) ?? []),
-          round.status === 'SKIPPED' ? `${q.text} (saltato)` : q.text,
-        ]);
+    for (const q of round.questionsJson as CalibrationQuestion[]) {
+      // Le situazioni di gioco sono più voci dello stesso test: conta la prima.
+      if (!q.microTest || (q.microTest.situation?.index ?? 0) > 0) continue;
+      const title = q.microTest.title ?? q.text;
+      tests.set(q.areaId, [
+        ...(tests.get(q.areaId) ?? []),
+        round.status === 'SKIPPED' ? `${title} (saltato)` : title,
+      ]);
+    }
   return tests;
 }
 
@@ -96,7 +99,7 @@ export async function generateMicroTest(
   step: CalibrationQuestionsResult,
 ) {
   const areaId = step.targetAreas[0];
-  const [prompt, proposed, latest] = await Promise.all([
+  const [prompt, proposed, latest, videos] = await Promise.all([
     loadActiveAssessmentPrompt(prisma, 'MICRO_TEST'),
     prisma.microTest.findMany({
       where: { OR: [{ userId }, { completions: { some: { userId } } }] },
@@ -109,6 +112,7 @@ export async function generateMicroTest(
       orderBy: { sequence: 'desc' },
       select: { areas: { where: { areaId } } },
     }),
+    videoCatalog(prisma, areaId),
   ]);
   const driver = input.drivers.find((d) => d.areaId === areaId)!;
   const area = latest.areas[0];
@@ -137,6 +141,7 @@ export async function generateMicroTest(
       },
     ],
     proposedTitles: proposed.map((p) => p.title),
+    videos,
   });
   return {
     ...result.tests[0],
@@ -148,72 +153,185 @@ export async function generateMicroTest(
 }
 
 /**
- * L'unica voce del round del micro-test: il test diventa un `MicroTest`
- * dell'atleta (fuori dal catalogo) e la voce ne conserva la provenienza.
+ * Le voci del round del micro-test: il test diventa un `MicroTest`
+ * dell'atleta (fuori dal catalogo) e ogni voce ne conserva la provenienza.
+ * La prova pratica ha una voce con gli esiti; le situazioni di gioco una voce
+ * per situazione, con la risposta corretta che resta sul server.
  */
-export async function microTestQuestion(
+export async function microTestQuestions(
   tx: Prisma.TransactionClient,
   userId: string,
   test: Awaited<ReturnType<typeof generateMicroTest>>,
-): Promise<CalibrationQuestion> {
+): Promise<CalibrationQuestion[]> {
+  const situational = test.format === 'SITUATIONAL';
   const { id } = await tx.microTest.create({
     data: {
       areaId: test.areaId,
       title: test.title,
       instructions: test.instructions,
-      optionsJson: test.options,
+      optionsJson: (situational
+        ? test.situations
+        : test.options) as unknown as Prisma.InputJsonValue,
       userId,
     },
     select: { id: true },
   });
-  return {
-    id: 't1',
+  const meta = {
+    id,
+    instructions: test.instructions,
+    informationGoal: test.informationGoal,
+    durationMinutes: test.durationMinutes,
+    physicalLoad: test.physicalLoad,
+    safetyNotes: test.safetyNotes,
+    provider: test.provider,
+    model: test.model,
+    promptVersionId: test.promptVersionId,
+    promptHash: test.promptHash,
+    title: test.title,
+    format: test.format,
+    video: test.video,
+  };
+  if (!situational)
+    return [
+      {
+        id: 't1',
+        areaId: test.areaId,
+        text: test.title,
+        options: test.options,
+        microTest: meta,
+      },
+    ];
+  return test.situations.map((s, index) => ({
+    id: `t${index + 1}`,
     areaId: test.areaId,
-    text: test.title,
-    options: test.options,
+    text: s.question,
+    options: s.options.map(({ value, label, score }) => ({
+      value,
+      label,
+      score,
+    })),
     microTest: {
-      id,
-      instructions: test.instructions,
-      informationGoal: test.informationGoal,
-      durationMinutes: test.durationMinutes,
-      physicalLoad: test.physicalLoad,
-      safetyNotes: test.safetyNotes,
-      provider: test.provider,
-      model: test.model,
-      promptVersionId: test.promptVersionId,
-      promptHash: test.promptHash,
+      ...meta,
+      situation: {
+        index,
+        total: test.situations.length,
+        label: s.label,
+        context: s.context,
+        options: s.options.map(({ value, correct, feedback }) => ({
+          value,
+          correct,
+          feedback,
+        })),
+        video: s.video,
+      },
+    },
+  }));
+}
+
+/** Spiegazione del coach per una situazione già risposta. */
+export function situationFeedback(q: CalibrationQuestion, value: string) {
+  const situation = q.microTest?.situation;
+  if (!situation) return null;
+  const chosen = situation.options.find((o) => o.value === value);
+  const correct = situation.options.find((o) => o.correct)!;
+  if (!chosen) return null;
+  return {
+    value,
+    correct: chosen.correct,
+    correctValue: correct.value,
+    feedback: {
+      [chosen.value]: chosen.feedback,
+      [correct.value]: correct.feedback,
     },
   };
 }
 
-/** Ciò che l'atleta vede del micro-test: niente provenienza né obiettivo interno. */
-export const publicMicroTest = (test: MicroTest | undefined) =>
-  test
-    ? {
-        microTest: {
-          instructions: test.instructions,
-          durationMinutes: test.durationMinutes,
-          safetyNotes: test.safetyNotes,
-        },
-      }
-    : {};
+/**
+ * Ciò che l'atleta vede del micro-test: niente provenienza né obiettivo
+ * interno. Nelle situazioni la spiegazione arriva solo dopo la risposta.
+ */
+export const publicMicroTest = (q: CalibrationQuestion, answers?: unknown) => {
+  const test = q.microTest;
+  if (!test) return {};
+  const answer = (answers as Record<string, unknown> | null)?.[q.id];
+  const situation = test.situation;
+  return {
+    microTest: {
+      instructions: test.instructions,
+      durationMinutes: test.durationMinutes,
+      safetyNotes: test.safetyNotes,
+      ...(test.title ? { title: test.title } : {}),
+      ...(situation
+        ? {
+            format: 'SITUATIONAL' as const,
+            situation: {
+              index: situation.index,
+              total: situation.total,
+              label: situation.label,
+              context: situation.context,
+            },
+            ...(typeof answer === 'string'
+              ? { feedback: situationFeedback(q, answer) }
+              : {}),
+          }
+        : {}),
+    },
+  };
+};
+
+/**
+ * Risposte valide per il round: una per voce, fra le opzioni proposte. Nelle
+ * situazioni di gioco la risposta data prima della spiegazione non cambia.
+ */
+export function validRoundAnswers(
+  round: { questionsJson: unknown; answersJson: unknown },
+  answers: Record<string, string | string[]>,
+) {
+  const questions = round.questionsJson as CalibrationQuestion[];
+  const saved = (round.answersJson ?? {}) as Record<string, unknown>;
+  return (
+    Object.keys(answers).length === questions.length &&
+    questions.every(
+      (q) =>
+        chosenOptions(q.options, answers[q.id], q.multiple) &&
+        (!q.microTest?.situation ||
+          saved[q.id] === undefined ||
+          saved[q.id] === answers[q.id]),
+    )
+  );
+}
 
 /** Evidenza di una voce del round: l'esito del micro-test è riportato dall'atleta. */
 export const roundEvidence = (
   q: CalibrationQuestion,
   option: { label: string },
 ) =>
-  q.microTest
+  q.microTest?.situation
     ? {
-        question: `Micro-test «${q.text}»: ${q.microTest.instructions}`,
-        answer: `${option.label} (esito riportato dall'atleta)`,
+        question: `Micro-test «${q.microTest.title ?? ''}», situazione «${q.microTest.situation.label}»: ${q.text}`,
+        answer: `${option.label} (${
+          q.microTest.situation.options.find(
+            (o) =>
+              o.correct &&
+              q.options.find((p) => p.value === o.value)?.label ===
+                option.label,
+          )
+            ? 'risposta corretta'
+            : 'risposta non corretta'
+        })`,
         source: 'MICRO_TEST' as const,
       }
-    : {
-        question: q.text,
-        answer: option.label,
-        source: 'CALIBRATION' as const,
-      };
+    : q.microTest
+      ? {
+          question: `Micro-test «${q.text}»: ${q.microTest.instructions}`,
+          answer: `${option.label} (esito riportato dall'atleta)`,
+          source: 'MICRO_TEST' as const,
+        }
+      : {
+          question: q.text,
+          answer: option.label,
+          source: 'CALIBRATION' as const,
+        };
 
 /**
  * L'atleta non può svolgere ora il micro-test proposto: il passo si chiude

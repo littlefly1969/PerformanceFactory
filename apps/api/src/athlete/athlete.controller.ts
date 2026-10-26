@@ -5,11 +5,13 @@ import {
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Header,
   Param,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -27,6 +29,7 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CompletePlanItemDto } from '../user-plan/dto/complete-plan-item.dto';
 import { AthleteService } from './athlete.service';
+import { ProfilePhotoDto, ProfilePhotoService } from './profile-photo';
 class CalendarQuery {
   @ApiProperty({ format: 'date', example: '2026-09-19' })
   @IsDateString()
@@ -47,7 +50,24 @@ export class AthleteController {
   constructor(
     private readonly athlete: AthleteService,
     private readonly availability: TrainingAvailabilityService,
+    private readonly photo: ProfilePhotoService,
   ) {}
+  @ApiOperation({ summary: 'Foto profilo, null se non caricata' })
+  @Header('Cache-Control', 'private, no-store')
+  @Get('profile/photo')
+  profilePhoto(@Req() req: Request) {
+    return this.photo.get(req.user.id);
+  }
+  @ApiOperation({ summary: 'Carica o sostituisce la foto profilo' })
+  @Put('profile/photo')
+  saveProfilePhoto(@Req() req: Request, @Body() body: ProfilePhotoDto) {
+    return this.photo.save(req.user.id, body.image);
+  }
+  @ApiOperation({ summary: 'Rimuove la foto profilo' })
+  @Delete('profile/photo')
+  removeProfilePhoto(@Req() req: Request) {
+    return this.photo.save(req.user.id, null);
+  }
   @Get('training/availability')
   @Header('Cache-Control', 'private, no-store')
   @ApiOperation({
@@ -89,6 +109,14 @@ export class AthleteController {
   @Get('training/calendar')
   calendar(@Req() req: Request, @Query() query: CalendarQuery) {
     return this.athlete.calendar(req.user.id, query.from, query.to);
+  }
+  @ApiOperation({
+    summary: 'Storico delle sessioni concluse con minuti e valutazioni',
+  })
+  @Header('Cache-Control', 'private, no-store')
+  @Get('training/history')
+  history(@Req() req: Request) {
+    return this.athlete.history(req.user.id);
   }
   @ApiOperation({ summary: 'Dettaglio di una sessione personale' })
   @Header('Cache-Control', 'private, no-store')

@@ -1,12 +1,15 @@
 import { performanceDriverName } from '../performance/performance-display';
 import { Prisma } from '@prisma/client';
 import { athleteDate, presentationStatus } from './training-sessions';
+import { normalizeSessionContent } from '../ai-orchestrator/session-content';
 
 export const sessionInclude = {
   trainingPlanItem: {
     select: { title: true, type: true, body: true, metadata: true },
   },
-  trainingPlanRelease: { select: { status: true, summaryText: true } },
+  trainingPlanRelease: {
+    select: { status: true, summaryText: true, version: true, startsOn: true },
+  },
 } satisfies Prisma.TrainingSessionInclude;
 type Session = Prisma.TrainingSessionGetPayload<{
   include: typeof sessionInclude;
@@ -29,6 +32,33 @@ export function sessionDetails(metadata: Prisma.JsonValue | null) {
   }
   return details;
 }
+/** Esercizi, modalità e durata scritti dall'AI; vuoti per le sessioni precedenti. */
+export function sessionContent(
+  metadata: Prisma.JsonValue | null,
+  date: string,
+  startsOn: Date | null,
+) {
+  const meta =
+    metadata && typeof metadata === 'object' && !Array.isArray(metadata)
+      ? metadata
+      : {};
+  const minutes = meta.durationMinutes;
+  const rest = meta.restSeconds;
+  return {
+    durationMinutes:
+      typeof minutes === 'number' && minutes > 0 ? minutes : null,
+    restSeconds: typeof rest === 'number' && rest >= 0 ? rest : null,
+    equipment: typeof meta.equipment === 'string' ? meta.equipment : null,
+    ...normalizeSessionContent(meta),
+    /** Settimana della finestra in cui cade la sessione, da 1. */
+    week: startsOn
+      ? Math.floor(
+          (Date.parse(`${date}T00:00:00Z`) - startsOn.getTime()) /
+            (7 * 86400000),
+        ) + 1
+      : null,
+  };
+}
 export function sessionView(s: Session, today = athleteDate()) {
   const date = s.scheduledDate.toISOString().slice(0, 10);
   const details = sessionDetails(s.trainingPlanItem.metadata);
@@ -44,6 +74,12 @@ export function sessionView(s: Session, today = athleteDate()) {
     type: s.trainingPlanItem.type,
     body: s.trainingPlanItem.body,
     details,
+    ...sessionContent(
+      s.trainingPlanItem.metadata,
+      date,
+      s.trainingPlanRelease.startsOn,
+    ),
+    planVersion: s.trainingPlanRelease.version,
     summary: s.trainingPlanRelease.summaryText,
     canAct:
       s.status === 'SCHEDULED' && s.trainingPlanRelease.status === 'ACTIVE',
@@ -60,6 +96,8 @@ export const areaSessionInclude = {
   planRelease: {
     select: {
       status: true,
+      version: true,
+      startsOn: true,
       aiContextSummaries: {
         select: { summaryText: true },
         orderBy: { createdAt: 'desc' as const },
@@ -87,6 +125,8 @@ export function areaSessionView(s: AreaSessionRecord, today = athleteDate()) {
     type: s.planItem.type,
     body: s.planItem.body,
     details: sessionDetails(s.planItem.metadata),
+    ...sessionContent(s.planItem.metadata, date, s.planRelease.startsOn),
+    planVersion: s.planRelease.version,
     summary: s.planRelease.aiContextSummaries[0]?.summaryText ?? '',
     canAct: s.status === 'SCHEDULED' && s.planRelease.status === 'ACTIVE',
     completedAt: s.completedAt,

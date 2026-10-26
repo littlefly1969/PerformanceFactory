@@ -1,3 +1,4 @@
+import type { MicroTestFormat, VideoChoice } from './micro-test-situations';
 import { BadGatewayException, Logger } from '@nestjs/common';
 import { hashJson } from './proposal-audit';
 import { requestStructuredProposal } from './proposal-structured-transport';
@@ -172,6 +173,23 @@ export type CalibrationQuestion = {
     model: string;
     promptVersionId: string | null;
     promptHash: string;
+    /** Titolo del test; assente nei test storici, dove è `text`. */
+    title?: string;
+    /** Prova pratica (storica) o situazioni di gioco. */
+    format?: MicroTestFormat;
+    /** Video da guardare dopo il test, scelto dall'AI. */
+    video?: VideoChoice | null;
+    /** Solo nelle situazioni di gioco: una voce per situazione. */
+    situation?: {
+      index: number;
+      total: number;
+      label: string;
+      context: string;
+      /** Risposta corretta e spiegazione del coach, mostrate dopo la scelta. */
+      options: { value: string; correct: boolean; feedback: string }[];
+      /** Video da proporre se l'atleta sbaglia la situazione. */
+      video: VideoChoice | null;
+    };
   };
 };
 

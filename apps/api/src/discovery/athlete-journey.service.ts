@@ -183,6 +183,7 @@ export class AthleteJourneyService {
       phase,
       nextStep: phase,
       firstName: user.firstName,
+      welcomeCompleted: !!saved.welcomeCompletedAt,
       // Bentornato dopo 10 giorni: riprende dal profilo esistente (§8.4).
       wakeup,
       trial: {

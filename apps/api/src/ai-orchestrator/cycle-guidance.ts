@@ -1,3 +1,4 @@
+import { sessionContentMetadata } from './session-content';
 import { BadRequestException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -153,6 +154,7 @@ export function buildTrainingPlanItems(
       sets: item.sets ?? null,
       reps: item.reps ?? null,
       restSeconds: item.restSeconds ?? null,
+      ...(item.content ? sessionContentMetadata(item.content) : {}),
       schedule: { dayOffset: item.dayOffset },
     },
     status: 'PROPOSED',

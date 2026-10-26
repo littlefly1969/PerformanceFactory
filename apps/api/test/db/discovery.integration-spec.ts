@@ -467,6 +467,66 @@ describe('PF4 discovery to authenticated journey', () => {
     expect((await register()).statusCode).toBe(400);
     expect(await prisma.athleteDiscovery.count({ where: { userId } })).toBe(1);
   });
+
+  it('records privacy and AI consents given in the sign-up form', async () => {
+    const documents = await app.get(ConsentsService).requiredDocuments();
+    const signup = (address: string, documentHash?: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/api/auth/register-athlete',
+        payload: {
+          firstName: 'Anna',
+          lastName: 'Bianchi',
+          email: address,
+          password: 'test-password-123',
+          adultConfirmed: true,
+          discovery: draft,
+          privacyAccepted: true,
+          aiAssistantAccepted: true,
+          marketingAccepted: true,
+          acceptedDocuments: documents.map((d) => ({
+            type: d.type,
+            version: d.version,
+            documentHash: documentHash ?? d.documentHash,
+          })),
+        },
+      });
+    // Un documento superato non crea l'account.
+    const staleEmail = `pf4-stale-${randomUUID()}@example.test`;
+    expect((await signup(staleEmail, 'stale')).statusCode).toBe(400);
+    expect(await prisma.user.count({ where: { email: staleEmail } })).toBe(0);
+
+    const response = await signup(`pf4-consents-${randomUUID()}@example.test`);
+    expect(response.statusCode).toBe(201);
+    const result = response.json<{
+      user: { id: string };
+      journey: { nextStep: string };
+    }>();
+    // Rimosso dall'afterAll insieme agli altri atleti di prova.
+    googleUsers.push(result.user.id);
+    expect(result.journey.nextStep).toBe('ASSESSMENT_INTRO');
+    const consents = await prisma.consent.findMany({
+      where: { userId: result.user.id, withdrawnAt: null },
+      select: { type: true, documentHash: true, source: true },
+    });
+    for (const document of documents)
+      expect(consents).toContainEqual({
+        type: document.type,
+        documentHash: document.documentHash,
+        source: 'register',
+      });
+    expect(consents).toHaveLength(documents.length + 1);
+    const journey = await app.inject({
+      method: 'GET',
+      url: '/api/auth/journey',
+      headers: {
+        cookie: String(response.headers['set-cookie']).split(';')[0],
+      },
+    });
+    expect(journey.json<{ nextStep: string }>().nextStep).toBe(
+      'ASSESSMENT_INTRO',
+    );
+  });
   const post = (path: string, payload: object = {}) =>
     app.inject({
       method: 'POST',
