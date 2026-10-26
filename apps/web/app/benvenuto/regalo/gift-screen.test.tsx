@@ -60,7 +60,9 @@ describe("GiftScreen", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
       "1Una lezione di prova, gratis.",
     );
-    expect(screen.getByText(/tutte e sei le aree/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/profilo è abbastanza attendibile/),
+    ).toBeInTheDocument();
     expect(screen.getByText("1 di 6 aree reali")).toBeInTheDocument();
     expect(
       screen.getByTitle("Preparazione atletica").closest("li"),

@@ -82,9 +82,9 @@ export function GiftScreen({
             lezione di prova, gratis.
           </h1>
           <p>
-            Si sblocca quando la tua Performance sarà completamente Reale: tutte
-            {areas.length === 6 ? " e sei" : ""} le aree misurate in campo,
-            niente più tratteggio.
+            Si sblocca quando il tuo profilo è abbastanza attendibile: continua
+            con domande e micro-test. In campo, con il coach, la tua Performance
+            diventa Reale area per area.
           </p>
           {areas.length > 0 && (
             <>
@@ -96,6 +96,7 @@ export function GiftScreen({
                   </li>
                 ))}
               </ul>
+              {/* Progresso del profilo, non condizione di sblocco: la lezione segue LESSON_ELIGIBILITY. */}
               <p className="pf-gift-count">
                 {`${real} di ${areas.length} aree reali`}
               </p>
