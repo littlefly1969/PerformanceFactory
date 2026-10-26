@@ -18,6 +18,9 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#0b0b0c",
+  // Senza viewport-fit=cover le safe area restano a zero: in PWA il contenuto
+  // finirebbe sotto la barra di stato e sopra l'home indicator.
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

@@ -217,23 +217,21 @@ export default function ProfilePage() {
         </p>
       </section>
 
-      <section className="pf-acc-card pf-acc-fit" id="indirizzo">
+      <section className="pf-acc-card pf-acc-fit pf-acc-address" id="indirizzo">
         <AthleteAddress onSaved={() => void lesson.reload()} />
       </section>
 
-      {evaluation && (
-        <section className="pf-acc-card pf-acc-fit">
-          <FitRankingEditor
-            onSaved={() => {
-              // La classifica rivaluta driver e confidenza: cambiano anche
-              // Spider, calibrazione ed eleggibilità alla lezione.
-              void profile.reload();
-              void refresh().catch(() => undefined);
-              void lesson.reload();
-            }}
-          />
-        </section>
-      )}
+      <section className="pf-acc-card pf-acc-fit">
+        <FitRankingEditor
+          onSaved={() => {
+            // La classifica rivaluta driver e confidenza: cambiano anche
+            // Spider, calibrazione ed eleggibilità alla lezione.
+            void profile.reload();
+            void refresh().catch(() => undefined);
+            void lesson.reload();
+          }}
+        />
+      </section>
     </AccountScreen>
   );
 }

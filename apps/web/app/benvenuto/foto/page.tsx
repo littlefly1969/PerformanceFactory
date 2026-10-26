@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { API_BASE, secureFetch } from "../../lib/api";
 import { WelcomeIntro, WelcomeShell } from "../_components/welcome-shell";
 import { resizePhoto } from "./resize-photo";
+import { FitRankingEditor } from "../../components/fit-ranking-editor";
 
 const NEXT = "/benvenuto/spider";
 
@@ -79,8 +80,8 @@ export default function WelcomePhotoPage() {
       }
     >
       <WelcomeIntro step={1} kicker="Il tuo profilo" title="Mettici la faccia.">
-        Aggiungi una tua foto: il coach ti riconosce in campo prima ancora del
-        primo allenamento.
+        Aggiungi una tua foto e, se ce l’hai, la tua classifica: il coach ti
+        riconosce in campo e l’AI tara subito il livello.
       </WelcomeIntro>
       <div className="pf-welcome-center">
         <div className="pf-photo">
@@ -117,6 +118,8 @@ export default function WelcomePhotoPage() {
           />
         </div>
         {busy && image && <p className="pf-welcome-note">Caricamento…</p>}
+        {/* Classifica FIT: dato di configurazione del profilo, non una domanda del percorso. */}
+        <FitRankingEditor tone="dark" />
         {error && (
           <p role="alert" className="pf-welcome-error">
             {error}

@@ -12,14 +12,15 @@ import {
   parseChoiceOptions,
 } from './calibration-questions';
 import { FIT_RANKING_RULE, FitRankingContext } from './fit-ranking-context';
+import { PADEL_SPORT_RULE } from './padel-context';
 
 /** Tipo di prompt in AiPromptVersion per le domande conoscitive iniziali. */
 export const INITIAL_QUESTIONS_PROMPT_TYPE = 'INITIAL_QUESTIONS';
 
 export const DEFAULT_INITIAL_QUESTIONS_PROMPT = [
-  'Sei il motore delle domande conoscitive iniziali di Performance Factory. Un atleta amatoriale maggiorenne si è appena registrato: ricevi le sue risposte al funnel (obiettivo, esperienza, frequenza di gioco, salute), la disponibilità all’allenamento, la classifica FIT dichiarata di padel e di tennis (attuale e migliore di sempre) e i driver della performance da conoscere.',
+  'Sei il motore delle domande conoscitive iniziali di Performance Factory, la piattaforma di allenamento al padel. Lo sport è il padel: ogni domanda, situazione di gioco e termine tecnico è di padel, mai di tennis o di altri sport di racchetta. Un atleta amatoriale maggiorenne si è appena registrato: ricevi le sue risposte al funnel (obiettivo, esperienza, frequenza di gioco, salute), la disponibilità all’allenamento, la classifica FIT dichiarata di padel e di tennis (attuale e migliore di sempre) e i driver della performance da conoscere.',
   'Scrivi le prime domande per ogni driver: servono alla prima stima della Performance Reale (R), quindi devono far emergere il livello reale dell’atleta su quel driver, non le sue opinioni.',
-  'Su misura: parti dalla classifica e dal funnel. Chi ha o ha avuto una classifica alta riceve situazioni di gioco e soglie da agonista; chi non è mai stato classificato riceve situazioni da amatore. Tieni conto dell’obiettivo e di eventuali limitazioni dichiarate. Non chiedere di nuovo ciò che il funnel o la classifica dicono già.',
+  'Su misura: parti dalla classifica e dal funnel. Chi ha o ha avuto una classifica alta riceve situazioni di gioco e soglie da agonista; chi non è mai stato classificato riceve situazioni da amatore. La classifica di tennis dice solo da dove viene l’atleta e quanto è allenabile: non trasformarla in domande di tennis. Tieni conto dell’obiettivo e di eventuali limitazioni dichiarate. Non chiedere di nuovo ciò che il funnel o la classifica dicono già.',
   'Le domande di uno stesso driver guardano aspetti diversi del driver e non si sovrappongono. Domande su comportamenti concreti, frequenze, situazioni di gioco, risultati misurabili: di norma a scelta singola, a scelta multipla solo quando l’atleta può riconoscersi in più opzioni insieme (per esempio dove sente fastidio o quali routine segue).',
   'Ogni opzione ha uno score di riferimento sulla scala ricevuta: deve ancorare la risposta al livello reale, non premiare la risposta più lunga. Nelle domande a scelta singola le opzioni coprono tutta la scala e sono mutuamente esclusive.',
   'Scrivi in italiano, con il tu, frasi brevi. Niente diagnosi mediche, niente dati personali, niente promesse di risultato.',
@@ -70,6 +71,7 @@ function formatRules(input: InitialQuestionsInput) {
     MULTIPLE_CHOICE_RULE,
     '- ogni driver ha almeno una domanda con multiple false.',
     FIT_RANKING_RULE,
+    PADEL_SPORT_RULE,
     'Questi vincoli prevalgono sulle istruzioni sopra.',
   ].join('\n');
 }

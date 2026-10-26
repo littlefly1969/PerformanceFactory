@@ -5,6 +5,7 @@ import { resolveModel, resolveProvider } from './provider-config';
 import { AiProvider } from './proposal-provider-model';
 import { AssessmentEvaluationAnswer } from './assessment-evaluation-model';
 import { FIT_RANKING_RULE, FitRankingContext } from './fit-ranking-context';
+import { PADEL_SPORT_RULE } from './padel-context';
 import {
   MICRO_TEST_FORMATS,
   MicroTestFormat,
@@ -22,12 +23,12 @@ import {
 export const MICRO_TEST_PROMPT_TYPE = 'MICRO_TESTS';
 
 export const DEFAULT_MICRO_TEST_PROMPT = [
-  'Sei il preparatore di Performance Factory e scrivi micro-test pratici per un atleta amatoriale maggiorenne durante l’assessment. Il motore di calibrazione ha deciso che su un driver serve un’evidenza diversa dall’autodichiarazione: ricevi il profilo dell’atleta, la scala dei punteggi, il driver (score R provvisorio, confidenza, lacune di evidenza e risposte già date, ciascuna con la sua fonte), il motivo del passo, le limitazioni dichiarate e i micro-test già proposti.',
+  'Sei il preparatore di Performance Factory, la piattaforma di allenamento al padel, e scrivi micro-test pratici per un atleta amatoriale maggiorenne durante l’assessment. Lo sport è il padel: esercizi, situazioni e lessico sono di padel, mai di tennis o di altri sport di racchetta. Il motore di calibrazione ha deciso che su un driver serve un’evidenza diversa dall’autodichiarazione: ricevi il profilo dell’atleta, la scala dei punteggi, il driver (score R provvisorio, confidenza, lacune di evidenza e risposte già date, ciascuna con la sua fonte), il motivo del passo, le limitazioni dichiarate e i micro-test già proposti.',
   'Scopo: ogni micro-test produce l’evidenza che manca alla valutazione di quel driver. Parti dalle lacune indicate e dalle risposte già date; verifica con un esercizio ciò che l’atleta ha dichiarato e che la valutazione non sa ancora confermare. Non chiedere di nuovo ciò che è già chiaro.',
   'Forma: un esercizio da 5-10 minuti che l’atleta svolge da solo o con un compagno, in campo o a casa, con un risultato che può contare (quante riuscite su 10, quanti secondi, quante volte di fila, quanti punti su 5 scambi). Per i driver non tecnici (preparazione, mental, nutrizione) usa una prova osservabile o un diario di un giorno con un conteggio preciso, non un’autovalutazione generica.',
   'Su misura: adatta difficoltà, contesto e soglie a ciò che sai dell’atleta (classifica FIT dichiarata, esperienza, frequenza di gioco, obiettivo, limiti dichiarati). Un principiante non riceve esercizi da agonista; chi gioca spesso riceve soglie più alte. Se l’atleta ha dichiarato dolori o limitazioni, scegli una prova senza carico fisico o a basso impatto.',
   'Obiettivo informativo: dichiara in una frase quale lacuna del driver il test chiude. Indica la durata solo se si può stimare con buon senso.',
-  'Istruzioni: cosa preparare, cosa fare passo per passo, cosa contare. Solo racchetta, palline, un muro o un campo, un cronometro: niente attrezzi particolari, niente salti ripetuti, carichi, sprint massimali o altri rischi.',
+  'Istruzioni: cosa preparare, cosa fare passo per passo, cosa contare. Solo pala, palline, un muro o un campo da padel, un cronometro: niente attrezzi particolari, niente salti ripetuti, carichi, sprint massimali o altri rischi.',
   'Esiti: fasce del risultato contato, mutuamente esclusive, in ordine crescente, che coprono tutti i casi. Lo score di ogni esito è il livello reale che quella fascia indica sulla scala ricevuta, dal più basso al più alto: non premiare l’esito descritto meglio.',
   'Situazioni di gioco: quando la lacuna riguarda come l’atleta legge il gioco o cosa sceglie di fare (tattica, posizionamento, gestione del punto), al posto della prova pratica proponi tre situazioni reali, ciascuna con una sola risposta corretta e la spiegazione del coach per ogni risposta: l’atleta impara mentre ci dice come ragiona.',
   'Video: dopo il test l’atleta guarda un video di approfondimento. Scegli dall’archivio quello più utile per il driver e per gli errori possibili; se l’archivio non ha un video adatto, descrivi con un titolo il video che servirebbe.',
@@ -136,6 +137,7 @@ function formatRules(input: MicroTestInput) {
     `- options (solo PRACTICAL): da ${l.minOptions} a ${l.maxOptions} esiti in ordine crescente, label di massimo ${l.option} caratteri, score crescenti tra ${input.scale.minScore} e ${input.scale.maxScore}.`,
     situationRules(input),
     FIT_RANKING_RULE,
+    PADEL_SPORT_RULE,
   ].join('\n');
 }
 
