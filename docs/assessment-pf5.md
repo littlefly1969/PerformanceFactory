@@ -112,6 +112,17 @@ minimo al massimo della scala attiva: una domanda con score uguali (`[20, 20,
 20]`) o che non tocca gli estremi (`[20, 50, 80]`) non distingue i livelli e
 fa scartare il lotto.
 
+**Lo sport è il padel.** `PADEL_SPORT_RULE`
+(`apps/api/src/ai-orchestrator/padel-context.ts`) è una regola fissa come
+quella della classifica: si aggiunge ai vincoli di formato dei prompt di
+domande iniziali, calibrazione, micro-test, valutazione e potenziale, quindi
+vale anche quando in AI Tuner è attivo un testo che non nomina lo sport. La
+regola fissa il campo, il gioco di coppia e il lessico ammesso (pala, bandeja,
+víbora, uscita di parete) e vieta gli argomenti che nel padel non esistono:
+corde e incordatura, singolare, superfici, colpi da fondo senza pareti. La
+classifica FIT di tennis resta un indizio sul passato sportivo dell'atleta, non
+un invito a fare domande di tennis.
+
 **Domande a scelta multipla.** L'AI decide quando una domanda ammette più
 risposte (`multiple: true`, per esempio dove si sente fastidio) e può marcare
 un'opzione come esclusiva (`exclusive: true`, per esempio «Nessuno»), che non

@@ -14,4 +14,4 @@ export type FitRankingContext = {
  * quando l'AI Tuner ha attivato un prompt senza riferimenti alla classifica.
  */
 export const FIT_RANKING_RULE =
-  '- fitRanking: classifica FIT dichiarata dall’atleta (padel e tennis, attuale e migliore di sempre), null se non dichiarata. È un dato importante: usala per tarare livello, difficoltà e lessico. Resta una dichiarazione: le aree lontane dal gioco (per esempio nutrizione o attrezzatura) si valutano dalle loro evidenze, non dalla classifica.';
+  '- fitRanking: classifica FIT dichiarata dall’atleta (padel e tennis, attuale e migliore di sempre), null se non dichiarata. È un dato importante: usala per tarare livello, difficoltà e lessico. La classifica di tennis è solo un indizio sul passato sportivo e sull’allenabilità: non è un invito a parlare di tennis. Resta una dichiarazione: le aree lontane dal gioco (per esempio nutrizione o attrezzatura) si valutano dalle loro evidenze, non dalla classifica.';
