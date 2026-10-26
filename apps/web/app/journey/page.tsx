@@ -1,18 +1,18 @@
 "use client";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PF4Shell } from "../start/pf4-shell";
 import { WelcomeHome } from "./welcome-home";
 import { ConsentStep } from "./consent-step";
-import { ProvisionalEvaluation } from "./provisional-evaluation";
-import { CalibrationPanel } from "./calibration-panel";
-import { FreeLessonPanel } from "./free-lesson-panel";
-import { ScenariosReveal } from "./scenarios-reveal";
 import { DurationStep, PerformanceResult } from "./performance-result";
 import { useJourney } from "./use-journey";
-import { AssessmentQuestion } from "./assessment-question";
+import { CardNumberStep } from "./card-number-step";
+import { MultiChoiceStep } from "./choice-options";
 import { QuestionsPreparing } from "./questions-preparing";
-import { FitRankingEditor } from "../components/fit-ranking-editor";
+import { AccountHome } from "./_account/account-home";
+import { DarkQuestion, SingleOptions } from "./_account/dark-question";
+import { ProvisionalReady } from "./_account/provisional-ready";
+import type { Journey } from "./journey-types";
 import "./journey.css";
 const HORIZON_MONTHS: Record<string, number> = {
   PROGRAM_3M: 3,
@@ -31,6 +31,19 @@ export default function JourneyPage() {
     refresh,
   } = useJourney();
   const q = j?.questions?.[j.currentQuestion];
+  // Profilo provvisorio pronto (immagine 9): solo appena finito l'assessment.
+  const [ready, setReady] = useState(false);
+  const previous = useRef<Journey["phase"]>(undefined);
+  useEffect(() => {
+    const before = previous.current;
+    previous.current = j?.phase;
+    if (
+      j?.phase === "EVALUATION" &&
+      (before === "ASSESSMENT" || before === "PROCESSING")
+    )
+      // Transizione osservata dal server: si mostra una volta.
+      setReady(true);
+  }, [j?.phase]);
   // Prima dell'assessment: la prima volta il benvenuto (foto, Spider, regalo,
   // app), poi la home, che è anche dove riapre l'app installata.
   const intro = j?.phase === "ASSESSMENT_INTRO";
@@ -48,15 +61,78 @@ export default function JourneyPage() {
         onStart={() => void action("start")}
       />
     );
+  if (j?.phase === "EVALUATION" && j.evaluation)
+    return ready ? (
+      <ProvisionalReady
+        evaluation={j.evaluation}
+        onHome={() => setReady(false)}
+      />
+    ) : (
+      <AccountHome journey={j} />
+    );
+  // Domanda dell'assessment nella veste del funnel (immagine 8).
+  if (j?.phase === "ASSESSMENT" && !j.assessmentComplete && q)
+    return (
+      <DarkQuestion
+        key={q.id}
+        kicker={q.section ?? q.areaName ?? "Assessment"}
+        title={q.title}
+        note={
+          j.wakeup
+            ? `${j.firstName ? `${j.firstName}, il` : "Il"} tuo profilo è come l’hai lasciato: riprendi dal prossimo passo, senza ricominciare.`
+            : undefined
+        }
+        progress={j.currentQuestion}
+        total={j.count}
+        showLogout
+        onBack={
+          j.currentQuestion > 0 && !busy
+            ? () => {
+                void action("back");
+              }
+            : () => window.location.assign("/journey/profilo")
+        }
+        footer={
+          error ? (
+            <p className="pf4-body pf4-error" role="alert">
+              {error}
+            </p>
+          ) : undefined
+        }
+      >
+        {q.inputType === "TEXT" ? (
+          <CardNumberStep
+            key={q.id}
+            initial={String(j.answers[q.id] ?? "")}
+            busy={busy}
+            onSubmit={(value) => action("answer", { questionId: q.id, value })}
+          />
+        ) : q.multiple ? (
+          <MultiChoiceStep
+            key={q.id}
+            options={q.options}
+            initial={j.answers[q.id]}
+            busy={busy}
+            onSubmit={(value) => action("answer", { questionId: q.id, value })}
+          />
+        ) : (
+          <SingleOptions
+            options={q.options}
+            selected={j.answers[q.id]}
+            busy={busy}
+            onSelect={(value) =>
+              void action("answer", { questionId: q.id, value })
+            }
+          />
+        )}
+      </DarkQuestion>
+    );
   // L'intro PF5 e chiara, come /start; il questionario resta sullo stage scuro.
   const assessment = j?.phase === "ASSESSMENT" || j?.phase === "PROCESSING";
-  // Le domande (disponibilità e classifica FIT per prime) hanno il look del funnel.
-  const asking = j?.phase === "ASSESSMENT" && !j.assessmentComplete && !!q;
   return (
-    <div className={assessment && !asking ? "pf4-assessment" : undefined}>
+    <div className={assessment ? "pf4-assessment" : undefined}>
       <PF4Shell
         showLogout
-        funnel={asking ? { tone: "dark" } : undefined}
         label={
           assessment
             ? `Assessment · ${j?.count ?? ""} domande`
@@ -120,17 +196,6 @@ export default function JourneyPage() {
             </button>
           </section>
         )}
-        {asking && q && (
-          <AssessmentQuestion
-            key={q.id}
-            question={q}
-            position={j.currentQuestion + 1}
-            count={j.count}
-            answer={j.answers[q.id]}
-            busy={busy}
-            onAnswer={(value) => action("answer", { questionId: q.id, value })}
-          />
-        )}
         {j?.phase === "ASSESSMENT" && j.questionsPending && (
           <QuestionsPreparing
             busy={busy}
@@ -160,55 +225,6 @@ export default function JourneyPage() {
                 : "Analizza le mie risposte →"}
             </button>
           </section>
-        )}
-        {j?.phase === "EVALUATION" && j.evaluation && (
-          <>
-            <ProvisionalEvaluation evaluation={j.evaluation} />
-            {j.calibration && (
-              <CalibrationPanel
-                calibration={j.calibration}
-                evaluation={j.evaluation}
-                busy={busy}
-                onOpenRound={() => void action("calibration/round")}
-                onAnswer={(roundId, answers) =>
-                  void action("calibration/answers", { roundId, answers })
-                }
-                onSkip={(roundId) =>
-                  void action("calibration/skip", { roundId })
-                }
-              />
-            )}
-            {j.calibration && (
-              <FreeLessonPanel
-                refreshKey={`${j.evaluation.id}:${j.calibration.status}:${j.calibration.roundsCompleted}`}
-                onChanged={() => void refresh()}
-              />
-            )}
-            {j.scenarios && j.scenarios.status !== "READY" && (
-              <section className="pf4-body" role="status">
-                <h2>
-                  {j.scenarios.status === "PENDING"
-                    ? "Stiamo preparando i tuoi scenari…"
-                    : "I tuoi scenari non sono ancora pronti."}
-                </h2>
-                <p>
-                  La tua R è consolidata: stiamo calcolando dove puoi arrivare
-                  in 3, 6 e 12 mesi. Aggiorna tra qualche istante.
-                </p>
-                <button className="pf4-cta" onClick={() => void refresh()}>
-                  Aggiorna
-                </button>
-              </section>
-            )}
-            {j.scenarios?.status === "READY" && (
-              <ScenariosReveal
-                scenarios={j.scenarios}
-                busy={busy}
-                onSelect={(horizon) => void action("horizon", { horizon })}
-              />
-            )}
-            <FitRankingEditor onSaved={() => void refresh()} />
-          </>
         )}
         {j?.phase === "SUBSCRIBED" && (
           <section className="pf4-body" aria-labelledby="pf4-subscribed-title">
