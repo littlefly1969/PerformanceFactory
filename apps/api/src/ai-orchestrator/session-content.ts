@@ -134,10 +134,11 @@ function text(value: unknown, max = 400) {
     ? value.trim().slice(0, max)
     : null;
 }
-function seconds(value: unknown) {
+/** Zero resta un valore: un recupero di 0 secondi è un'istruzione, non un dato mancante. */
+function seconds(value: unknown, min: number) {
   return typeof value === 'number' &&
     Number.isInteger(value) &&
-    value > 0 &&
+    value >= min &&
     value <= MAX_TIMER_SECONDS
     ? value
     : null;
@@ -165,8 +166,8 @@ export function normalizeSessionContent(value: unknown): SessionContent {
         prescription,
         cue: text(e.cue) ?? '',
         demo: text(e.demo) ?? '',
-        workSeconds: seconds(e.workSeconds),
-        restSeconds: seconds(e.restSeconds),
+        workSeconds: seconds(e.workSeconds, 1),
+        restSeconds: seconds(e.restSeconds, 0),
       };
     })
     .filter((e): e is SessionExercise => e !== null)

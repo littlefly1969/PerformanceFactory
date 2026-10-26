@@ -33,12 +33,14 @@ export function SessionFinish({
   outcomes,
   startedAt,
   onSaved,
+  onResume,
 }: {
   session: Session;
   steps: Exercise[];
   outcomes: string[];
   startedAt: number;
   onSaved: () => void;
+  onResume: () => void;
 }) {
   const [effort, setEffort] = useState<number>();
   const [note, setNote] = useState("");
@@ -49,6 +51,21 @@ export function SessionFinish({
   const [minutes] = useState(() =>
     Math.max(1, Math.round((Date.now() - startedAt) / 60000)),
   );
+  /** Nessun esercizio svolto: la sessione resta saltata, non completata. */
+  async function skip() {
+    setBusy(true);
+    setFailure("");
+    try {
+      await athleteRequest(
+        `/athlete/training/sessions/${encodeURIComponent(session.id)}/skip`,
+        {},
+      );
+      onSaved();
+    } catch (e) {
+      setFailure((e as Error).message);
+      setBusy(false);
+    }
+  }
   async function save() {
     if (!effort) return;
     setBusy(true);
@@ -68,6 +85,38 @@ export function SessionFinish({
       setBusy(false);
     }
   }
+  if (done === 0)
+    return (
+      <SubscriberShell
+        footer={
+          <button className="pfs-cta" disabled={busy} onClick={skip}>
+            {busy ? "Salvataggio…" : "Segna come saltata"}
+          </button>
+        }
+      >
+        <div className="pfs-finish">
+          <i className="pfs-rule" aria-hidden="true" />
+          <span className="pfs-kicker">Nessun esercizio svolto</span>
+          <h1 className="pfs-title">Zero su {inWords(steps.length)}.</h1>
+          <p className="pfs-lead">
+            Hai saltato tutti gli esercizi: la sessione resterà nel calendario
+            come saltata. Se vuoi, puoi ricominciare dal primo.
+          </p>
+          <button
+            className="pfs-link pfs-skip"
+            disabled={busy}
+            onClick={onResume}
+          >
+            Riprendi la sessione
+          </button>
+          {failure && (
+            <p className="pfs-alert" role="alert">
+              {failure}
+            </p>
+          )}
+        </div>
+      </SubscriberShell>
+    );
   return (
     <SubscriberShell
       footer={

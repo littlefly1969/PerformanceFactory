@@ -30,7 +30,7 @@ describe('session content written by the AI', () => {
           cue: 'Ginocchio sopra il piede.',
           demo: 'Affondo laterale.',
           workSeconds: 0,
-          restSeconds: 5000,
+          restSeconds: 0,
         },
       ],
     });
@@ -53,10 +53,15 @@ describe('session content written by the AI', () => {
           cue: 'Ginocchio sopra il piede.',
           demo: 'Affondo laterale.',
           workSeconds: null,
-          restSeconds: null,
+          restSeconds: 0,
         },
       ],
     });
+    expect(
+      normalizeSessionContent({
+        exercises: [{ name: 'A', prescription: '1', restSeconds: 5000 }],
+      }).exercises[0].restSeconds,
+    ).toBeNull();
     expect(sessionContentMetadata(content)).toEqual({
       mode: 'PARTNER',
       goal: 'Spinta laterale',

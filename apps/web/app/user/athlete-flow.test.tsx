@@ -519,6 +519,40 @@ describe("PF4 athlete experience", () => {
       },
     });
   });
+  it("records a session with every exercise skipped as skipped, or resumes it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          requests.push({ url });
+          return respond({ status: "SKIPPED" });
+        }
+        return respond(executable);
+      }),
+    );
+    window.sessionStorage.clear();
+    render(<SessionPlayer id={session.id} />);
+    for (let i = 0; i < 2; i++)
+      await userEvent.click(
+        await screen.findByRole("button", { name: "Salta questo esercizio" }),
+      );
+    expect(screen.getByText("Zero su due.")).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Riprendi la sessione" }),
+    );
+    expect(screen.getByText("01 / 02")).toBeInTheDocument();
+    for (let i = 0; i < 2; i++)
+      await userEvent.click(
+        screen.getByRole("button", { name: "Salta questo esercizio" }),
+      );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Segna come saltata" }),
+    );
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/user"));
+    expect(requests).toEqual([
+      { url: "/api/athlete/training/sessions/session-one/skip" },
+    ]);
+  });
   it("shows the perceived effort of a completed session", async () => {
     vi.stubGlobal(
       "fetch",

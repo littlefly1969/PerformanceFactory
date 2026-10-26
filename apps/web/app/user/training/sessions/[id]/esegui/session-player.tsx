@@ -216,6 +216,11 @@ export function SessionPlayer({ id }: { id: string }) {
           saveRun(id, null);
           router.push("/user");
         }}
+        onResume={() => {
+          const restart = { index: 0, outcomes: [], startedAt: run.startedAt };
+          setRun(restart);
+          saveRun(id, restart);
+        }}
       />
     );
   const step = steps[run.index];
