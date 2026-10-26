@@ -81,12 +81,13 @@ function ProfileHeader({ profile }: { profile: AthleteProfile | null }) {
  * calibrazione. Prima dell'assessment lo Spider è vuoto.
  */
 export default function ProfilePage() {
-  const { journey: j, error, busy, action } = useAccountJourney();
+  const { journey: j, error, busy, action, refresh } = useAccountJourney();
   const profile = useResource<AthleteProfile>("/athlete-journey/profile");
   const evaluation = j?.evaluation ?? null;
-  const lesson = useResource<FreeLessonView>(
-    evaluation ? "/athlete-journey/free-lesson" : null,
-  );
+  const lesson = useResource<FreeLessonView>("/athlete-journey/free-lesson");
+  // Prima dell'assessment la fase è UNAVAILABLE: decidono flag e circoli.
+  const offered =
+    !!lesson.data?.enabled && (lesson.data.clubs?.length ?? 0) > 0;
   const calibration = j?.calibration ?? null;
   const closed = isClosed(calibration);
   const rule = calibration?.consolidationRule.minOverallConfidence ?? null;
@@ -124,6 +125,7 @@ export default function ProfilePage() {
           count={j.count}
           started={started}
           busy={busy}
+          offered={offered}
           onStart={() => {
             if (started) return window.location.assign("/journey");
             void action("start").then(
@@ -132,7 +134,7 @@ export default function ProfilePage() {
           }}
         />
       )}
-      {lesson.data && <FreeLessonCard view={lesson.data} />}
+      {evaluation && lesson.data && <FreeLessonCard view={lesson.data} />}
 
       {evaluation && global && (
         <section className="pf-acc-global" aria-labelledby="pf-acc-global">
@@ -218,7 +220,11 @@ export default function ProfilePage() {
         <section className="pf-acc-card pf-acc-fit">
           <FitRankingEditor
             onSaved={() => {
+              // La classifica rivaluta driver e confidenza: cambiano anche
+              // Spider, calibrazione ed eleggibilità alla lezione.
               void profile.reload();
+              void refresh().catch(() => undefined);
+              void lesson.reload();
             }}
           />
         </section>

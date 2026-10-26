@@ -346,6 +346,30 @@ export function MicroTestResultView({ roundId }: { roundId: string }) {
   );
 }
 
+/** Valutazione interrotta: le risposte sono salvate, si rilancia l'esito. */
+function StalledEvaluation({ onRetry }: { onRetry: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <section className="pf-acc-micro" role="status">
+      <h2>Le tue risposte sono salvate.</h2>
+      <p>
+        La valutazione del micro-test si è interrotta. Riprova: usiamo le
+        risposte che hai già dato.
+      </p>
+      <PillButton
+        arrow={false}
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          void onRetry().finally(() => setBusy(false));
+        }}
+      >
+        {busy ? "Aggiorniamo la tua valutazione…" : "Completa la valutazione"}
+      </PillButton>
+    </section>
+  );
+}
+
 /**
  * Micro-test proposto dall'AI durante la calibrazione: scheda iniziale,
  * situazioni di gioco o prova pratica, poi il risultato con il video.
@@ -374,6 +398,28 @@ export function MicroTestTab({
     round.questions[0]?.microTest
       ? round
       : null;
+  // Micro-test rimasto in valutazione (processo interrotto): si riprova con
+  // le risposte già fissate, che il server non cambia.
+  const stalled =
+    round?.action === "PROPOSE_MICRO_TEST" && round.status === "EVALUATING"
+      ? round
+      : null;
+  if (stalled)
+    return (
+      <StalledEvaluation
+        onRetry={() =>
+          onAnswered(
+            stalled.id,
+            Object.fromEntries(
+              Object.entries(stalled.answers ?? {}).map(([id, value]) => [
+                id,
+                String(value),
+              ]),
+            ),
+          )
+        }
+      />
+    );
   if (resultRound && !open)
     return <MicroTestResultView roundId={resultRound} />;
   if (!evaluation)

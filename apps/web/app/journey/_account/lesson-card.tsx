@@ -52,29 +52,42 @@ function Card({
 
 const SEAT = "1 posto in una lezione da 1 ora in gruppo di 4.";
 
-/** Prima dell'assessment: la lezione si sblocca completando le domande. */
+/**
+ * Prima dell'assessment. La lezione si promette solo se il server la offre
+ * (funzione attiva e almeno un circolo), e l'assessment è il primo passo, non
+ * lo sblocco: poi servono domande e test fino a un profilo attendibile.
+ */
 export function AssessmentLessonCard({
   answered,
   count,
   started,
   busy,
+  offered,
   onStart,
 }: {
   answered: number;
   count: number;
   started: boolean;
   busy: boolean;
+  offered: boolean;
   onStart: () => void;
 }) {
   const value = count ? Math.round((answered / count) * 100) : 0;
   return (
     <Card
       ring={<Ring value={value} />}
-      kicker="Lezione gratuita"
-      title="Completa l’assessment per sbloccarla."
+      kicker={offered ? "Lezione gratuita" : "Il tuo assessment"}
+      title={
+        offered
+          ? "Completa l’assessment: è il primo passo per sbloccarla."
+          : "Scopri dove sei oggi."
+      }
     >
       <p>
-        {answered} di {count} domande · poi {SEAT}
+        {answered} di {count} domande
+        {offered
+          ? " · poi continui con domande e test fino a sbloccare la lezione di prova."
+          : " · da qui nasce il tuo Spider."}
       </p>
       <PillButton disabled={busy} onClick={onStart}>
         {busy

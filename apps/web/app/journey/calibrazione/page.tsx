@@ -119,7 +119,15 @@ export default function CalibrationPage() {
       />
     );
 
+  // Round rimasto in valutazione (processo interrotto): si rimanda la
+  // valutazione con le risposte già fissate, che il server non cambia.
+  const stalled = round?.status === "EVALUATING" ? round : null;
   const next = async () => {
+    if (stalled)
+      return void action("calibration/answers", {
+        roundId: stalled.id,
+        answers: stalled.answers ?? {},
+      });
     if (microTestOpen(c)) return window.location.assign("/journey/coach");
     if (round?.status === "OPEN") return setAnswering(true);
     if (await action("calibration/round")) setAnswering(true);
@@ -137,9 +145,11 @@ export default function CalibrationPage() {
     <PillButton tone="lime" disabled={busy || !c} onClick={() => void next()}>
       {busy
         ? "Prepariamo il prossimo passo…"
-        : microTestOpen(c)
-          ? "Fai il micro-test"
-          : "Continua la calibrazione"}
+        : stalled
+          ? "Completa la valutazione"
+          : microTestOpen(c)
+            ? "Fai il micro-test"
+            : "Continua la calibrazione"}
     </PillButton>
   );
   return (
