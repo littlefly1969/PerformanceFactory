@@ -234,7 +234,7 @@ export function SessionPlayer({ id }: { id: string }) {
             <>
               <div className="pfs-run-count">
                 <span>
-                  {twoDigits(run.index)} / {twoDigits(steps.length)}
+                  {twoDigits(run.index + 1)} / {twoDigits(steps.length)}
                 </span>
                 Riposo
               </div>

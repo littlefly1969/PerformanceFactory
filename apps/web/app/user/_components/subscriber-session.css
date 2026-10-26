@@ -144,14 +144,14 @@
   margin-top: 22px;
   padding-top: 22px;
 }
-.pfs-body {
+.pfs .pfs-body {
   white-space: pre-wrap;
   font-size: 16px;
   line-height: 1.55;
   color: #2a2a2e;
   margin: 12px 0;
 }
-.pfs-small {
+.pfs .pfs-small {
   font-size: 10px;
   letter-spacing: 1.3px;
   line-height: 1.6;
@@ -245,7 +245,7 @@
   background: var(--pfs-ink);
 }
 .pfs-video {
-  margin: 0;
+  margin: 0 0 22px;
   aspect-ratio: 16 / 10;
   border-radius: 24px;
   background: repeating-linear-gradient(
@@ -275,13 +275,14 @@
   border-radius: 12px;
   padding: 10px 12px;
 }
-.pfs-prescription {
-  font-size: 30px;
+.pfs .pfs-prescription {
+  color: var(--pfs-ink);
+  font-size: 32px;
   font-weight: 400;
   letter-spacing: -0.03em;
   margin: 0;
 }
-.pfs-cue {
+.pfs .pfs-cue {
   color: var(--pfs-muted);
   font-size: 15px;
   line-height: 1.55;

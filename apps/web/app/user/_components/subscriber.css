@@ -97,18 +97,18 @@
   flex: 1;
   padding: 20px 20px 132px;
 }
-.pfs-muted,
-.pfs-meta,
-.pfs-small {
+.pfs .pfs-muted,
+.pfs .pfs-meta,
+.pfs .pfs-small {
   color: var(--pfs-muted);
 }
-.pfs-meta {
+.pfs .pfs-meta {
   font-size: 11px;
   letter-spacing: 1.2px;
   text-transform: uppercase;
   margin: 6px 0 0;
 }
-.pfs-alert {
+.pfs .pfs-alert {
   border: 1px solid #f0c9c9;
   background: #fff6f6;
   color: #8a2020;
@@ -127,7 +127,7 @@
   letter-spacing: -0.04em;
   margin: 8px 0 10px;
 }
-.pfs-lead {
+.pfs .pfs-lead {
   font-size: 14px;
   line-height: 1.55;
   color: #55555b;
