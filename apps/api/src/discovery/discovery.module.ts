@@ -20,14 +20,6 @@ import { AssessmentAnomalyAdminController } from './calibration/assessment-anoma
 import { FitRankingController } from './fit-ranking/fit-ranking.controller';
 import { FitRankingService } from './fit-ranking/fit-ranking.service';
 import {
-  AthleteProfileController,
-  AthleteProfileService,
-} from './athlete-profile';
-import {
-  MicroTestSessionController,
-  MicroTestSessionService,
-} from './calibration/micro-test-session';
-import {
   EstimatedProfileController,
   EstimatedProfileService,
 } from './estimated-profile';
@@ -49,8 +41,6 @@ import {
     AssessmentAnomalyAdminController,
     FitRankingController,
     EstimatedProfileController,
-    MicroTestSessionController,
-    AthleteProfileController,
   ],
   providers: [
     DiscoveryService,
@@ -61,8 +51,6 @@ import {
     ScenariosService,
     FitRankingService,
     EstimatedProfileService,
-    MicroTestSessionService,
-    AthleteProfileService,
   ],
   exports: [
     AthleteRegistrationService,
