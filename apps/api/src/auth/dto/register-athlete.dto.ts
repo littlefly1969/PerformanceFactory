@@ -74,6 +74,14 @@ export class RegisterAthleteDto {
   @IsBoolean()
   aiAssistantAccepted?: boolean;
 
+  @ApiProperty({
+    required: false,
+    description: 'Consenso facoltativo marketing dei circoli partner',
+  })
+  @IsOptional()
+  @IsBoolean()
+  marketingAccepted?: boolean;
+
   @ApiProperty({ required: false, type: [AcceptedDocumentDto] })
   @IsOptional()
   @IsArray()
