@@ -5,26 +5,39 @@ import "./number-choice.css";
 
 type Option = { value: string | number; label: string };
 
-/** Numero dell'opzione, se l'opzione è un numero (anche scritto come testo). */
+/**
+ * Numero dell'opzione, solo se è una quantità: il valore è un numero e
+ * l'etichetta comincia con lo stesso numero («5 giorni»). Gli id seriali delle
+ * opzioni scritte dall'AI («0» per «Mai») non sono quantità.
+ */
 export function optionNumber(option: Option) {
   const value =
     typeof option.value === "number" ? option.value : Number(option.value);
-  return Number.isFinite(value) && String(option.value).trim() !== ""
+  if (!Number.isFinite(value) || String(option.value).trim() === "")
+    return null;
+  const shown = option.label.match(/^\s*(\d+(?:[.,]\d+)?)/)?.[1];
+  return shown !== undefined && Number(shown.replace(",", ".")) === value
     ? value
     : null;
 }
 
 /**
- * Domanda numerica: opzioni che sono tutte numeri, almeno tre, scelta singola.
- * Si risponde con il quadrante, non con un elenco lungo.
+ * Domanda quantitativa: una domanda operativa (giorni, minuti) con almeno tre
+ * opzioni, tutte quantità, a scelta singola. Si risponde con il quadrante,
+ * non con un elenco lungo. Le domande dei driver restano scelte.
  */
 export function numericOptions(question: {
   options: Option[];
   multiple?: boolean;
-  inputType?: string;
+  kind?: string;
 }) {
   const { options } = question;
-  if (question.multiple || options.length < 3) return null;
+  if (
+    (question.kind !== undefined && question.kind !== "OPERATIONAL") ||
+    question.multiple ||
+    options.length < 3
+  )
+    return null;
   const numbers = options.map(optionNumber);
   if (numbers.some((n) => n === null)) return null;
   return options

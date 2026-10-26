@@ -13,6 +13,7 @@ import { OnboardingService } from '../onboarding/onboarding.service';
 import { loadSpecialistQuestionRecords } from '../onboarding/onboarding-questions';
 import { discoveryContext } from './discovery-context';
 import { generateInitialQuestionBank } from './initial-question-bank';
+import { JOURNEY_LEASE_MS } from './journey-lease';
 import {
   estimatedMinutes,
   logAssessmentProblems,
@@ -48,7 +49,7 @@ import { recordMeaningfulInteraction } from '../engagement/meaningful-interactio
 import { pendingWakeup } from '../engagement/engagement.service';
 import { baselineValue, chosenOptions, roundAnswers } from './choice-answers';
 
-const LEASE_MS = 10 * 60 * 1000;
+const LEASE_MS = JOURNEY_LEASE_MS;
 /** Prova mostrata all'atleta: solo visualizzazione, nessun blocco a scadenza. */
 const TRIAL_DAYS = 7;
 const actor = (id: string) => ({ id, role: 'USER' as const });

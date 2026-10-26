@@ -38,7 +38,11 @@ classifica in vigore. Una riga nuova nasce a ogni dichiarazione dell'atleta
 (fonte `PROFILE`; le righe `JOURNEY` restano quelle dichiarate quando la
 classifica era parte del percorso); una dichiarazione identica all'ultima non
 crea righe. Se la classifica cambia prima della prima valutazione, le domande
-dei driver già scritte dall'AI si cancellano e vengono riscritte. La classifica
+dei driver già scritte dall'AI si cancellano e vengono riscritte. Mentre l'AI
+scrive le domande o fa la prima valutazione (lease `AthleteDiscovery.operationAt`)
+la classifica non si può cambiare: l'API risponde 409 e si riprova dopo. La
+migrazione `20261026160000_fit_ranking_out_of_journey` toglie le vecchie risposte
+`fit:*` dai percorsi in corso e riallinea il loro cursore alla nuova sequenza. La classifica
 è copiata anche in `UserOnboardingAssessment.profileJson.fit_ranking`, il
 profilo letto dal coaching.
 

@@ -709,6 +709,29 @@ describe('PF4 discovery to authenticated journey', () => {
     expect(regenerated.questions).toHaveLength(14);
     expect(regenerated.questions[2].id).not.toBe(bank[0].id);
     bank.splice(0, bank.length, ...regenerated.questions.slice(2));
+    // Con l'AI al lavoro sulla classifica di prima (lease attivo, nessuna
+    // valutazione ancora) la classifica non cambia e la banca resta.
+    await prisma.athleteDiscovery.update({
+      where: { userId },
+      data: { operationAt: new Date() },
+    });
+    expect(
+      (
+        await post('fit-ranking', {
+          padelCurrent: '1',
+          padelBest: '1',
+          tennisCurrent: '2.1',
+          tennisBest: '1',
+        })
+      ).statusCode,
+    ).toBe(409);
+    expect(
+      await prisma.userOnboardingQuestion.count({ where: { userId } }),
+    ).toBe(12);
+    await prisma.athleteDiscovery.update({
+      where: { userId },
+      data: { operationAt: null },
+    });
     // L'AI può marcare una domanda come multipla: la risposta è un elenco e
     // un'opzione esclusiva resta da sola.
     const multi = await prisma.userOnboardingQuestion.findUniqueOrThrow({

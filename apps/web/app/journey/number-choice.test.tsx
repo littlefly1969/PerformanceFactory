@@ -24,6 +24,15 @@ describe("Risposta numerica del percorso", () => {
         ],
       }),
     ).toBeNull();
+    // Id seriali delle opzioni AI: «Mai / A volte / Sempre» resta una scelta.
+    const serial = ["Mai", "A volte", "Sempre"].map((label, i) => ({
+      value: String(i),
+      label,
+    }));
+    expect(numericOptions({ options: serial })).toBeNull();
+    // Le domande dei driver restano scelte anche con etichette numeriche.
+    expect(numericOptions({ options: days, kind: "AREA" })).toBeNull();
+    expect(numericOptions({ options: days, kind: "OPERATIONAL" })).toHaveLength(5);
     // Due sole opzioni restano un elenco: il quadrante non aggiunge nulla.
     expect(numericOptions({ options: days.slice(0, 2) })).toBeNull();
     expect(optionUnit("5 giorni")).toBe("giorni");

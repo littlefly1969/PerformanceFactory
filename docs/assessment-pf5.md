@@ -53,8 +53,9 @@ minuti. `fixedQuestionCount` comprende le sole operative. Le risposte `GET /auth
 Ordine obbligatorio:
 
 1. **Domande operative**, sezione «Disponibilità». Quando le opzioni sono
-   tutte numeri (giorni, minuti) si risponde con il quadrante e i tasti più e
-   meno, non con un elenco di opzioni.
+   quantità (valore numerico ed etichetta che comincia con lo stesso numero,
+   come «5 giorni») si risponde con il quadrante e i tasti più e meno, non con
+   un elenco di opzioni. Le domande dei driver restano sempre scelte.
 2. **Domande dei driver**, scritte dall'AI per questo atleta, raggruppate
    nell'ordine dei driver.
 

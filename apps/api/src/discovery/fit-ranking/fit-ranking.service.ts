@@ -1,7 +1,12 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CalibrationService } from '../calibration/calibration.service';
 import { dropStaleBank } from '../initial-question-bank';
+import { journeyLeaseActive } from '../journey-lease';
 import {
   FIT_RANKING_OPTIONS,
   FitRankingValues,
@@ -56,10 +61,21 @@ export class FitRankingService {
       ...declared,
       cardNumber: normalizeCardNumber(body.cardNumber) ?? null,
     } as FitRankingValues;
-    const evaluated = await this.prisma.assessmentEvaluation.count({
-      where: { userId },
-    });
     await this.prisma.$transaction(async (tx) => {
+      // Stesso lock del lease del percorso: mentre l'AI scrive le domande o fa
+      // la prima valutazione con la classifica di prima, non si cambia.
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
+      const [discovery, evaluated] = await Promise.all([
+        tx.athleteDiscovery.findUnique({
+          where: { userId },
+          select: { operationAt: true },
+        }),
+        tx.assessmentEvaluation.count({ where: { userId } }),
+      ]);
+      if (!evaluated && journeyLeaseActive(discovery?.operationAt ?? null))
+        throw new ConflictException(
+          'Stiamo elaborando le tue risposte: riprova tra poco.',
+        );
       const changed = await saveFitRanking(
         tx,
         userId,
