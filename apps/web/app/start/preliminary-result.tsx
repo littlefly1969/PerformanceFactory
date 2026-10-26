@@ -101,8 +101,8 @@ export function PreliminaryResult({
             Gratis finché non ti conosciamo abbastanza.
           </p>
           <p>
-            Profilo, micro-test e coach AI senza carta, fino alla chiusura della
-            calibrazione (al massimo circa 30 giorni).
+            Profilo, micro-test e coach AI senza carta, finché la calibrazione
+            non è abbastanza sicura del tuo livello.
           </p>
         </aside>
         <h1>Questi sono i tuoi vincoli.</h1>

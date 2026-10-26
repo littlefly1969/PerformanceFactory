@@ -25,6 +25,10 @@
 .pf4-funnel .pf4-header button {
   font-size: 22px;
 }
+.pf4-funnel .pf4-header .pf4-logout {
+  font-size: 10px;
+  text-align: right;
+}
 .pf4-header-mark {
   display: flex;
   justify-content: center;
@@ -511,4 +515,17 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
+}
+.pf4-funnel .pf4-sheet .pf4-card-number {
+  margin-top: 24px;
+}
+.pf4-funnel .pf4-sheet .pf4-card-number span {
+  color: var(--pf4-muted);
+  font-size: 14px;
+}
+.pf4-funnel .pf4-sheet .pf4-card-number input {
+  padding: 18px 20px;
+  border: 0;
+  border-radius: 18px;
+  font-size: 16px;
 }
