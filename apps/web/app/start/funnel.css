@@ -516,16 +516,19 @@
   justify-content: center;
   gap: 12px;
 }
-.pf4-funnel .pf4-sheet .pf4-card-number {
-  margin-top: 24px;
-}
-.pf4-funnel .pf4-sheet .pf4-card-number span {
-  color: var(--pf4-muted);
-  font-size: 14px;
-}
-.pf4-funnel .pf4-sheet .pf4-card-number input {
-  padding: 18px 20px;
-  border: 0;
-  border-radius: 18px;
-  font-size: 16px;
+/* Lo schermo è la pagina: se il contenuto ci sta non c'è scroll, quando è più
+   lungo scorre la colonna e non la pagina (100dvh, non 100vh). */
+@media (max-width: 899px) {
+  .pf4-funnel.pf4 {
+    height: 100dvh;
+    overflow: hidden;
+  }
+  .pf4-funnel .pf4-device {
+    height: 100%;
+    min-height: 0;
+  }
+  .pf4-funnel .pf4-stage {
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
 }

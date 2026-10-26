@@ -7,7 +7,7 @@ PF5 e un unico questionario continuo, seguito dalla prima valutazione AI delle
 risposte.
 
 ```
-login → consensi → intro PF5 → domande operative → classifica FIT
+login → consensi → intro PF5 → domande operative
       → l'AI scrive le domande dei driver → domande dei driver
       → ultima risposta salvata (assessmentComplete)
       → Analizza le mie risposte → valutazione AI (R provvisoria)
@@ -39,29 +39,32 @@ di domande è scritto nel frontend.
 conteggi:
 
 ```
-count = domande operative + 5 della classifica FIT + driver attivi × domande per driver
+count = domande operative + driver attivi × domande per driver
 estimatedMinutes = max(1, ceil(count / 3))
 ```
 
 Le domande per driver sono `initialQuestionsPerArea` del back office
 (`/admin/calibration`, default 2, da 1 a 4). Con la configurazione padel
-attuale: 2 domande operative + 5 della classifica FIT + 6 driver × 2 domande =
-19 domande, circa 7 minuti. `fixedQuestionCount`
-comprende operative e classifica. Le risposte `GET /auth/journey` e
+attuale: 2 domande operative + 6 driver × 2 domande = 14 domande, circa 5
+minuti. `fixedQuestionCount` comprende le sole operative. Le risposte `GET /auth/journey` e
 `POST /athlete-journey/start` riportano `fixedQuestionCount`,
 `areaQuestionCount`, `count` ed `estimatedMinutes`.
 
 Ordine obbligatorio:
 
-1. **Domande operative**, sezione «Disponibilità».
-2. **Classifica FIT**, sezione «Classifica FIT»: padel attuale e migliore di
-   sempre, tennis attuale e migliore di sempre, numero di tessera facoltativo.
-   Vedi [Classifica FIT](classifica-fit.md).
-3. **Domande dei driver**, scritte dall'AI per questo atleta, raggruppate
+1. **Domande operative**, sezione «Disponibilità». Quando le opzioni sono
+   quantità (valore numerico ed etichetta che comincia con lo stesso numero,
+   come «5 giorni») si risponde con il quadrante e i tasti più e meno, non con
+   un elenco di opzioni. Le domande dei driver restano sempre scelte.
+2. **Domande dei driver**, scritte dall'AI per questo atleta, raggruppate
    nell'ordine dei driver.
 
+La classifica FIT non è più una domanda del percorso: è un dato di
+configurazione del profilo, che si dichiara nella schermata della foto e si
+corregge dal profilo. Vedi [Classifica FIT](classifica-fit.md).
+
 Il progressivo mostra `n / count` e, sopra ogni domanda, la sezione
-(«Disponibilità», «Classifica FIT» o il nome del driver).
+(«Disponibilità» o il nome del driver).
 
 ## Domande operative (bloccate)
 
@@ -91,7 +94,7 @@ risponde una volta sola, nell'assessment. La frequenza abituale
 ## Domande dei driver (scritte dall'AI)
 
 Non ci sono più domande di driver preconfezionate. Quando l'atleta ha risposto
-alle domande operative e alla classifica FIT, il percorso risponde con
+alle domande operative, il percorso risponde con
 `questionsPending: true` e la pagina mostra «Prepariamo le tue domande…». La
 pagina chiama da sola `POST /athlete-journey/questions`, che in un'unica
 richiesta all'AI fa scrivere `initialQuestionsPerArea` domande per ogni driver
@@ -147,9 +150,9 @@ automatico (`INITIAL_QUESTIONS_ATTEMPTS` = 2), poi risponde 502
 pronte.» con **Riprova**. Non ci sono domande di riserva: senza AI i passaggi
 successivi (valutazione, calibrazione, scenari) non possono comunque partire.
 
-**Se l'atleta corregge la classifica** tornando indietro dopo che le domande
-sono state scritte, le domande e le loro risposte si cancellano e l'AI le
-riscrive per la classifica nuova.
+**Se l'atleta corregge la classifica** dal profilo dopo che le domande sono
+state scritte e prima della prima valutazione, le domande e le loro risposte si
+cancellano e l'AI le riscrive per la classifica nuova.
 
 Una configurazione senza driver o senza domande operative è un errore:
 
@@ -216,8 +219,8 @@ descritta in [Gestione admin della discovery](discovery-admin.md).
   dell'AI (N per driver, driver estranei, doppioni, score fuori scala, opzioni),
   riprova automatica ed errore da riprovare.
 - **PostgreSQL** (`test/db/discovery.integration-spec.ts`): configurazione
-  invalida che non parte e non genera domande; 2 operative e 5 di classifica in
-  testa; AI che non risponde (502, nessuna domanda di riserva) e riprova; 12
+  invalida che non parte e non genera domande; 2 operative in testa; AI che non
+  risponde (502, nessuna domanda di riserva) e riprova; 12
   domande dell'AI a coppie per driver; classifica corretta che fa riscrivere le
   domande; profilo scritto alla prima risposta; stop con `assessmentComplete`.
 - **Web** (`questions-preparing.test.tsx`, `ai-tuner/prompts/domande-iniziali`):

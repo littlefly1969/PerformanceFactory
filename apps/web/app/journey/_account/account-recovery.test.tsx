@@ -78,9 +78,10 @@ describe("Classifica FIT corretta nel profilo", () => {
       "/fit-ranking": FIT,
     });
     render(<ProfilePage />);
-    const save = await screen.findByRole("button", {
-      name: /Salva classifica/,
-    });
+    await userEvent.click(
+      await screen.findByRole("button", { name: /Modifica|Aggiungi/ }),
+    );
+    const save = screen.getByRole("button", { name: "Salva" });
     const [padelNow, padelBest, tennisNow, tennisBest] =
       screen.getAllByRole("combobox");
     await userEvent.selectOptions(padelNow, "3");

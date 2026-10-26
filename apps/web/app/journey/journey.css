@@ -291,37 +291,3 @@
   font-weight: 600;
 }
 
-/* Classifica FIT: tessera facoltativa nel percorso e correzione dopo la valutazione. */
-.pf4-card-number,
-.pf4-fit-ranking form {
-  display: grid;
-  gap: 1rem;
-  max-width: 38rem;
-}
-.pf4-fit-ranking {
-  padding: 26px 0;
-}
-.pf4-fit-ranking fieldset {
-  display: grid;
-  gap: 0.75rem;
-  border: 0;
-  margin: 0;
-  padding: 0;
-}
-.pf4-card-number label,
-.pf4-fit-ranking label {
-  display: grid;
-  gap: 0.5rem;
-  line-height: 1.5;
-}
-.pf4-card-number input,
-.pf4-fit-ranking select,
-.pf4-fit-ranking input {
-  width: 100%;
-  padding: 0.8rem;
-  border: 1px solid #ddd;
-  border-radius: 0.6rem;
-  background: white;
-  color: #171717;
-  font: inherit;
-}

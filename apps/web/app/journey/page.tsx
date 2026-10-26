@@ -6,8 +6,8 @@ import { WelcomeHome } from "./welcome-home";
 import { ConsentStep } from "./consent-step";
 import { DurationStep, PerformanceResult } from "./performance-result";
 import { useJourney } from "./use-journey";
-import { CardNumberStep } from "./card-number-step";
 import { MultiChoiceStep } from "./choice-options";
+import { NumberChoiceStep, numericOptions } from "./number-choice";
 import { QuestionsPreparing } from "./questions-preparing";
 import { AccountHome } from "./_account/account-home";
 import { DarkQuestion, SingleOptions } from "./_account/dark-question";
@@ -100,18 +100,19 @@ export default function JourneyPage() {
           ) : undefined
         }
       >
-        {q.inputType === "TEXT" ? (
-          <CardNumberStep
-            key={q.id}
-            initial={String(j.answers[q.id] ?? "")}
-            busy={busy}
-            onSubmit={(value) => action("answer", { questionId: q.id, value })}
-          />
-        ) : q.multiple ? (
+        {q.multiple ? (
           <MultiChoiceStep
             key={q.id}
             options={q.options}
             initial={j.answers[q.id]}
+            busy={busy}
+            onSubmit={(value) => action("answer", { questionId: q.id, value })}
+          />
+        ) : numericOptions(q) ? (
+          <NumberChoiceStep
+            key={q.id}
+            options={q.options}
+            selected={j.answers[q.id]}
             busy={busy}
             onSubmit={(value) => action("answer", { questionId: q.id, value })}
           />

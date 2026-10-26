@@ -2,13 +2,16 @@
 
 ## Cosa chiede
 
-Subito dopo le due domande di disponibilità l'assessment chiede, una alla volta:
+La classifica non è una domanda dell'assessment: è un dato di configurazione del
+profilo, come la foto. Si dichiara in un riquadro compatto, tutto in una
+schermata:
 
-1. classifica FIT di padel attuale;
-2. migliore classifica FIT di padel di sempre;
-3. classifica FIT di tennis attuale;
-4. migliore classifica FIT di tennis di sempre;
-5. numero di tessera FIT, facoltativo (si può saltare).
+1. classifica FIT di padel, attuale e migliore di sempre;
+2. classifica FIT di tennis, attuale e migliore di sempre;
+3. numero di tessera FIT, facoltativo (compare solo se lo si chiede).
+
+«Non ho classifiche» la dichiara tutta in un tocco. È sempre facoltativa: senza
+dichiarazione i prompt ricevono `fitRanking: null`.
 
 Padel e tennis hanno classifiche separate. Le liste sono chiuse, dalla più alta
 alla più bassa, e finiscono con «Nessuna classifica»:
@@ -23,17 +26,23 @@ migliore arriva fino all'attuale, e se l'atleta alza l'attuale la migliore già
 data sale con lei. Le liste sono in `FIT_RANKING_OPTIONS`
 (`apps/api/src/discovery/fit-ranking/fit-ranking.ts`).
 
-Le domande non sono template configurabili: gli id sono `fit:padelCurrent`,
-`fit:padelBest`, `fit:tennisCurrent`, `fit:tennisBest`, `fit:cardNumber` e il
-backend le inserisce nella sequenza. Non danno punteggio e non entrano nelle
-risposte dell'onboarding.
+Il riquadro (`apps/web/app/components/fit-ranking-editor.tsx`) compare nella
+schermata della foto del benvenuto (`/benvenuto/foto`), nel profilo del percorso
+(`/journey/profilo`) e nel profilo dell'atleta (`/user/profile`). La classifica
+non dà punteggio e non entra nelle risposte dell'onboarding.
 
 ## Dove si salva
 
 `AthleteFitRanking` è uno storico a soli inserimenti: l'ultima riga è la
-classifica in vigore. Una riga nuova nasce quando le quattro classifiche del
-percorso sono complete (fonte `JOURNEY`) e a ogni correzione dell'atleta (fonte
-`PROFILE`); una dichiarazione identica all'ultima non crea righe. La classifica
+classifica in vigore. Una riga nuova nasce a ogni dichiarazione dell'atleta
+(fonte `PROFILE`; le righe `JOURNEY` restano quelle dichiarate quando la
+classifica era parte del percorso); una dichiarazione identica all'ultima non
+crea righe. Se la classifica cambia prima della prima valutazione, le domande
+dei driver già scritte dall'AI si cancellano e vengono riscritte. Mentre l'AI
+scrive le domande o fa la prima valutazione (lease `AthleteDiscovery.operationAt`)
+la classifica non si può cambiare: l'API risponde 409 e si riprova dopo. La
+migrazione `20261026160000_fit_ranking_out_of_journey` toglie le vecchie risposte
+`fit:*` dai percorsi in corso e riallinea il loro cursore alla nuova sequenza. La classifica
 è copiata anche in `UserOnboardingAssessment.profileJson.fit_ranking`, il
 profilo letto dal coaching.
 
@@ -50,8 +59,8 @@ testo modificabile.
 
 ## Correzione e ricalcolo della R
 
-L'atleta corregge la classifica quando vuole: nel percorso dopo la prima
-valutazione (sotto la valutazione e la calibrazione) e nel profilo (`/user/profile`).
+L'atleta corregge la classifica quando vuole, dal profilo del percorso
+(`/journey/profilo`) o dal profilo dell'atleta (`/user/profile`).
 
 | Endpoint | Cosa fa |
 |---|---|
@@ -78,5 +87,4 @@ nuovo salvataggio riprova il ricalcolo.
 - Unit: `apps/api/src/discovery/fit-ranking/fit-ranking.spec.ts`.
 - PostgreSQL: `apps/api/test/db/discovery.integration-spec.ts` (sequenza,
   storico, profilo, input AI senza tessera, correzione con ricalcolo).
-- Web: `apps/web/app/components/fit-ranking-editor.test.tsx`,
-  `apps/web/app/journey/card-number-step.test.tsx`.
+- Web: `apps/web/app/components/fit-ranking-editor.test.tsx`.

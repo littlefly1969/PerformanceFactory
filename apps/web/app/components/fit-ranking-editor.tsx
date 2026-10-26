@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import { athleteRequest, useAthlete } from "../user/_components/use-athlete";
+import "./fit-ranking.css";
 
 type Sport = "PADEL" | "TENNIS";
 type Option = { value: string; label: string };
@@ -25,9 +26,11 @@ const EMPTY: Values = {
   cardNumber: "",
 };
 const SPORTS: { sport: Sport; name: string; prefix: "padel" | "tennis" }[] = [
-  { sport: "PADEL", name: "padel", prefix: "padel" },
-  { sport: "TENNIS", name: "tennis", prefix: "tennis" },
+  { sport: "PADEL", name: "Padel", prefix: "padel" },
+  { sport: "TENNIS", name: "Tennis", prefix: "tennis" },
 ];
+/** Nessuna classifica: la voce che chiude ogni lista, lato server. */
+const NONE = "NONE";
 
 /** La migliore non può essere più bassa dell'attuale: lista fino all'attuale. */
 function bestOptions(options: Option[], current: string) {
@@ -35,57 +38,84 @@ function bestOptions(options: Option[], current: string) {
   return index < 0 ? options : options.slice(0, index + 1);
 }
 
+const labelOf = (options: Option[], value: string) =>
+  options.find((o) => o.value === value)?.label ?? "—";
+
+/** Riga di sintesi: una classifica per sport, senza aprire il modulo. */
+function Summary({ view }: { view: FitRankingView }) {
+  if (!view.ranking) return <p>Non l’hai ancora indicata.</p>;
+  return (
+    <dl className="pf-fit-summary">
+      {SPORTS.map(({ sport, name, prefix }) => (
+        <div key={sport}>
+          <dt>{name}</dt>
+          <dd>
+            {labelOf(view.options[sport], view.ranking![`${prefix}Current`])}
+            <span>
+              best{" "}
+              {labelOf(view.options[sport], view.ranking![`${prefix}Best`])}
+            </span>
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 function RankingForm({
   view,
   onSaved,
+  onClose,
 }: {
   view: FitRankingView;
   onSaved: (next: FitRankingView) => void;
+  onClose: () => void;
 }) {
   const [values, setValues] = useState<Values>(
     view.ranking
       ? { ...view.ranking, cardNumber: view.ranking.cardNumber ?? "" }
       : EMPTY,
   );
+  const [card, setCard] = useState(!!view.ranking?.cardNumber);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(
     view.recalculationPending
       ? "La tua R non è ancora stata ricalcolata con l'ultima classifica: salva di nuovo per riprovare."
       : "",
   );
-  const set = (field: keyof Values, value: string) =>
+  const set = (next: Partial<Values>) =>
     setValues((v) => {
-      const next = { ...v, [field]: value };
+      const merged = { ...v, ...next };
       // Attuale più alta della migliore: la migliore sale con lei.
       for (const { sport, prefix } of SPORTS) {
         const allowed = bestOptions(
           view.options[sport],
-          next[`${prefix}Current`],
+          merged[`${prefix}Current`],
         );
         if (
-          next[`${prefix}Best`] &&
-          !allowed.some((o) => o.value === next[`${prefix}Best`])
+          merged[`${prefix}Best`] &&
+          !allowed.some((o) => o.value === merged[`${prefix}Best`])
         )
-          next[`${prefix}Best`] = next[`${prefix}Current`];
+          merged[`${prefix}Best`] = merged[`${prefix}Current`];
       }
-      return next;
+      return merged;
     });
-  async function save(event: React.FormEvent) {
-    event.preventDefault();
+  async function save(next: Values) {
     if (busy) return;
     setBusy(true);
     setMessage("");
     try {
-      const next = await athleteRequest<FitRankingView>(
+      const saved = await athleteRequest<FitRankingView>(
         "/athlete-journey/fit-ranking",
-        values,
+        next,
       );
-      onSaved(next);
+      onSaved(saved);
       setMessage(
-        next.recalculationPending
+        saved.recalculationPending
           ? "Classifica salvata, ma non siamo riusciti a ricalcolare la tua R. Salva di nuovo per riprovare."
-          : "Classifica salvata. Se è cambiata, la tua R è stata ricalcolata.",
+          : "",
       );
+      if (!saved.recalculationPending) onClose();
     } catch (e) {
       setMessage(
         (e as Error).message ||
@@ -95,19 +125,30 @@ function RankingForm({
       setBusy(false);
     }
   }
+  const complete = SPORTS.every(
+    ({ prefix }) => values[`${prefix}Current`] && values[`${prefix}Best`],
+  );
   return (
-    <form onSubmit={save} className="pf4-availability-form">
+    <form
+      className="pf-fit-form"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void save(values);
+      }}
+    >
       {SPORTS.map(({ sport, name, prefix }) => (
-        <fieldset key={sport}>
-          <legend>Classifica FIT di {name}</legend>
+        <div className="pf-fit-row" key={sport}>
+          <span>{name}</span>
           <label>
-            Attuale
+            <small>Attuale</small>
             <select
               required
               value={values[`${prefix}Current`]}
-              onChange={(e) => set(`${prefix}Current`, e.target.value)}
+              onChange={(e) =>
+                set({ [`${prefix}Current`]: e.target.value } as Partial<Values>)
+              }
             >
-              <option value="">Seleziona</option>
+              <option value="">—</option>
               {view.options[sport].map((o) => (
                 <option key={o.value} value={o.value}>
                   {o.label}
@@ -116,13 +157,15 @@ function RankingForm({
             </select>
           </label>
           <label>
-            Migliore di sempre
+            <small>Migliore</small>
             <select
               required
               value={values[`${prefix}Best`]}
-              onChange={(e) => set(`${prefix}Best`, e.target.value)}
+              onChange={(e) =>
+                set({ [`${prefix}Best`]: e.target.value } as Partial<Values>)
+              }
             >
-              <option value="">Seleziona</option>
+              <option value="">—</option>
               {bestOptions(view.options[sport], values[`${prefix}Current`]).map(
                 (o) => (
                   <option key={o.value} value={o.value}>
@@ -132,52 +175,110 @@ function RankingForm({
               )}
             </select>
           </label>
-        </fieldset>
+        </div>
       ))}
-      <label>
-        Numero di tessera FIT (facoltativo)
-        <input
-          value={values.cardNumber}
-          maxLength={30}
-          onChange={(e) => set("cardNumber", e.target.value)}
-        />
-      </label>
-      <button className="pf4-cta" disabled={busy}>
-        {busy ? "Salvataggio…" : "Salva classifica →"}
-      </button>
+      {card ? (
+        <label className="pf-fit-card">
+          <small>Numero di tessera FIT (facoltativo)</small>
+          <input
+            value={values.cardNumber}
+            maxLength={30}
+            autoComplete="off"
+            onChange={(e) => set({ cardNumber: e.target.value })}
+          />
+        </label>
+      ) : (
+        <button
+          type="button"
+          className="pf-fit-link"
+          onClick={() => setCard(true)}
+        >
+          Aggiungi il numero di tessera
+        </button>
+      )}
+      <div className="pf-fit-actions">
+        <button className="pf-fit-save" disabled={busy || !complete}>
+          {busy ? "Salvataggio…" : "Salva"}
+        </button>
+        <button
+          type="button"
+          className="pf-fit-link"
+          disabled={busy}
+          onClick={() =>
+            void save({
+              ...EMPTY,
+              padelCurrent: NONE,
+              padelBest: NONE,
+              tennisCurrent: NONE,
+              tennisBest: NONE,
+              cardNumber: values.cardNumber,
+            })
+          }
+        >
+          Non ho classifiche
+        </button>
+      </div>
       {message && <p role="status">{message}</p>}
     </form>
   );
 }
 
 /**
- * Classifica FIT sempre correggibile dall'atleta: una classifica cambiata fa
- * ricalcolare la R.
+ * Classifica FIT: dato di configurazione del profilo, non una domanda del
+ * percorso. Si vede in una riga e si corregge quando serve; se cambia dopo la
+ * valutazione, la R viene ricalcolata.
  */
-export function FitRankingEditor({ onSaved }: { onSaved?: () => void }) {
+export function FitRankingEditor({
+  onSaved,
+  tone = "light",
+}: {
+  onSaved?: () => void;
+  tone?: "light" | "dark";
+}) {
   const { data, error, reload } = useAthlete<FitRankingView>(
     "/athlete-journey/fit-ranking",
   );
   const [view, setView] = useState<FitRankingView>();
   const current = view ?? data;
+  const [open, setOpen] = useState(false);
   return (
-    <section className="pf4-athlete-section pf4-fit-ranking">
-      <span className="pf4-kicker">La tua classifica FIT</span>
-      <h2>Padel e tennis, attuale e migliore di sempre.</h2>
-      <p>
-        La usiamo in ogni valutazione. Se cambia, aggiornala qui: ricalcoliamo
-        la tua R con le risposte che ci hai già dato.
-      </p>
-      {current && (
+    <section className={`pf-fit pf-fit-${tone}`}>
+      <div className="pf-fit-head">
+        <div>
+          <span className="pf-fit-kicker">Classifica FIT</span>
+          {current && <Summary view={current} />}
+        </div>
+        {current && (
+          <button
+            type="button"
+            className="pf-fit-link"
+            aria-expanded={open}
+            onClick={() => setOpen((o) => !o)}
+          >
+            {open ? "Chiudi" : current.ranking ? "Modifica" : "Aggiungi"}
+          </button>
+        )}
+      </div>
+      {current?.recalculationPending && !open && (
+        <p role="status">
+          La tua R non è ancora stata ricalcolata con l’ultima classifica.
+        </p>
+      )}
+      {current && open && (
         <RankingForm
           view={current}
+          onClose={() => setOpen(false)}
           onSaved={(next) => {
             setView(next);
             onSaved?.();
           }}
         />
       )}
-      {error && <button onClick={reload}>Riprova a caricare</button>}
+      {error && (
+        <button type="button" className="pf-fit-link" onClick={reload}>
+          Riprova a caricare
+        </button>
+      )}
     </section>
   );
 }

@@ -10,11 +10,7 @@ import {
   loadAssessmentConfiguration,
 } from './assessment-configuration';
 import { discoveryContext } from './discovery-context';
-import {
-  FIT_RANKING_FIELDS,
-  fitRankingFromAnswers,
-  loadFitRankingContext,
-} from './fit-ranking/fit-ranking';
+import { loadFitRankingContext } from './fit-ranking/fit-ranking';
 
 /**
  * Scrive con l'AI le domande conoscitive iniziali di ogni driver, su misura
@@ -94,28 +90,36 @@ export async function generateInitialQuestionBank(
 }
 
 /**
- * Classifica FIT cambiata dopo che l'AI ha scritto le domande dei driver:
- * erano su misura per la classifica precedente, quindi si cancellano con le
- * loro risposte e l'AI le riscrive. Restituisce le risposte da salvare.
+ * Classifica FIT cambiata dal profilo prima della prima valutazione: le
+ * domande dei driver erano su misura per la classifica precedente, quindi si
+ * cancellano con le loro risposte e l'AI le riscrive al passo successivo.
  */
 export async function dropStaleBank(
   tx: Prisma.TransactionClient,
   userId: string,
-  saved: { assessmentAnswers: Prisma.JsonValue },
-  answers: Record<string, unknown>,
-  questions: { id: string; areaId: string | null }[],
 ) {
-  const before = fitRankingFromAnswers(
-    saved.assessmentAnswers as Record<string, unknown>,
-  );
-  const after = fitRankingFromAnswers(answers);
-  const changed = FIT_RANKING_FIELDS.some(
-    ({ field }) => before?.[field] !== after?.[field],
-  );
-  const bank = questions.filter((q) => q.areaId);
-  if (!changed || !bank.length) return answers;
+  const bank = await tx.userOnboardingQuestion.findMany({
+    where: { userId },
+    select: { id: true },
+  });
+  if (!bank.length) return false;
+  const saved = await tx.athleteDiscovery.findUnique({ where: { userId } });
+  if (!saved) return false;
   await tx.userOnboardingQuestion.deleteMany({ where: { userId } });
-  return Object.fromEntries(
-    Object.entries(answers).filter(([id]) => !bank.some((q) => q.id === id)),
+  const answers = Object.fromEntries(
+    Object.entries(saved.assessmentAnswers as Record<string, unknown>).filter(
+      ([id]) => !bank.some((q) => q.id === id),
+    ),
   );
+  await tx.athleteDiscovery.update({
+    where: { userId },
+    data: {
+      assessmentAnswers: answers as Prisma.InputJsonValue,
+      currentQuestion: Math.min(
+        saved.currentQuestion,
+        Object.keys(answers).length,
+      ),
+    },
+  });
+  return true;
 }
