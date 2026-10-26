@@ -14,6 +14,7 @@ import {
   sanitizeTouch,
 } from './attribution';
 import { CreatePartnerDto, UpdatePartnerDto } from './dto/partner.dto';
+import { ClubImageKind, clubImagePath, decodeClubImage } from './club-image';
 
 const REFERRAL_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
 const REFERRAL_LENGTH = 8;
@@ -25,8 +26,34 @@ const partnerSelect = {
   name: true,
   city: true,
   isActive: true,
+  logoUpdatedAt: true,
+  photoUpdatedAt: true,
   createdAt: true,
 } as const;
+
+type PartnerRow = Prisma.PartnerGetPayload<{ select: typeof partnerSelect }>;
+
+/** Il back office vede i percorsi delle immagini, non i data URL. */
+function partnerView({
+  logoUpdatedAt,
+  photoUpdatedAt,
+  ...partner
+}: PartnerRow) {
+  return {
+    ...partner,
+    logoUrl: clubImagePath(partner.id, 'logo', logoUpdatedAt),
+    photoUrl: clubImagePath(partner.id, 'photo', photoUpdatedAt),
+  };
+}
+
+/** Un'immagine nuova aggiorna la sua versione; null la rimuove. */
+function imageUpdate(kind: ClubImageKind, value: string | null | undefined) {
+  if (value === undefined) return {};
+  return {
+    [`${kind}Image`]: value,
+    [`${kind}UpdatedAt`]: value === null ? null : new Date(),
+  };
+}
 
 @Injectable()
 export class PartnersService {
@@ -48,14 +75,14 @@ export class PartnersService {
       counts.map((row) => [row.partnerId, row._count._all]),
     );
     return partners.map((partner) => ({
-      ...partner,
+      ...partnerView(partner),
       attributedUsers: byPartner.get(partner.id) ?? 0,
     }));
   }
 
   async create(input: CreatePartnerDto) {
     try {
-      return await this.prisma.partner.create({
+      const partner = await this.prisma.partner.create({
         data: {
           code: input.code,
           name: input.name.trim(),
@@ -63,6 +90,7 @@ export class PartnersService {
         },
         select: partnerSelect,
       });
+      return partnerView(partner);
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -79,15 +107,30 @@ export class PartnersService {
       select: { id: true },
     });
     if (!existing) throw new NotFoundException('Circolo non trovato');
-    return this.prisma.partner.update({
+    const partner = await this.prisma.partner.update({
       where: { id },
       data: {
         ...(input.name !== undefined && { name: input.name.trim() }),
         ...(input.city !== undefined && { city: input.city.trim() || null }),
         ...(input.isActive !== undefined && { isActive: input.isActive }),
+        ...imageUpdate('logo', input.logoImage),
+        ...imageUpdate('photo', input.photoImage),
       },
       select: partnerSelect,
     });
+    return partnerView(partner);
+  }
+
+  /** Logo o foto di un circolo attivo, già decodificati per la risposta HTTP. */
+  async image(id: string, kind: ClubImageKind) {
+    const partner = await this.prisma.partner.findFirst({
+      where: { id, isActive: true },
+      select: { logoImage: true, photoImage: true },
+    });
+    const dataUrl = kind === 'logo' ? partner?.logoImage : partner?.photoImage;
+    const image = dataUrl ? decodeClubImage(dataUrl) : null;
+    if (!image) throw new NotFoundException('Immagine non trovata');
+    return image;
   }
 
   /**

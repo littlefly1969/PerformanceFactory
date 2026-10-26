@@ -22,7 +22,29 @@ const config: DiscoveryConfiguration = {
 
 type Call = { url: string; body?: Record<string, unknown> };
 
-function serve(registration: "fails" | "succeeds" = "fails") {
+const documents = [
+  {
+    type: "PRIVACY",
+    version: "p1",
+    title: "Informativa privacy e trattamento dati Performance Factory",
+    summary: "Sintesi privacy",
+    body: ["Testo privacy"],
+    documentHash: "hash-privacy",
+  },
+  {
+    type: "AI_ASSISTANT",
+    version: "a1",
+    title: "Consenso esplicito all uso dell assistente AI",
+    summary: "Sintesi AI",
+    body: ["Testo AI"],
+    documentHash: "hash-ai",
+  },
+];
+
+function serve(
+  registration: "fails" | "succeeds" = "fails",
+  withDocuments = false,
+) {
   const calls: Call[] = [];
   vi.stubGlobal(
     "fetch",
@@ -32,6 +54,10 @@ function serve(registration: "fails" | "succeeds" = "fails") {
         url,
         body: init?.body ? JSON.parse(String(init.body)) : undefined,
       });
+      if (url.endsWith("/consents/documents"))
+        return withDocuments
+          ? new Response(JSON.stringify(documents))
+          : new Response("{}", { status: 503 });
       if (url.endsWith("/auth/register-athlete"))
         return registration === "succeeds"
           ? new Response(JSON.stringify({ journey: { nextStep: "CONSENTS" } }))
@@ -111,11 +137,16 @@ describe("Ingresso: attribuzione, eventi e 18+", () => {
       name: /almeno 18 anni/,
     });
     expect(adult).toBeRequired();
-    await userEvent.type(screen.getByLabelText("Nome"), "Mario");
-    await userEvent.type(screen.getByLabelText("Cognome"), "Rossi");
+    await userEvent.type(
+      screen.getByLabelText("Nome e cognome"),
+      "Mario Rossi",
+    );
     await userEvent.type(screen.getByLabelText("E-mail"), "m@pf.test");
     await userEvent.type(screen.getByLabelText("Password"), "password1");
-    await userEvent.type(screen.getByLabelText("Conferma password"), "password1");
+    await userEvent.type(
+      screen.getByLabelText("Conferma password"),
+      "password1",
+    );
     await userEvent.click(adult);
     await userEvent.click(screen.getByRole("button", { name: "Crea account" }));
     const registration = await waitFor(() => {
@@ -124,6 +155,8 @@ describe("Ingresso: attribuzione, eventi e 18+", () => {
       return call!;
     });
     expect(registration.body).toMatchObject({
+      firstName: "Mario",
+      lastName: "Rossi",
       adultConfirmed: true,
       attribution: {
         anonymousId: expect.any(String),
@@ -148,11 +181,16 @@ describe("Ingresso: attribuzione, eventi e 18+", () => {
     vi.stubGlobal("location", { ...window.location, assign });
     serve("succeeds");
     render(<StartPage />);
-    await userEvent.type(await screen.findByLabelText("Nome"), "Mario");
-    await userEvent.type(screen.getByLabelText("Cognome"), "Rossi");
+    await userEvent.type(
+      await screen.findByLabelText("Nome e cognome"),
+      "Mario Rossi",
+    );
     await userEvent.type(screen.getByLabelText("E-mail"), "m@pf.test");
     await userEvent.type(screen.getByLabelText("Password"), "password1");
-    await userEvent.type(screen.getByLabelText("Conferma password"), "password1");
+    await userEvent.type(
+      screen.getByLabelText("Conferma password"),
+      "password1",
+    );
     await userEvent.click(
       screen.getByRole("checkbox", { name: /almeno 18 anni/ }),
     );
@@ -162,5 +200,96 @@ describe("Ingresso: attribuzione, eventi e 18+", () => {
     expect(localStorage.getItem("pf.firstTouch")).toBeNull();
     expect(localStorage.getItem("pf.lastTouch")).toBeNull();
     expect(localStorage.getItem("pf.anonymousId")).toBeNull();
+  });
+
+  it("collects privacy and AI consents in the sign-up form when the documents load", async () => {
+    sessionStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        version: 3,
+        currentStep: "registration",
+        answers: { only: "a" },
+      }),
+    );
+    const calls = serve("fails", true);
+    render(<StartPage />);
+    const privacy = await screen.findByRole("checkbox", {
+      name: /Informativa privacy/,
+    });
+    await userEvent.type(
+      screen.getByLabelText("Nome e cognome"),
+      "Anna Maria De Rossi",
+    );
+    await userEvent.type(screen.getByLabelText("E-mail"), "a@pf.test");
+    await userEvent.type(screen.getByLabelText("Password"), "password1");
+    await userEvent.type(
+      screen.getByLabelText("Conferma password"),
+      "password1",
+    );
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /almeno 18 anni/ }),
+    );
+    const submit = screen.getByRole("button", { name: "Crea account" });
+    // Privacy e AI sono obbligatori: senza, il pulsante resta spento.
+    expect(submit).toBeDisabled();
+    await userEvent.click(privacy);
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /assistente AI/ }),
+    );
+    // Il testo completo si apre sotto la voce.
+    await userEvent.click(
+      screen.getAllByRole("button", { name: "Leggi ↓" })[0],
+    );
+    expect(screen.getByText("Testo privacy")).toBeInTheDocument();
+    await userEvent.click(submit);
+    const registration = await waitFor(() => {
+      const call = calls.find((c) => c.url.endsWith("/auth/register-athlete"));
+      expect(call).toBeDefined();
+      return call!;
+    });
+    expect(registration.body).toMatchObject({
+      firstName: "Anna",
+      lastName: "Maria De Rossi",
+      privacyAccepted: true,
+      aiAssistantAccepted: true,
+      marketingAccepted: false,
+      acceptedDocuments: [
+        { type: "PRIVACY", version: "p1", documentHash: "hash-privacy" },
+        { type: "AI_ASSISTANT", version: "a1", documentHash: "hash-ai" },
+      ],
+    });
+  });
+
+  it("asks for a surname before sending the registration", async () => {
+    sessionStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        version: 3,
+        currentStep: "registration",
+        answers: { only: "a" },
+      }),
+    );
+    const calls = serve();
+    render(<StartPage />);
+    await userEvent.type(
+      await screen.findByLabelText("Nome e cognome"),
+      "Mario",
+    );
+    await userEvent.type(screen.getByLabelText("E-mail"), "m@pf.test");
+    await userEvent.type(screen.getByLabelText("Password"), "password1");
+    await userEvent.type(
+      screen.getByLabelText("Conferma password"),
+      "password1",
+    );
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /almeno 18 anni/ }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Crea account" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Scrivi nome e cognome",
+    );
+    expect(calls.some((c) => c.url.endsWith("/auth/register-athlete"))).toBe(
+      false,
+    );
   });
 });

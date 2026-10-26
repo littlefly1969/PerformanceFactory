@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ProductShell, StatusBadge } from "@/app/components/product-shell";
 import { adminRequest } from "../components/admin-request";
+import { ClubImages, resizeClubImage } from "./club-images";
 
 type Partner = {
   id: string;
@@ -10,6 +11,8 @@ type Partner = {
   name: string;
   city: string | null;
   isActive: boolean;
+  logoUrl: string | null;
+  photoUrl: string | null;
   attributedUsers: number;
 };
 type Funnel = {
@@ -81,7 +84,7 @@ export default function AdminPartnersPage() {
     <ProductShell
       eyebrow="Amministrazione circoli"
       title="Circoli e provenienza"
-      description="Ogni circolo ha un codice da usare nel link o nel QR. Chi si registra da quel link resta collegato al circolo; la prima provenienza vale sulle successive."
+      description="Ogni circolo ha un codice da usare nel link o nel QR. Chi si registra da quel link resta collegato al circolo; la prima provenienza vale sulle successive. Logo e foto compaiono nel carosello del regalo per i circoli che offrono la lezione gratuita."
       actions={
         <button className="pf-button-secondary" type="button" onClick={load}>
           Aggiorna
@@ -127,6 +130,25 @@ export default function AdminPartnersPage() {
                 <p className="pf-muted">
                   Atleti registrati: {partner.attributedUsers}
                 </p>
+                <ClubImages
+                  name={partner.name}
+                  logoUrl={partner.logoUrl}
+                  photoUrl={partner.photoUrl}
+                  busy={busy}
+                  onChange={(kind, file) =>
+                    void run(
+                      async () =>
+                        adminRequest(`/admin/partners/${partner.id}`, "PATCH", {
+                          [`${kind}Image`]: file
+                            ? await resizeClubImage(file, kind)
+                            : null,
+                        }),
+                      file
+                        ? "Immagine aggiornata: la vedono gli atleti nel regalo."
+                        : "Immagine rimossa.",
+                    )
+                  }
+                />
                 <button
                   className="pf-button-secondary"
                   type="button"

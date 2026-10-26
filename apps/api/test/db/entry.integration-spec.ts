@@ -344,6 +344,57 @@ describe('Entry slice with PostgreSQL', () => {
     ).toEqual({ source: 'direct' });
   });
 
+  it('stores club logo and photo from the back office and serves them publicly', async () => {
+    const club = (
+      await admin('POST', '/api/admin/partners', {
+        code: `img-${randomUUID().slice(0, 8)}`,
+        name: 'Circolo con logo',
+      })
+    ).json<{ id: string; logoUrl: string | null }>();
+    partnerIds.push(club.id);
+    expect(club.logoUrl).toBeNull();
+    const png = Buffer.from('89504e470d0a1a0a', 'hex');
+    const updated = await admin('PATCH', `/api/admin/partners/${club.id}`, {
+      logoImage: `data:image/png;base64,${png.toString('base64')}`,
+    });
+    expect(updated.statusCode).toBe(200);
+    const { logoUrl, photoUrl } = updated.json<{
+      logoUrl: string;
+      photoUrl: string | null;
+    }>();
+    expect(logoUrl).toMatch(new RegExp(`^/partners/${club.id}/logo\\?v=\\d+$`));
+    expect(photoUrl).toBeNull();
+
+    const logo = await app.inject({ method: 'GET', url: `/api${logoUrl}` });
+    expect(logo.statusCode).toBe(200);
+    expect(logo.headers['content-type']).toBe('image/png');
+    expect(logo.rawPayload.equals(png)).toBe(true);
+    expect(
+      (
+        await app.inject({
+          method: 'GET',
+          url: `/api/partners/${club.id}/photo`,
+        })
+      ).statusCode,
+    ).toBe(404);
+
+    // SVG può contenere script: il back office accetta solo immagini raster.
+    expect(
+      (
+        await admin('PATCH', `/api/admin/partners/${club.id}`, {
+          photoImage: 'data:image/svg+xml;base64,PHN2Zy8+',
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await admin('PATCH', `/api/admin/partners/${club.id}`, {
+          logoImage: null,
+        })
+      ).json<{ logoUrl: string | null }>().logoUrl,
+    ).toBeNull();
+  });
+
   it('accepts only allowlisted anonymous browser events', async () => {
     const visitor = anonymousId();
     const events = [

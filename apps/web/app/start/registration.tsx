@@ -6,6 +6,20 @@ import { clearAttribution, currentAttribution } from "../lib/attribution";
 import type { DiscoveryDraft } from "./discovery-types";
 import { DRAFT_KEY, journeyHref } from "./discovery-state";
 import { clearQuizToken, withQuizToken } from "./quiz-draft";
+import {
+  ConsentText,
+  SignupCheck,
+  useConsentDocuments,
+} from "./signup-consents";
+
+/** «Mario De Rossi» → nome «Mario», cognome «De Rossi». */
+export function splitFullName(full: string) {
+  const [firstName = "", ...rest] = full.trim().split(/\s+/);
+  return { firstName, lastName: rest.join(" ") };
+}
+
+const accepts = (title: string) =>
+  `Ho letto e accetto ${/^[aeiou]/i.test(title) ? "l’" : "il "}${title}`;
 
 export function Registration({
   draft,
@@ -18,7 +32,18 @@ export function Registration({
 }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [checks, setChecks] = useState<Record<string, boolean>>({});
+  const documents = useConsentDocuments();
   const locked = useRef(false);
+  const check = (name: string) => ({
+    name,
+    checked: !!checks[name],
+    onChange: (checked: boolean) => setChecks({ ...checks, [name]: checked }),
+  });
+  // Con i documenti caricati i consensi si danno qui; altrimenti dopo l'account.
+  const consentsReady =
+    !!documents && documents.every((d) => checks[d.documentHash]);
+  const ready = !!checks.adultConfirmed && (!documents || consentsReady);
   return (
     <form
       className="pf4-body pf4-registration"
@@ -26,6 +51,11 @@ export function Registration({
         event.preventDefault();
         if (locked.current) return;
         const data = new FormData(event.currentTarget);
+        const name = splitFullName(String(data.get("fullName") ?? ""));
+        if (!name.lastName) {
+          setError("Scrivi nome e cognome");
+          return;
+        }
         if (data.get("password") !== data.get("confirmation")) {
           setError("Le password non coincidono");
           return;
@@ -41,11 +71,24 @@ export function Registration({
               credentials: "include",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                firstName: data.get("firstName"),
-                lastName: data.get("lastName"),
+                ...name,
                 email: data.get("email"),
                 password: data.get("password"),
                 adultConfirmed: data.get("adultConfirmed") === "on",
+                ...(documents && consentsReady
+                  ? {
+                      privacyAccepted: true,
+                      aiAssistantAccepted: true,
+                      marketingAccepted: !!checks.marketingAccepted,
+                      acceptedDocuments: documents.map(
+                        ({ type, version, documentHash }) => ({
+                          type,
+                          version,
+                          documentHash,
+                        }),
+                      ),
+                    }
+                  : {}),
                 discovery: draft,
                 attribution: currentAttribution(),
                 quizToken,
@@ -82,33 +125,23 @@ export function Registration({
       }}
     >
       <h1>Crea il tuo account.</h1>
-      <p className="pf4-kicker">Salviamo il tuo punto di partenza</p>
+      <p className="pf4-kicker">Salviamo programma e progressi</p>
       <GoogleRegistrationButton
         draft={draft}
         pending={googlePending}
         disabled={busy}
         onError={setError}
       />
-      <p className="pf4-kicker">Oppure continua con email</p>
+      <p className="pf4-divider">Oppure con e-mail</p>
       <div className="pf4-fields">
         <label>
-          Nome
+          Nome e cognome
           <input
-            name="firstName"
-            autoComplete="given-name"
-            maxLength={100}
+            name="fullName"
+            autoComplete="name"
+            maxLength={201}
             required
-            placeholder="Mario"
-          />
-        </label>
-        <label>
-          Cognome
-          <input
-            name="lastName"
-            autoComplete="family-name"
-            maxLength={100}
-            required
-            placeholder="Rossi"
+            placeholder="Mario Rossi"
           />
         </label>
         <label>
@@ -147,20 +180,39 @@ export function Registration({
           />
         </label>
       </div>
-      <label className="pf4-check">
-        <input type="checkbox" name="adultConfirmed" required /> Dichiaro di
-        avere almeno 18 anni
-      </label>
-      <p className="pf4-note">
-        Dopo la registrazione potrai leggere e scegliere i consensi del tuo
-        percorso.
-      </p>
+      <div className="pf4-signup-checks">
+        <SignupCheck {...check("adultConfirmed")} required>
+          Ho almeno 18 anni
+        </SignupCheck>
+        {documents?.map((document) => (
+          <SignupCheck
+            key={document.documentHash}
+            {...check(document.documentHash)}
+            required
+            details={<ConsentText document={document} />}
+          >
+            {accepts(document.title)}
+          </SignupCheck>
+        ))}
+        {documents && (
+          <SignupCheck {...check("marketingAccepted")} required={false}>
+            Voglio ricevere novità, offerte e iniziative dei circoli partner.
+            Puoi cambiare idea in qualsiasi momento dal profilo.
+          </SignupCheck>
+        )}
+      </div>
+      {!documents && (
+        <p className="pf4-note">
+          Dopo la registrazione potrai leggere e scegliere i consensi del tuo
+          percorso.
+        </p>
+      )}
       {error && (
         <p role="alert" className="pf4-error">
           {error}
         </p>
       )}
-      <button className="pf4-cta" disabled={busy}>
+      <button className="pf4-cta" disabled={busy || !ready}>
         {busy ? "Creazione account…" : "Crea account"}
       </button>
       <p className="pf4-login">
