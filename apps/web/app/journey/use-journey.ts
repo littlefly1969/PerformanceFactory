@@ -3,7 +3,7 @@ import { clearAttribution, currentAttribution } from "../lib/attribution";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE, secureFetch } from "../lib/api";
 import { DRAFT_KEY } from "../start/discovery-state";
-import { clearQuizToken, withQuizToken } from "../start/quiz-draft";
+import { clearQuizToken, resumeQuiz, withQuizToken } from "../start/quiz-draft";
 import type { Journey, ConsentDocument } from "./journey-types";
 export function useJourney() {
   const [journey, setJourney] = useState<Journey>();
@@ -49,11 +49,15 @@ export function useJourney() {
             credentials: "include",
           }),
         );
-        const config = await read(
-          await fetch(`${API_BASE}/public/athlete-discovery`, {
-            cache: "no-store",
-          }),
-        );
+        // Come su /start, la bozza salvata sul server vince sulla versione
+        // pubblicata: il controllo usa la configurazione congelata del quiz.
+        const config =
+          (await resumeQuiz())?.configuration ??
+          (await read(
+            await fetch(`${API_BASE}/public/athlete-discovery`, {
+              cache: "no-store",
+            }),
+          ));
         let raw: string | null = null;
         try {
           raw = sessionStorage.getItem(DRAFT_KEY);

@@ -1829,6 +1829,50 @@ describe('PF4 discovery to authenticated journey', () => {
     ).toHaveProperty('fit_ranking.value.padel.current', '3ª fascia');
   });
 
+  it('leaves a FIT ranking saved during the AI call pending for recalculation', async () => {
+    const ai = app.get(AiProposalProviderService);
+    const evaluate = ai.evaluateAssessment.bind(ai);
+    // B arriva mentre l'AI valuta A: non è nell'input, quindi resta da ricalcolare.
+    const spy = jest
+      .spyOn(ai, 'evaluateAssessment')
+      .mockImplementationOnce(async (input) => {
+        await prisma.athleteFitRanking.create({
+          data: {
+            userId,
+            source: 'PROFILE',
+            padelCurrent: '3',
+            padelBest: '2',
+            tennisCurrent: '4.NC',
+            tennisBest: '3.1',
+            cardNumber: null,
+          },
+        });
+        return evaluate(input);
+      });
+    const a = {
+      padelCurrent: '2',
+      padelBest: '2',
+      tennisCurrent: '4.NC',
+      tennisBest: '3.1',
+      cardNumber: '',
+    };
+    const saved = await post('fit-ranking', a);
+    spy.mockRestore();
+    expect(saved.statusCode).toBe(201);
+    expect(saved.json()).toMatchObject({ recalculationPending: true });
+    const [b, first] = await prisma.athleteFitRanking.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 2,
+    });
+    expect(b.recalculatedAt).toBeNull();
+    expect(first).toMatchObject({ padelCurrent: '2' });
+    expect(first.recalculatedAt).not.toBeNull();
+    // Lo stesso salvataggio di B ora riprova il ricalcolo e lo chiude.
+    const retried = await post('fit-ranking', { ...a, padelCurrent: '3' });
+    expect(retried.json()).toMatchObject({ recalculationPending: false });
+  });
+
   it('lets an admin delete a test athlete with the whole journey', async () => {
     const result = await deleteAthleteCompletely(prisma, userId);
     expect(result.deleted).toBe(true);

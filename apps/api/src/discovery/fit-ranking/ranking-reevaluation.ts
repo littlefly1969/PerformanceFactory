@@ -16,6 +16,7 @@ import {
   lockCalibration,
 } from '../calibration/lesson-evidence';
 import { linkFeedback } from '../calibration/lesson-feedback';
+import { loadFitRanking } from './fit-ranking';
 
 type EvaluatedRound = {
   status: string;
@@ -31,6 +32,7 @@ type EvaluatedRound = {
  * essa; altrimenti resta provvisoria e la R consolidata precedente rimane
  * quella mostrata. Il programma già creato non cambia. Va chiamata sotto il
  * lease dell'atleta. Restituisce false se non c'è ancora una valutazione.
+ * Segna ricalcolate solo le dichiarazioni FIT entrate nell'input.
  */
 export async function reevaluateForRanking(
   prisma: PrismaService,
@@ -42,6 +44,9 @@ export async function reevaluateForRanking(
     where: { userId, status: 'EVALUATED' },
     orderBy: { sequence: 'asc' },
   });
+  // Dichiarazione letta prima dell'input: una salvata durante la chiamata AI
+  // non è stata valutata e resta in attesa di ricalcolo.
+  const included = await loadFitRanking(prisma, userId);
   const input = await buildInput(rounds);
   // Micro-test e feedback del coach restano evidenze anche qui.
   const feedbackIds = await addLessonEvidence(prisma, userId, input);
@@ -72,10 +77,15 @@ export async function reevaluateForRanking(
         : {}),
     });
     await linkFeedback(tx, feedbackIds, saved.id);
-    await tx.athleteFitRanking.updateMany({
-      where: { userId, recalculatedAt: null },
-      data: { recalculatedAt: now },
-    });
+    if (included)
+      await tx.athleteFitRanking.updateMany({
+        where: {
+          userId,
+          recalculatedAt: null,
+          OR: [{ id: included.id }, { createdAt: { lt: included.createdAt } }],
+        },
+        data: { recalculatedAt: now },
+      });
     if (closed) return true;
     const next = statusAfterEvaluation(
       current.status as CalibrationStatus,

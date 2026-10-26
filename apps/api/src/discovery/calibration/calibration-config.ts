@@ -88,3 +88,26 @@ export async function hasProgramEntitlement(
   });
   return subscriptions.some((s) => hasEntitlement(s, now));
 }
+
+/**
+ * Orizzonte dell'abbonamento che dà accesso al programma: è quello pagato,
+ * che può differire dalla scelta corrente se è stato pagato un checkout
+ * aperto prima di cambiarla. Null senza accesso.
+ */
+export async function entitledHorizon(
+  prisma: Pick<PrismaService, 'subscription'>,
+  userId: string,
+  now = new Date(),
+) {
+  const subscriptions = await prisma.subscription.findMany({
+    where: { userId, status: { in: ['ACTIVE', 'PAYMENT_GRACE'] } },
+    orderBy: { createdAt: 'desc' },
+    select: {
+      status: true,
+      entitlementEndAt: true,
+      graceEndsAt: true,
+      horizon: true,
+    },
+  });
+  return subscriptions.find((s) => hasEntitlement(s, now))?.horizon ?? null;
+}

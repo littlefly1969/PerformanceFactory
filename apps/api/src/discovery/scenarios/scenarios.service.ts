@@ -15,7 +15,10 @@ import {
 } from '../assessment-configuration';
 import { isCalibrationClosed } from '../calibration/calibration-rules';
 import { PROGRAM_HORIZON_WEEKS } from '../program-horizon';
-import { OPEN_SUBSCRIPTION_STATUSES } from '../../payments/checkout.service';
+import {
+  CheckoutService,
+  OPEN_SUBSCRIPTION_STATUSES,
+} from '../../payments/checkout.service';
 import { PROGRAM_HORIZON_MONTHS as HORIZON_MONTHS } from '../../payments/payment-plans';
 import { AiProposalProviderService } from '../../ai-orchestrator/proposal-provider.service';
 import { loadActiveAssessmentPrompt } from '../../ai-orchestrator/assessment-prompts';
@@ -63,6 +66,7 @@ export class ScenariosService {
     private readonly flags: FeatureFlagsService,
     private readonly analytics: AnalyticsService,
     private readonly ai: AiProposalProviderService,
+    private readonly checkout: CheckoutService,
   ) {}
 
   /**
@@ -180,13 +184,15 @@ export class ScenariosService {
 
   /**
    * Salva l'orizzonte scelto dopo il reveal: si può cambiare finché non c'è
-   * un abbonamento pagato; un checkout ancora aperto viene sostituito al
-   * prossimo avvio (#14).
+   * un abbonamento pagato. Un checkout ancora aperto per un altro orizzonte
+   * si chiude presso il provider prima del cambio, così non si può più
+   * pagare un percorso diverso da quello scelto (#14).
    */
   async select(userId: string, horizon: unknown) {
     if (!isProgramHorizon(horizon))
       throw new BadRequestException('Orizzonte non valido');
     if (!(await this.ready(userId))) throw new ConflictException(NOT_REVEALED);
+    await this.checkout.expireOtherHorizons(userId, horizon);
     const now = new Date();
     await this.prisma.$transaction(async (tx) => {
       // Stesso lock del checkout: scelta e pagamento non si incrociano.
@@ -204,6 +210,18 @@ export class ScenariosService {
       if (paid)
         throw new ConflictException(
           'Il percorso è già attivo: l’orizzonte non si può cambiare',
+        );
+      // Un checkout aperto nel frattempo per l'orizzonte precedente.
+      const stale = await tx.subscription.count({
+        where: {
+          userId,
+          status: 'CHECKOUT_PENDING',
+          horizon: { not: horizon },
+        },
+      });
+      if (stale)
+        throw new ConflictException(
+          'C’è un pagamento in corso per un altro percorso: riprova',
         );
       const activated = await tx.athleteDiscovery.count({
         where: { userId, activatedAt: { not: null } },
@@ -235,20 +253,13 @@ export class ScenariosService {
 
   /**
    * Baseline del programma dopo l'abbonamento: R consolidata per driver e P
-   * dell'orizzonte scelto, dagli stessi scenari mostrati nel reveal. Un
-   * driver senza scenario parte con P uguale a R. Null se manca la scelta o
-   * la valutazione consolidata.
+   * dell'orizzonte pagato, dagli stessi scenari mostrati nel reveal. Un
+   * driver senza scenario parte con P uguale a R. Null se manca la
+   * valutazione consolidata.
    */
-  async programBaseline(userId: string) {
-    const [evaluation, discovery] = await Promise.all([
-      this.consolidated(userId),
-      this.prisma.athleteDiscovery.findUnique({
-        where: { userId },
-        select: { programHorizon: true },
-      }),
-    ]);
-    const horizon = discovery?.programHorizon;
-    if (!evaluation || !horizon) return null;
+  async programBaseline(userId: string, horizon: ProgramHorizon) {
+    const evaluation = await this.consolidated(userId);
+    if (!evaluation) return null;
     const first = await this.firstScenario(evaluation.id);
     const rows = first
       ? await this.prisma.potentialScenario.findMany({
