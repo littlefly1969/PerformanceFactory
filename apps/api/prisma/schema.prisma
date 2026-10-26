@@ -1305,6 +1305,9 @@ model AthleteDiscovery {
   activatedAt DateTime?
   /// Prima apertura del paywall, dopo la scelta dell'orizzonte.
   paywallViewedAt DateTime?
+  /// Fine della sequenza di benvenuto (foto, Spider, regalo, installazione app):
+  /// lato server perché su iOS l'app installata non condivide lo storage con Safari.
+  welcomeCompletedAt DateTime?
   createdAt DateTime @default(now())
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
