@@ -156,6 +156,8 @@
   background: #fff;
 }
 .pf-home-spider {
+  color: inherit;
+  text-decoration: none;
   display: flex;
   gap: 18px;
   align-items: center;
@@ -179,6 +181,7 @@
 }
 .pf-home-footer {
   margin-top: 28px;
+  padding-bottom: 96px;
   text-align: center;
 }
 .pf-home-logout {
