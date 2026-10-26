@@ -501,6 +501,7 @@ model Area {
   microTests                  MicroTest[]
   lessonFeedback              CoachLessonFeedback[]
   potentialScenarios          PotentialScenario[]
+  coachingVideos              CoachingVideo[]
 }
 
 model FeedbackEntry {
@@ -1977,6 +1978,25 @@ model MicroTestCompletion {
   @@index([userId, completedAt])
 }
 
+/// Archivio dei video di approfondimento curato dal back office: l'AI sceglie
+/// quale mostrare dopo un micro-test, in base al test e alle risposte.
+model CoachingVideo {
+  id          String   @id @default(uuid())
+  /// Driver a cui il video si riferisce; nullo se vale per tutti.
+  areaId      String?
+  title       String
+  description String   @default("")
+  /// Indirizzo del video; nullo finché il file non è pronto (si mostra il titolo).
+  url         String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  area Area? @relation(fields: [areaId], references: [id], onDelete: SetNull)
+
+  @@index([areaId, isActive])
+}
+
 /// Lezione di padel di un'ora in gruppo da 4 presso un circolo partner (A4.8).
 model FreeLesson {
   id              String   @id @default(uuid())
@@ -1995,7 +2015,9 @@ model FreeLesson {
 
   partner  Partner               @relation(fields: [partnerId], references: [id])
   coach    User?                 @relation("FreeLessonCoach", fields: [coachId], references: [id], onDelete: SetNull)
-  seats    FreeLessonSeat[]
+  seats    FreeLessonSeat[]      @relation("FreeLessonSeatLesson")
+  /// Posti che indicano questa lezione come preferita: il gruppo lo compone l'admin.
+  preferredBy FreeLessonSeat[]   @relation("FreeLessonSeatPreference")
   feedback CoachLessonFeedback[]
 
   @@index([partnerId, startsAt])
@@ -2017,11 +2039,14 @@ model FreeLessonSeat {
   /// §10.3): versione della regola e valutazione su cui è stata presa.
   eligibilityPolicyId     String?
   eligibilityEvaluationId String?
+  /// Giorno e orario indicati dall'atleta fra le lezioni in calendario; il gruppo lo compone l'admin.
+  preferredLessonId      String?
   updatedAt              DateTime  @updatedAt
 
   user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   partner              Partner               @relation(fields: [partnerId], references: [id])
-  lesson               FreeLesson?           @relation(fields: [lessonId], references: [id], onDelete: Restrict)
+  lesson               FreeLesson?           @relation("FreeLessonSeatLesson", fields: [lessonId], references: [id], onDelete: Restrict)
+  preferredLesson      FreeLesson?           @relation("FreeLessonSeatPreference", fields: [preferredLessonId], references: [id], onDelete: SetNull)
   eligibilityPolicy    ConfidencePolicy?     @relation(fields: [eligibilityPolicyId], references: [id], onDelete: Restrict)
   eligibilityEvaluation AssessmentEvaluation? @relation(fields: [eligibilityEvaluationId], references: [id], onDelete: SetNull)
 

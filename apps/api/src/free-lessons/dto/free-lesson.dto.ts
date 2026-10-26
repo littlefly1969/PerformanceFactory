@@ -27,6 +27,12 @@ export class RequestFreeLessonDto {
   @ApiProperty()
   @Equals(true, { message: 'Serve il consenso a condividere il livello' })
   shareWithCoach: boolean;
+
+  /** Lezione in calendario preferita; il gruppo lo compone comunque l'admin. */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsUUID()
+  lessonId?: string;
 }
 
 export class UpdateFreeLessonConfigDto {

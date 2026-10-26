@@ -24,6 +24,22 @@ export class CalibrationAnswersDto {
   answers: Record<string, string | string[]>;
 }
 
+export class SituationAnswerDto {
+  @ApiProperty()
+  @IsUUID()
+  roundId: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(20)
+  questionId: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(20)
+  value: string;
+}
+
 export class CalibrationRoundDto {
   @ApiProperty()
   @IsUUID()

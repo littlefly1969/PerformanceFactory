@@ -1,5 +1,9 @@
 import { Test } from '@nestjs/testing';
-import { ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
@@ -579,6 +583,29 @@ describe('Free lesson with PostgreSQL', () => {
         where: { lessonId, status: 'ASSIGNED' },
       }),
     ).toBe(1);
+  });
+
+  it('shows the free days and times and keeps the preferred one, while the admin composes the group', async () => {
+    const full = await lesson(1);
+    const open = await lesson(4);
+    await admin.assign(full, await requested([40, 50]));
+    const id = await athlete([60, 50]);
+    const view = await athletes.view(id);
+    const slots = view.enabled ? view.slots.map((s) => s.id) : [];
+    // La lezione al completo non si propone.
+    expect(slots).toContain(open);
+    expect(slots).not.toContain(full);
+    await expect(
+      athletes.request(id, partnerId, true, full),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(await athletes.request(id, partnerId, true, open)).toMatchObject({
+      phase: 'REQUESTED',
+      seat: { status: 'REQUESTED', preferredLessonId: open },
+    });
+    // La preferenza si cambia finché il posto non è assegnato.
+    expect(await athletes.request(id, partnerId, true)).toMatchObject({
+      seat: { preferredLessonId: null },
+    });
   });
 
   it('AT-15/AT-16/AT-18: with a lesson possible R waits for it or for an explicit decline', async () => {

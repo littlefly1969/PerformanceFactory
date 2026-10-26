@@ -85,8 +85,9 @@ export function useJourney() {
     }, 2000);
     return () => clearInterval(timer);
   }, [journey?.phase, busy, refresh]);
+  /** Azione del percorso; restituisce true se il server l'ha accettata. */
   async function action(path: string, input: unknown = {}) {
-    if (lock.current) return;
+    if (lock.current) return false;
     lock.current = true;
     setBusy(true);
     setError("");
@@ -100,8 +101,10 @@ export function useJourney() {
       );
       setJourney(data);
       setGoalReview(false);
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Connessione non disponibile");
+      return false;
     } finally {
       lock.current = false;
       setBusy(false);

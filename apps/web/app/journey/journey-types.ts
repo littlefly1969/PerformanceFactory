@@ -108,6 +108,21 @@ export type Calibration = {
         instructions: string;
         durationMinutes: number | null;
         safetyNotes: string;
+        title?: string;
+        /** Situazioni di gioco: una voce per situazione, spiegata dopo la risposta. */
+        format?: "SITUATIONAL";
+        situation?: {
+          index: number;
+          total: number;
+          label: string;
+          context: string;
+        };
+        feedback?: {
+          value: string;
+          correct: boolean;
+          correctValue: string;
+          feedback: Record<string, string>;
+        } | null;
       };
     }[];
     answers: Record<string, string | string[]>;
