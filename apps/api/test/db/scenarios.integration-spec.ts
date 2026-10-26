@@ -428,4 +428,44 @@ describe('P3/P6/P12 scenarios and program horizon on PostgreSQL', () => {
       horizon: 'PROGRAM_3M',
     });
   });
+
+  it('does not change horizon while the provider is still creating the previous checkout', async () => {
+    await setFlag(true);
+    const userId = await athlete();
+    await ready(userId);
+    await service.select(userId, 'PROGRAM_3M');
+    // Prenotazione creata da start(), ancora in attesa di createCheckout().
+    const preparing = await prisma.subscription.create({
+      data: {
+        userId,
+        horizon: 'PROGRAM_3M',
+        billingCycle: 'MONTHLY',
+        provider: 'STRIPE',
+        amountCents: 1000,
+        currency: 'EUR',
+      },
+    });
+    await expect(service.select(userId, 'PROGRAM_12M')).rejects.toThrow(
+      ConflictException,
+    );
+    expect(
+      await prisma.subscription.findUniqueOrThrow({
+        where: { id: preparing.id },
+      }),
+    ).toMatchObject({ status: 'CHECKOUT_PENDING' });
+    expect(
+      await prisma.athleteDiscovery.findUniqueOrThrow({ where: { userId } }),
+    ).toMatchObject({ programHorizon: 'PROGRAM_3M' });
+    // Preparazione interrotta: nessun link consegnato, il cambio prosegue.
+    await prisma.subscription.update({
+      where: { id: preparing.id },
+      data: { createdAt: new Date(Date.now() - 5 * 60000) },
+    });
+    await service.select(userId, 'PROGRAM_12M');
+    expect(
+      await prisma.subscription.findUniqueOrThrow({
+        where: { id: preparing.id },
+      }),
+    ).toMatchObject({ status: 'CHECKOUT_FAILED' });
+  });
 });
