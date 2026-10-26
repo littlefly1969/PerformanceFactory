@@ -76,10 +76,11 @@ export function sessionContentSchemaProperties(options?: {
     mode: { type: 'string', enum: [...SESSION_MODES] },
     goal: nullableText,
     prerequisites: nullableText,
+    // Niente maxItems: annidato in planItems Gemini rifiuta lo schema (HTTP 400).
+    // Il limite MAX_EXERCISES resta applicato in normalizeSessionContent.
     exercises: {
       type: 'array',
       minItems: 1,
-      maxItems: MAX_EXERCISES,
       items: ordered(
         {
           name: { type: 'string' },
