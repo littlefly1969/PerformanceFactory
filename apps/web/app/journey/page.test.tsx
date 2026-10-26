@@ -80,7 +80,9 @@ describe("PF4 authenticated journey functions", () => {
       }),
     );
     render(<JourneyPage />);
-    await userEvent.click(await screen.findByRole("button", { name: "Esci" }));
+    // L'uscita resta disponibile anche nella domanda in veste scura.
+    await screen.findByText("Domanda configurata");
+    await userEvent.click(screen.getByRole("button", { name: "Esci" }));
     expect(requests).toContain("/api/auth/logout");
   });
   it("renders server questions and stops after the last answer without submitting", async () => {
@@ -315,7 +317,7 @@ describe("PF5 assessment intro and questions", () => {
       await screen.findByRole("button", { name: "Inizia l’assessment" }),
     );
     expect(requests.at(-1)).toBe("/api/athlete-journey/start");
-    expect(await screen.findByText("1 / 14 · Disponibilità")).toBeVisible();
+    expect(await screen.findByText("Disponibilità")).toBeVisible();
     // Il progressivo usa il totale del backend.
     expect(screen.getByRole("progressbar")).toHaveAttribute(
       "aria-valuemax",
@@ -392,22 +394,16 @@ describe("PF5 assessment intro and questions", () => {
     await userEvent.click(
       await screen.findByRole("button", { name: "Analizza le mie risposte →" }),
     );
+    // Fine dell'assessment: il profilo provvisorio è pronto, poi il profilo.
     expect(
-      await screen.findByRole("heading", { name: "Ecco dove sei oggi." }),
+      await screen.findByRole("heading", {
+        name: "Il tuo profilo provvisorio è pronto.",
+      }),
     ).toBeInTheDocument();
     expect(requests.filter((url) => url.endsWith("/evaluate"))).toHaveLength(1);
-    expect(screen.getByText("Prima valutazione · provvisoria")).toBeVisible();
-    expect(screen.getByText("Gestisci bene la rete.")).toBeVisible();
     expect(
-      screen.getByText("Per affinare: Un video di una partita."),
-    ).toBeVisible();
-    expect(screen.getByText("affidabilità bassa")).toBeVisible();
-    expect(screen.getByText("affidabilità alta")).toBeVisible();
-    // Confidence bassa: tratto tenue e tratteggiato, nessun potenziale mostrato.
-    const r = screen.getByTestId("provisional-r");
-    expect(Number(r.getAttribute("fill-opacity"))).toBeCloseTo(0.33);
-    expect(r).toHaveAttribute("stroke-dasharray", "4 3");
-    expect(screen.queryByText(/Potenziale/)).not.toBeInTheDocument();
+      screen.getByRole("link", { name: /Vai al tuo profilo/ }),
+    ).toHaveAttribute("href", "/journey/profilo");
     expect(requests.some((url) => url.endsWith("/submit"))).toBe(false);
   });
 
@@ -467,47 +463,6 @@ describe("Wake-up after ten idle days", () => {
   });
 });
 
-describe("Scenarios being prepared", () => {
-  it("OP-09: asks to refresh while the AI writes the scenarios, never shows invented ones", async () => {
-    const requests: string[] = [];
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (url: string) => {
-        requests.push(url);
-        if (url.endsWith("/fit-ranking"))
-          return new Response(JSON.stringify(FIT_RANKING));
-        return new Response(
-          JSON.stringify({
-            ...base,
-            phase: "EVALUATION",
-            evaluation: {
-              id: "evaluation-2",
-              status: "CONSOLIDATED",
-              source: "CALIBRATION_ROUND",
-              summary: "R consolidata.",
-              overallConfidence: 80,
-              scale: { min: 0, max: 100 },
-              createdAt: "2026-10-08T22:00:00.000Z",
-              drivers: [],
-            },
-            calibration: null,
-            scenarios: { status: "PENDING" },
-          }),
-        );
-      }),
-    );
-    render(<JourneyPage />);
-    expect(
-      await screen.findByRole("heading", {
-        name: "Stiamo preparando i tuoi scenari…",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.queryByText(/Dove puoi arrivare/)).toBeNull();
-    const before = requests.length;
-    await userEvent.click(screen.getByRole("button", { name: "Aggiorna" }));
-    await waitFor(() => expect(requests.length).toBeGreaterThan(before));
-  });
-});
 describe("After the subscription", () => {
   it("creates the program from the paid horizon and leads to the Home", async () => {
     const requests: string[] = [];

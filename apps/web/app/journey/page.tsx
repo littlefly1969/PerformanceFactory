@@ -84,6 +84,7 @@ export default function JourneyPage() {
         }
         progress={j.currentQuestion}
         total={j.count}
+        showLogout
         onBack={
           j.currentQuestion > 0 && !busy
             ? () => {

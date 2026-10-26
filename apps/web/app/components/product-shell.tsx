@@ -75,6 +75,7 @@ const roleNav: Record<string, NavItem[]> = {
     { href: "/admin/anomalies", label: "Segnalazioni" },
     { href: "/admin/partners", label: "Circoli" },
     { href: "/admin/free-lessons", label: "Lezione gratuita" },
+    { href: "/admin/videos", label: "Video" },
     { href: "/admin/feature-flags", label: "Rilasci" },
   ],
   AI_TUNER: [
@@ -131,6 +132,7 @@ const pathMatchesRole = (path: string, role?: string) => {
       path.startsWith("/admin/anomalies") ||
       path.startsWith("/admin/partners") ||
       path.startsWith("/admin/free-lessons") ||
+      path.startsWith("/admin/videos") ||
       path.startsWith("/admin/feature-flags")
     );
   }
@@ -237,6 +239,7 @@ const getLogicalBackHref = (path: string, search: string) => {
     path === "/admin/anomalies" ||
     path === "/admin/partners" ||
     path === "/admin/free-lessons" ||
+    path === "/admin/videos" ||
     path === "/admin/feature-flags"
   ) {
     return "/admin/cycles";

@@ -13,6 +13,7 @@ export function DarkQuestion({
   progress,
   total,
   onBack,
+  showLogout = false,
   children,
   footer,
 }: {
@@ -22,6 +23,7 @@ export function DarkQuestion({
   progress: number;
   total: number;
   onBack?: () => void;
+  showLogout?: boolean;
   children: ReactNode;
   footer?: ReactNode;
 }) {
@@ -35,6 +37,7 @@ export function DarkQuestion({
       progress={progress}
       total={total}
       onBack={onBack}
+      showLogout={showLogout}
     >
       <div className="pf4-dark-hero">
         <span className="pf4-kicker">{kicker}</span>

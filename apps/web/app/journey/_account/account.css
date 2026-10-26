@@ -84,7 +84,8 @@
 .pf-acc-muted {
   color: var(--acc-muted) !important;
 }
-.pf-acc-note {
+.pf-acc-note,
+.pf-acc p.pf-acc-note {
   display: block;
   margin: 6px 0 14px;
   font-size: 10px;
