@@ -287,7 +287,7 @@ describe('generateAreaScheduleProposal', () => {
       new Logger('test'),
       input,
     );
-    expect(proposal.promptVersion).toBe('area-schedule-v2');
+    expect(proposal.promptVersion).toBe('area-schedule-v3');
     expect(proposal.planItems.length).toBeGreaterThan(0);
     const offsets = proposal.planItems.map(
       (item) =>

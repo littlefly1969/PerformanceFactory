@@ -18,6 +18,41 @@ export type Session = {
   skippedAt: string | null;
   completionNotes: string | null;
   completionRating: number | null;
+  /** Campi scritti dall'AI per l'esecuzione: assenti nelle sessioni precedenti. */
+  durationMinutes?: number | null;
+  restSeconds?: number | null;
+  equipment?: string | null;
+  mode?: "SOLO" | "PARTNER" | "COACH" | null;
+  goal?: string | null;
+  prerequisites?: string | null;
+  exercises?: Exercise[];
+  week?: number | null;
+  planVersion?: number;
+};
+export type Exercise = {
+  name: string;
+  prescription: string;
+  cue: string;
+  /** Descrizione del video dimostrativo, mostrata finché l'archivio non c'è. */
+  demo: string;
+  workSeconds: number | null;
+  restSeconds: number | null;
+};
+export type Objective = {
+  area: string;
+  title: string;
+  unit: string | null;
+  baseline: number | null;
+  current: number | null;
+  target: number | null;
+  targetLabel: string | null;
+  deadline: string;
+  source: "CHECK_IN_TEST" | "COACH_EVALUATION" | "ATHLETE_ANSWERS";
+};
+export type History = {
+  completed: number;
+  minutes: number;
+  sessions: Session[];
 };
 export type Calendar = {
   from: string;
@@ -80,6 +115,9 @@ export type Home = {
           | "WINDOW_COMPLETE";
       };
   nextSession: Session | null;
+  objectives?: Objective[];
+  /** Prossima lezione di ogni area a calendario. */
+  lessons?: Session[];
   checkIn: { id: string; kind: string; title: string; count: number } | null;
   streak: { days: number };
   week: Calendar;
