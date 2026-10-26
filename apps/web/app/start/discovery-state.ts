@@ -1,6 +1,7 @@
 import { answerValid } from "./discovery-answer";
 export { answerValid, questionValue, optionsFor } from "./discovery-answer";
 import { pruneHiddenAnswers, visibleQuestions } from "./discovery-branches";
+import { screenIds, screenOf, screenQuestions } from "./funnel-screens";
 import type {
   DiscoveryConfiguration,
   DiscoveryDraft,
@@ -42,13 +43,9 @@ export function restoreDraft(
       return emptyDraft(config.version);
     draft = pruneHiddenAnswers(config.questions, draft);
     const questions = visibleQuestions(config.questions, draft);
-    const steps = [
-      "intro",
-      ...questions.map((q) => q.id),
-      "processing",
-      "result",
-      "registration",
-    ];
+    const screens = screenIds(questions);
+    draft.currentStep = screenOf(questions, draft.currentStep);
+    const steps = ["intro", ...screens, "processing", "result", "registration"];
     const index = steps.indexOf(draft.currentStep);
     if (index < 0) {
       const originalIndex = config.questions.findIndex(
@@ -60,9 +57,11 @@ export function restoreDraft(
           ?.id ?? "result";
       return restoreDraft(JSON.stringify(draft), config);
     }
-    const firstInvalid = questions.findIndex((q) => !answerValid(q, draft!));
+    const firstInvalid = screens.findIndex((id) =>
+      screenQuestions(questions, id).some((q) => !answerValid(q, draft!)),
+    );
     if (firstInvalid >= 0 && firstInvalid + 1 < index)
-      return { ...draft, currentStep: questions[firstInvalid].id };
+      return { ...draft, currentStep: screens[firstInvalid] };
     return draft;
   } catch {
     return emptyDraft(config.version);

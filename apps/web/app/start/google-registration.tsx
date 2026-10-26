@@ -54,7 +54,7 @@ export function GoogleRegistrationButton({
   return (
     <button
       type="button"
-      className="pf4-cta pf4-secondary"
+      className="pf4-cta pf4-secondary pf4-google"
       disabled={disabled}
       onClick={() => {
         try {
@@ -72,7 +72,10 @@ export function GoogleRegistrationButton({
         );
       }}
     >
-      {pending ? "Continua con il tuo account Google" : "Registrati con Google"}
+      <span className="pf4-google-mark" aria-hidden="true">
+        G
+      </span>
+      {pending ? "Continua con il tuo account Google" : "Continua con Google"}
     </button>
   );
 }

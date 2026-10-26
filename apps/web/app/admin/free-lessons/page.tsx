@@ -95,6 +95,9 @@ export default function AdminFreeLessonsPage() {
                 const lessons = open.filter(
                   (l) => l.partnerId === request.partnerId,
                 );
+                const preferred = lessons.find(
+                  (l) => l.id === request.preferredLessonId,
+                );
                 return (
                   <article className="pf-card" key={request.userId}>
                     <h3>{athleteLabel(request)}</h3>
@@ -102,6 +105,8 @@ export default function AdminFreeLessonsPage() {
                       {request.club}
                       {request.deadlineAt &&
                         ` · calibrazione fino a ${dateTime(request.deadlineAt)}`}
+                      {preferred &&
+                        ` · preferisce ${dateTime(preferred.startsAt)}`}
                     </p>
                     <select
                       className="pf-input"

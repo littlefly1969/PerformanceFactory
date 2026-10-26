@@ -38,7 +38,12 @@ export type Overview = {
     seats: Array<Athlete & { status: string }>;
   }>;
   requests: Array<
-    Athlete & { partnerId: string; club: string; requestedAt: string }
+    Athlete & {
+      partnerId: string;
+      club: string;
+      requestedAt: string;
+      preferredLessonId?: string | null;
+    }
   >;
   microTests: Array<{
     id: string;

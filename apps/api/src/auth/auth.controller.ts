@@ -91,7 +91,10 @@ export class AuthController {
       headers?: { 'user-agent'?: string };
     },
   ) {
-    const result = await this.athleteRegistration!.register(body);
+    const result = await this.athleteRegistration!.register(body, {
+      ipAddress: req.ip,
+      userAgent: req.headers?.['user-agent'],
+    });
     await registrationSession(req, result.user.id);
     return result;
   }

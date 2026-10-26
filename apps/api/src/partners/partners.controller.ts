@@ -8,9 +8,15 @@ import {
   Patch,
   Post,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
-import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiCookieAuth,
+  ApiOperation,
+  ApiProduces,
+  ApiTags,
+} from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -18,6 +24,9 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { FeatureFlagsService } from '../features/feature-flags.service';
 import { PartnersService } from './partners.service';
 import { CreatePartnerDto, UpdatePartnerDto } from './dto/partner.dto';
+import { ClubImageKind } from './club-image';
+
+type ImageReply = { header: (name: string, value: string) => unknown };
 
 @ApiTags('partners')
 @Controller()
@@ -55,6 +64,34 @@ export class PartnersController {
     @Body() body: UpdatePartnerDto,
   ) {
     return this.partners.update(id, body);
+  }
+
+  @Get('partners/:id/logo')
+  @ApiOperation({ summary: 'Logo pubblico di un circolo attivo' })
+  @ApiProduces('image/png', 'image/jpeg', 'image/webp')
+  logo(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Res({ passthrough: true }) reply: ImageReply,
+  ) {
+    return this.sendImage(id, 'logo', reply);
+  }
+
+  @Get('partners/:id/photo')
+  @ApiOperation({ summary: 'Foto pubblica di un circolo attivo' })
+  @ApiProduces('image/png', 'image/jpeg', 'image/webp')
+  photo(
+    @Param('id', new ParseUUIDPipe()) id: string,
+    @Res({ passthrough: true }) reply: ImageReply,
+  ) {
+    return this.sendImage(id, 'photo', reply);
+  }
+
+  private async sendImage(id: string, kind: ClubImageKind, reply: ImageReply) {
+    const image = await this.partners.image(id, kind);
+    reply.header('Content-Type', image.contentType);
+    // L'URL porta la versione dell'immagine: un nuovo caricamento cambia indirizzo.
+    reply.header('Cache-Control', 'public, max-age=31536000, immutable');
+    return image.body;
   }
 
   @Get('athlete/referral')

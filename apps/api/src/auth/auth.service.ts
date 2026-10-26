@@ -4,6 +4,7 @@ import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { signAccessToken } from '../common/auth-token';
 import { ConsentsService } from '../consents/consents.service';
+import { AthleteSession, markAthleteSession } from './athlete-session';
 
 export type SafeUser = {
   id: string;
@@ -15,9 +16,10 @@ export type SafeUser = {
   createdAt: Date;
 };
 
+type CarriedSession = { userId?: string } & AthleteSession;
 type SessionCarrier = {
-  session?: { userId?: string };
-  raw?: { session?: { userId?: string } };
+  session?: CarriedSession;
+  raw?: { session?: CarriedSession };
 };
 
 type LogoutSession = {
@@ -148,6 +150,11 @@ export class AuthService {
     }
 
     const safe = this.sanitizeUser(user) as SafeUser & { role: UserRole };
+    if (safe.role === UserRole.USER) {
+      markAthleteSession(req.session);
+      if (req.raw?.session !== req.session)
+        markAthleteSession(req.raw?.session);
+    }
     const token = signAccessToken({
       id: safe.id,
       email: safe.email,
