@@ -52,6 +52,21 @@ export default function ScenariosPage() {
           </PillLink>
         </section>
       )}
+      {closed && !s && (
+        <section className="pf-acc-card" role="status">
+          <p>
+            La scelta del percorso non è ancora disponibile. Riprova più tardi:
+            appena è attiva trovi qui i tuoi scenari a 3, 6 e 12 mesi.
+          </p>
+          <PillButton
+            tone="outline"
+            arrow={false}
+            onClick={() => void refresh()}
+          >
+            Aggiorna
+          </PillButton>
+        </section>
+      )}
       {closed && s && s.status !== "READY" && (
         <section className="pf-acc-card" role="status">
           <p>
