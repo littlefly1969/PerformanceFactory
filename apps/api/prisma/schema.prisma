@@ -1597,6 +1597,11 @@ model Partner {
   isActive  Boolean  @default(true)
   /// Il circolo offre la lezione gratuita di gruppo (A4.8, A7.2); spento di default.
   freeLessonsEnabled Boolean @default(false)
+  /// Logo e foto del circolo per il carosello del regalo: data URL PNG, JPEG o WebP già ridimensionati dal back office.
+  logoImage      String?
+  logoUpdatedAt  DateTime?
+  photoImage     String?
+  photoUpdatedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

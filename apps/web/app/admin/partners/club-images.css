@@ -1,0 +1,35 @@
+.pf-club-images {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+.pf-club-image {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+}
+.pf-club-image img,
+.pf-club-image-empty {
+  border: 1px solid var(--pf-border, #d6d6d1);
+  border-radius: 10px;
+}
+.pf-club-image-logo {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  background: #ffffff;
+}
+.pf-club-image-photo {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+.pf-club-image-empty {
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  opacity: 0.6;
+}
+.pf-club-image label {
+  text-align: center;
+}
