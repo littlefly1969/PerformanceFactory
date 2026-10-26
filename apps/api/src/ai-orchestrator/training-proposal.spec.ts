@@ -201,7 +201,13 @@ describe('Rolling training constraints and contract', () => {
       {},
       Date.now(),
     );
-    expect(normalized.planItems).toEqual(planItems);
+    expect(normalized.planItems).toEqual(
+      planItems.map((item) => ({
+        ...item,
+        content: { mode: null, goal: null, prerequisites: null, exercises: [] },
+      })),
+    );
+    expect(normalized.objectives).toEqual([]);
     expect(normalized.audit.outputJson.trainingWindow).toEqual(
       input.trainingWindow,
     );

@@ -169,6 +169,61 @@ describe('Scheduled area calendar with PostgreSQL', () => {
     ).toBe(true);
   });
 
+  it('espone esercizi, lezioni per area e storico all area abbonato', async () => {
+    const athlete = await f.user();
+    const training = await publishTrainingWindow(athlete.id);
+    await runScheduled(athlete.id);
+
+    const sport = training.sessions[0];
+    const detail = await f.app.inject({
+      method: 'GET',
+      url: `/api/athlete/training/sessions/${sport.id}`,
+      headers: athlete.headers,
+    });
+    expect(detail.json()).toMatchObject({
+      mode: 'SOLO',
+      planVersion: training.version,
+      week: 1,
+      durationMinutes: expect.any(Number),
+    });
+    expect(detail.json().exercises[0]).toMatchObject({
+      name: expect.any(String),
+      prescription: expect.any(String),
+      demo: expect.any(String),
+    });
+
+    const home = await f.app.inject({
+      method: 'GET',
+      url: '/api/athlete/home',
+      headers: athlete.headers,
+    });
+    const lessons = home.json<{
+      lessons: { track: string; areaName: string }[];
+    }>().lessons;
+    expect(lessons).toHaveLength(1);
+    expect(lessons[0]).toMatchObject({ track: 'AREA' });
+    expect(lessons[0].areaName.startsWith('Preparazione')).toBe(true);
+    expect(home.json().objectives).toEqual([]);
+
+    await f.app.inject({
+      method: 'POST',
+      url: `/api/athlete/training/sessions/${sport.id}/complete`,
+      headers: athlete.headers,
+      payload: { completionRating: 3 },
+    });
+    const history = await f.app.inject({
+      method: 'GET',
+      url: '/api/athlete/training/history',
+      headers: athlete.headers,
+    });
+    expect(history.statusCode).toBe(200);
+    expect(history.json()).toMatchObject({
+      completed: 1,
+      minutes: detail.json().durationMinutes,
+      sessions: [{ id: sport.id, completionRating: 3 }],
+    });
+  });
+
   it('chiude una seduta di area senza toccare il ciclo sportivo', async () => {
     const athlete = await f.user();
     const training = await publishTrainingWindow(athlete.id);

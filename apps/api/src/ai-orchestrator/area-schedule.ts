@@ -1,3 +1,9 @@
+import {
+  normalizeSessionContent,
+  SESSION_CONTENT_RULES,
+  sessionContentMetadata,
+  stubSessionContent,
+} from './session-content';
 import { BadRequestException, ConflictException, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -192,6 +198,7 @@ export function buildAreaSchedulePreview(input: AreaScheduleInput) {
           : 'I giorni occupati dal programma sportivo non sono disponibili: non proporli.',
         'Non superare la disponibilita di durata; considera skip, note, rating e check-in precedenti.',
         'Il lavoro di area integra il programma sportivo, senza duplicarne il contenuto.',
+        ...SESSION_CONTENT_RULES,
       ],
     },
     responseJsonSchema: buildAreaScheduleJsonSchema(input),
@@ -265,6 +272,7 @@ export function normalizeAreaScheduleProposal(
       sets: item.sets ?? null,
       reps: item.reps ?? null,
       restSeconds: item.restSeconds ?? null,
+      content: normalizeSessionContent(item),
     } as AreaSessionProposal;
   });
   const sessionsPerWeek = raw.sessionsPerWeek as number;
@@ -300,6 +308,7 @@ export function normalizeAreaScheduleProposal(
         ...(session.restSeconds === null
           ? {}
           : { restSeconds: session.restSeconds }),
+        ...(session.content ? sessionContentMetadata(session.content) : {}),
       } as Record<string, unknown>,
     }));
   const questions = (raw.questions as unknown[]).map((value, index) => {
@@ -365,6 +374,7 @@ export async function generateAreaScheduleProposal(
           shared.has(dayOffset) ? AREA_SHARED_DAY_MINUTES : 45,
           availability.sessionDurationMinutes,
         ),
+        ...stubSessionContent(input.area.name, 45),
       })),
     );
     return normalizeAreaScheduleProposal(

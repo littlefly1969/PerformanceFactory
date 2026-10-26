@@ -7,9 +7,12 @@ import TrainingPage from "./training/page";
 import CheckInPage from "./check-in/page";
 import ProgressPage from "./performance/page";
 import { SessionDetail } from "./training/sessions/[id]/session-detail";
+import { SessionPlayer } from "./training/sessions/[id]/esegui/session-player";
 import type { Home, Session } from "./_components/athlete-types";
+const push = vi.fn();
 vi.mock("next/navigation", () => ({
   usePathname: () => "/user",
+  useRouter: () => ({ push }),
   useSearchParams: () => new URLSearchParams("date=2026-09-19"),
 }));
 vi.mock("../lib/api", () => ({
@@ -36,6 +39,34 @@ const session: Session = {
   completionNotes: null,
   completionRating: null,
 };
+const executable: Session = {
+  ...session,
+  durationMinutes: 30,
+  equipment: "Corpo libero",
+  mode: "SOLO",
+  goal: "Spinta laterale",
+  prerequisites: null,
+  week: 2,
+  planVersion: 1,
+  exercises: [
+    {
+      name: "Skip laterale",
+      prescription: "2 × 40 sec",
+      cue: "Busto alto.",
+      demo: "Skip lungo la linea di fondo, vista frontale.",
+      workSeconds: 40,
+      restSeconds: 45,
+    },
+    {
+      name: "Affondi laterali",
+      prescription: "12 per lato",
+      cue: "Ginocchio sopra il piede.",
+      demo: "Affondo laterale.",
+      workSeconds: null,
+      restSeconds: 45,
+    },
+  ],
+};
 const home: Home = {
   firstName: "Ada",
   today: "2026-09-19",
@@ -43,9 +74,7 @@ const home: Home = {
     snapshotId: "s",
     date: "2026-09-19",
     current: 68,
-    drivers: [
-      { id: "a", name: "Tecnica", current: 68 },
-    ],
+    drivers: [{ id: "a", name: "Tecnica", current: 68 }],
   },
   program: {
     durationWeeks: 12,
@@ -79,13 +108,15 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("PF4 athlete experience", () => {
-  it("lets the athlete log out from every page header", async () => {
-    const fetch = vi.fn(async () => respond(home));
-    vi.stubGlobal("fetch", fetch);
+  it("keeps logout in the profile, reached from the home avatar", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => respond(home)),
+    );
     render(<HomePage />);
-    await userEvent.click(await screen.findByRole("button", { name: "Esci" }));
-    expect(fetch).toHaveBeenCalledWith("/api/auth/logout", { method: "POST" });
-    expect(screen.getByRole("button", { name: "Uscita..." })).toBeDisabled();
+    expect(
+      await screen.findByRole("link", { name: "Il tuo profilo" }),
+    ).toHaveAttribute("href", "/user/profile");
   });
   it("shows real performance and one prominent session CTA", async () => {
     vi.stubGlobal(
@@ -96,9 +127,10 @@ describe("PF4 athlete experience", () => {
     expect(
       await screen.findByRole("heading", { name: session.title }),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: /Inizia la sessione/ }),
-    ).toHaveAttribute("href", "/user/training/sessions/session-one");
+    expect(screen.getByRole("link", { name: /Inizia ora/ })).toHaveAttribute(
+      "href",
+      "/user/training/sessions/session-one/esegui",
+    );
     expect(screen.getByText("68")).toBeInTheDocument();
     expect(screen.queryByText(/calorie|punti|minuti/i)).not.toBeInTheDocument();
   });
@@ -239,7 +271,7 @@ describe("PF4 athlete experience", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Finestra corrente")).toHaveTextContent(
-      "Finestra 3 / 6",
+      "Finestra 3 / 6 · programma di 12 settimane",
     );
     expect(
       screen.queryByRole("button", { name: /Prepara il mio piano/ }),
@@ -319,16 +351,20 @@ describe("PF4 athlete experience", () => {
           from: query.get("from"),
           to: query.get("to"),
           sessions: query.get("from") === "2026-09-01" ? [session] : [],
+          completed: 0,
+          minutes: 0,
         });
       }),
     );
     render(<TrainingPage />);
-    expect((await screen.findAllByText(session.title)).length).toBe(2);
+    expect(await screen.findByText(session.title)).toBeInTheDocument();
     await userEvent.click(
       screen.getByRole("button", { name: "Mese successivo" }),
     );
     await waitFor(() =>
-      expect(requests.at(-1)?.url).toContain("from=2026-10-01&to=2026-10-31"),
+      expect(
+        requests.filter((r) => r.url.includes("calendar")).at(-1)?.url,
+      ).toContain("from=2026-09-28&to=2026-10-31"),
     );
     expect(
       await screen.findByText("Nessuna sessione in questa data."),
@@ -356,11 +392,11 @@ describe("PF4 athlete experience", () => {
       }),
     );
     render(<TrainingPage />);
-    expect((await screen.findAllByText("Forza e stabilità")).length).toBe(2);
+    expect(await screen.findByText("Forza e stabilità")).toBeInTheDocument();
     expect(screen.getAllByText(/Preparazione atletica/).length).toBeGreaterThan(
       0,
     );
-    expect(screen.getAllByText(session.title).length).toBe(2);
+    expect(screen.getByText(session.title)).toBeInTheDocument();
   });
   it("uses one check-in question at a time and submits existing option IDs", async () => {
     vi.stubGlobal(
@@ -409,46 +445,99 @@ describe("PF4 athlete experience", () => {
       },
     });
   });
-  it("collects optional session feedback and reloads backend completion", async () => {
-    let completed = false;
+  it("shows the session sheet with its exercises and lets the athlete skip it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (init?.method === "POST") {
+          requests.push({ url });
+          return respond({ status: "SKIPPED" });
+        }
+        return respond(executable);
+      }),
+    );
+    render(<SessionDetail id={session.id} />);
+    expect(
+      await screen.findByRole("heading", { name: session.title }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Sessione 01 · Settimana 02")).toBeInTheDocument();
+    expect(screen.getByText("Spinta laterale")).toBeInTheDocument();
+    expect(screen.getByText("Da solo")).toBeInTheDocument();
+    expect(screen.getByText("Skip laterale")).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Inizia la sessione" }),
+    ).toHaveAttribute("href", "/user/training/sessions/session-one/esegui");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Salta la sessione" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /Conferma: salta la sessione/ }),
+    );
+    expect(requests[0]).toEqual({
+      url: "/api/athlete/training/sessions/session-one/skip",
+    });
+  });
+  it("runs the session exercise by exercise, rests, and saves the effort", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string, init?: RequestInit) => {
         if (init?.method === "POST") {
           requests.push({ url, body: JSON.parse(String(init.body)) });
-          completed = true;
           return respond({ status: "COMPLETED" });
         }
-        return respond(
-          completed
-            ? {
-                ...session,
-                status: "COMPLETED",
-                displayStatus: "DONE",
-                canAct: false,
-                completionRating: 4,
-                completionNotes: "Ottimo",
-              }
-            : session,
-        );
+        return respond(executable);
       }),
     );
-    render(<SessionDetail id={session.id} />);
-    await userEvent.click(
-      await screen.findByRole("button", { name: /Segna come completata/ }),
-    );
-    await userEvent.click(screen.getByRole("button", { name: "4" }));
-    await userEvent.type(screen.getByRole("textbox"), "Ottimo");
-    await userEvent.click(
-      screen.getByRole("button", { name: /Salva e chiudi/ }),
-    );
+    render(<SessionPlayer id={session.id} />);
+    expect(await screen.findByText("01 / 02")).toBeInTheDocument();
+    expect(screen.getByText("Video demo · Placeholder")).toBeInTheDocument();
     expect(
-      await screen.findByText("La tua valutazione: 4 / 5"),
+      screen.getByText("Skip lungo la linea di fondo, vista frontale."),
     ).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Fatto" }));
+    expect(screen.getByText("Riposo")).toBeInTheDocument();
+    expect(screen.getByText("45")).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Salta il riposo" }),
+    );
+    expect(screen.getByText("Affondi laterali")).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Salta questo esercizio" }),
+    );
+    expect(screen.getByText("Uno su due.")).toBeInTheDocument();
+    const save = screen.getByRole("button", { name: "Torna alla home" });
+    expect(save).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "2" }));
+    await userEvent.click(save);
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/user"));
+    // 2 = abbastanza facile: il backend conserva la valutazione rovesciata.
     expect(requests[0]).toEqual({
       url: "/api/athlete/training/sessions/session-one/complete",
-      body: { completionRating: 4, completionNotes: "Ottimo" },
+      body: {
+        completionRating: 4,
+        completionNotes: "Esercizi saltati: Affondi laterali.",
+      },
     });
+  });
+  it("shows the perceived effort of a completed session", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        respond({
+          ...executable,
+          status: "COMPLETED",
+          displayStatus: "DONE",
+          canAct: false,
+          completionRating: 4,
+          completionNotes: "Ottimo",
+        }),
+      ),
+    );
+    render(<SessionDetail id={session.id} />);
+    expect(
+      await screen.findByText("Fatica percepita: 2 / 5"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Ottimo")).toBeInTheDocument();
   });
   it("reuses performance visuals and renders real history", async () => {
     vi.stubGlobal(
@@ -459,7 +548,9 @@ describe("PF4 athlete experience", () => {
     );
     render(<ProgressPage />);
     expect(
-      await screen.findByRole("img", { name: "Performance attuale per driver" }),
+      await screen.findByRole("img", {
+        name: "Performance attuale per driver",
+      }),
     ).toBeInTheDocument();
     // La P a passo fisso non si mostra all'atleta.
     expect(screen.queryByText(/otenziale/)).not.toBeInTheDocument();

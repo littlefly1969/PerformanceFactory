@@ -90,6 +90,14 @@ export class AthleteController {
   calendar(@Req() req: Request, @Query() query: CalendarQuery) {
     return this.athlete.calendar(req.user.id, query.from, query.to);
   }
+  @ApiOperation({
+    summary: 'Storico delle sessioni concluse con minuti e valutazioni',
+  })
+  @Header('Cache-Control', 'private, no-store')
+  @Get('training/history')
+  history(@Req() req: Request) {
+    return this.athlete.history(req.user.id);
+  }
   @ApiOperation({ summary: 'Dettaglio di una sessione personale' })
   @Header('Cache-Control', 'private, no-store')
   @Get('training/sessions/:id')

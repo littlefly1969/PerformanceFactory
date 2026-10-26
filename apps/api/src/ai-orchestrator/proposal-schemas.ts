@@ -1,3 +1,7 @@
+import {
+  objectivesSchema,
+  sessionContentSchemaProperties,
+} from './session-content';
 import { areaPromptKey } from './proposal-goals';
 import {
   CycleProposalInput,
@@ -384,10 +388,17 @@ export function buildTrainingProposalJsonSchema(
     sets: { type: ['integer', 'null'], minimum: 1 },
     reps: { type: ['string', 'null'] },
     restSeconds: { type: ['integer', 'null'], minimum: 0 },
+    ...sessionContentSchemaProperties(options),
   };
   return {
     ...base,
-    required: ['summaryText', 'sessionsPerWeek', 'planItems', 'questions'],
+    required: [
+      'summaryText',
+      'sessionsPerWeek',
+      'planItems',
+      'questions',
+      'objectives',
+    ],
     properties: {
       ...base.properties,
       sessionsPerWeek: {
@@ -395,6 +406,7 @@ export function buildTrainingProposalJsonSchema(
         minimum: minSessionsPerWeek,
         maximum: maxSessionsPerWeek,
       },
+      objectives: objectivesSchema(options),
       planItems: {
         type: 'array',
         minItems: 2 * minSessionsPerWeek,
@@ -417,6 +429,7 @@ export function buildTrainingProposalJsonSchema(
             'sessionsPerWeek',
             'planItems',
             'questions',
+            'objectives',
           ],
         }
       : {}),
@@ -459,6 +472,7 @@ export function buildAreaScheduleJsonSchema(
     sets: { type: ['integer', 'null'], minimum: 1 },
     reps: { type: ['string', 'null'] },
     restSeconds: { type: ['integer', 'null'], minimum: 0 },
+    ...sessionContentSchemaProperties(options),
   };
   return {
     ...base,
