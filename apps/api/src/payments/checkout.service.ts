@@ -274,20 +274,30 @@ export class CheckoutService {
         expiresAt,
         ...checkoutReturnUrls(),
       });
-      await this.prisma.subscription.update({
-        where: { id: subscription.id },
+      const saved = await this.prisma.subscription.updateMany({
+        where: {
+          id: subscription.id,
+          status: SubscriptionStatus.CHECKOUT_PENDING,
+        },
         data: {
           providerCheckoutId: checkout.checkoutId,
           checkoutUrl: checkout.url,
           checkoutExpiresAt: expiresAt,
         },
       });
+      if (!saved.count) {
+        // Una preparazione lenta può essere stata liberata nel frattempo:
+        // il link appena arrivato non deve essere consegnato né restare pagabile.
+        await provider.expireCheckout(checkout.checkoutId);
+        throw new ConflictException('Checkout superato: riprova il pagamento');
+      }
       return {
         subscriptionId: subscription.id,
         provider: provider.kind,
         checkoutUrl: checkout.url,
       };
     } catch (error) {
+      if (error instanceof ConflictException) throw error;
       // Nessun record orfano: il posto si libera e l'utente puo riprovare.
       await this.prisma.subscription.updateMany({
         where: {
