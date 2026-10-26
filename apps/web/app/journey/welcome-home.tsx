@@ -27,6 +27,30 @@ function useProfilePhoto() {
   return image;
 }
 
+/**
+ * La lezione si promette solo se il server la rende possibile: funzione attiva
+ * per l'atleta e almeno un circolo. Prima dell'assessment la fase è sempre
+ * UNAVAILABLE (nessuna calibrazione), quindi decidono flag e circoli.
+ */
+function useLessonOffered() {
+  const [offered, setOffered] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    secureFetch(`${API_BASE}/athlete-journey/free-lesson`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((view: { enabled?: boolean; clubs?: unknown[] } | null) => {
+        if (alive) setOffered(!!view?.enabled && (view.clubs?.length ?? 0) > 0);
+      })
+      .catch(() => {
+        /* Senza risposta nessuna promessa: resta la card generica. */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return offered;
+}
+
 /** Esagono vuoto: lo Spider nasce con le prime risposte. */
 function EmptySpider() {
   const ring = (r: number) =>
@@ -60,6 +84,7 @@ export function WelcomeHome({
   onStart: () => void;
 }) {
   const photo = useProfilePhoto();
+  const lesson = useLessonOffered();
   const name = journey.firstName?.trim();
   const answered = Math.min(journey.currentQuestion, journey.count);
   const percent = journey.count
@@ -103,13 +128,21 @@ export function WelcomeHome({
               <span>{percent}%</span>
             </div>
             <div>
-              <span className="pf-home-kicker">Lezione gratuita</span>
-              <h2 id="pf-home-lesson">Completa l’assessment per sbloccarla.</h2>
+              <span className="pf-home-kicker">
+                {lesson ? "Lezione gratuita" : "Il tuo assessment"}
+              </span>
+              <h2 id="pf-home-lesson">
+                {lesson
+                  ? "Completa l’assessment: è il primo passo per sbloccarla."
+                  : "Scopri dove sei oggi."}
+              </h2>
             </div>
           </div>
           <p>
-            {answered} di {journey.count} domande · poi un posto nella tua
-            lezione di prova gratuita.
+            {answered} di {journey.count} domande
+            {lesson
+              ? " · poi continui con domande e test fino a sbloccare la lezione di prova."
+              : " · da qui nasce il tuo Spider."}
           </p>
           <button
             type="button"
