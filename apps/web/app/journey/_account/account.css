@@ -528,6 +528,61 @@
 .pf-acc-fit {
   margin-bottom: 8px;
 }
+/* Indirizzo nel profilo: stile del form scoped alla sola card indirizzo,
+   la classifica FIT ha i suoi stili in fit-ranking.css. */
+.pf-acc-address .pf4-athlete-section {
+  padding: 0;
+}
+.pf-acc-address h2 {
+  margin: 6px 0 8px;
+  font-size: 18px;
+  font-weight: 500;
+}
+.pf-acc-address p {
+  color: #6d6d70;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.pf-acc-address form,
+.pf-acc-address fieldset {
+  display: grid;
+  gap: 12px;
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.pf-acc-address form {
+  margin-top: 14px;
+}
+.pf-acc-address legend {
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+.pf-acc-address label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+}
+.pf-acc-address select,
+.pf-acc-address input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #0b0b0c1f;
+  border-radius: 12px;
+  background: #fff;
+  color: #0b0b0c;
+  font: inherit;
+}
+.pf-acc-address .pf4-cta {
+  justify-self: start;
+  padding: 12px 20px;
+  border: 0;
+  border-radius: 999px;
+  background: #0b0b0c;
+  color: #fff;
+  font: inherit;
+}
+
 /* Home dopo l'assessment e profilo provvisorio pronto. */
 .pf-acc-home-spider {
   display: flex;

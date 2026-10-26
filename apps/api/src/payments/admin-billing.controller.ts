@@ -55,7 +55,7 @@ export class AdminBillingController {
 
   @Put('options/:horizon/:billingCycle')
   @ApiOperation({
-    summary: 'Attiva o disattiva una combinazione orizzonte x cadenza',
+    summary: 'Attiva, disattiva o prezza una combinazione orizzonte x cadenza',
   })
   @ApiParam({ name: 'horizon', enum: ProgramHorizon })
   @ApiParam({ name: 'billingCycle', enum: BillingCycle })
@@ -66,6 +66,12 @@ export class AdminBillingController {
     billingCycle: BillingCycle,
     @Body() body: UpdateBillingOptionDto,
   ) {
-    return this.catalog.updateOption(horizon, billingCycle, body.isActive);
+    return this.catalog.updateOption(
+      horizon,
+      billingCycle,
+      body.isActive,
+      body.amountCents,
+      body.currency,
+    );
   }
 }

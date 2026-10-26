@@ -344,6 +344,55 @@ describe('Entry slice with PostgreSQL', () => {
     ).toEqual({ source: 'direct' });
   });
 
+  it('saves the club anagrafica, normalizes the province and clears empty fields', async () => {
+    const created = (
+      await admin('POST', '/api/admin/partners', {
+        code: `anagrafica-${randomUUID().slice(0, 8)}`,
+        name: 'Circolo Padel Pescara',
+        city: 'Pescara',
+        province: 'pe',
+        address: 'Via del Mare 12',
+        postalCode: '65126',
+        website: 'https://padelpescara.example/',
+        freeLessonsEnabled: true,
+      })
+    ).json<{ id: string }>();
+    partnerIds.push(created.id);
+    expect(created).toMatchObject({
+      city: 'Pescara',
+      province: 'PE',
+      address: 'Via del Mare 12',
+      postalCode: '65126',
+      website: 'https://padelpescara.example/',
+      freeLessonsEnabled: true,
+    });
+    // Provincia, CAP e indirizzi non validi non entrano nell'anagrafica.
+    for (const invalid of [
+      { province: 'ABC' },
+      { postalCode: '123' },
+      { website: 'non-un-indirizzo' },
+    ])
+      expect(
+        (await admin('PATCH', `/api/admin/partners/${created.id}`, invalid))
+          .statusCode,
+      ).toBe(400);
+    // La stringa vuota azzera il campo, gli altri restano come sono.
+    expect(
+      (
+        await admin('PATCH', `/api/admin/partners/${created.id}`, {
+          province: '',
+          address: '  ',
+          freeLessonsEnabled: false,
+        })
+      ).json(),
+    ).toMatchObject({
+      province: null,
+      address: null,
+      postalCode: '65126',
+      freeLessonsEnabled: false,
+    });
+  });
+
   it('stores club logo and photo from the back office and serves them publicly', async () => {
     const club = (
       await admin('POST', '/api/admin/partners', {

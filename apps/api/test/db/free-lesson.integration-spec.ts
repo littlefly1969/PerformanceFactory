@@ -275,6 +275,48 @@ describe('Free lesson with PostgreSQL', () => {
     await prisma.$disconnect();
   });
 
+  it('dice quanto dista il circolo, e perche non lo sa senza indirizzo', async () => {
+    const id = await athlete([80, 90]);
+    // Senza indirizzo non si inventa un numero: si dice il motivo.
+    expect(await athletes.view(id)).toMatchObject({
+      distance: { available: false, reason: 'NO_ADDRESS' },
+      clubs: [{ distanceKm: null }],
+    });
+
+    // Indirizzo salvato ma non riconosciuto: nessuna coordinata, nessuna distanza.
+    await prisma.userAddress.create({
+      data: {
+        userId: id,
+        street: 'Via senza nome 1',
+        postalCode: '67100',
+        city: "L'Aquila",
+        province: 'AQ',
+      },
+    });
+    expect(await athletes.view(id)).toMatchObject({
+      distance: { available: false, reason: 'ADDRESS_NOT_LOCATED' },
+      clubs: [{ distanceKm: null }],
+    });
+
+    // Atleta e circolo localizzati: distanza in linea d'aria fra Pescara e L'Aquila.
+    await prisma.userAddress.update({
+      where: { userId: id },
+      data: { latitude: 42.3498, longitude: 13.3995 },
+    });
+    await prisma.partner.update({
+      where: { id: partnerId },
+      data: { latitude: 42.4618, longitude: 14.2161 },
+    });
+    const located = await athletes.view(id);
+    expect(located).toMatchObject({
+      distance: { available: true, reason: null },
+    });
+    const [club] = (located as { clubs: Array<{ distanceKm: number | null }> })
+      .clubs;
+    expect(club.distanceKm).toBeGreaterThan(65);
+    expect(club.distanceKm).toBeLessThan(80);
+  });
+
   it('credits each interaction once, also with parallel requests, and keeps the catalog out of the panel', async () => {
     const id = await athlete([40, 50]);
     for (const sequence of [1, 2]) {

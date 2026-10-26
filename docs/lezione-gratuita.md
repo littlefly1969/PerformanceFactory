@@ -190,13 +190,60 @@ della regola di eleggibilità, `lesson_declined`, `lesson_booked`,
 Default: traguardo visivo di 100 crediti, 30 per la prima valutazione, 20 per
 passo di calibrazione, 10 per micro-test del catalogo (storico); eleggibilità con confidence
 complessiva ≥ 50 (regola v1, da approvare, in `/admin/calibration`). Per provarla:
-accendere `free_lesson` in `/admin/feature-flags` e attivare un circolo in
-`/admin/free-lessons`.
+accendere `free_lesson` in `/admin/feature-flags`. I circoli arrivano già pronti
+dal seed (vedi sotto); per aggiungerne o spegnerne uno si usa `/admin/partners`
+oppure `/admin/free-lessons`.
+
+## Circoli seminati in Abruzzo
+
+Il seed (`apps/api/prisma/seed.ts`) crea quattordici circoli di padel reali in
+Abruzzo per il primo lancio territoriale: tre in provincia di Pescara, tre a
+Chieti, due a Teramo e sei in provincia dell'Aquila (Avezzano e cinque in
+città). Nome, città, provincia, indirizzo e CAP vengono da
+fonti pubbliche: gli elenchi FITP Abruzzo delle squadre dei campionati di padel
+e le directory di settore. Il sito è presente solo dove è stato verificato; logo
+e foto si caricano dal back office (`/admin/partners`): il seed non inventa
+dati.
+
+Ogni circolo parte attivo, con `freeLessonsEnabled` acceso e una o due lezioni
+in calendario (gruppo da 4, un'ora, livello «Principianti» o «Intermedi»),
+assegnate al coach demo `coach_padel@example.it`. Le lezioni hanno un UUID
+deterministico (versione 5, dal codice del circolo e dal numero della lezione),
+quindi le API le accettano e rieseguire il seed non le duplica.
+
+Il seed crea solo ciò che manca. Un circolo già presente non viene toccato:
+stato, lezione gratuita, dati e immagini restano come li ha lasciati il back
+office; il seed prova solo a risolvere le coordinate se mancano. Allo stesso
+modo una lezione già creata mantiene data, stato e posti assegnati.
+
+## Distanza fra atleta e circolo
+
+L'atleta scrive il suo indirizzo dal profilo (`/journey/profilo` nella fase
+gratuita, `/user/profile` da abbonato). Da lì la scelta del circolo
+(`/journey/circolo`) mostra quanto dista ogni circolo in linea d'aria. La
+distanza esce dalle coordinate di entrambi: quelle del circolo si risolvono dal
+suo indirizzo quando l'admin lo salva (o al primo giro del seed), quelle
+dell'atleta quando salva il suo.
+
+Il geocoding è un tentativo, non un passo obbligatorio: è un servizio esterno
+configurabile con `GEOCODING_URL` (per difetto Nominatim di OpenStreetMap),
+spegnibile con `GEOCODING_ENABLED=false`. Se non risponde o non trova
+l'indirizzo, le coordinate restano vuote e all'atleta si dice perché la
+distanza non si può calcolare, invece di mostrare un numero inventato:
+
+| `distance.reason` | Cosa vede l'atleta |
+|---|---|
+| `NO_ADDRESS` | manca l'indirizzo: lo si aggiunge dal profilo |
+| `ADDRESS_NOT_LOCATED` | l'indirizzo c'è ma non è stato riconosciuto: si può correggere |
+| `null` | la distanza c'è, per i circoli di cui si conosce la sede |
+
+Un circolo senza coordinate ha `distanceKm` nullo anche quando l'atleta è
+localizzato: la sua riga resta senza distanza, le altre la mostrano.
 
 Test: `free-lesson-rules.spec.ts`, `calibration-rules.spec.ts`,
 `test/db/free-lesson.integration-spec.ts` (crediti in parallelo, catalogo fuori
 dal pannello, eleggibilità per regola, capienza con assegnazioni parallele, attesa di
-R e feedback del coach, rinuncia e territorio non servito, ritiro, flag spento), `app/journey/free-lesson-panel.test.tsx`. I micro-test sono testati con la
+R e feedback del coach, rinuncia e territorio non servito, ritiro, flag spento), `app/journey/_account/account-area.test.tsx`. I micro-test sono testati con la
 calibrazione (`docs/calibrazione.md`).
 
 ## Aperto

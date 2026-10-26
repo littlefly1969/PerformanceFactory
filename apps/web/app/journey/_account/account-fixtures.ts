@@ -88,9 +88,10 @@ export const lesson = {
   missing: [],
   credits: { balance: 100, toUnlock: 100 },
   clubs: [
-    { id: "c1", name: "Padel Club Nord", city: "Milano" },
-    { id: "c2", name: "Circolo Navigli", city: "Milano" },
+    { id: "c1", name: "Padel Club Nord", city: "Milano", distanceKm: 3.2 },
+    { id: "c2", name: "Circolo Navigli", city: "Milano", distanceKm: null },
   ],
+  distance: { available: true, reason: null },
   slots: [
     {
       id: "l1",

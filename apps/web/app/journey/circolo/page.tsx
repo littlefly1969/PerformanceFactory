@@ -32,6 +32,20 @@ const when = (iso: string) =>
     minute: "2-digit",
   });
 
+/** Senza distanza si dice perché, invece di mostrare un numero inventato. */
+const NO_DISTANCE = {
+  NO_ADDRESS:
+    "Non possiamo calcolare quanto distano i circoli: aggiungi il tuo indirizzo nel profilo.",
+  ADDRESS_NOT_LOCATED:
+    "Non possiamo calcolare quanto distano i circoli: il tuo indirizzo non è stato riconosciuto, puoi correggerlo nel profilo.",
+};
+
+/** Città e distanza del circolo, nelle parti che conosciamo. */
+const clubPlace = (club: { city: string | null; distanceKm: number | null }) =>
+  [club.city, club.distanceKm === null ? null : `a ${club.distanceKm} km`]
+    .filter(Boolean)
+    .join(" · ");
+
 /** Giorni con almeno una lezione in calendario, in ordine. */
 function days(slots: LessonSlot[]) {
   const seen = new Map<string, string>();
@@ -182,10 +196,18 @@ export default function ClubPage() {
                 }}
               >
                 <b>{club.name}</b>
-                {club.city && <small>{club.city}</small>}
+                {clubPlace(club) && <small>{clubPlace(club)}</small>}
               </button>
             ))}
           </div>
+          {view.distance?.reason && (
+            <p className="pf-acc-muted">
+              {NO_DISTANCE[view.distance.reason]}{" "}
+              <a className="pf-acc-link" href="/journey/profilo#indirizzo">
+                Vai al profilo
+              </a>
+            </p>
+          )}
           <span className="pf-acc-kicker">Giorno</span>
           {clubDays.length ? (
             <div className="pf-acc-days" role="radiogroup" aria-label="Giorno">

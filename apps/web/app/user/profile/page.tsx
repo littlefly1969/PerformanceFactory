@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { TrainingAvailability } from "./training-availability";
+import { AthleteAddress } from "../../components/athlete-address";
 import { FitRankingEditor } from "../../components/fit-ranking-editor";
 import { MarketingPreference, ReferralCard } from "./marketing-and-referral";
 import { AthleteShell } from "../_components/athlete-shell";
@@ -32,6 +33,7 @@ export default function ProfilePage() {
             </p>
           </section>
           <TrainingAvailability />
+          <AthleteAddress />
           <FitRankingEditor />
           <section className="pf4-athlete-section">
             <span className="pf4-kicker">Il tuo coach</span>

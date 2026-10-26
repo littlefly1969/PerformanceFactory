@@ -10,7 +10,13 @@ type Partner = {
   code: string;
   name: string;
   city: string | null;
+  province: string | null;
+  address: string | null;
+  postalCode: string | null;
+  website: string | null;
+  located: boolean;
   isActive: boolean;
+  freeLessonsEnabled: boolean;
   logoUrl: string | null;
   photoUrl: string | null;
   attributedUsers: number;
@@ -30,10 +36,71 @@ const FUNNEL_STEPS = [
   ["registration_completed", "Registrazioni completate"],
 ] as const;
 
-const emptyDraft = { code: "", name: "", city: "" };
+/** Anagrafica del circolo: etichetta e se il campo e obbligatorio. */
+const DETAIL_FIELDS = [
+  ["name", "Nome", true],
+  ["city", "Città o zona", false],
+  ["province", "Provincia (sigla, es. CH)", false],
+  ["address", "Indirizzo", false],
+  ["postalCode", "CAP", false],
+  ["website", "Sito o pagina social", false],
+] as const;
+
+type DetailField = (typeof DETAIL_FIELDS)[number][0];
+type Details = Record<DetailField, string>;
+
+const emptyDetails: Details = {
+  name: "",
+  city: "",
+  province: "",
+  address: "",
+  postalCode: "",
+  website: "",
+};
+const emptyDraft = { ...emptyDetails, code: "" };
 
 function clubLink(code: string, origin: string) {
   return `${origin}/start?club=${encodeURIComponent(code)}`;
+}
+
+/** Campi gia compilati del circolo, pronti per il form di modifica. */
+function detailsOf(partner: Partner): Details {
+  return {
+    name: partner.name,
+    city: partner.city ?? "",
+    province: partner.province ?? "",
+    address: partner.address ?? "",
+    postalCode: partner.postalCode ?? "",
+    website: partner.website ?? "",
+  };
+}
+
+/** Sede leggibile: le parti mancanti non lasciano separatori vuoti. */
+function placeOf(partner: Partner) {
+  const place = [
+    partner.address,
+    [partner.postalCode, partner.city].filter(Boolean).join(" "),
+    partner.province,
+  ]
+    .filter((part) => part && part.trim())
+    .join(" · ");
+  return place || "Sede non indicata";
+}
+
+/** Solo i campi compilati: alla creazione i vuoti restano fuori dal corpo. */
+function filledDetails(details: Details) {
+  return Object.fromEntries(
+    DETAIL_FIELDS.map(
+      ([field]) => [field, details[field].trim()] as const,
+    ).filter(([, value]) => value),
+  );
+}
+
+/** Tutti i campi, anche vuoti: la stringa vuota azzera il valore salvato. */
+function patchDetails(details: Details) {
+  return Object.fromEntries(
+    DETAIL_FIELDS.map(([field]) => [field, details[field].trim()] as const),
+  );
 }
 
 export default function AdminPartnersPage() {
@@ -41,6 +108,9 @@ export default function AdminPartnersPage() {
   const [funnel, setFunnel] = useState<Funnel>();
   const [days, setDays] = useState(30);
   const [draft, setDraft] = useState(emptyDraft);
+  const [edit, setEdit] = useState<{ id: string; details: Details } | null>(
+    null,
+  );
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [origin, setOrigin] = useState("");
@@ -98,6 +168,12 @@ export default function AdminPartnersPage() {
           tone: "success",
         },
         {
+          label: "Con lezione gratuita",
+          value: partners.filter((partner) => partner.freeLessonsEnabled)
+            .length,
+          tone: "accent",
+        },
+        {
           label: `Registrazioni ${days} gg`,
           value: funnel?.events.registration_completed ?? 0,
           tone: "warning",
@@ -117,15 +193,32 @@ export default function AdminPartnersPage() {
                   <div>
                     <h3>{partner.name}</h3>
                     <p className="pf-muted">
-                      {partner.city ?? "Città non indicata"} · {partner.code}
+                      {placeOf(partner)} · {partner.code}
                     </p>
                   </div>
                   <StatusBadge tone={partner.isActive ? "success" : "neutral"}>
                     {partner.isActive ? "Attivo" : "Sospeso"}
                   </StatusBadge>
                 </div>
+                {partner.website && (
+                  <p className="pf-muted">
+                    Sito o pagina social:{" "}
+                    <a
+                      href={partner.website}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                    >
+                      {partner.website}
+                    </a>
+                  </p>
+                )}
                 <p className="pf-muted">
                   Link per QR: {clubLink(partner.code, origin)}
+                </p>
+                <p className="pf-muted">
+                  {partner.located
+                    ? "Sede riconosciuta: agli atleti mostriamo la distanza."
+                    : "Sede non riconosciuta: agli atleti diciamo che la distanza non si può calcolare."}
                 </p>
                 <p className="pf-muted">
                   Atleti registrati: {partner.attributedUsers}
@@ -149,22 +242,122 @@ export default function AdminPartnersPage() {
                     )
                   }
                 />
-                <button
-                  className="pf-button-secondary"
-                  type="button"
-                  disabled={busy}
-                  onClick={() =>
-                    void run(
-                      () =>
-                        adminRequest(`/admin/partners/${partner.id}`, "PATCH", {
-                          isActive: !partner.isActive,
-                        }),
-                      partner.isActive ? "Circolo sospeso." : "Circolo attivato.",
-                    )
-                  }
-                >
-                  {partner.isActive ? "Sospendi" : "Attiva"}
-                </button>
+                <label className="pf-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={partner.freeLessonsEnabled}
+                    disabled={busy}
+                    onChange={(event) =>
+                      void run(
+                        () =>
+                          adminRequest(
+                            `/admin/partners/${partner.id}`,
+                            "PATCH",
+                            { freeLessonsEnabled: event.target.checked },
+                          ),
+                        event.target.checked
+                          ? "Lezione gratuita attiva per il circolo."
+                          : "Lezione gratuita disattivata per il circolo.",
+                      )
+                    }
+                  />
+                  Offre la lezione gratuita
+                </label>
+                {edit?.id === partner.id ? (
+                  <form
+                    className="pf-stack"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      void run(
+                        () =>
+                          adminRequest(
+                            `/admin/partners/${partner.id}`,
+                            "PATCH",
+                            patchDetails(edit.details),
+                          ),
+                        "Circolo aggiornato.",
+                      ).then((saved) => saved && setEdit(null));
+                    }}
+                  >
+                    {DETAIL_FIELDS.map(([field, label, required]) => (
+                      <label className="pf-field" key={field}>
+                        {label}
+                        <input
+                          className="pf-input"
+                          required={required}
+                          value={edit.details[field]}
+                          onChange={(event) =>
+                            setEdit(
+                              (current) =>
+                                current && {
+                                  ...current,
+                                  details: {
+                                    ...current.details,
+                                    [field]: event.target.value,
+                                  },
+                                },
+                            )
+                          }
+                        />
+                      </label>
+                    ))}
+                    <p className="pf-field-hint">
+                      Lascia vuoto un campo per cancellare il dato salvato.
+                    </p>
+                    <div className="pf-row">
+                      <button
+                        className="pf-button"
+                        type="submit"
+                        disabled={busy}
+                      >
+                        Salva
+                      </button>
+                      <button
+                        className="pf-button-secondary"
+                        type="button"
+                        onClick={() => setEdit(null)}
+                      >
+                        Annulla
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="pf-row">
+                    <button
+                      className="pf-button-secondary"
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        setEdit({
+                          id: partner.id,
+                          details: detailsOf(partner),
+                        })
+                      }
+                    >
+                      Modifica dati
+                    </button>
+                    <button
+                      className="pf-button-secondary"
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        void run(
+                          () =>
+                            adminRequest(
+                              `/admin/partners/${partner.id}`,
+                              "PATCH",
+                              { isActive: !partner.isActive },
+                            ),
+                          partner.isActive
+                            ? "Circolo sospeso."
+                            : "Circolo attivato.",
+                        )
+                      }
+                    >
+                      {partner.isActive ? "Sospendi" : "Attiva"}
+                    </button>
+                  </div>
+                )}
               </article>
             ))}
           </div>
@@ -176,8 +369,7 @@ export default function AdminPartnersPage() {
                 () =>
                   adminRequest("/admin/partners", "POST", {
                     code: draft.code.trim().toLowerCase(),
-                    name: draft.name.trim(),
-                    ...(draft.city.trim() ? { city: draft.city.trim() } : {}),
+                    ...filledDetails(draft),
                   }),
                 "Circolo creato.",
               ).then((created) => created && setDraft(emptyDraft));
@@ -186,8 +378,7 @@ export default function AdminPartnersPage() {
             <h3>Nuovo circolo</h3>
             {(
               [
-                ["name", "Nome", true],
-                ["city", "Città o zona", false],
+                ...DETAIL_FIELDS,
                 ["code", "Codice (es. padel-roma-nord)", true],
               ] as const
             ).map(([field, label, required]) => (

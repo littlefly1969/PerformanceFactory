@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { LogoutButton } from "../../components/logout-button";
 import { FitRankingEditor } from "../../components/fit-ranking-editor";
+import { AthleteAddress } from "../../components/athlete-address";
 import {
   type AthleteProfile,
   type FreeLessonView,
@@ -214,6 +215,10 @@ export default function ProfilePage() {
             ? "Ogni risposta e ogni micro-test rendono più nitida l’area che conosciamo meno."
             : "Rispondi all’assessment: lo Spider nasce provvisorio e si definisce mentre ti alleni."}
         </p>
+      </section>
+
+      <section className="pf-acc-card pf-acc-fit pf-acc-address" id="indirizzo">
+        <AthleteAddress onSaved={() => void lesson.reload()} />
       </section>
 
       <section className="pf-acc-card pf-acc-fit">

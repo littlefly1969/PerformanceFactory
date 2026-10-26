@@ -1,11 +1,12 @@
 import { BillingCycle, ProgramHorizon } from '@prisma/client';
 import { addMonths, buildPaywallOffers } from './payment-plans';
 
+// Listino di riferimento senza sconto: 10,00 EUR al mese.
 const prices = [
-  { billingCycle: BillingCycle.MONTHLY, amountCents: 1990, currency: 'eur' },
-  { billingCycle: BillingCycle.QUARTERLY, amountCents: 5000, currency: 'eur' },
-  { billingCycle: BillingCycle.SEMIANNUAL, amountCents: 9000, currency: 'eur' },
-  { billingCycle: BillingCycle.ANNUAL, amountCents: 15000, currency: 'eur' },
+  { billingCycle: BillingCycle.MONTHLY, amountCents: 1000, currency: 'eur' },
+  { billingCycle: BillingCycle.QUARTERLY, amountCents: 3000, currency: 'eur' },
+  { billingCycle: BillingCycle.SEMIANNUAL, amountCents: 6000, currency: 'eur' },
+  { billingCycle: BillingCycle.ANNUAL, amountCents: 12000, currency: 'eur' },
 ];
 
 const blueprintMatrix: Array<[ProgramHorizon, BillingCycle[]]> = [
@@ -17,6 +18,23 @@ const blueprintMatrix: Array<[ProgramHorizon, BillingCycle[]]> = [
 const options = blueprintMatrix.flatMap(([horizon, cycles]) =>
   cycles.map((billingCycle) => ({ horizon, billingCycle, isActive: true })),
 );
+
+// Prezzi per combinazione: 3 mesi 10,00/mese, 6 mesi 9,50, 12 mesi 8,90.
+const monthlyByHorizon: Record<ProgramHorizon, number> = {
+  PROGRAM_3M: 1000,
+  PROGRAM_6M: 950,
+  PROGRAM_12M: 890,
+};
+
+const pricedOptions = options.map((option) => ({
+  ...option,
+  amountCents:
+    monthlyByHorizon[option.horizon] *
+    { MONTHLY: 1, QUARTERLY: 3, SEMIANNUAL: 6, ANNUAL: 12 }[
+      option.billingCycle
+    ],
+  currency: 'eur',
+}));
 
 describe('buildPaywallOffers', () => {
   it('follows the A5 horizon x billing matrix with configured prices', () => {
@@ -35,9 +53,68 @@ describe('buildPaywallOffers', () => {
     expect(offers[0].billingOptions[0]).toEqual({
       billingCycle: 'MONTHLY',
       billingMonths: 1,
-      amountCents: 1990,
+      amountCents: 1000,
+      monthlyEquivalentCents: 1000,
       currency: 'eur',
     });
+  });
+
+  it('prices each combination from the option, with the cycle list as fallback', () => {
+    const offers = buildPaywallOffers(prices, pricedOptions);
+    expect(
+      offers.map((offer) => [
+        offer.horizon,
+        offer.monthlyCents,
+        offer.horizonTotalCents,
+        offer.savingPercent,
+      ]),
+    ).toEqual([
+      ['PROGRAM_3M', 1000, 3000, 0],
+      ['PROGRAM_6M', 950, 5700, 5],
+      ['PROGRAM_12M', 890, 10680, 11],
+    ]);
+    const annual = offers[2].billingOptions.find(
+      (option) => option.billingCycle === 'ANNUAL',
+    );
+    expect(annual).toEqual({
+      billingCycle: 'ANNUAL',
+      billingMonths: 12,
+      amountCents: 10680,
+      monthlyEquivalentCents: 890,
+      currency: 'eur',
+    });
+    // Senza prezzo sulla combinazione resta il listino della cadenza.
+    const listed = buildPaywallOffers(prices, [
+      { horizon: 'PROGRAM_6M', billingCycle: 'SEMIANNUAL', isActive: true },
+    ]);
+    expect(listed[0].billingOptions[0].amountCents).toBe(6000);
+  });
+
+  it('totals the horizon from the real installments, not the rounded month', () => {
+    const [annual] = buildPaywallOffers(prices, [
+      {
+        horizon: 'PROGRAM_12M',
+        billingCycle: 'ANNUAL',
+        isActive: true,
+        amountCents: 10000,
+        currency: 'eur',
+      },
+    ]);
+    expect([annual.monthlyCents, annual.horizonTotalCents]).toEqual([
+      833, 10000,
+    ]);
+    const [quarterly] = buildPaywallOffers(prices, [
+      {
+        horizon: 'PROGRAM_6M',
+        billingCycle: 'QUARTERLY',
+        isActive: true,
+        amountCents: 2999,
+        currency: 'eur',
+      },
+    ]);
+    expect([quarterly.monthlyCents, quarterly.horizonTotalCents]).toEqual([
+      1000, 5998,
+    ]);
   });
 
   it('hides inactive combinations, missing prices and empty horizons', () => {

@@ -87,6 +87,7 @@ model User {
   isBetaTester     Boolean   @default(false)
   /// Codice personale da condividere per il referral (A8.19).
   referralCode     String?   @unique
+  address          UserAddress?
   attribution      UserAttribution?  @relation("UserAttribution")
   referredUsers    UserAttribution[] @relation("ReferredUsers")
   analyticsEvents  AnalyticsEvent[]
@@ -1515,6 +1516,11 @@ model ProgramBillingOption {
   horizon      ProgramHorizon
   billingCycle BillingCycle
   isActive     Boolean        @default(true)
+  /// Prezzo della singola rata per questa combinazione: sovrascrive
+  /// BillingCyclePrice e porta il vantaggio degli orizzonti piu lunghi
+  /// (A5-D01). Nullo: vale il prezzo di listino della cadenza.
+  amountCents  Int?
+  currency     String?
   updatedAt    DateTime       @updatedAt
 
   @@id([horizon, billingCycle])
@@ -1598,6 +1604,17 @@ model Partner {
   code      String   @unique
   name      String
   city      String?
+  /// Sigla della provincia, due lettere maiuscole (es. CH, AQ, PE, TE).
+  province  String?
+  address   String?
+  postalCode String?
+  /// Sito ufficiale o pagina social del circolo.
+  website   String?
+  /// Coordinate della sede, risolte dall'indirizzo: servono per dire
+  /// all'atleta quanto dista il circolo. Nulle se non risolte.
+  latitude  Float?
+  longitude Float?
+  geocodedAt DateTime?
   isActive  Boolean  @default(true)
   /// Il circolo offre la lezione gratuita di gruppo (A4.8, A7.2); spento di default.
   freeLessonsEnabled Boolean @default(false)
@@ -1612,6 +1629,25 @@ model Partner {
   attributions UserAttribution[]
   freeLessons  FreeLesson[]
   lessonSeats  FreeLessonSeat[]
+}
+
+/// Indirizzo dell'atleta: senza di esso non si puo dire quanto dista un
+/// circolo dalla lezione gratuita (A4.8). Lo scrive e lo cancella l'atleta.
+model UserAddress {
+  userId     String    @id
+  street     String
+  postalCode String
+  city       String
+  /// Sigla della provincia, due lettere maiuscole.
+  province   String
+  /// Coordinate risolte dall'indirizzo; nulle se il geocoding non ha risposto.
+  latitude   Float?
+  longitude  Float?
+  geocodedAt DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 /// Provenienza dell'atleta: prima e ultima sorgente prima della registrazione (A6 ricostruito).

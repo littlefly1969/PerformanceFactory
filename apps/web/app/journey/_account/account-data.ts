@@ -40,7 +40,18 @@ export type FreeLessonView =
         | "CLOSED";
       missing: Array<"LEVEL" | "CONFIDENCE" | "PROFILE">;
       credits: { balance: number; toUnlock: number };
-      clubs: { id: string; name: string; city: string | null }[];
+      clubs: {
+        id: string;
+        name: string;
+        city: string | null;
+        /** Distanza in linea d'aria, null se non si può calcolare. */
+        distanceKm: number | null;
+      }[];
+      /** Senza distanza il motivo: manca l'indirizzo o non è riconosciuto. */
+      distance: {
+        available: boolean;
+        reason: "NO_ADDRESS" | "ADDRESS_NOT_LOCATED" | null;
+      };
       slots: LessonSlot[];
       attributedClubId: string | null;
       seat: {

@@ -1,7 +1,12 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { BillingCycle, ProgramHorizon } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { BILLING_CYCLE_MONTHS, buildPaywallOffers } from './payment-plans';
+import {
+  BILLING_CYCLE_MONTHS,
+  buildPaywallOffers,
+  monthlyEquivalentCents,
+  resolveAmount,
+} from './payment-plans';
 
 /** Prezzi e matrice orizzonte x ciclo letti da database, gestiti da back office. */
 @Injectable()
@@ -23,7 +28,10 @@ export class BillingCatalogService {
       }),
       this.prisma.billingCyclePrice.findUnique({ where: { billingCycle } }),
     ]);
-    if (!option?.isActive || !price || price.amountCents <= 0) {
+    const amount = option?.isActive
+      ? resolveAmount(option, price ?? undefined)
+      : null;
+    if (!amount) {
       throw new BadRequestException(
         'Combinazione di orizzonte e cadenza di pagamento non disponibile',
       );
@@ -32,8 +40,12 @@ export class BillingCatalogService {
       horizon,
       billingCycle,
       billingMonths: BILLING_CYCLE_MONTHS[billingCycle],
-      amountCents: price.amountCents,
-      currency: price.currency,
+      amountCents: amount.amountCents,
+      monthlyEquivalentCents: monthlyEquivalentCents(
+        amount.amountCents,
+        billingCycle,
+      ),
+      currency: amount.currency,
     };
   }
 
@@ -69,15 +81,29 @@ export class BillingCatalogService {
     });
   }
 
+  /**
+   * Stato e prezzo della combinazione: `amountCents` a null riporta la
+   * combinazione al listino della cadenza.
+   */
   updateOption(
     horizon: ProgramHorizon,
     billingCycle: BillingCycle,
     isActive: boolean,
+    amountCents?: number | null,
+    currency?: string | null,
   ) {
+    const price =
+      amountCents === undefined
+        ? {}
+        : {
+            amountCents,
+            currency:
+              amountCents === null ? null : (currency?.toLowerCase() ?? 'eur'),
+          };
     return this.prisma.programBillingOption.upsert({
       where: { horizon_billingCycle: { horizon, billingCycle } },
-      create: { horizon, billingCycle, isActive },
-      update: { isActive },
+      create: { horizon, billingCycle, isActive, ...price },
+      update: { isActive, ...price },
     });
   }
 }

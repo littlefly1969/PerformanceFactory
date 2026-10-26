@@ -66,9 +66,14 @@ describe('Payments on PostgreSQL (stub provider)', () => {
 
   it('seeds the Blueprint A5 matrix as configurable data', async () => {
     const offers = await catalog.offers();
+    // 10,00 EUR al mese sui 3 mesi, 9,50 sui 6, 8,90 sui 12: lo sconto sta
+    // sul prezzo della combinazione, non sul listino della cadenza.
     expect(
       offers.map((offer) => [
         offer.horizon,
+        offer.monthlyCents,
+        offer.horizonTotalCents,
+        offer.savingPercent,
         offer.billingOptions.map((option) => [
           option.billingCycle,
           option.amountCents,
@@ -77,26 +82,35 @@ describe('Payments on PostgreSQL (stub provider)', () => {
     ).toEqual([
       [
         'PROGRAM_3M',
+        1000,
+        3000,
+        0,
         [
-          ['MONTHLY', 1990],
-          ['QUARTERLY', 5000],
+          ['MONTHLY', 1000],
+          ['QUARTERLY', 3000],
         ],
       ],
       [
         'PROGRAM_6M',
+        950,
+        5700,
+        5,
         [
-          ['MONTHLY', 1990],
-          ['QUARTERLY', 5000],
-          ['SEMIANNUAL', 9000],
+          ['MONTHLY', 950],
+          ['QUARTERLY', 2850],
+          ['SEMIANNUAL', 5700],
         ],
       ],
       [
         'PROGRAM_12M',
+        890,
+        10680,
+        11,
         [
-          ['MONTHLY', 1990],
-          ['QUARTERLY', 5000],
-          ['SEMIANNUAL', 9000],
-          ['ANNUAL', 15000],
+          ['MONTHLY', 890],
+          ['QUARTERLY', 2670],
+          ['SEMIANNUAL', 5340],
+          ['ANNUAL', 10680],
         ],
       ],
     ]);
@@ -133,7 +147,7 @@ describe('Payments on PostgreSQL (stub provider)', () => {
     });
     expect(pending).toMatchObject({
       status: 'CHECKOUT_PENDING',
-      amountCents: 1990,
+      amountCents: 890,
     });
     expect((await subscriptions.status(user.id)).entitled).toBe(false);
 
@@ -318,7 +332,7 @@ describe('Payments on PostgreSQL (stub provider)', () => {
             horizon: 'PROGRAM_3M',
             billingCycle: 'MONTHLY',
             provider: 'STUB',
-            amountCents: 1990,
+            amountCents: 1000,
             currency: 'eur',
           },
         }),

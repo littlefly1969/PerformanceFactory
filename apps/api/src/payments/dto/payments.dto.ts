@@ -8,6 +8,7 @@ import {
   Matches,
   Max,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 export class StartCheckoutDto {
@@ -37,4 +38,21 @@ export class UpdateBillingOptionDto {
   @ApiProperty()
   @IsBoolean()
   isActive!: boolean;
+
+  @ApiPropertyOptional({
+    description:
+      'Prezzo della rata per questa combinazione in centesimi; null riporta la combinazione al listino della cadenza',
+    nullable: true,
+  })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsInt()
+  @Min(50)
+  @Max(1_000_000)
+  amountCents?: number | null;
+
+  @ApiPropertyOptional({ example: 'eur' })
+  @IsOptional()
+  @Matches(/^[a-zA-Z]{3}$/)
+  currency?: string;
 }

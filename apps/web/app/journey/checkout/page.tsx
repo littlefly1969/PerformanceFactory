@@ -14,10 +14,18 @@ import { HORIZON_MONTHS } from "../_account/scenario-values";
 
 type Offer = {
   horizon: ProgramHorizon;
+  horizonMonths: number;
+  /** Prezzo al mese dell'orizzonte e costo di tutto il programma. */
+  monthlyCents: number;
+  horizonTotalCents: number;
+  currency: string;
+  /** Quanto si risparmia al mese rispetto al programma più breve. */
+  savingPercent: number;
   billingOptions: {
     billingCycle: string;
     billingMonths: number;
     amountCents: number;
+    monthlyEquivalentCents: number;
     currency: string;
   }[];
 };
@@ -35,6 +43,29 @@ const price = (cents: number, currency: string) =>
   );
 
 const HORIZONS: ProgramHorizon[] = ["PROGRAM_3M", "PROGRAM_6M", "PROGRAM_12M"];
+
+/**
+ * Riepilogo della cadenza scelta, o della più corta finché non si sceglie:
+ * prezzo al mese, totale come rata per numero di rate (quanto si paga
+ * davvero) e vantaggio sul prezzo al mese del programma più breve.
+ */
+function costSummary(
+  offer: Offer,
+  option: Offer["billingOptions"][number],
+  baselineCents: number,
+) {
+  const [title] = CYCLES[option.billingCycle] ?? [option.billingCycle];
+  const total =
+    option.amountCents * Math.ceil(offer.horizonMonths / option.billingMonths);
+  const saving =
+    baselineCents > option.monthlyEquivalentCents
+      ? Math.round(
+          ((baselineCents - option.monthlyEquivalentCents) / baselineCents) *
+            100,
+        )
+      : 0;
+  return `${title}: ${price(option.monthlyEquivalentCents, option.currency)} al mese, ${price(total, option.currency)} per tutti i ${offer.horizonMonths} mesi${saving > 0 ? `, ${saving}% al mese in meno del programma più breve` : ""}.`;
+}
 
 /**
  * Checkout: durata del programma e cadenza di pagamento sono due scelte
@@ -59,8 +90,8 @@ export default function CheckoutPage() {
       alive = false;
     };
   }, []);
-  const options =
-    offers?.find((o) => o.horizon === horizon)?.billingOptions ?? [];
+  const offer = offers?.find((o) => o.horizon === horizon);
+  const options = offer?.billingOptions ?? [];
   const shown = options.length > 0;
   useEffect(() => {
     if (!shown) return;
@@ -69,6 +100,12 @@ export default function CheckoutPage() {
     }).catch(() => undefined);
   }, [shown]);
   const chosen = options.some((o) => o.billingCycle === cycle) ? cycle : "";
+  const summaryOption =
+    options.find((o) => o.billingCycle === chosen) ?? options[0];
+  const baselineCents =
+    offers?.find((o) => o.horizon === "PROGRAM_3M")?.monthlyCents ??
+    offers?.[0]?.monthlyCents ??
+    0;
   const pay = async () => {
     setPaying(true);
     setMessage("");
@@ -133,6 +170,12 @@ export default function CheckoutPage() {
         )}
       </div>
 
+      {offer && summaryOption && (
+        <p className="pf-acc-muted" aria-live="polite">
+          {costSummary(offer, summaryOption, baselineCents)}
+        </p>
+      )}
+
       <span className="pf-acc-kicker">2 · Pagamento</span>
       <p>
         La durata del programma e la cadenza di pagamento sono due scelte
@@ -161,7 +204,11 @@ export default function CheckoutPage() {
             >
               <span>
                 <b>{title}</b>
-                <small>{note}</small>
+                <small>
+                  {note}
+                  {o.billingMonths > 1 &&
+                    ` · ${price(o.monthlyEquivalentCents, o.currency)} al mese`}
+                </small>
               </span>
               <span>
                 {price(o.amountCents, o.currency)} / {per}

@@ -5,6 +5,7 @@ import ProfilePage from "../profilo/page";
 import CoachPage from "../coach/page";
 import ClubPage from "../circolo/page";
 import ScenariosPage from "../scenari/page";
+import CheckoutPage from "../checkout/page";
 import {
   calibration,
   drivers,
@@ -148,6 +149,98 @@ describe("Scelta del circolo", () => {
       expect(
         calls.find((c) => c.url.endsWith("/free-lesson/request"))?.body,
       ).toEqual({ partnerId: "c1", shareWithCoach: true, lessonId: "l1" }),
+    );
+  });
+});
+
+describe("Distanza dei circoli", () => {
+  it("shows how far each club is when the address is known", async () => {
+    serve({
+      "/auth/journey": journey(),
+      "/athlete-journey/free-lesson": lesson,
+    });
+    render(<ClubPage />);
+    expect(await screen.findByText("Milano · a 3.2 km")).toBeInTheDocument();
+    expect(screen.queryByText(/Non possiamo calcolare/)).toBeNull();
+  });
+
+  it("says the distance cannot be computed without an address", async () => {
+    serve({
+      "/auth/journey": journey(),
+      "/athlete-journey/free-lesson": {
+        ...lesson,
+        clubs: lesson.clubs.map((club) => ({ ...club, distanceKm: null })),
+        distance: { available: false, reason: "NO_ADDRESS" },
+      },
+    });
+    render(<ClubPage />);
+    expect(
+      await screen.findByText(/aggiungi il tuo indirizzo nel profilo/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/km/)).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Vai al profilo" }),
+    ).toHaveAttribute("href", "/journey/profilo#indirizzo");
+  });
+});
+
+describe("Checkout", () => {
+  it("summarises the cost of the cadence the athlete picks", async () => {
+    const option = (billingCycle: string, months: number, cents: number) => ({
+      billingCycle,
+      billingMonths: months,
+      amountCents: cents,
+      monthlyEquivalentCents: Math.round(cents / months),
+      currency: "eur",
+    });
+    serve({
+      "/auth/journey": journey({
+        calibration: calibration(null, "PAYWALL_READY"),
+        scenarios: {
+          status: "READY",
+          engine: { key: "p", version: "1", provisional: true },
+          scale: { min: 0, max: 100 },
+          selectedHorizon: "PROGRAM_12M",
+          horizons: [{ horizon: "PROGRAM_12M", months: 12, drivers: [] }],
+        },
+      }),
+      "/payments/offers": [
+        {
+          horizon: "PROGRAM_3M",
+          horizonMonths: 3,
+          monthlyCents: 1000,
+          horizonTotalCents: 3000,
+          currency: "eur",
+          savingPercent: 0,
+          billingOptions: [option("MONTHLY", 1, 1000)],
+        },
+        {
+          horizon: "PROGRAM_12M",
+          horizonMonths: 12,
+          monthlyCents: 890,
+          horizonTotalCents: 10680,
+          currency: "eur",
+          savingPercent: 11,
+          billingOptions: [
+            option("MONTHLY", 1, 890),
+            option("QUARTERLY", 3, 2670),
+            option("ANNUAL", 12, 10000),
+          ],
+        },
+      ],
+    });
+    render(<CheckoutPage />);
+    expect(await screen.findByText(/^Pagamento mensile: /)).toHaveTextContent(
+      "Pagamento mensile: 8,90 € al mese, 106,80 € per tutti i 12 mesi, 11% al mese in meno del programma più breve.",
+    );
+    expect(screen.getByText(/Addebito ogni 3 mesi/)).toHaveTextContent(
+      "· 8,90 € al mese",
+    );
+    await userEvent.click(
+      screen.getByRole("radio", { name: /Pagamento annuale/ }),
+    );
+    expect(screen.getByText(/^Pagamento annuale: /)).toHaveTextContent(
+      "Pagamento annuale: 8,33 € al mese, 100,00 € per tutti i 12 mesi, 17% al mese in meno del programma più breve.",
     );
   });
 });

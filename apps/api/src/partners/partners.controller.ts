@@ -46,7 +46,9 @@ export class PartnersController {
   }
 
   @Post('admin/partners')
-  @ApiOperation({ summary: 'Crea un circolo con il suo codice per link e QR' })
+  @ApiOperation({
+    summary: 'Crea un circolo con codice per link e QR, sede e logo',
+  })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
@@ -55,7 +57,10 @@ export class PartnersController {
   }
 
   @Patch('admin/partners/:id')
-  @ApiOperation({ summary: 'Modifica nome, citta o stato di un circolo' })
+  @ApiOperation({
+    summary:
+      'Modifica dati, sede, logo, lezione gratuita o stato di un circolo',
+  })
   @ApiCookieAuth()
   @UseGuards(AuthenticatedGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
