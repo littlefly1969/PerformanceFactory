@@ -1,9 +1,11 @@
 "use client";
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { API_BASE, secureFetch } from "../lib/api";
 import { LogoutButton } from "../components/logout-button";
 import type { Journey } from "./journey-types";
+import { AccountNav } from "./_account/account-shell";
 import "../start/pf4.css";
 import "./welcome-home.css";
 
@@ -157,19 +159,25 @@ export function WelcomeHome({
           </button>
         </section>
 
-        <section className="pf-home-card pf-home-spider">
+        {/* Lo Spider porta al profilo, dove nasce con le prime risposte. */}
+        <Link
+          className="pf-home-card pf-home-spider"
+          href="/journey/profilo"
+          aria-label="Il tuo Spider: vai al profilo"
+        >
           <EmptySpider />
           <div>
             <span className="pf-home-kicker">Il tuo Spider</span>
             <strong>R —</strong>
             <p>Rispondi alle prime domande: lo Spider nasce provvisorio.</p>
           </div>
-        </section>
+        </Link>
 
         <footer className="pf-home-footer">
           <LogoutButton className="pf-home-logout" />
         </footer>
       </div>
+      <AccountNav active="home" />
     </main>
   );
 }
