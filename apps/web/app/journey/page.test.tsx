@@ -278,14 +278,37 @@ describe("PF5 assessment intro and questions", () => {
     expect(
       screen.getByRole("img", { name: "Assessment al 0%" }),
     ).toBeInTheDocument();
+    // Senza lezione disponibile nessuna promessa: card generica.
     expect(
-      screen.getByText(/0 di 12 domande · poi un posto/),
+      screen.getByText(/0 di 12 domande · da qui nasce/),
     ).toBeInTheDocument();
+    expect(screen.queryByText("Lezione gratuita")).not.toBeInTheDocument();
     expect(screen.getByText("R —")).toBeInTheDocument();
     // La foto del benvenuto, se c'è, va nell'avatar.
     await waitFor(() =>
       expect(requests).toContain("/api/athlete/profile/photo"),
     );
+  });
+
+  it("promises the lesson only when the server offers it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async (url: string) =>
+          new Response(
+            JSON.stringify(
+              url.endsWith("/free-lesson")
+                ? { enabled: true, phase: "UNAVAILABLE", clubs: [{ id: "c" }] }
+                : journey({ count: 12 }),
+            ),
+          ),
+      ),
+    );
+    render(<JourneyPage />);
+    expect(await screen.findByText("Lezione gratuita")).toBeInTheDocument();
+    expect(
+      screen.getByText(/0 di 12 domande · poi continui/),
+    ).toBeInTheDocument();
   });
 
   it("starts from the intro and shows the operational section first", async () => {
