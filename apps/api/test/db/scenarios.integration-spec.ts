@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { AnalyticsService } from '../../src/analytics/analytics.service';
 import {
   assertProgramAllowed,
+  entitledHorizon,
   loadCalibrationSettings,
 } from '../../src/discovery/calibration/calibration-config';
 import { ScenariosService } from '../../src/discovery/scenarios/scenarios.service';
@@ -12,6 +13,10 @@ import { AiProposalProviderService } from '../../src/ai-orchestrator/proposal-pr
 import { PotentialGenerationInput } from '../../src/ai-orchestrator/potential-generation';
 import { FeatureFlagsService } from '../../src/features/feature-flags.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { BillingCatalogService } from '../../src/payments/billing-catalog.service';
+import { CheckoutService } from '../../src/payments/checkout.service';
+import { PaymentProviderAdapter } from '../../src/payments/providers/payment-provider';
+import { PaymentProviderRegistry } from '../../src/payments/providers/payment-provider.registry';
 import { getRequiredTestDatabaseUrl } from '../utils/db-test-guard';
 import { ensureTestDatabaseExists } from '../utils/ensure-test-database';
 
@@ -23,6 +28,8 @@ describe('P3/P6/P12 scenarios and program horizon on PostgreSQL', () => {
     AiProposalProviderService['generatePotential']
   >;
   const inputs: PotentialGenerationInput[] = [];
+  /** Checkout chiusi presso il provider di prova. */
+  const expired: string[] = [];
   const users: string[] = [];
   const areaIds: string[] = [];
   const originalUrl = process.env.DATABASE_URL;
@@ -46,11 +53,20 @@ describe('P3/P6/P12 scenarios and program horizon on PostgreSQL', () => {
         inputs.push(input);
         return generate(input);
       });
+    const providers = new PaymentProviderRegistry();
+    providers.register({
+      kind: 'STRIPE',
+      expireCheckout: (id: string) => {
+        expired.push(id);
+        return Promise.resolve('EXPIRED');
+      },
+    } as unknown as PaymentProviderAdapter);
     service = new ScenariosService(
       prisma,
       new FeatureFlagsService(prisma),
       new AnalyticsService(prisma),
       ai,
+      new CheckoutService(prisma, new BillingCatalogService(prisma), providers),
     );
     for (const name of ['Tecnica', 'Fisico'])
       areaIds.push(
@@ -365,6 +381,51 @@ describe('P3/P6/P12 scenarios and program horizon on PostgreSQL', () => {
     await prisma.calibrationConfig.update({
       where: { id: 'default' },
       data: { programBeforePaywall: settings.programBeforePaywall },
+    });
+  });
+
+  it('closes the checkout of the previous horizon and builds the program on the paid one', async () => {
+    await setFlag(true);
+    const userId = await athlete();
+    await ready(userId);
+    await service.select(userId, 'PROGRAM_3M');
+    const checkoutId = `cs_${randomUUID()}`;
+    const pending = await prisma.subscription.create({
+      data: {
+        userId,
+        horizon: 'PROGRAM_3M',
+        billingCycle: 'MONTHLY',
+        provider: 'STRIPE',
+        amountCents: 1000,
+        currency: 'EUR',
+        providerCheckoutId: checkoutId,
+        checkoutUrl: 'https://checkout.example.test/3m',
+        checkoutExpiresAt: new Date(Date.now() + 30 * 60000),
+      },
+    });
+    // Cambio di idea con il checkout 3M ancora aperto in un'altra scheda.
+    await service.select(userId, 'PROGRAM_12M');
+    expect(expired).toContain(checkoutId);
+    expect(
+      await prisma.subscription.findUniqueOrThrow({
+        where: { id: pending.id },
+      }),
+    ).toMatchObject({ status: 'CHECKOUT_EXPIRED' });
+    // Se il vecchio checkout è stato pagato comunque, vale l'orizzonte pagato.
+    await prisma.subscription.update({
+      where: { id: pending.id },
+      data: {
+        status: 'ACTIVE',
+        entitlementEndAt: new Date(Date.now() + 30 * 86400000),
+      },
+    });
+    expect(
+      await prisma.athleteDiscovery.findUniqueOrThrow({ where: { userId } }),
+    ).toMatchObject({ programHorizon: 'PROGRAM_12M' });
+    const paid = await entitledHorizon(prisma, userId);
+    expect(paid).toBe('PROGRAM_3M');
+    expect(await service.programBaseline(userId, paid!)).toMatchObject({
+      horizon: 'PROGRAM_3M',
     });
   });
 });

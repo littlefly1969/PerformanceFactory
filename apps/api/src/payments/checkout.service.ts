@@ -184,6 +184,22 @@ export class CheckoutService {
     });
   }
 
+  /**
+   * Cambio di orizzonte dopo il reveal: chiude i checkout ancora aperti per
+   * un orizzonte diverso, così il vecchio link non si può più pagare. Se il
+   * pagamento risulta già completato il cambio è rifiutato.
+   */
+  async expireOtherHorizons(userId: string, horizon: ProgramHorizon) {
+    const stale = await this.prisma.subscription.findMany({
+      where: {
+        userId,
+        status: SubscriptionStatus.CHECKOUT_PENDING,
+        horizon: { not: horizon },
+      },
+    });
+    for (const subscription of stale) await this.invalidate(subscription);
+  }
+
   /** Chiude il checkout precedente presso il provider prima di liberare il posto. */
   private async invalidate(subscription: Subscription) {
     if (subscription.providerCheckoutId) {

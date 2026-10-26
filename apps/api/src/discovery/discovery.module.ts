@@ -1,4 +1,5 @@
 import { FeaturesModule } from '../features/features.module';
+import { PaymentsModule } from '../payments/payments.module';
 import { ScenariosService } from './scenarios/scenarios.service';
 import { OnboardingModule } from '../onboarding/onboarding.module';
 import { AthleteJourneyService } from './athlete-journey.service';
@@ -28,6 +29,7 @@ import { FitRankingService } from './fit-ranking/fit-ranking.service';
     PartnersModule,
     AnalyticsModule,
     FeaturesModule,
+    PaymentsModule,
   ],
   controllers: [
     DiscoveryController,
