@@ -40,7 +40,7 @@ const base = {
     },
   ],
   durationOptions: [
-    { weeks: 12, label: "12 settimane", description: "Un ciclo completo" },
+    { weeks: 18, label: "18 settimane", description: "Un ciclo completo" },
   ],
   programDurationWeeks: null,
   result: {
@@ -146,7 +146,7 @@ describe("PF4 authenticated journey functions", () => {
     );
     expect(
       requests.filter((r) => r.url.endsWith("/duration")).at(-1)?.body,
-    ).toEqual({ weeks: 12 });
+    ).toEqual({ weeks: 18 });
     expect(
       await screen.findByRole("link", { name: /Vai al programma/ }),
     ).toHaveAttribute("href", "/user");
@@ -282,7 +282,7 @@ describe("PF5 assessment intro and questions", () => {
       ).toBeInTheDocument();
       const later = screen.getByRole("region", { name: "Cosa si attiva dopo" });
       expect(within(later).getAllByText("Bloccato")).toHaveLength(3);
-      expect(later).toHaveTextContent("Scenari a 3, 6 e 12 mesi");
+      expect(later).toHaveTextContent("Scenari a 4, 6 e 12 mesi");
       expect(later).not.toHaveTextContent("settimane");
       expect(
         screen.getByRole("button", { name: "Scopri la tua performance" }),

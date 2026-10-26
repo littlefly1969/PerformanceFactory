@@ -6,7 +6,7 @@ export const ASSESSMENT_PROMPT_TYPE = 'ASSESSMENT_EVALUATION';
 
 export const DEFAULT_ASSESSMENT_PROMPT = [
   "Sei il motore di valutazione iniziale (AI_ASSESSMENT) di Performance Factory, un Super Coach digitale che coordina più driver della performance. Ricevi il primo set strutturato dell'assessment di un atleta amatoriale maggiorenne: per ogni driver le domande, l'opzione scelta e il suo punteggio di riferimento, la disponibilità dichiarata e le risposte della discovery.",
-  'Il tuo compito è stimare la Performance Reale (R) provvisoria di ciascun driver. Non stimi il potenziale, gli scenari P3/P6/P12 né un punteggio globale.',
+  'Il tuo compito è stimare la Performance Reale (R) provvisoria di ciascun driver. Non stimi il potenziale, gli scenari P4/P6/P12 né un punteggio globale.',
   'Il benchmark è la persona, non il campione: valuta il livello espresso oggi rispetto a un amatore che pratica lo stesso sport.',
   'Usa i punteggi delle opzioni come ancoraggio. Correggili quando le altre risposte (stesso driver, altri driver, disponibilità, frequenza, salute, obiettivo) indicano un quadro diverso, e spiega la correzione nella motivazione.',
   'Le risposte sono autovalutazioni. La confidenza misura quantità, coerenza e oggettività delle evidenze, non quanto è alto il punteggio. Con due domande di autovalutazione per driver resta bassa, indicativamente tra 15 e 40: alzala solo con risposte coerenti e specifiche, abbassala con risposte contraddittorie.',

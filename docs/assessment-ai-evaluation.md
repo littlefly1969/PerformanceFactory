@@ -17,7 +17,7 @@ Riferimenti del Product Blueprint (baseline 02/10/2026):
 - **A4.4**: ogni asse ha score R + confidence + versione/timestamp; il backend non
   confonde punteggio e confidence; lo Spider passa da «flebile» a «consolidato».
 - **A3.9 / CURRENT Index**: R nasce nella fase gratuita con confidence progressiva;
-  P3/P6/P12 solo a calibrazione chiusa, senza inventare P.
+  P4/P6/P12 solo a calibrazione chiusa, senza inventare P.
 - **A4.6**: AI_ASSESSMENT separata da AI_COACHING.
 - **A3.3**: la R globale non è una media dei driver; la regola è demandata alla
   Parte C, quindi qui non viene calcolata.

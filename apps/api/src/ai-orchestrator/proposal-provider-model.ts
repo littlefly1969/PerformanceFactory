@@ -372,7 +372,7 @@ export type ScheduleConstraints = {
   prescription: { minSessionsPerWeek: number; maxSessionsPerWeek: number };
 };
 export type TrainingConstraints = ScheduleConstraints & {
-  /** Orizzonte di 3, 6 o 12 mesi espresso in settimane. */
+  /** Orizzonte di 4, 6 o 12 mesi espresso in settimane. */
   programDurationWeeks: ProgramWeeks;
   operationalWindowDays: 14;
 };

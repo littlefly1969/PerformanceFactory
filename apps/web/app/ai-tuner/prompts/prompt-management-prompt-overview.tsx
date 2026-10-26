@@ -71,9 +71,9 @@ export function renderPromptOverview(model: PromptManagementModel) {
       <section className="pf-panel pf-prompt-current-panel">
         <div className="pf-panel-header pf-prompt-current-header">
           <div>
-            <h2>Scenari P3/P6/P12</h2>
+            <h2>Scenari P4/P6/P12</h2>
             <p className="pf-muted">
-              Prompt che a R consolidata stima il potenziale a 3, 6 e 12 mesi,
+              Prompt che a R consolidata stima il potenziale a 4, 6 e 12 mesi,
               entro i criteri versionati.
             </p>
           </div>

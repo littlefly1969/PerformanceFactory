@@ -48,7 +48,7 @@ export class PaymentsController {
 
   @Get('offers')
   @ApiOperation({
-    summary: 'Orizzonti 3/6/12 mesi con le cadenze di pagamento attive',
+    summary: 'Orizzonti 4/6/12 mesi con le cadenze di pagamento attive',
   })
   offers() {
     return this.catalog.offers();

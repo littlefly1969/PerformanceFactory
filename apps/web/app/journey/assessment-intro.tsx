@@ -4,7 +4,7 @@ import type { Journey } from "./journey-types";
 /** Tappe del Blueprint dopo l'assessment: testo statico, nessuna durata promessa. */
 const UNLOCKED_LATER = [
   "Livello stimato sui sei driver",
-  "Scenari a 3, 6 e 12 mesi",
+  "Scenari a 4, 6 e 12 mesi",
   "Programma e coaching",
 ];
 

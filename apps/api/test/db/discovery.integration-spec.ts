@@ -517,7 +517,7 @@ describe('PF4 discovery to authenticated journey', () => {
   });
 
   it('starts with availability and the FIT ranking, the driver questions come later', async () => {
-    expect((await post('duration', { weeks: 12 })).statusCode).toBe(409);
+    expect((await post('duration', { weeks: 18 })).statusCode).toBe(409);
     const intro = await state();
     expect(intro).toMatchObject({
       phase: 'ASSESSMENT_INTRO',
@@ -1683,16 +1683,16 @@ describe('PF4 discovery to authenticated journey', () => {
     );
     expect((await state()).phase).toBe('DURATION');
     expect(
-      (await post('duration', { weeks: 12 })).json<JourneyResponse>().phase,
+      (await post('duration', { weeks: 18 })).json<JourneyResponse>().phase,
     ).toBe('COMPLETE');
-    expect((await state()).programDurationWeeks).toBe(12);
+    expect((await state()).programDurationWeeks).toBe(18);
     expect(
       (
         await prisma.userOnboardingAssessment.findUniqueOrThrow({
           where: { userId },
         })
       ).profileJson,
-    ).toHaveProperty('program_duration_weeks.value', 12);
+    ).toHaveProperty('program_duration_weeks.value', 18);
   });
 
   it('lets the athlete correct the FIT ranking at any time and recalculates R', async () => {

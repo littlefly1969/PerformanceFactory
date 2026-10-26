@@ -35,8 +35,8 @@ export type Evaluation = {
     commitment?: string | null;
   }[];
 };
-export type ProgramHorizon = "PROGRAM_3M" | "PROGRAM_6M" | "PROGRAM_12M";
-/** Scenari P3/P6/P12 a calibrazione chiusa, dal motore di P (provvisorio finché manca la Parte C). */
+export type ProgramHorizon = "PROGRAM_4M" | "PROGRAM_6M" | "PROGRAM_12M";
+/** Scenari P4/P6/P12 a calibrazione chiusa, dal motore di P (provvisorio finché manca la Parte C). */
 /** Gap tra R consolidata e P, nella scala della valutazione. */
 export type Gap = { current: number; potential: number; gap: number };
 /** Scenari scritti e validati, pronti per il reveal. */

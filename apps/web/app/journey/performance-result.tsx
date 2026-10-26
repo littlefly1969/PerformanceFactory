@@ -40,7 +40,7 @@ function Radar({ drivers }: { drivers: Driver[] }) {
 }
 /**
  * Solo la performance attuale: la P a passo fisso resta nel database ma non si
- * mostra all'atleta finché non arrivano gli scenari P3/P6/P12 (Blueprint A3).
+ * mostra all'atleta finché non arrivano gli scenari P4/P6/P12 (Blueprint A3).
  */
 export function PerformanceVisual({
   performance: r,

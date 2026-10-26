@@ -204,7 +204,7 @@ export async function testMicroTestPrompt(
   };
 }
 
-/** Prova gli scenari P3/P6/P12 sul caso sintetico, con una R consolidata fittizia. */
+/** Prova gli scenari P4/P6/P12 sul caso sintetico, con una R consolidata fittizia. */
 export async function testPotentialPrompt(
   ai: AiProposalProviderService,
   basePrompt: string,

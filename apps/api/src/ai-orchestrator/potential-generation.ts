@@ -5,12 +5,12 @@ import { requestStructuredProposal } from './proposal-structured-transport';
 import { resolveModel, resolveProvider } from './provider-config';
 import { FIT_RANKING_RULE, FitRankingContext } from './fit-ranking-context';
 
-/** Tipo di prompt in AiPromptVersion per gli scenari P3/P6/P12. */
+/** Tipo di prompt in AiPromptVersion per gli scenari P4/P6/P12. */
 export const POTENTIAL_PROMPT_TYPE = 'POTENTIAL';
 
 export const DEFAULT_POTENTIAL_PROMPT = [
   'Sei il Performance Engine di Performance Factory. Ricevi la R consolidata di un atleta amatoriale maggiorenne, driver per driver, con confidenza, commitment, motivazione della valutazione e lacune residue, più livello e giorni a settimana dichiarati.',
-  'Scopo: stimare dove può arrivare ogni driver in 3, 6 e 12 mesi di percorso guidato (P3, P6, P12), in modo onesto e motivato. Il potenziale cresce più in fretta all’inizio e poi rallenta: non proiettare una crescita lineare.',
+  'Scopo: stimare dove può arrivare ogni driver in 4, 6 e 12 mesi di percorso guidato (P4, P6, P12), in modo onesto e motivato. Il potenziale cresce più in fretta all’inizio e poi rallenta: non proiettare una crescita lineare.',
   'La classifica FIT dichiarata (padel e tennis, attuale e migliore di sempre) pesa: chi ha avuto una classifica migliore di quella attuale ha margine di ritorno, chi non è mai stato classificato parte da più lontano.',
   'Usa ciò che sai: un commitment alto e più giorni disponibili giustificano progressi maggiori; un driver già vicino al tetto del livello cresce poco o resta dov’è; lacune di evidenza ampie riducono la confidenza, non il potenziale.',
   'Ogni driver ha limiti per orizzonte (valore massimo e confidenza massima) calcolati da criteri versionati: restaci dentro. Se non c’è margine, P resta uguale a R.',
@@ -33,15 +33,16 @@ const LEVEL_CEILING: Record<string, number> = {
  */
 export const POTENTIAL_CRITERIA = {
   key: 'potential-criteria',
-  version: '1',
+  // v2: l'orizzonte di ingresso e 4 mesi, non 3; le quote restano quelle di v1.
+  version: '2',
   approved: false,
   /** Tetto per livello, in quota della scala: P non lo supera. */
   levelCeiling: LEVEL_CEILING,
   defaultCeiling: 0.8,
   /** Quota massima del margine R→tetto colmabile in ciascun orizzonte. */
-  maxMarginShare: { PROGRAM_3M: 0.5, PROGRAM_6M: 0.75, PROGRAM_12M: 0.95 },
+  maxMarginShare: { PROGRAM_4M: 0.5, PROGRAM_6M: 0.75, PROGRAM_12M: 0.95 },
   /** Confidenza massima rispetto a quella del driver: più lontano, meno certo. */
-  maxConfidenceShare: { PROGRAM_3M: 0.9, PROGRAM_6M: 0.75, PROGRAM_12M: 0.6 },
+  maxConfidenceShare: { PROGRAM_4M: 0.9, PROGRAM_6M: 0.75, PROGRAM_12M: 0.6 },
   rationaleMax: 300,
 } as const satisfies {
   key: string;
@@ -55,7 +56,7 @@ export const POTENTIAL_CRITERIA = {
 };
 
 export const POTENTIAL_HORIZONS: ProgramHorizon[] = [
-  'PROGRAM_3M',
+  'PROGRAM_4M',
   'PROGRAM_6M',
   'PROGRAM_12M',
 ];
@@ -142,8 +143,8 @@ function formatRules(input: PotentialGenerationInput) {
   return [
     'FORMATO DI RISPOSTA (fisso): rispondi solo con JSON conforme allo schema.',
     `- scenarios: esattamente uno per ogni driver ricevuto e per ciascun orizzonte (${POTENTIAL_HORIZONS.join(', ')}), ${input.drivers.length * 3} in tutto, con lo stesso areaId.`,
-    '- value: tra la R del driver e il maxValue del suo orizzonte, mai in calo da P3 a P6 a P12.',
-    '- confidence: intero da 0 al maxConfidence dell’orizzonte, mai in crescita da P3 a P6 a P12.',
+    '- value: tra la R del driver e il maxValue del suo orizzonte, mai in calo da P4 a P6 a P12.',
+    '- confidence: intero da 0 al maxConfidence dell’orizzonte, mai in crescita da P4 a P6 a P12.',
     `- rationale: massimo ${POTENTIAL_CRITERIA.rationaleMax} caratteri.`,
     FIT_RANKING_RULE,
     'Questi limiti prevalgono sulle istruzioni sopra.',
@@ -177,7 +178,7 @@ export function buildPotentialPrompt(input: PotentialGenerationInput) {
   return {
     system: `${input.basePrompt.trim()}\n\n${formatRules(input)}`,
     user: {
-      task: 'P3, P6 e P12 per ogni driver, entro i limiti indicati.',
+      task: 'P4, P6 e P12 per ogni driver, entro i limiti indicati.',
       criteria: `${POTENTIAL_CRITERIA.key}@${POTENTIAL_CRITERIA.version}`,
       scale: input.scale,
       level: input.level,

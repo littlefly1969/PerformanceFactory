@@ -1296,7 +1296,7 @@ model AthleteDiscovery {
   baselineId String?
   programDurationWeeks Int?
   durationSelectedAt DateTime?
-  /// Orizzonte scelto dopo il reveal di P3/P6/P12 (Blueprint A5): 3, 6 o 12 mesi.
+  /// Orizzonte scelto dopo il reveal di P4/P6/P12 (Blueprint A5): 4, 6 o 12 mesi.
   programHorizon ProgramHorizon?
   horizonSelectedAt DateTime?
   /// ACTIVATED (A10, PF-FS-PREPAYWALL §7.3): R consolidata, P e gap mostrati.
@@ -1462,7 +1462,7 @@ model AssessmentEvaluationArea {
 
 // Pagamenti (Blueprint A4/A5): PROGRAM_HORIZON e BILLING_CYCLE sono proprieta distinte.
 enum ProgramHorizon {
-  PROGRAM_3M
+  PROGRAM_4M
   PROGRAM_6M
   PROGRAM_12M
 }
@@ -1509,6 +1509,11 @@ model ProgramBillingOption {
   horizon      ProgramHorizon
   billingCycle BillingCycle
   isActive     Boolean        @default(true)
+  /// Prezzo della singola rata per questa combinazione: sovrascrive
+  /// BillingCyclePrice e porta il vantaggio degli orizzonti piu lunghi
+  /// (A5-D01). Nullo: vale il prezzo di listino della cadenza.
+  amountCents  Int?
+  currency     String?
   updatedAt    DateTime       @updatedAt
 
   @@id([horizon, billingCycle])
@@ -1592,6 +1597,14 @@ model Partner {
   code      String   @unique
   name      String
   city      String?
+  /// Sigla della provincia, due lettere maiuscole (es. CH, AQ, PE, TE).
+  province  String?
+  address   String?
+  postalCode String?
+  /// Sito ufficiale o pagina social del circolo.
+  website   String?
+  /// URL pubblico del logo mostrato all'atleta; nullo se non disponibile.
+  logoUrl   String?
   isActive  Boolean  @default(true)
   /// Il circolo offre la lezione gratuita di gruppo (A4.8, A7.2); spento di default.
   freeLessonsEnabled Boolean @default(false)

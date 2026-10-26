@@ -6,10 +6,18 @@ import { confidenceLabel } from "./provisional-evaluation";
 
 type Offer = {
   horizon: ProgramHorizon;
+  horizonMonths: number;
+  /** Prezzo al mese dell'orizzonte e costo di tutto il percorso. */
+  monthlyCents: number;
+  horizonTotalCents: number;
+  currency: string;
+  /** Quanto si risparmia al mese rispetto al percorso piu breve. */
+  savingPercent: number;
   billingOptions: {
     billingCycle: string;
     billingMonths: number;
     amountCents: number;
+    monthlyEquivalentCents: number;
     currency: string;
   }[];
 };
@@ -115,11 +123,25 @@ function HorizonOffer({ horizon }: { horizon: ProgramHorizon }) {
     return <p>Le offerte per questo percorso non sono ancora disponibili.</p>;
   return (
     <>
+      <p className="pf-muted">
+        {price(offer.monthlyCents, offer.currency)} al mese,{" "}
+        {price(offer.horizonTotalCents, offer.currency)} per tutti i{" "}
+        {offer.horizonMonths} mesi
+        {offer.savingPercent > 0
+          ? `: ${offer.savingPercent}% al mese in meno del percorso piu breve`
+          : ""}
+        .
+      </p>
       <ul className="pf4-offer" aria-label="Come pagare il percorso">
         {offer.billingOptions.map((o) => (
           <li key={o.billingCycle}>
             <strong>{price(o.amountCents, o.currency)}</strong>{" "}
             {CYCLES[o.billingCycle] ?? o.billingCycle}{" "}
+            {o.billingMonths > 1 && (
+              <span className="pf-muted">
+                ({price(o.monthlyEquivalentCents, o.currency)} al mese){" "}
+              </span>
+            )}
             <button
               className="pf4-cta"
               disabled={paying !== null}
@@ -138,7 +160,7 @@ function HorizonOffer({ horizon }: { horizon: ProgramHorizon }) {
 }
 
 /**
- * Reveal a calibrazione chiusa: tre Spider R+P3, R+P6, R+P12 e la scelta del
+ * Reveal a calibrazione chiusa: tre Spider R+P4, R+P6, R+P12 e la scelta del
  * percorso. La scelta porta all'offerta; il pagamento è il passo successivo.
  */
 export function ScenariosReveal({
@@ -157,7 +179,7 @@ export function ScenariosReveal({
       aria-labelledby="pf4-scenarios-title"
     >
       <span className="pf4-kicker">I tuoi scenari</span>
-      <h2 id="pf4-scenarios-title">Dove puoi arrivare in 3, 6 e 12 mesi.</h2>
+      <h2 id="pf4-scenarios-title">Dove puoi arrivare in 4, 6 e 12 mesi.</h2>
       <p>
         Partiamo dalla tua R consolidata. Il potenziale cresce più in fretta
         all&apos;inizio e poi rallenta: dipende dal tuo livello, dal tuo impegno

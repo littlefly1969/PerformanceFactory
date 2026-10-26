@@ -24,9 +24,18 @@ const partnerSelect = {
   code: true,
   name: true,
   city: true,
+  province: true,
+  address: true,
+  postalCode: true,
+  website: true,
+  logoUrl: true,
   isActive: true,
+  freeLessonsEnabled: true,
   createdAt: true,
 } as const;
+
+/** Campo di testo opzionale: senza contenuto resta null invece di stringa vuota. */
+const text = (value: string | undefined) => value?.trim() || null;
 
 @Injectable()
 export class PartnersService {
@@ -59,7 +68,15 @@ export class PartnersService {
         data: {
           code: input.code,
           name: input.name.trim(),
-          city: input.city?.trim() || null,
+          city: text(input.city),
+          province: text(input.province)?.toUpperCase() ?? null,
+          address: text(input.address),
+          postalCode: text(input.postalCode),
+          website: text(input.website),
+          logoUrl: text(input.logoUrl),
+          ...(input.freeLessonsEnabled !== undefined && {
+            freeLessonsEnabled: input.freeLessonsEnabled,
+          }),
         },
         select: partnerSelect,
       });
@@ -83,7 +100,19 @@ export class PartnersService {
       where: { id },
       data: {
         ...(input.name !== undefined && { name: input.name.trim() }),
-        ...(input.city !== undefined && { city: input.city.trim() || null }),
+        ...(input.city !== undefined && { city: text(input.city) }),
+        ...(input.province !== undefined && {
+          province: text(input.province)?.toUpperCase() ?? null,
+        }),
+        ...(input.address !== undefined && { address: text(input.address) }),
+        ...(input.postalCode !== undefined && {
+          postalCode: text(input.postalCode),
+        }),
+        ...(input.website !== undefined && { website: text(input.website) }),
+        ...(input.logoUrl !== undefined && { logoUrl: text(input.logoUrl) }),
+        ...(input.freeLessonsEnabled !== undefined && {
+          freeLessonsEnabled: input.freeLessonsEnabled,
+        }),
         ...(input.isActive !== undefined && { isActive: input.isActive }),
       },
       select: partnerSelect,

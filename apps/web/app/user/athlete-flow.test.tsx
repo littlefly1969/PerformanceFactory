@@ -279,7 +279,7 @@ describe("PF4 athlete experience", () => {
           currentFrequency: "2_3",
           daysPerWeek: null,
           sessionDurationMinutes: null,
-          programDurationWeeks: 12,
+          programDurationWeeks: 18,
           preferredDays: [],
         });
       }),
@@ -290,7 +290,7 @@ describe("PF4 athlete experience", () => {
       "4",
     );
     await userEvent.selectOptions(screen.getByLabelText(/Quanto tempo/), "60");
-    expect(screen.getByLabelText("Durata del programma")).toHaveValue("12");
+    expect(screen.getByLabelText("Durata del programma")).toHaveValue("18");
     await userEvent.click(
       screen.getByRole("button", { name: /Salva disponibilità/ }),
     );
@@ -303,7 +303,7 @@ describe("PF4 athlete experience", () => {
         currentFrequency: "2_3",
         daysPerWeek: 4,
         sessionDurationMinutes: 60,
-        programDurationWeeks: 12,
+        programDurationWeeks: 18,
         preferredDays: [],
       },
     });

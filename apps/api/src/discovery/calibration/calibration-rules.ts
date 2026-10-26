@@ -11,7 +11,7 @@ export type CalibrationStatus =
   /** Posto assegnato alla lezione gratuita: solo informativo, non blocca il consolidamento. */
   | 'FREE_LESSON_VALIDATION'
   | 'CALIBRATION_COMPLETED'
-  /** Orizzonte scelto dopo il reveal di P3/P6/P12: pronto per l'offerta. */
+  /** Orizzonte scelto dopo il reveal di P4/P6/P12: pronto per l'offerta. */
   | 'PAYWALL_READY';
 
 /** Stati in cui la calibrazione è chiusa: niente più round né rivalutazioni. */

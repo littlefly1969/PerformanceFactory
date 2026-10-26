@@ -59,7 +59,7 @@ const find = (s: Scenario[], areaId: string, horizon: string) =>
 describe('potential generation criteria', () => {
   it('bounds P by the level ceiling and confidence by the horizon', () => {
     expect(potentialBounds(input, input.drivers[0])).toEqual({
-      PROGRAM_3M: { maxValue: 60, maxConfidence: 63 },
+      PROGRAM_4M: { maxValue: 60, maxConfidence: 63 },
       PROGRAM_6M: { maxValue: 70, maxConfidence: 52 },
       PROGRAM_12M: { maxValue: 78, maxConfidence: 42 },
     });
@@ -77,13 +77,13 @@ describe('potential generation criteria', () => {
   it.each([
     [
       'above the criteria',
-      (s: Scenario[]) => (find(s, 'a', 'PROGRAM_3M').value = 61),
-      'valore fuori criteri: a:PROGRAM_3M',
+      (s: Scenario[]) => (find(s, 'a', 'PROGRAM_4M').value = 61),
+      'valore fuori criteri: a:PROGRAM_4M',
     ],
     [
       'below the current R',
-      (s: Scenario[]) => (find(s, 'b', 'PROGRAM_3M').value = 84),
-      'valore fuori criteri: b:PROGRAM_3M',
+      (s: Scenario[]) => (find(s, 'b', 'PROGRAM_4M').value = 84),
+      'valore fuori criteri: b:PROGRAM_4M',
     ],
     [
       'declining with the horizon',
@@ -93,14 +93,14 @@ describe('potential generation criteria', () => {
     [
       'more confident further away',
       (s: Scenario[]) => {
-        find(s, 'a', 'PROGRAM_3M').confidence = 10;
+        find(s, 'a', 'PROGRAM_4M').confidence = 10;
       },
       'confidenza in crescita: a:PROGRAM_6M',
     ],
     [
       'over the confidence limit',
-      (s: Scenario[]) => (find(s, 'a', 'PROGRAM_3M').confidence = 64),
-      'confidenza fuori criteri: a:PROGRAM_3M',
+      (s: Scenario[]) => (find(s, 'a', 'PROGRAM_4M').confidence = 64),
+      'confidenza fuori criteri: a:PROGRAM_4M',
     ],
     [
       'missing a horizon',
@@ -110,12 +110,12 @@ describe('potential generation criteria', () => {
     [
       'for an unknown driver',
       (s: Scenario[]) => s.push({ ...s[0], areaId: 'x' }),
-      'scenario inatteso o ripetuto: x:PROGRAM_3M',
+      'scenario inatteso o ripetuto: x:PROGRAM_4M',
     ],
     [
       'without a rationale',
       (s: Scenario[]) => (s[0].rationale = ' '),
-      'motivazione non valida: a:PROGRAM_3M',
+      'motivazione non valida: a:PROGRAM_4M',
     ],
   ])('rejects a proposal %s', (_, change, problem) => {
     const { result, problems } = tweak(change);
@@ -125,7 +125,7 @@ describe('potential generation criteria', () => {
 
   it('sends the bounds and the criteria version to the AI', () => {
     const prompt = buildPotentialPrompt(input);
-    expect(prompt.user.criteria).toBe('potential-criteria@1');
+    expect(prompt.user.criteria).toBe('potential-criteria@2');
     expect(prompt.user.drivers[0].bounds.PROGRAM_6M.maxValue).toBe(70);
     expect(prompt.system).toContain('mai in calo');
   });

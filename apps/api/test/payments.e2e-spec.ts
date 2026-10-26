@@ -54,7 +54,7 @@ const prismaFake = {
   },
   programBillingOption: {
     findMany: jest.fn().mockResolvedValue([
-      { horizon: 'PROGRAM_3M', billingCycle: 'MONTHLY', isActive: true },
+      { horizon: 'PROGRAM_4M', billingCycle: 'MONTHLY', isActive: true },
       { horizon: 'PROGRAM_12M', billingCycle: 'ANNUAL', isActive: true },
       { horizon: 'PROGRAM_12M', billingCycle: 'MONTHLY', isActive: false },
     ]),
@@ -108,8 +108,8 @@ describe('Payments (e2e)', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual([
       expect.objectContaining({
-        horizon: 'PROGRAM_3M',
-        potential: 'P3',
+        horizon: 'PROGRAM_4M',
+        potential: 'P4',
         billingOptions: [
           expect.objectContaining({
             billingCycle: 'MONTHLY',

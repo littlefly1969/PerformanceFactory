@@ -66,37 +66,42 @@ describe('Payments on PostgreSQL (stub provider)', () => {
 
   it('seeds the Blueprint A5 matrix as configurable data', async () => {
     const offers = await catalog.offers();
+    // 10,00 EUR al mese sui 4 mesi, 9,50 sui 6, 8,90 sui 12: lo sconto sta
+    // sul prezzo della combinazione, non sul listino della cadenza.
     expect(
       offers.map((offer) => [
         offer.horizon,
+        offer.monthlyCents,
+        offer.horizonTotalCents,
+        offer.savingPercent,
         offer.billingOptions.map((option) => [
           option.billingCycle,
           option.amountCents,
         ]),
       ]),
     ).toEqual([
-      [
-        'PROGRAM_3M',
-        [
-          ['MONTHLY', 1990],
-          ['QUARTERLY', 5000],
-        ],
-      ],
+      ['PROGRAM_4M', 1000, 4000, 0, [['MONTHLY', 1000]]],
       [
         'PROGRAM_6M',
+        950,
+        5700,
+        5,
         [
-          ['MONTHLY', 1990],
-          ['QUARTERLY', 5000],
-          ['SEMIANNUAL', 9000],
+          ['MONTHLY', 950],
+          ['QUARTERLY', 2850],
+          ['SEMIANNUAL', 5700],
         ],
       ],
       [
         'PROGRAM_12M',
+        890,
+        10680,
+        11,
         [
-          ['MONTHLY', 1990],
-          ['QUARTERLY', 5000],
-          ['SEMIANNUAL', 9000],
-          ['ANNUAL', 15000],
+          ['MONTHLY', 890],
+          ['QUARTERLY', 2670],
+          ['SEMIANNUAL', 5340],
+          ['ANNUAL', 10680],
         ],
       ],
     ]);
@@ -111,7 +116,7 @@ describe('Payments on PostgreSQL (stub provider)', () => {
       },
     });
 
-    await expect(checkouts.start(user, 'PROGRAM_3M', 'ANNUAL')).rejects.toThrow(
+    await expect(checkouts.start(user, 'PROGRAM_4M', 'ANNUAL')).rejects.toThrow(
       'non disponibile',
     );
     // Il paywall segue il reveal: niente checkout prima, niente altro orizzonte (#14).
@@ -120,7 +125,7 @@ describe('Payments on PostgreSQL (stub provider)', () => {
     ).rejects.toThrow('dopo aver visto i tuoi scenari');
     await paywallReady(prisma, user.id, 'PROGRAM_12M');
     await expect(
-      checkouts.start(user, 'PROGRAM_3M', 'MONTHLY'),
+      checkouts.start(user, 'PROGRAM_4M', 'MONTHLY'),
     ).rejects.toThrow('non corrisponde al percorso');
     expect(
       await prisma.subscription.count({ where: { userId: user.id } }),
@@ -133,7 +138,7 @@ describe('Payments on PostgreSQL (stub provider)', () => {
     });
     expect(pending).toMatchObject({
       status: 'CHECKOUT_PENDING',
-      amountCents: 1990,
+      amountCents: 890,
     });
     expect((await subscriptions.status(user.id)).entitled).toBe(false);
 
@@ -164,7 +169,7 @@ describe('Payments on PostgreSQL (stub provider)', () => {
       cancelAtPeriodEnd: false,
     });
     await expect(
-      checkouts.start(user, 'PROGRAM_3M', 'MONTHLY'),
+      checkouts.start(user, 'PROGRAM_4M', 'MONTHLY'),
     ).rejects.toThrow('gia un abbonamento attivo');
     expect(
       await prisma.paymentCustomer.findUnique({
@@ -269,8 +274,8 @@ describe('Payments on PostgreSQL (stub provider)', () => {
     });
 
     it('invalidates a pending checkout when the athlete changes horizon or cycle', async () => {
-      const user = await newUser('PROGRAM_3M');
-      const first = await checkouts.start(user, 'PROGRAM_3M', 'MONTHLY');
+      const user = await newUser('PROGRAM_4M');
+      const first = await checkouts.start(user, 'PROGRAM_4M', 'MONTHLY');
       await paywallReady(prisma, user.id, 'PROGRAM_12M');
       const second = await checkouts.start(user, 'PROGRAM_12M', 'ANNUAL');
       expect(second.subscriptionId).not.toBe(first.subscriptionId);
@@ -280,7 +285,7 @@ describe('Payments on PostgreSQL (stub provider)', () => {
         select: { status: true, horizon: true },
       });
       expect(rows).toEqual([
-        { status: 'CHECKOUT_EXPIRED', horizon: 'PROGRAM_3M' },
+        { status: 'CHECKOUT_EXPIRED', horizon: 'PROGRAM_4M' },
         { status: 'CHECKOUT_PENDING', horizon: 'PROGRAM_12M' },
       ]);
     });
@@ -315,16 +320,16 @@ describe('Payments on PostgreSQL (stub provider)', () => {
         prisma.subscription.create({
           data: {
             userId: user.id,
-            horizon: 'PROGRAM_3M',
+            horizon: 'PROGRAM_4M',
             billingCycle: 'MONTHLY',
             provider: 'STUB',
-            amountCents: 1990,
+            amountCents: 1000,
             currency: 'eur',
           },
         }),
       ).rejects.toMatchObject({ code: 'P2002' });
       await expect(
-        checkouts.start(user, 'PROGRAM_3M', 'MONTHLY'),
+        checkouts.start(user, 'PROGRAM_4M', 'MONTHLY'),
       ).rejects.toThrow('gia un abbonamento attivo');
     });
 

@@ -54,7 +54,7 @@ export type PotentialTestOutput = {
     areaId: string;
     name?: string;
     current?: number;
-    horizon: "PROGRAM_3M" | "PROGRAM_6M" | "PROGRAM_12M";
+    horizon: "PROGRAM_4M" | "PROGRAM_6M" | "PROGRAM_12M";
     value: number;
     confidence: number;
     rationale: string;

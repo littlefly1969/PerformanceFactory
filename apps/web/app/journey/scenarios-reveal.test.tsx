@@ -26,7 +26,7 @@ const scenarios = (selectedHorizon: Scenarios["selectedHorizon"] = null) =>
     scale: { min: 0, max: 100 },
     selectedHorizon,
     horizons: [
-      { horizon: "PROGRAM_3M", months: 3, drivers: drivers(52), gap: gap(52) },
+      { horizon: "PROGRAM_4M", months: 4, drivers: drivers(52), gap: gap(52) },
       { horizon: "PROGRAM_6M", months: 6, drivers: drivers(61), gap: gap(61) },
       {
         horizon: "PROGRAM_12M",
@@ -42,7 +42,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("P3/P6/P12 reveal", () => {
+describe("P4/P6/P12 reveal", () => {
   it("shows three scenarios marked as provisional and sends the chosen horizon", async () => {
     const onSelect = vi.fn();
     render(
@@ -89,29 +89,42 @@ describe("P3/P6/P12 reveal", () => {
           new Response(
             JSON.stringify([
               {
-                horizon: "PROGRAM_3M",
+                horizon: "PROGRAM_4M",
+                horizonMonths: 4,
+                monthlyCents: 3900,
+                horizonTotalCents: 15600,
+                currency: "EUR",
+                savingPercent: 0,
                 billingOptions: [
                   {
                     billingCycle: "MONTHLY",
                     billingMonths: 1,
                     amountCents: 3900,
+                    monthlyEquivalentCents: 3900,
                     currency: "EUR",
                   },
                 ],
               },
               {
                 horizon: "PROGRAM_12M",
+                horizonMonths: 12,
+                monthlyCents: 2900,
+                horizonTotalCents: 34800,
+                currency: "EUR",
+                savingPercent: 26,
                 billingOptions: [
                   {
                     billingCycle: "MONTHLY",
                     billingMonths: 1,
                     amountCents: 2900,
+                    monthlyEquivalentCents: 2900,
                     currency: "EUR",
                   },
                   {
                     billingCycle: "ANNUAL",
                     billingMonths: 12,
                     amountCents: 29000,
+                    monthlyEquivalentCents: 2417,
                     currency: "EUR",
                   },
                 ],
@@ -151,11 +164,17 @@ describe("P3/P6/P12 reveal", () => {
             JSON.stringify([
               {
                 horizon: "PROGRAM_6M",
+                horizonMonths: 6,
+                monthlyCents: 3900,
+                horizonTotalCents: 23400,
+                currency: "EUR",
+                savingPercent: 0,
                 billingOptions: [
                   {
                     billingCycle: "MONTHLY",
                     billingMonths: 1,
                     amountCents: 3900,
+                    monthlyEquivalentCents: 3900,
                     currency: "EUR",
                   },
                 ],

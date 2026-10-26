@@ -44,7 +44,7 @@ separa due contenuti.
   dove puoi arrivare.», «Nessuna carta», «Nessun impegno». Il testo è statico e
   non usa le risposte della discovery. Non promette una prova a giorni né un
   programma: nel Blueprint la fase gratuita è la calibrazione e il programma si
-  sceglie dopo gli scenari P3/P6/P12 (vedi [Ingresso](ingresso-attribuzione-flag.md)).
+  sceglie dopo gli scenari P4/P6/P12 (vedi [Ingresso](ingresso-attribuzione-flag.md)).
 - **Sotto: i vincoli dell'atleta.** «Questi sono i tuoi vincoli.» e le misure
   dichiarate.
   - Il BMI si calcola dalle risposte con `contextKey` `general_height_cm` e

@@ -123,7 +123,7 @@ generato al primo uso).
   delle API: percorso, home, progressi, profilo performance e submit
   dell'onboarding la omettono per il ruolo `USER`, e la priorità del risultato
   è il driver con la R più bassa. Resta nel database e nelle viste dei
-  professionisti finché non arrivano gli scenari P3/P6/P12.
+  professionisti finché non arrivano gli scenari P4/P6/P12.
 
 ## Aperti
 

@@ -48,6 +48,148 @@ const defaultGoalPrompt = [
   'Se status e OK, compila tutti i prompt delle aree richieste nel contesto. Ogni prompt area deve contenere role, objective, required_inputs, initial_questionnaire, exercise_generation_rules, feedback_questions, progression_rules, measurement_indicators, safety_limits, output_format.',
 ].join('\n');
 
+
+/**
+ * Circoli di padel reali in Abruzzo, per il primo lancio territoriale: nome,
+ * sede e provincia da fonti pubbliche (elenchi FITP Abruzzo dei campionati a
+ * squadre di padel e directory di settore). Il logo resta nullo finche non c'e
+ * un URL pubblico stabile: nessun dato inventato. Tutti partono con la lezione
+ * gratuita accesa e qualche lezione in calendario.
+ */
+const abruzzoClubs: Array<{
+  code: string;
+  name: string;
+  city: string;
+  province: string;
+  address: string;
+  postalCode: string;
+  website: string | null;
+  /** Livelli dei gruppi della lezione gratuita, uno per lezione in calendario. */
+  lessonLevels: string[];
+}> = [
+  {
+    code: 'palapadel-montesilvano',
+    name: 'PalaPadel Montesilvano',
+    city: 'Montesilvano',
+    province: 'PE',
+    address: 'Via Inn 5',
+    postalCode: '65015',
+    website: null,
+    lessonLevels: ['Principianti', 'Intermedi'],
+  },
+  {
+    code: 'punto-de-oro-montesilvano',
+    name: 'Punto de Oro Padel Club',
+    city: 'Montesilvano',
+    province: 'PE',
+    address: 'Via Alcide De Gasperi 38',
+    postalCode: '65015',
+    website: null,
+    lessonLevels: ['Principianti'],
+  },
+  {
+    code: 'prati37-pescara',
+    name: 'Prati37',
+    city: 'Pescara',
+    province: 'PE',
+    address: 'Strada Prati 37',
+    postalCode: '65124',
+    website: 'https://www.facebook.com/p/Prati37-100084303083663/',
+    lessonLevels: ['Principianti', 'Intermedi'],
+  },
+  {
+    code: 'rozu-lanciano',
+    name: 'Rozu Lanciano Padel',
+    city: 'Lanciano',
+    province: 'CH',
+    address: 'Via Rocco Carabba 43',
+    postalCode: '66034',
+    website: null,
+    lessonLevels: ['Principianti'],
+  },
+  {
+    code: 'tiki-padel-francavilla',
+    name: 'Tiki Padel',
+    city: 'Francavilla al Mare',
+    province: 'CH',
+    address: 'Contrada Valle Anzuca',
+    postalCode: '66023',
+    website: null,
+    lessonLevels: ['Intermedi'],
+  },
+  {
+    code: 'rocca-padel-trabocchi',
+    name: 'Rocca Padel - Costa dei Trabocchi Sporting Club',
+    city: 'Rocca San Giovanni',
+    province: 'CH',
+    address: 'Contrada Perazza, localita Piana della Rocca',
+    postalCode: '66020',
+    website: null,
+    lessonLevels: ['Principianti'],
+  },
+  {
+    code: 'ancaria-padel',
+    name: 'Ancaria Padel',
+    city: 'Ancarano',
+    province: 'TE',
+    address: 'Via Bonifica del Tronto',
+    postalCode: '64010',
+    website: null,
+    lessonLevels: ['Principianti'],
+  },
+  {
+    code: 'martin-padel-martinsicuro',
+    name: 'Martin Padel',
+    city: 'Martinsicuro',
+    province: 'TE',
+    address: 'Via del Lavoro 14',
+    postalCode: '64014',
+    website: 'https://www.facebook.com/martinpadelasd/',
+    lessonLevels: ['Principianti', 'Intermedi'],
+  },
+  {
+    code: 'sporting-cat-avezzano',
+    name: 'Sporting Cat',
+    city: 'Avezzano',
+    province: 'AQ',
+    address: "Via Sant'Andrea 97",
+    postalCode: '67051',
+    website: null,
+    lessonLevels: ['Principianti', 'Intermedi'],
+  },
+  {
+    code: 'non-solo-padel-aq',
+    name: 'Non Solo Padel AQ',
+    city: "L'Aquila",
+    province: 'AQ',
+    address: 'Via Edoardo Scarfoglio 11/A',
+    postalCode: '67100',
+    website: null,
+    lessonLevels: ['Principianti'],
+  },
+];
+
+/**
+ * Prossima occorrenza del giorno della settimana indicato, all'ora indicata
+ * (UTC): il calendario della lezione gratuita resta nel futuro a ogni seed.
+ */
+function nextWeekdayAt(from: Date, weekday: number, hour: number, weeksAhead = 0) {
+  const result = new Date(
+    Date.UTC(
+      from.getUTCFullYear(),
+      from.getUTCMonth(),
+      from.getUTCDate(),
+      hour,
+      0,
+      0,
+      0,
+    ),
+  );
+  const delta = (weekday - result.getUTCDay() + 7) % 7 || 7;
+  result.setUTCDate(result.getUTCDate() + delta + weeksAhead * 7);
+  return result;
+}
+
 async function main() {
   console.log('[seed] start');
   const passwordHash = await bcrypt.hash('password123', 10);
@@ -468,6 +610,69 @@ async function main() {
     });
   }
 
+
+  // Circoli partner in Abruzzo con la lezione gratuita accesa e il calendario
+  // delle prime lezioni: il seed si puo rieseguire, le date si rinfrescano.
+  const padelCoach = await prisma.user.upsert({
+    where: { email: 'coach_padel@example.it' },
+    update: { role: UserRole.PROFESSIONAL, isActive: true },
+    create: {
+      email: 'coach_padel@example.it',
+      password: passwordHash,
+      role: UserRole.PROFESSIONAL,
+      firstName: 'Coach',
+      lastName: 'Padel',
+      isActive: true,
+    },
+  });
+
+  const seedNow = new Date();
+  for (const [clubIndex, club] of abruzzoClubs.entries()) {
+    const partnerData = {
+      name: club.name,
+      city: club.city,
+      province: club.province,
+      address: club.address,
+      postalCode: club.postalCode,
+      website: club.website,
+      isActive: true,
+      freeLessonsEnabled: true,
+    };
+    const partner = await prisma.partner.upsert({
+      where: { code: club.code },
+      update: partnerData,
+      create: { code: club.code, kind: 'CLUB', ...partnerData },
+      select: { id: true },
+    });
+
+    for (const [lessonIndex, levelLabel] of club.lessonLevels.entries()) {
+      // Una lezione a settimana per livello, a rotazione fra i giorni liberi
+      // dei circoli: martedi, giovedi e sabato alle 18, 19 e 10 UTC.
+      const slot = (clubIndex + lessonIndex) % 3;
+      const startsAt = nextWeekdayAt(
+        seedNow,
+        [2, 4, 6][slot],
+        [18, 19, 10][slot],
+        lessonIndex,
+      );
+      await prisma.freeLesson.upsert({
+        where: { id: `free-lesson-${club.code}-${lessonIndex + 1}` },
+        update: { startsAt, levelLabel, status: 'SCHEDULED' },
+        create: {
+          id: `free-lesson-${club.code}-${lessonIndex + 1}`,
+          partnerId: partner.id,
+          coachId: padelCoach.id,
+          startsAt,
+          durationMinutes: 60,
+          capacity: 4,
+          levelLabel,
+          status: 'SCHEDULED',
+          createdById: admin.id,
+        },
+      });
+    }
+  }
+
   const activeScale = await prisma.performanceScaleConfig.findFirst({
     where: { isActive: true },
     select: { id: true },
@@ -493,6 +698,8 @@ async function main() {
     scaleCount,
     onboardingTemplateCount,
     goalPromptConfigCount,
+    partnerCount,
+    freeLessonCount,
   ] =
     await Promise.all([
       prisma.user.count(),
@@ -502,10 +709,12 @@ async function main() {
       prisma.performanceScaleConfig.count(),
       prisma.onboardingQuestionTemplate.count(),
       prisma.aiGoalPromptConfig.count(),
+      prisma.partner.count(),
+      prisma.freeLesson.count(),
     ]);
 
   console.log(
-    `[seed] done users=${userCount} areas=${areaCount} competences=${competenceCount} links=${linkCount} scales=${scaleCount} onboardingTemplates=${onboardingTemplateCount} goalPromptConfigs=${goalPromptConfigCount} admin=${admin.email}`,
+    `[seed] done users=${userCount} areas=${areaCount} competences=${competenceCount} links=${linkCount} scales=${scaleCount} onboardingTemplates=${onboardingTemplateCount} goalPromptConfigs=${goalPromptConfigCount} partners=${partnerCount} freeLessons=${freeLessonCount} admin=${admin.email}`,
   );
 }
 

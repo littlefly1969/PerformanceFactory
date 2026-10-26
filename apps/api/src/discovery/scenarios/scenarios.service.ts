@@ -47,7 +47,7 @@ export const isProgramHorizon = (value: unknown): value is ProgramHorizon =>
 const NOT_REVEALED = 'Gli scenari si sbloccano a calibrazione completata';
 
 /**
- * Scenari P3/P6/P12 a calibrazione chiusa e scelta dell'orizzonte (gap 1.8,
+ * Scenari P4/P6/P12 a calibrazione chiusa e scelta dell'orizzonte (gap 1.8,
  * 1.9). L'AI formula P una volta per valutazione consolidata, entro criteri
  * versionati (§7.1, §7.3); gli scenari già mostrati non cambiano con un nuovo
  * prompt o una nuova versione dei criteri. Mostrarli con i gap rende l'atleta
@@ -304,7 +304,7 @@ export class ScenariosService {
   }
 
   /**
-   * L'AI scrive P3/P6/P12 sotto lease per atleta: richieste concorrenti non
+   * L'AI scrive P4/P6/P12 sotto lease per atleta: richieste concorrenti non
    * chiamano il provider due volte. La calibrazione è chiusa, quindi il suo
    * lease è libero. Il salvataggio ricontrolla sotto lock che nessun altro
    * abbia già scritto gli scenari della stessa valutazione.

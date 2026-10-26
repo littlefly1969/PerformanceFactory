@@ -1,6 +1,6 @@
 # Programmi con finestre adattive di 14 giorni
 
-Il programma scelto dall'atleta è di **3, 6 o 12 mesi**, cioè 12, 26 o 52 settimane (prima 4, 12 o 52: vedi `scenari-orizzonte.md`). Ogni release nuova copre 14 giorni: rispettivamente 6, 13 o 26 finestre per macroblocco. Al termine del macroblocco il percorso continua con un nuovo blocco della stessa durata, ricalcolando dal contesto aggiornato. Non vengono generati mesi di allenamenti in anticipo.
+Il programma scelto dall'atleta è di **4, 6 o 12 mesi**, cioè 18, 26 o 52 settimane (prima 4, 12 o 52: vedi `scenari-orizzonte.md`). Ogni release nuova copre 14 giorni: rispettivamente 9, 13 o 26 finestre per macroblocco. Al termine del macroblocco il percorso continua con un nuovo blocco della stessa durata, ricalcolando dal contesto aggiornato. Non vengono generati mesi di allenamenti in anticipo.
 
 ## Disponibilità e vincoli
 

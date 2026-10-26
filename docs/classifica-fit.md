@@ -41,7 +41,7 @@ profilo letto dal coaching.
 
 Ogni prompt dell'assessment riceve `fitRanking`: domande conoscitive iniziali
 dei driver, valutazione della R,
-domande di calibrazione, micro-test e scenari P3/P6/P12. Il coaching la legge dal
+domande di calibrazione, micro-test e scenari P4/P6/P12. Il coaching la legge dal
 profilo. Ai prompt arrivano solo le etichette leggibili e la data della
 dichiarazione: **mai il numero di tessera**. Una regola fissa
 (`FIT_RANKING_RULE`) si aggiunge ai prompt anche quando l'AI Tuner ha attivato
@@ -65,7 +65,7 @@ classifica nuova:
 - **calibrazione aperta**: valgono le regole di sempre, compresa la chiusura
   quando la regola di consolidamento è soddisfatta;
 - **calibrazione chiusa**: la nuova R è consolidata solo se soddisfa ancora la
-  regola, e allora P3/P6/P12 si rigenerano su di essa; altrimenti resta
+  regola, e allora P4/P6/P12 si rigenerano su di essa; altrimenti resta
   provvisoria e la R consolidata precedente rimane quella mostrata. Il programma
   già creato non cambia.
 

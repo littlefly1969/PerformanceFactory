@@ -102,7 +102,7 @@ function AvailabilityForm({ initial }: { initial: Availability }) {
         >
           <option value="">Seleziona</option>
           {[
-            [12, "3 mesi"],
+            [18, "4 mesi"],
             [26, "6 mesi"],
             [52, "12 mesi"],
           ].map(([w, label]) => (

@@ -15,7 +15,7 @@ import { QuestionsPreparing } from "./questions-preparing";
 import { FitRankingEditor } from "../components/fit-ranking-editor";
 import "./journey.css";
 const HORIZON_MONTHS: Record<string, number> = {
-  PROGRAM_3M: 3,
+  PROGRAM_4M: 4,
   PROGRAM_6M: 6,
   PROGRAM_12M: 12,
 };
@@ -214,7 +214,7 @@ export default function JourneyPage() {
                 </h2>
                 <p>
                   La tua R è consolidata: stiamo calcolando dove puoi arrivare
-                  in 3, 6 e 12 mesi. Aggiorna tra qualche istante.
+                  in 4, 6 e 12 mesi. Aggiorna tra qualche istante.
                 </p>
                 <button className="pf4-cta" onClick={() => void refresh()}>
                   Aggiorna

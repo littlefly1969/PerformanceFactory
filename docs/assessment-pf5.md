@@ -25,7 +25,7 @@ Replica il mockup PF5 su pagina chiara:
     cinque minuti.»;
   - la CTA nera **Scopri la tua performance** con freccia lime.
 - **Sotto la card.** «Cosa si attiva dopo»: Livello stimato sui sei driver,
-  Scenari a 3, 6 e 12 mesi, Programma e coaching, tutti «Bloccato». È testo
+  Scenari a 4, 6 e 12 mesi, Programma e coaching, tutti «Bloccato». È testo
   statico e non promette durate.
 
 I numeri sono `count` ed `estimatedMinutes` del backend, scritti in lettere da

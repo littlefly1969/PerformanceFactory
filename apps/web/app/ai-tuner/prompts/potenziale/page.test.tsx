@@ -40,7 +40,7 @@ it("lists only potential prompts and shows the scenarios tested on the synthetic
           JSON.stringify([
             {
               id: "potential-prompt-default",
-              name: "scenari P3/P6/P12",
+              name: "scenari P4/P6/P12",
               basePrompt: "Stima il potenziale entro i limiti.",
               version: 1,
               isActive: true,
@@ -56,7 +56,7 @@ it("lists only potential prompts and shows the scenarios tested on the synthetic
           model: "deterministic-stub",
           latencyMs: 2,
           output: {
-            criteria: "potential-criteria@1",
+            criteria: "potential-criteria@2",
             scenarios: [
               {
                 areaId: "a",
@@ -76,7 +76,7 @@ it("lists only potential prompts and shows the scenarios tested on the synthetic
   render(<PotentialPromptPage />);
   await screen.findByDisplayValue("Stima il potenziale entro i limiti.");
   expect(
-    screen.getByRole("heading", { name: "Scenari P3/P6/P12" }),
+    screen.getByRole("heading", { name: "Scenari P4/P6/P12" }),
   ).toBeVisible();
   expect(gets.some((u) => u.includes("kind=POTENTIAL"))).toBe(true);
   expect(screen.queryByLabelText("Caso di prova")).toBeNull();
@@ -85,7 +85,7 @@ it("lists only potential prompts and shows the scenarios tested on the synthetic
   const result = await screen.findByRole("region", {
     name: "Risultato della prova",
   });
-  expect(within(result).getByText(/potential-criteria@1/)).toBeVisible();
+  expect(within(result).getByText(/potential-criteria@2/)).toBeVisible();
   const row = within(result).getByRole("row", { name: /Tecnico-tattico/ });
   expect(row).toHaveTextContent("P6");
   expect(row).toHaveTextContent("40 → 64");

@@ -90,7 +90,7 @@ describe('assessment evaluation', () => {
     ]);
     expect(output.overallConfidence).toBe(30);
     expect(validateAssessmentEvaluation(output, input)).toEqual(output);
-    expect(JSON.stringify(output)).not.toMatch(/potential|P3|P6|P12/);
+    expect(JSON.stringify(output)).not.toMatch(/potential|P4|P6|P12/);
   });
 
   it('accepts a complete output and reorders drivers as received', () => {

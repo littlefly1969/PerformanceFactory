@@ -129,7 +129,7 @@ export class AthleteJourneyController {
     return this.journey.calibrationSkip(req.user.id, body.roundId);
   }
   @ApiOperation({
-    summary: 'Sceglie il percorso di 3, 6 o 12 mesi dopo gli scenari P3/P6/P12',
+    summary: 'Sceglie il percorso di 4, 6 o 12 mesi dopo gli scenari P4/P6/P12',
   })
   @Post('horizon')
   horizon(
