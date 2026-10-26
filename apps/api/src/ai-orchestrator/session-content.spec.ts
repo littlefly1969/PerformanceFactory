@@ -132,4 +132,15 @@ describe('session content written by the AI', () => {
     const objective = objectivesSchema().items;
     expect(objective.required).toEqual(Object.keys(objective.properties));
   });
+
+  it('caps exercises in code, not in the schema Gemini rejects', () => {
+    expect(sessionContentSchemaProperties().exercises).not.toHaveProperty(
+      'maxItems',
+    );
+    const exercises = Array.from({ length: 20 }, (_, i) => ({
+      name: `E${i}`,
+      prescription: '1',
+    }));
+    expect(normalizeSessionContent({ exercises }).exercises).toHaveLength(12);
+  });
 });

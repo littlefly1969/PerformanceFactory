@@ -693,6 +693,26 @@ async function main() {
       isActive: true,
     },
   });
+  // Senza competenza sulla specializzazione il piano padel non trova un coach.
+  for (const sport of demoSports.filter((s) =>
+    s.label.toLowerCase().includes('padel'),
+  )) {
+    for (const specialization of sport.specializations) {
+      await prisma.coachSpecializationCompetence.upsert({
+        where: {
+          coachId_specializationId: {
+            coachId: padelCoach.id,
+            specializationId: specialization.id,
+          },
+        },
+        update: {},
+        create: {
+          coachId: padelCoach.id,
+          specializationId: specialization.id,
+        },
+      });
+    }
+  }
 
   const seedNow = new Date();
   const geocoding = new GeocodingService();
