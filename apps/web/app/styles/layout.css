@@ -440,6 +440,7 @@
 
 .pf-login-page {
   min-height: 100vh;
+  min-height: 100dvh;
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(420px, 0.9fr);
   background: var(--pf-bg);

@@ -1,12 +1,8 @@
 import {
-  alignBest,
   bestOptions,
   fitRankingContext,
-  fitRankingFromAnswers,
   fitRankingProblems,
-  fitRankingQuestions,
   normalizeCardNumber,
-  validFitAnswer,
 } from './fit-ranking';
 
 const valid = {
@@ -48,46 +44,6 @@ describe('FIT ranking', () => {
     expect(normalizeCardNumber(undefined)).toBeNull();
     expect(normalizeCardNumber('x'.repeat(31))).toBeUndefined();
     expect(normalizeCardNumber(12)).toBeUndefined();
-  });
-
-  it('asks four rankings and the optional card, best after current', () => {
-    const questions = fitRankingQuestions({ 'fit:padelCurrent': '2' });
-    expect(questions.map((q) => q.id)).toEqual([
-      'fit:padelCurrent',
-      'fit:padelBest',
-      'fit:tennisCurrent',
-      'fit:tennisBest',
-      'fit:cardNumber',
-    ]);
-    expect(questions.map((q) => q.required)).toEqual([
-      true,
-      true,
-      true,
-      true,
-      false,
-    ]);
-    expect(validFitAnswer(questions[1], '3')).toBe(false);
-    expect(validFitAnswer(questions[1], '1')).toBe(true);
-    expect(validFitAnswer(questions[4], '')).toBe(true);
-    expect(validFitAnswer(questions[4], 7)).toBe(false);
-  });
-
-  it('raises the best answer when the current one goes above it', () => {
-    expect(
-      alignBest({ 'fit:padelCurrent': '1', 'fit:padelBest': '3' }),
-    ).toEqual({ 'fit:padelCurrent': '1', 'fit:padelBest': '1' });
-  });
-
-  it('builds the declaration only when the four rankings are answered', () => {
-    const answers = {
-      'fit:padelCurrent': '3',
-      'fit:padelBest': '2',
-      'fit:tennisCurrent': 'NONE',
-    };
-    expect(fitRankingFromAnswers(answers)).toBeNull();
-    expect(
-      fitRankingFromAnswers({ ...answers, 'fit:tennisBest': 'NONE' }),
-    ).toEqual(valid);
   });
 
   it('gives the AI readable labels and never the card number', () => {

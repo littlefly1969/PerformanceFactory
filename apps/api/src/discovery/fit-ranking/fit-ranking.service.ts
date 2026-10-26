@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CalibrationService } from '../calibration/calibration.service';
+import { dropStaleBank } from '../initial-question-bank';
 import {
   FIT_RANKING_OPTIONS,
   FitRankingValues,
@@ -58,9 +59,18 @@ export class FitRankingService {
     const evaluated = await this.prisma.assessmentEvaluation.count({
       where: { userId },
     });
-    await this.prisma.$transaction((tx) =>
-      saveFitRanking(tx, userId, values, 'PROFILE', evaluated > 0),
-    );
+    await this.prisma.$transaction(async (tx) => {
+      const changed = await saveFitRanking(
+        tx,
+        userId,
+        values,
+        'PROFILE',
+        evaluated > 0,
+      );
+      // Prima della valutazione le domande dei driver sono su misura per la
+      // classifica: se cambia, l'AI le riscrive.
+      if (changed && !evaluated) await dropStaleBank(tx, userId);
+    });
     // Prima della prima valutazione la classifica entra già nel suo input.
     if (this.pending(await loadFitRanking(this.prisma, userId)))
       await this.calibration.reevaluateForRanking(userId);

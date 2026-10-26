@@ -1,9 +1,4 @@
-import {
-  OnboardingInputType,
-  OnboardingQuestionScope,
-  Prisma,
-} from '@prisma/client';
-import { TemplateRecord } from '../../onboarding/onboarding-model';
+import { Prisma } from '@prisma/client';
 import { saveProfileEntry } from '../assessment-configuration';
 import { FitRankingContext } from '../../ai-orchestrator/fit-ranking-context';
 
@@ -62,7 +57,7 @@ export const FIT_RANKING_FIELDS = [
   { field: 'tennisCurrent', sport: 'TENNIS', best: false },
   { field: 'tennisBest', sport: 'TENNIS', best: true },
 ] as const;
-type RankingField = (typeof FIT_RANKING_FIELDS)[number]['field'];
+export type RankingField = (typeof FIT_RANKING_FIELDS)[number]['field'];
 
 const position = (sport: FitRankingSport, value: string) =>
   FIT_RANKING_OPTIONS[sport].findIndex((o) => o.value === value);
@@ -192,111 +187,4 @@ export async function saveFitRanking(
     value: fitRankingContext(row),
   });
   return changed;
-}
-
-/** Id delle domande del percorso: non sono template, vivono solo qui. */
-export const FIT_QUESTION_PREFIX = 'fit:';
-const CARD_QUESTION_ID = `${FIT_QUESTION_PREFIX}cardNumber`;
-export const isFitQuestion = (id: string) => id.startsWith(FIT_QUESTION_PREFIX);
-
-const TITLES: Record<RankingField, string> = {
-  padelCurrent: 'Qual è la tua classifica FIT di padel attuale?',
-  padelBest: 'Qual è la migliore classifica FIT di padel che hai avuto?',
-  tennisCurrent: 'Qual è la tua classifica FIT di tennis attuale?',
-  tennisBest: 'Qual è la migliore classifica FIT di tennis che hai avuto?',
-};
-
-/**
- * Quattro domande obbligatorie e il numero di tessera facoltativo, subito
- * dopo la disponibilità. Le opzioni della migliore dipendono dall'attuale già
- * risposta.
- */
-export function fitRankingQuestions(
-  answers: Record<string, unknown>,
-): TemplateRecord[] {
-  const record = (
-    id: string,
-    label: string,
-    options: { value: string; label: string }[] | null,
-    order: number,
-  ): TemplateRecord => ({
-    id,
-    key: id,
-    scope: OnboardingQuestionScope.GENERAL,
-    areaId: null,
-    label,
-    helpText: null,
-    inputType: options ? OnboardingInputType.SELECT : OnboardingInputType.TEXT,
-    optionsJson: options,
-    required: !!options,
-    orderIndex: order,
-    area: null,
-  });
-  return [
-    ...FIT_RANKING_FIELDS.map(({ field, sport, best }, i) =>
-      record(
-        `${FIT_QUESTION_PREFIX}${field}`,
-        TITLES[field],
-        best
-          ? bestOptions(
-              sport,
-              answers[`${FIT_QUESTION_PREFIX}${sport.toLowerCase()}Current`],
-            )
-          : FIT_RANKING_OPTIONS[sport],
-        i,
-      ),
-    ),
-    record(
-      CARD_QUESTION_ID,
-      'Numero di tessera FIT (facoltativo)',
-      null,
-      FIT_RANKING_FIELDS.length,
-    ),
-  ];
-}
-
-/** Valori della dichiarazione dalle risposte del percorso, se complete. */
-export function fitRankingFromAnswers(
-  answers: Record<string, unknown>,
-): FitRankingValues | null {
-  const value = (field: string) => answers[`${FIT_QUESTION_PREFIX}${field}`];
-  const values = {
-    padelCurrent: value('padelCurrent'),
-    padelBest: value('padelBest'),
-    tennisCurrent: value('tennisCurrent'),
-    tennisBest: value('tennisBest'),
-    cardNumber: normalizeCardNumber(value('cardNumber')) ?? null,
-  } as FitRankingValues;
-  return fitRankingProblems(values).length ? null : values;
-}
-
-/**
- * Risposta del percorso valida: opzione della lista per le classifiche,
- * testo breve (anche vuoto) per la tessera.
- */
-export function validFitAnswer(question: TemplateRecord, value: unknown) {
-  if (question.id === CARD_QUESTION_ID)
-    return normalizeCardNumber(value) !== undefined;
-  const options = (question.optionsJson ?? []) as { value: string }[];
-  return typeof value === 'string' && options.some((o) => o.value === value);
-}
-
-/**
- * Risposte dopo un cambio dell'attuale: se la migliore già data è ora più
- * bassa, diventa uguale all'attuale.
- */
-export function alignBest(answers: Record<string, unknown>) {
-  const next = { ...answers };
-  for (const sport of FIT_RANKING_SPORTS) {
-    const prefix = `${FIT_QUESTION_PREFIX}${sport.toLowerCase()}`;
-    const current = next[`${prefix}Current`];
-    const best = next[`${prefix}Best`];
-    if (
-      typeof current === 'string' &&
-      typeof best === 'string' &&
-      !bestOptions(sport, current).some((o) => o.value === best)
-    )
-      next[`${prefix}Best`] = current;
-  }
-  return next;
 }

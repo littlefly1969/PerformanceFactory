@@ -47,18 +47,18 @@ afterEach(() => {
 });
 
 describe("FIT ranking editor", () => {
-  it("offers as best only the current ranking and the ones above it", async () => {
+  it("shows the declared ranking in one line and opens the form on request", async () => {
     serve(view);
     render(<FitRankingEditor />);
-    const padel = within(
-      (await screen.findByText("Classifica FIT di padel")).closest("fieldset")!,
-    );
-    const best = padel.getByLabelText("Migliore di sempre");
+    expect(await screen.findByText("3ª fascia")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Modifica" }));
+    const padel = within(screen.getAllByText("Padel").at(-1)!.closest(".pf-fit-row")!);
+    const best = padel.getByLabelText("Migliore");
     expect(
       within(best)
         .getAllByRole("option")
         .map((o) => o.textContent),
-    ).toEqual(["Seleziona", "1ª fascia", "2ª fascia", "3ª fascia"]);
+    ).toEqual(["—", "1ª fascia", "2ª fascia", "3ª fascia"]);
     // L'attuale sale sopra la migliore: la migliore la segue.
     await userEvent.selectOptions(padel.getByLabelText("Attuale"), "1");
     expect(best).toHaveValue("1");
@@ -68,13 +68,15 @@ describe("FIT ranking editor", () => {
     const posts = serve({ ...view, recalculationPending: true });
     const onSaved = vi.fn();
     render(<FitRankingEditor onSaved={onSaved} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Modifica" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Aggiungi il numero di tessera" }),
+    );
     await userEvent.type(
-      await screen.findByLabelText("Numero di tessera FIT (facoltativo)"),
+      screen.getByLabelText("Numero di tessera FIT (facoltativo)"),
       "AB12",
     );
-    await userEvent.click(
-      screen.getByRole("button", { name: "Salva classifica →" }),
-    );
+    await userEvent.click(screen.getByRole("button", { name: "Salva" }));
     expect(
       await screen.findByText(/non siamo riusciti a ricalcolare la tua R/),
     ).toBeInTheDocument();
@@ -88,5 +90,23 @@ describe("FIT ranking editor", () => {
       },
     ]);
     expect(onSaved).toHaveBeenCalled();
+  });
+
+  it("declares no ranking at all in one tap", async () => {
+    const posts = serve(view);
+    render(<FitRankingEditor />);
+    await userEvent.click(await screen.findByRole("button", { name: "Modifica" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Non ho classifiche" }),
+    );
+    expect(posts).toEqual([
+      {
+        padelCurrent: "NONE",
+        padelBest: "NONE",
+        tennisCurrent: "NONE",
+        tennisBest: "NONE",
+        cardNumber: "",
+      },
+    ]);
   });
 });

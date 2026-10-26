@@ -1,0 +1,40 @@
+/* Risposta numerica sul foglio chiaro: quadrante a inchiostro e stepper. */
+.pf4-number-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.pf4-number-choice .pf4-gauge {
+  width: min(228px, 62vw);
+  margin: 2px auto -22px;
+}
+.pf4-number-choice .pf4-gauge line {
+  stroke: #0b0b0c26;
+}
+.pf4-number-choice .pf4-gauge line.is-on {
+  stroke: #0b0b0c;
+}
+.pf4-number-choice .pf4-gauge line.is-current {
+  stroke: #7fa70f;
+}
+.pf4-number-choice .pf4-gauge-value {
+  color: #0b0b0c;
+}
+.pf4-number-choice .pf4-gauge-value strong {
+  font-size: 58px;
+}
+.pf4-number-choice .pf4-stepper {
+  margin-top: 12px;
+}
+.pf4-number-choice .pf4-stepper output {
+  min-width: 96px;
+  padding: 0 6px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: center;
+}
+.pf4-number-choice .pf4-cta {
+  width: 100%;
+  margin-top: 18px;
+}

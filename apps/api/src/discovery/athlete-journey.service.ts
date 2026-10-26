@@ -12,10 +12,7 @@ import { ConsentsService } from '../consents/consents.service';
 import { OnboardingService } from '../onboarding/onboarding.service';
 import { loadSpecialistQuestionRecords } from '../onboarding/onboarding-questions';
 import { discoveryContext } from './discovery-context';
-import {
-  dropStaleBank,
-  generateInitialQuestionBank,
-} from './initial-question-bank';
+import { generateInitialQuestionBank } from './initial-question-bank';
 import {
   estimatedMinutes,
   logAssessmentProblems,
@@ -50,14 +47,7 @@ import type { ProvidedBaseline } from '../onboarding/onboarding-assessment';
 import { recordMeaningfulInteraction } from '../engagement/meaningful-interaction';
 import { pendingWakeup } from '../engagement/engagement.service';
 import { baselineValue, chosenOptions, roundAnswers } from './choice-answers';
-import {
-  alignBest,
-  fitRankingFromAnswers,
-  fitRankingQuestions,
-  isFitQuestion,
-  saveFitRanking,
-  validFitAnswer,
-} from './fit-ranking/fit-ranking';
+
 const LEASE_MS = 10 * 60 * 1000;
 /** Prova mostrata all'atleta: solo visualizzazione, nessun blocco a scadenza. */
 const TRIAL_DAYS = 7;
@@ -92,19 +82,18 @@ export class AthleteJourneyService {
       }),
       pendingWakeup(this.prisma, userId),
     ]);
-    // Avviato: le domande dei driver arrivano dopo la classifica FIT.
+    // Avviato: le domande dei driver arrivano dopo la disponibilità.
     const started = bank.length > 0 || saved.phase === 'ASSESSMENT';
     const answers = saved.assessmentAnswers as Record<
       string,
       OnboardingAnswer['value']
     >;
-    const ranking = fitRankingQuestions(answers);
     // Finché le domande dei driver non ci sono vale la configurazione; poi la banca.
     const config = bank.length
       ? null
       : await loadAssessmentConfiguration(this.prisma, userId);
     if (config?.problems.length) logAssessmentProblems(config.problems);
-    const questions = started ? [...operational, ...ranking, ...bank] : [];
+    const questions = started ? [...operational, ...bank] : [];
     const drivers = bank.length
       ? [...new Set(bank.map((q) => q.areaId!))].map((id) => {
           const area = bank.find((q) => q.areaId === id)!.area!;
@@ -121,10 +110,8 @@ export class AthleteJourneyService {
         }));
     const orderedAreas = drivers.map((d) => d.id);
     const driverList = drivers.map((d) => ({ ...d, name: driverName(d.name) }));
-    const count = bank.length
-      ? questions.length
-      : config!.count + ranking.length;
-    const fixedCount = operational.length + ranking.length;
+    const count = bank.length ? questions.length : config!.count;
+    const fixedCount = operational.length;
     const processing =
       saved.operationAt && Date.now() - saved.operationAt.getTime() < LEASE_MS;
     const evaluation = started
@@ -207,16 +194,8 @@ export class AthleteJourneyService {
       answers,
       questions: questions.map((q) => ({
         id: q.id,
-        kind: q.areaId
-          ? 'AREA'
-          : isFitQuestion(q.id)
-            ? 'RANKING'
-            : 'OPERATIONAL',
-        section: q.area
-          ? driverName(q.area.name)
-          : isFitQuestion(q.id)
-            ? 'Classifica FIT'
-            : 'Disponibilità',
+        kind: q.areaId ? 'AREA' : 'OPERATIONAL',
+        section: q.area ? driverName(q.area.name) : 'Disponibilità',
         title: q.label,
         areaId: q.areaId,
         areaName: q.area ? driverName(q.area.name) : null,
@@ -281,7 +260,6 @@ export class AthleteJourneyService {
     const index = questions.findIndex((q) => q.id === questionId);
     if (index < 0 || !this.valid(questions[index], value))
       throw new BadRequestException('Risposta non valida');
-    const fit = isFitQuestion(questionId);
     await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
       const saved = await tx.athleteDiscovery.findUniqueOrThrow({
@@ -297,15 +275,10 @@ export class AthleteJourneyService {
         throw new ConflictException(
           'La domanda è cambiata. Riprendi il percorso.',
         );
-      let answers: Record<string, unknown> = {
+      const answers: Record<string, unknown> = {
         ...(saved.assessmentAnswers as object),
         [questionId]: value,
       };
-      if (fit) {
-        answers = alignBest(answers);
-        // Classifica cambiata: le domande dei driver vanno riscritte.
-        answers = await dropStaleBank(tx, userId, saved, answers, questions);
-      }
       await tx.athleteDiscovery.update({
         where: { userId },
         data: {
@@ -313,11 +286,8 @@ export class AthleteJourneyService {
           currentQuestion: index + 1,
         },
       });
-      // La classifica completa entra subito nello storico e nel profilo.
-      const ranking = fit ? fitRankingFromAnswers(answers) : null;
-      if (ranking) await saveFitRanking(tx, userId, ranking, 'JOURNEY');
       // Le risposte operative vanno subito nel profilo letto dal training.
-      else if (!fit && !questions[index].areaId)
+      if (!questions[index].areaId)
         await saveOperationalAnswer(tx, userId, questions[index], value);
       await recordMeaningfulInteraction(tx, userId, 'ASSESSMENT_ANSWER');
     });
@@ -374,7 +344,7 @@ export class AthleteJourneyService {
           this.prisma,
           this.ai,
           userId,
-          questions.filter((q) => !isFitQuestion(q.id)),
+          questions,
           stored,
           areas,
         );
@@ -491,10 +461,7 @@ export class AthleteJourneyService {
   ) {
     const claimed = await this.claim(userId);
     try {
-      // La classifica non è una risposta dell'onboarding: vive nel suo storico.
-      const questions = (await this.sequence(userId)).filter(
-        (q) => !isFitQuestion(q.id),
-      );
+      const questions = await this.sequence(userId);
       const stored = claimed.assessmentAnswers as Record<string, unknown>;
       if (
         !questions.some((q) => q.areaId) ||
@@ -563,23 +530,17 @@ export class AthleteJourneyService {
   }
 
   /**
-   * Operative per prime, poi la classifica FIT, poi la banca di area; vuota
-   * finché l'assessment non parte.
+   * Operative per prime, poi la banca di area; vuota finché l'assessment non
+   * parte. La classifica FIT non è una domanda del percorso: è un dato di
+   * configurazione del profilo, con il suo storico.
    */
   private async sequence(userId: string) {
     const bank = await loadSpecialistQuestionRecords(this.prisma, userId);
     const saved = await this.record(userId);
     if (!bank.length && saved.phase !== 'ASSESSMENT') return [];
-    return [
-      ...(await loadOperationalTemplates(this.prisma)),
-      ...fitRankingQuestions(
-        saved.assessmentAnswers as Record<string, unknown>,
-      ),
-      ...bank,
-    ];
+    return [...(await loadOperationalTemplates(this.prisma)), ...bank];
   }
   private valid(q: TemplateRecord, value: unknown) {
-    if (isFitQuestion(q.id)) return validFitAnswer(q, value);
     const options = normalizeOptions(q.optionsJson) as { value: unknown }[];
     return chosenOptions(options, value, q.multiple) !== null;
   }
