@@ -16,8 +16,9 @@ SET "amountCents" = EXCLUDED."amountCents",
 
 -- Matrice offerta: 3 mesi a 10,00 EUR/mese, 6 mesi a 9,50 (-5%), 12 mesi a
 -- 8,90 (-11%). Lo sconto sta sulla durata del percorso, non sulla cadenza:
--- pagare in un'unica rata non cambia la cifra.
-DELETE FROM "ProgramBillingOption";
+-- pagare in un'unica rata non cambia la cifra. Le combinazioni esistenti
+-- prendono solo il prezzo: restano attive o spente come le ha lasciate il
+-- back office; quelle che mancano nascono attive.
 INSERT INTO "ProgramBillingOption" ("horizon","billingCycle","isActive","amountCents","currency","updatedAt") VALUES
   ('PROGRAM_3M','MONTHLY',true,1000,'eur',CURRENT_TIMESTAMP),
   ('PROGRAM_3M','QUARTERLY',true,3000,'eur',CURRENT_TIMESTAMP),
@@ -27,7 +28,11 @@ INSERT INTO "ProgramBillingOption" ("horizon","billingCycle","isActive","amountC
   ('PROGRAM_12M','MONTHLY',true,890,'eur',CURRENT_TIMESTAMP),
   ('PROGRAM_12M','QUARTERLY',true,2670,'eur',CURRENT_TIMESTAMP),
   ('PROGRAM_12M','SEMIANNUAL',true,5340,'eur',CURRENT_TIMESTAMP),
-  ('PROGRAM_12M','ANNUAL',true,10680,'eur',CURRENT_TIMESTAMP);
+  ('PROGRAM_12M','ANNUAL',true,10680,'eur',CURRENT_TIMESTAMP)
+ON CONFLICT ("horizon","billingCycle") DO UPDATE
+SET "amountCents" = EXCLUDED."amountCents",
+    "currency" = EXCLUDED."currency",
+    "updatedAt" = CURRENT_TIMESTAMP;
 
 -- Anagrafica del circolo partner: indirizzo e contatti per la scheda
 -- mostrata all'atleta e per la lezione gratuita.

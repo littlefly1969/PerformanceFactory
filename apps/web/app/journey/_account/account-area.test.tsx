@@ -185,7 +185,14 @@ describe("Distanza dei circoli", () => {
 });
 
 describe("Checkout", () => {
-  it("shows the monthly price, the real total and the saving", async () => {
+  it("summarises the cost of the cadence the athlete picks", async () => {
+    const option = (billingCycle: string, months: number, cents: number) => ({
+      billingCycle,
+      billingMonths: months,
+      amountCents: cents,
+      monthlyEquivalentCents: Math.round(cents / months),
+      currency: "eur",
+    });
     serve({
       "/auth/journey": journey({
         calibration: calibration(null, "PAYWALL_READY"),
@@ -199,6 +206,15 @@ describe("Checkout", () => {
       }),
       "/payments/offers": [
         {
+          horizon: "PROGRAM_3M",
+          horizonMonths: 3,
+          monthlyCents: 1000,
+          horizonTotalCents: 3000,
+          currency: "eur",
+          savingPercent: 0,
+          billingOptions: [option("MONTHLY", 1, 1000)],
+        },
+        {
           horizon: "PROGRAM_12M",
           horizonMonths: 12,
           monthlyCents: 890,
@@ -206,23 +222,25 @@ describe("Checkout", () => {
           currency: "eur",
           savingPercent: 11,
           billingOptions: [
-            {
-              billingCycle: "QUARTERLY",
-              billingMonths: 3,
-              amountCents: 2670,
-              monthlyEquivalentCents: 890,
-              currency: "eur",
-            },
+            option("MONTHLY", 1, 890),
+            option("QUARTERLY", 3, 2670),
+            option("ANNUAL", 12, 10000),
           ],
         },
       ],
     });
     render(<CheckoutPage />);
-    expect(
-      await screen.findByText(/11% al mese in meno del programma più breve/),
-    ).toHaveTextContent("8,90 € al mese, 106,80 € per tutti i 12 mesi");
+    expect(await screen.findByText(/^Pagamento mensile: /)).toHaveTextContent(
+      "Pagamento mensile: 8,90 € al mese, 106,80 € per tutti i 12 mesi, 11% al mese in meno del programma più breve.",
+    );
     expect(screen.getByText(/Addebito ogni 3 mesi/)).toHaveTextContent(
       "· 8,90 € al mese",
+    );
+    await userEvent.click(
+      screen.getByRole("radio", { name: /Pagamento annuale/ }),
+    );
+    expect(screen.getByText(/^Pagamento annuale: /)).toHaveTextContent(
+      "Pagamento annuale: 8,33 € al mese, 100,00 € per tutti i 12 mesi, 17% al mese in meno del programma più breve.",
     );
   });
 });

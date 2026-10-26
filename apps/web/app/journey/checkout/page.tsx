@@ -45,6 +45,29 @@ const price = (cents: number, currency: string) =>
 const HORIZONS: ProgramHorizon[] = ["PROGRAM_3M", "PROGRAM_6M", "PROGRAM_12M"];
 
 /**
+ * Riepilogo della cadenza scelta, o della più corta finché non si sceglie:
+ * prezzo al mese, totale come rata per numero di rate (quanto si paga
+ * davvero) e vantaggio sul prezzo al mese del programma più breve.
+ */
+function costSummary(
+  offer: Offer,
+  option: Offer["billingOptions"][number],
+  baselineCents: number,
+) {
+  const [title] = CYCLES[option.billingCycle] ?? [option.billingCycle];
+  const total =
+    option.amountCents * Math.ceil(offer.horizonMonths / option.billingMonths);
+  const saving =
+    baselineCents > option.monthlyEquivalentCents
+      ? Math.round(
+          ((baselineCents - option.monthlyEquivalentCents) / baselineCents) *
+            100,
+        )
+      : 0;
+  return `${title}: ${price(option.monthlyEquivalentCents, option.currency)} al mese, ${price(total, option.currency)} per tutti i ${offer.horizonMonths} mesi${saving > 0 ? `, ${saving}% al mese in meno del programma più breve` : ""}.`;
+}
+
+/**
  * Checkout: durata del programma e cadenza di pagamento sono due scelte
  * diverse (A5). Le cadenze di ogni durata e i prezzi vengono dal back office;
  * il pagamento si conclude nella pagina sicura del fornitore.
@@ -77,6 +100,12 @@ export default function CheckoutPage() {
     }).catch(() => undefined);
   }, [shown]);
   const chosen = options.some((o) => o.billingCycle === cycle) ? cycle : "";
+  const summaryOption =
+    options.find((o) => o.billingCycle === chosen) ?? options[0];
+  const baselineCents =
+    offers?.find((o) => o.horizon === "PROGRAM_3M")?.monthlyCents ??
+    offers?.[0]?.monthlyCents ??
+    0;
   const pay = async () => {
     setPaying(true);
     setMessage("");
@@ -141,15 +170,9 @@ export default function CheckoutPage() {
         )}
       </div>
 
-      {offer && shown && (
-        <p className="pf-acc-muted">
-          {price(offer.monthlyCents, offer.currency)} al mese,{" "}
-          {price(offer.horizonTotalCents, offer.currency)} per tutti i{" "}
-          {offer.horizonMonths} mesi
-          {offer.savingPercent > 0
-            ? `: ${offer.savingPercent}% al mese in meno del programma più breve`
-            : ""}
-          .
+      {offer && summaryOption && (
+        <p className="pf-acc-muted" aria-live="polite">
+          {costSummary(offer, summaryOption, baselineCents)}
         </p>
       )}
 

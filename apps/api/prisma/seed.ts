@@ -699,21 +699,41 @@ async function main() {
   for (const [clubIndex, club] of abruzzoClubs.entries()) {
     const existing = await prisma.partner.findUnique({
       where: { code: club.code },
-      select: { id: true, latitude: true },
+      select: {
+        id: true,
+        latitude: true,
+        address: true,
+        postalCode: true,
+        city: true,
+        province: true,
+      },
     });
-    // Coordinate dall'indirizzo, solo se mancano: senza rete restano vuote e
-    // all'atleta si dice che la distanza non si puo calcolare.
-    const located =
-      existing?.latitude == null
-        ? await geocoding.locate({
-            street: club.address,
-            postalCode: club.postalCode,
-            city: club.city,
-            province: club.province,
-          })
+    // Coordinate solo se mancano, dalla sede salvata: per un circolo gia
+    // presente vale quella del back office, il catalogo solo alla creazione.
+    // Senza rete o senza sede completa restano vuote e all'atleta si dice
+    // che la distanza non si puo calcolare.
+    const sede = existing ?? {
+      address: club.address,
+      postalCode: club.postalCode,
+      city: club.city,
+      province: club.province,
+    };
+    const query =
+      existing?.latitude == null &&
+      sede.address &&
+      sede.postalCode &&
+      sede.city &&
+      sede.province
+        ? {
+            street: sede.address,
+            postalCode: sede.postalCode,
+            city: sede.city,
+            province: sede.province,
+          }
         : null;
+    const located = query ? await geocoding.locate(query) : null;
     // Nominatim chiede al massimo una richiesta al secondo.
-    if (existing?.latitude == null && geocoding.configured)
+    if (query && geocoding.configured)
       await new Promise((resolve) => setTimeout(resolve, 1100));
     const coordinates = located ? { ...located, geocodedAt: new Date() } : {};
     const partner = existing
