@@ -2,13 +2,13 @@ import { BillingCycle, ProgramHorizon } from '@prisma/client';
 
 // Blueprint A5: l'orizzonte sportivo e la cadenza di pagamento sono indipendenti.
 export const PROGRAM_HORIZON_MONTHS: Record<ProgramHorizon, number> = {
-  PROGRAM_4M: 4,
+  PROGRAM_3M: 3,
   PROGRAM_6M: 6,
   PROGRAM_12M: 12,
 };
 
 export const PROGRAM_HORIZON_POTENTIAL: Record<ProgramHorizon, string> = {
-  PROGRAM_4M: 'P4',
+  PROGRAM_3M: 'P3',
   PROGRAM_6M: 'P6',
   PROGRAM_12M: 'P12',
 };
@@ -17,7 +17,7 @@ export const PROGRAM_HORIZON_POTENTIAL: Record<ProgramHorizon, string> = {
  * Orizzonte di ingresso: il suo prezzo al mese e il riferimento da cui si
  * misura il vantaggio degli orizzonti piu lunghi mostrato nel paywall.
  */
-export const BASELINE_HORIZON: ProgramHorizon = 'PROGRAM_4M';
+export const BASELINE_HORIZON: ProgramHorizon = 'PROGRAM_3M';
 
 export const BILLING_CYCLE_MONTHS: Record<BillingCycle, number> = {
   MONTHLY: 1,
@@ -27,7 +27,7 @@ export const BILLING_CYCLE_MONTHS: Record<BillingCycle, number> = {
 };
 
 const HORIZON_ORDER: ProgramHorizon[] = [
-  ProgramHorizon.PROGRAM_4M,
+  ProgramHorizon.PROGRAM_3M,
   ProgramHorizon.PROGRAM_6M,
   ProgramHorizon.PROGRAM_12M,
 ];

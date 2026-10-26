@@ -14,7 +14,10 @@ const base: Extract<FreeLessonView, { enabled: true }> = {
   missing: ["CONFIDENCE"],
   credits: { balance: 70, toUnlock: 100 },
   earn: { initialAssessment: 30, calibrationRound: 20 },
-  clubs: [{ id: "c1", name: "Padel Roma Nord", city: "Roma" }],
+  clubs: [
+    { id: "c1", name: "Padel Roma Nord", city: "Roma", distanceKm: 7.2 },
+  ],
+  distance: { available: true, reason: null },
   attributedClubId: "c1",
   seat: null,
 };
@@ -64,6 +67,33 @@ describe("FreeLessonPanel", () => {
     expect(calls.map((c) => c.url)).toEqual([
       "/api/athlete-journey/free-lesson",
     ]);
+  });
+
+  it("shows how far each club is, and why it cannot when the address is missing", async () => {
+    serve({ ...base, phase: "ELIGIBLE", missing: [] });
+    render(<FreeLessonPanel refreshKey="a" />);
+    expect(
+      await screen.findByRole("option", {
+        name: "Padel Roma Nord, Roma, a 7.2 km",
+      }),
+    ).toBeInTheDocument();
+
+    cleanup();
+    vi.unstubAllGlobals();
+    serve({
+      ...base,
+      phase: "ELIGIBLE",
+      missing: [],
+      clubs: [{ ...base.clubs[0], distanceKm: null }],
+      distance: { available: false, reason: "NO_ADDRESS" },
+    });
+    render(<FreeLessonPanel refreshKey="b" />);
+    expect(
+      await screen.findByText(/aggiungi il tuo indirizzo nel profilo/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("option", { name: "Padel Roma Nord, Roma" }),
+    ).toBeInTheDocument();
   });
 
   it("asks for the coach sharing consent before requesting the seat", async () => {

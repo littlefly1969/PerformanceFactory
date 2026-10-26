@@ -45,7 +45,7 @@ const input: TrainingProposalInput = {
     },
   },
   trainingConstraints: {
-    programDurationWeeks: 18,
+    programDurationWeeks: 12,
     operationalWindowDays: 14,
     currentFrequency: { min: 2, max: 3 },
     availability: { daysPerWeek: 4, sessionDurationMinutes: 60 },
@@ -324,7 +324,7 @@ describe('Rolling training constraints and contract', () => {
       expect(
         buildTrainingProposalPreview(input).inputJson.prompt.user.constraints
           .programDurationWeeks,
-      ).toBe(18);
+      ).toBe(12);
     },
   );
 });

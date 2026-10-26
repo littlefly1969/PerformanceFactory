@@ -2,6 +2,7 @@ import {
   TrainingAvailabilityDto,
   TrainingAvailabilityService,
 } from './training-availability';
+import { AthleteAddressDto, AthleteAddressService } from './athlete-address';
 import {
   Body,
   Controller,
@@ -47,7 +48,23 @@ export class AthleteController {
   constructor(
     private readonly athlete: AthleteService,
     private readonly availability: TrainingAvailabilityService,
+    private readonly address: AthleteAddressService,
   ) {}
+  @Get('address')
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({
+    summary: 'Indirizzo dell atleta, per la distanza dai circoli',
+  })
+  getAddress(@Req() req: Request) {
+    return this.address.get(req.user.id);
+  }
+  @Post('address')
+  @ApiOperation({
+    summary: 'Salva l indirizzo e prova a risolverne le coordinate',
+  })
+  saveAddress(@Req() req: Request, @Body() body: AthleteAddressDto) {
+    return this.address.save(req.user.id, body);
+  }
   @Get('training/availability')
   @Header('Cache-Control', 'private, no-store')
   @ApiOperation({

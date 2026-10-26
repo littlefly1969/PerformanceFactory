@@ -15,7 +15,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { getRequiredTestDatabaseUrl } from '../utils/db-test-guard';
 import { ensureTestDatabaseExists } from '../utils/ensure-test-database';
 
-describe('P4/P6/P12 scenarios and program horizon on PostgreSQL', () => {
+describe('P3/P6/P12 scenarios and program horizon on PostgreSQL', () => {
   let prisma: PrismaService;
   let service: ScenariosService;
   let ai: AiProposalProviderService;
@@ -179,7 +179,7 @@ describe('P4/P6/P12 scenarios and program horizon on PostgreSQL', () => {
     );
   });
 
-  it('has the AI write P4/P6/P12 once per consolidated evaluation, within the versioned criteria', async () => {
+  it('has the AI write P3/P6/P12 once per consolidated evaluation, within the versioned criteria', async () => {
     await setFlag(true);
     const userId = await athlete();
     const calls = generateSpy.mock.calls.length;
@@ -198,10 +198,10 @@ describe('P4/P6/P12 scenarios and program horizon on PostgreSQL', () => {
     const view = await ready(userId);
     expect(view.engine).toEqual({
       key: 'ai-potential',
-      version: '2',
+      version: '1',
       provisional: true,
     });
-    expect(view.horizons.map((h) => h.months)).toEqual([4, 6, 12]);
+    expect(view.horizons.map((h) => h.months)).toEqual([3, 6, 12]);
     // Stub: quattro quinti del limite dei criteri (tetto INTERMEDIATE = 80).
     expect(view.horizons.map((h) => h.drivers[0].potential)).toEqual([
       56, 64, 70.4,
@@ -249,7 +249,7 @@ describe('P4/P6/P12 scenarios and program horizon on PostgreSQL', () => {
       where: { userId, status: 'CONSOLIDATED' },
     });
     await prisma.potentialScenario.createMany({
-      data: (['PROGRAM_4M', 'PROGRAM_6M', 'PROGRAM_12M'] as const).flatMap(
+      data: (['PROGRAM_3M', 'PROGRAM_6M', 'PROGRAM_12M'] as const).flatMap(
         (horizon, k) =>
           areaIds.map((areaId) => ({
             userId,
@@ -359,7 +359,7 @@ describe('P4/P6/P12 scenarios and program horizon on PostgreSQL', () => {
     });
     await expect(assertProgramAllowed(prisma, userId)).resolves.toBeUndefined();
     // Dopo il pagamento l'orizzonte non cambia più (#14).
-    await expect(service.select(userId, 'PROGRAM_4M')).rejects.toThrow(
+    await expect(service.select(userId, 'PROGRAM_3M')).rejects.toThrow(
       'non si può cambiare',
     );
     await prisma.calibrationConfig.update({

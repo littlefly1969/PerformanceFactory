@@ -23,7 +23,7 @@ const URL = `${API_BASE}/admin/confidence-policies`;
 const TEXT: Record<Kind, { title: string; hint: string }> = {
   R_CONSOLIDATION: {
     title: "Consolidamento di R",
-    hint: "Quando le evidenze bastano per consolidare R e generare P4/P6/P12. Tempo trascorso, numero di round e lezione gratuita non contano.",
+    hint: "Quando le evidenze bastano per consolidare R e generare P3/P6/P12. Tempo trascorso, numero di round e lezione gratuita non contano.",
   },
   LESSON_ELIGIBILITY: {
     title: "Eleggibilità alla lezione gratuita",

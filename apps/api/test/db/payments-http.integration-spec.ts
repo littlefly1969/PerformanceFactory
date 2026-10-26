@@ -102,7 +102,7 @@ describe('Payments HTTP flow on PostgreSQL', () => {
         role: 'USER',
       },
     });
-    await paywallReady(prisma, user.id, 'PROGRAM_4M');
+    await paywallReady(prisma, user.id, 'PROGRAM_3M');
     const headers = {
       'content-type': 'application/json',
       'x-test-user': user.id,
@@ -114,8 +114,8 @@ describe('Payments HTTP flow on PostgreSQL', () => {
           url: '/api/payments/checkout',
           headers,
           payload: JSON.stringify({
-            horizon: 'PROGRAM_4M',
-            billingCycle: 'MONTHLY',
+            horizon: 'PROGRAM_3M',
+            billingCycle: 'QUARTERLY',
           }),
         }),
       ),
@@ -145,8 +145,8 @@ describe('Payments HTTP flow on PostgreSQL', () => {
       entitled: true,
       subscription: {
         id: bodies[0].subscriptionId,
-        horizon: 'PROGRAM_4M',
-        billingCycle: 'MONTHLY',
+        horizon: 'PROGRAM_3M',
+        billingCycle: 'QUARTERLY',
         status: 'ACTIVE',
       },
     });

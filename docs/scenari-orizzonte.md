@@ -1,15 +1,15 @@
-# Scenari P4/P6/P12 e scelta del percorso
+# Scenari P3/P6/P12 e scelta del percorso
 
 ## Risultato
 
 Quando la calibrazione si chiude (`CALIBRATION_COMPLETED`, vedi
-`calibrazione.md`), l'atleta vede tre Spider, R+P4, R+P6 e R+P12, e sceglie un
-percorso di 4, 6 o 12 mesi. La scelta porta il percorso a `PAYWALL_READY` e
+`calibrazione.md`), l'atleta vede tre Spider, R+P3, R+P6 e R+P12, e sceglie un
+percorso di 3, 6 o 12 mesi. La scelta porta il percorso a `PAYWALL_READY` e
 mostra le cadenze di pagamento attive per quell'orizzonte (offerta di #9). Il
 pagamento è il passo successivo (gap 1.10-1.11).
 
 ```
-CALIBRATION_COMPLETED ──reveal P4/P6/P12──► scelta 4/6/12 mesi ──► PAYWALL_READY
+CALIBRATION_COMPLETED ──reveal P3/P6/P12──► scelta 3/6/12 mesi ──► PAYWALL_READY
                                                                       │
                                        abbonamento con entitlement ◄──┘ sblocca il programma
 ```
@@ -18,25 +18,25 @@ Tutto è dietro il feature flag `potential_scenarios`, spento di default: si
 rilascia prima ai beta tester da `/admin/feature-flags`. Con il flag spento il
 percorso resta a `CALIBRATION_COMPLETED`, come nella slice 2.
 
-Riferimenti del Product Blueprint: A3.9 (P4/P6/P12 solo a calibrazione chiusa,
+Riferimenti del Product Blueprint: A3.9 (P3/P6/P12 solo a calibrazione chiusa,
 senza inventare P), A4.4 (Spider), A5 (orizzonte e cadenza indipendenti).
 
 ## P formulata dall'AI entro criteri versionati (PF-FS-PREPAYWALL §7.1, §7.3)
 
 A R consolidata il Performance Engine AI
-(`apps/api/src/ai-orchestrator/potential-generation.ts`) scrive P4, P6 e P12 per
+(`apps/api/src/ai-orchestrator/potential-generation.ts`) scrive P3, P6 e P12 per
 ogni driver, con confidenza e motivazione. Il prompt è la famiglia `POTENTIAL`,
 modificabile e versionata dall'AI Tuner in `/ai-tuner/prompts/potenziale`.
 
-Il backend accetta solo una proposta entro i criteri `potential-criteria` v2
+Il backend accetta solo una proposta entro i criteri `potential-criteria` v1
 (`POTENTIAL_CRITERIA`), inviati all'AI come limiti per driver e orizzonte:
 
-| Criterio | Valore v2 (da approvare, Parte C) |
+| Criterio | Valore v1 (da approvare, Parte C) |
 |---|---|
 | Tetto per livello (quota della scala) | principiante 70%, intermedio 80%, avanzato 88%, agonista 94%, professionista 98%; livello assente 80% |
-| Quota massima del margine R→tetto | 4 mesi 50%, 6 mesi 75%, 12 mesi 95% |
-| Confidenza massima, rispetto a min(driver, livello) | 4 mesi 90%, 6 mesi 75%, 12 mesi 60% |
-| Forma | P fra R e il limite, mai in calo da P4 a P12; confidenza mai in crescita; motivazione di massimo 300 caratteri |
+| Quota massima del margine R→tetto | 3 mesi 50%, 6 mesi 75%, 12 mesi 95% |
+| Confidenza massima, rispetto a min(driver, livello) | 3 mesi 90%, 6 mesi 75%, 12 mesi 60% |
+| Forma | P fra R e il limite, mai in calo da P3 a P12; confidenza mai in crescita; motivazione di massimo 300 caratteri |
 
 Un driver già oltre il tetto resta dov'è. Una proposta fuori criteri non arriva
 all'atleta. Finché i criteri non sono approvati gli scenari restano marcati come
@@ -65,7 +65,7 @@ anche se di un motore precedente (`provisional-plateau`).
 | Metodo e percorso | Effetto |
 |---|---|
 | `GET /auth/journey` | aggiunge `scenarios` (motore, scala, orizzonti con driver e gap, orizzonte scelto) a calibrazione chiusa e con il flag attivo |
-| `POST /athlete-journey/horizon` | `{ horizon: PROGRAM_4M | PROGRAM_6M | PROGRAM_12M }`: solo dopo il reveal (`activatedAt`), salva la scelta, porta a `PAYWALL_READY`, scrive l'evento `program_horizon_selected`; si può cambiare finché non c'è un abbonamento pagato (409 dopo) |
+| `POST /athlete-journey/horizon` | `{ horizon: PROGRAM_3M | PROGRAM_6M | PROGRAM_12M }`: solo dopo il reveal (`activatedAt`), salva la scelta, porta a `PAYWALL_READY`, scrive l'evento `program_horizon_selected`; si può cambiare finché non c'è un abbonamento pagato (409 dopo) |
 | `POST /athlete-journey/paywall/viewed` | prima apertura del paywall, solo a `PAYWALL_READY`: `paywallViewedAt` ed evento `paywall_viewed` una volta |
 | `GET /payments/offers` | (da #9) cadenze attive per orizzonte; il web mostra solo quelle dell'orizzonte scelto |
 | `POST /payments/checkout` | 409 se il percorso non è `PAYWALL_READY` o se l'orizzonte dell'offerta non è quello scelto (#14) |
@@ -117,30 +117,26 @@ fase `SUBSCRIBED` (A4 `SUBSCRIBED_ACTIVE`) e non mostra più l'offerta.
 - la baseline (`PerformanceProfileSnapshot` e `CurrentState`) usa la R della
   valutazione consolidata e, come P, lo scenario dell'orizzonte pagato, lo stesso
   mostrato nel reveal; un driver senza scenario ha P uguale a R;
-- la durata è quella dell'orizzonte (18, 26 o 52 settimane), anche in
+- la durata è quella dell'orizzonte (12, 26 o 52 settimane), anche in
   `program_duration_weeks` del profilo: il passo `DURATION` non si ripete.
 
 Il percorso passa a `COMPLETE` e porta alla Home `/user`, dove il motore rolling
 prepara la prima finestra. Senza entitlement la chiamata risponde 409; una
 seconda chiamata non crea un'altra baseline.
 
-## Durate del programma: da 4/12/52 settimane a 4/6/12 mesi
+## Durate del programma: da 4/12/52 settimane a 3/6/12 mesi
 
 Il motore di training lavora a finestre di 14 giorni, quindi ogni orizzonte è un
-numero pari di settimane: 4 mesi = 18, 6 mesi = 26, 12 mesi = 52.
+numero pari di settimane: 3 mesi = 12, 6 mesi = 26, 12 mesi = 52.
 
 - `TrainingConstraintsService`, il DTO della disponibilità, il passo `DURATION`
-  del percorso e il profilo accettano 18, 26 o 52 settimane.
-- Il prompt di training parla di programma di 4, 6 o 12 mesi.
-- Migrazione dei dati esistenti: 4 e 12 settimane → orizzonte di ingresso, 52 →
+  del percorso e il profilo accettano 12, 26 o 52 settimane.
+- Il prompt di training parla di programma di 3, 6 o 12 mesi.
+- Migrazione dei dati esistenti: 4 e 12 settimane → 3 mesi (12 settimane), 52 →
   12 mesi. `programHorizon` viene valorizzato e `program_duration_weeks` nel
   profilo dell'onboarding segue la stessa mappatura.
-- L'orizzonte di ingresso è passato in seguito da 3 mesi (12 settimane) a 4 mesi
-  (18 settimane): il valore dell'enum è stato rinominato in `PROGRAM_4M` e le
-  righe già a 12 settimane sono state portate a 18.
 
-Migrazioni: `20261009090000_potential_scenarios` e
-`20261022110000_horizon_4m_club_anagrafica_pricing`.
+Migrazione: `20261009090000_potential_scenarios`.
 
 ## Test
 
@@ -154,7 +150,7 @@ degli scenari mostrati, attivazione ed eventi, scelta e blocco dell'orizzonte,
 
 ## Aperto
 
-- **Criteri definitivi** (Parte C, OP-03): i valori v2 vanno approvati; sono
+- **Criteri definitivi** (Parte C, OP-03): i valori v1 vanno approvati; sono
   costanti versionate nel codice, non back office.
 - **Freshness**: oggi gli scenari si scrivono solo con una nuova valutazione
   consolidata. Dopo la calibrazione serviranno dati di

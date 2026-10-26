@@ -52,9 +52,12 @@ const defaultGoalPrompt = [
 /**
  * Circoli di padel reali in Abruzzo, per il primo lancio territoriale: nome,
  * sede e provincia da fonti pubbliche (elenchi FITP Abruzzo dei campionati a
- * squadre di padel e directory di settore). Il logo resta nullo finche non c'e
- * un URL pubblico stabile: nessun dato inventato. Tutti partono con la lezione
- * gratuita accesa e qualche lezione in calendario.
+ * squadre di padel, stampa locale e directory di settore). Il logo resta nullo
+ * finche non c'e un URL pubblico stabile e il sito solo dove verificato:
+ * nessun dato inventato. Tutti partono con la lezione gratuita accesa e
+ * qualche lezione in calendario. Del comune dell'Aquila ci sono le strutture
+ * con piu fonti indipendenti; quelle attestate da un solo aggregatore restano
+ * fuori finche non sono confermate.
  */
 const abruzzoClubs: Array<{
   code: string;
@@ -163,6 +166,46 @@ const abruzzoClubs: Array<{
     city: "L'Aquila",
     province: 'AQ',
     address: 'Via Edoardo Scarfoglio 11/A',
+    postalCode: '67100',
+    website: null,
+    lessonLevels: ['Principianti'],
+  },
+  {
+    code: 'padelus-laquila',
+    name: "PadelUs L'Aquila",
+    city: "L'Aquila",
+    province: 'AQ',
+    address: "Via dell'Industria snc, nucleo industriale di Bazzano",
+    postalCode: '67100',
+    website: 'https://www.instagram.com/padelus_laquila/',
+    lessonLevels: ['Principianti', 'Intermedi'],
+  },
+  {
+    code: 'contrada-cavalli-laquila',
+    name: 'Villaggio Sportivo Contrada Cavalli',
+    city: "L'Aquila",
+    province: 'AQ',
+    address: "Strada Vicinale dell'Aterno 32",
+    postalCode: '67100',
+    website: 'https://www.facebook.com/villaggiosportivo.contradacavalli/',
+    lessonLevels: ['Principianti'],
+  },
+  {
+    code: 'area-sport-laquila',
+    name: 'Centro Sportivo Area Sport',
+    city: "L'Aquila",
+    province: 'AQ',
+    address: 'Via Rodolfo Volpe snc, Monticchio',
+    postalCode: '67100',
+    website: 'https://www.areasportlaquila.it/',
+    lessonLevels: ['Intermedi'],
+  },
+  {
+    code: 'padel-beach-laquila',
+    name: "Padel Beach L'Aquila",
+    city: "L'Aquila",
+    province: 'AQ',
+    address: 'Via Onorevole Giuseppe Saragat snc',
     postalCode: '67100',
     website: null,
     lessonLevels: ['Principianti'],

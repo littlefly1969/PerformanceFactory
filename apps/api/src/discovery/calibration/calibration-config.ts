@@ -46,7 +46,7 @@ export async function updateCalibrationSettings(
 /**
  * Chi è entrato in calibrazione non ottiene il programma (baseline e piano) dal
  * flusso precedente, nemmeno a calibrazione completata o con l'orizzonte
- * scelto (PAYWALL_READY): la sequenza è calibrazione → P4/P6/P12 → Program
+ * scelto (PAYWALL_READY): la sequenza è calibrazione → P3/P6/P12 → Program
  * Horizon → paywall. Lo sblocca solo un abbonamento con entitlement attivo.
  * Il back office può riaprirlo (decisione 13). Gli atleti senza valutazione AI
  * seguono ancora il flusso precedente finché non arriva il paywall (gap 1.10).

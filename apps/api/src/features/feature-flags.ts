@@ -19,7 +19,7 @@ export const FEATURE_FLAG_REGISTRY = [
   {
     key: 'potential_scenarios',
     description:
-      'A calibrazione chiusa mostra P4/P6/P12 e la scelta del percorso di 4, 6 o 12 mesi (1.8-1.9).',
+      'A calibrazione chiusa mostra P3/P6/P12 e la scelta del percorso di 3, 6 o 12 mesi (1.8-1.9).',
   },
 ] as const;
 

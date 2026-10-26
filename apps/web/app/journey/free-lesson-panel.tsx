@@ -3,7 +3,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { API_BASE, secureFetch } from "@/app/lib/api";
 
-type Club = { id: string; name: string; city: string | null };
+type Club = {
+  id: string;
+  name: string;
+  city: string | null;
+  /** Distanza in linea d'aria, null se non si puo calcolare. */
+  distanceKm: number | null;
+};
+
+/** Perche la distanza dai circoli non si puo calcolare. */
+type Distance = {
+  available: boolean;
+  reason: "NO_ADDRESS" | "ADDRESS_NOT_LOCATED" | null;
+};
 
 export type FreeLessonView =
   | { enabled: false }
@@ -26,6 +38,7 @@ export type FreeLessonView =
         calibrationRound: number;
       };
       clubs: Club[];
+      distance: Distance;
       attributedClubId: string | null;
       seat: {
         status: string;
@@ -44,6 +57,24 @@ const when = (iso: string) =>
     hour: "2-digit",
     minute: "2-digit",
   });
+
+/** Senza distanza si dice perche, invece di mostrare un numero inventato. */
+const NO_DISTANCE: Record<string, string> = {
+  NO_ADDRESS:
+    "Non possiamo calcolare quanto distano i circoli: aggiungi il tuo indirizzo nel profilo.",
+  ADDRESS_NOT_LOCATED:
+    "Non possiamo calcolare quanto distano i circoli: il tuo indirizzo non è stato riconosciuto, puoi correggerlo nel profilo.",
+};
+
+/** Nome del circolo con citta e distanza, nelle parti che conosciamo. */
+const clubLabel = (club: Club) =>
+  [
+    club.name,
+    club.city,
+    club.distanceKm === null ? null : `a ${club.distanceKm} km`,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
 const MISSING: Record<string, string> = {
   LEVEL:
@@ -190,12 +221,14 @@ export function FreeLessonPanel({
             >
               {view.clubs.map((club) => (
                 <option key={club.id} value={club.id}>
-                  {club.name}
-                  {club.city ? `, ${club.city}` : ""}
+                  {clubLabel(club)}
                 </option>
               ))}
             </select>
           </label>
+          {view.distance.reason && (
+            <p className="pf-muted">{NO_DISTANCE[view.distance.reason]}</p>
+          )}
           <label>
             <input
               type="checkbox"

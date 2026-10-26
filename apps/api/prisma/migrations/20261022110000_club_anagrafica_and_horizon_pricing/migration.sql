@@ -1,13 +1,3 @@
--- Orizzonte di ingresso a 4 mesi al posto di 3 (A5): il nome del valore cambia
--- in blocco, cosi le righe esistenti restano coerenti senza conversioni.
-ALTER TYPE "ProgramHorizon" RENAME VALUE 'PROGRAM_3M' TO 'PROGRAM_4M';
-
--- 4 mesi sono 18 settimane: numero pari, come chiede il motore di training
--- che lavora a finestre di 14 giorni.
-UPDATE "AthleteDiscovery"
-SET "programDurationWeeks" = 18
-WHERE "programHorizon" = 'PROGRAM_4M' AND "programDurationWeeks" = 12;
-
 -- Prezzo per combinazione orizzonte x cadenza: il vantaggio degli orizzonti
 -- piu lunghi vive qui, non nel listino della cadenza (A5-D01).
 ALTER TABLE "ProgramBillingOption" ADD COLUMN "amountCents" INTEGER;
@@ -24,11 +14,13 @@ SET "amountCents" = EXCLUDED."amountCents",
     "currency" = EXCLUDED."currency",
     "updatedAt" = CURRENT_TIMESTAMP;
 
--- Matrice offerta: 4 mesi a 10,00 EUR/mese (solo mensile, 4 non e divisibile
--- per nessuna cadenza piu lunga), 6 mesi a 9,50 (-5%), 12 mesi a 8,90 (-11%).
+-- Matrice offerta: 3 mesi a 10,00 EUR/mese, 6 mesi a 9,50 (-5%), 12 mesi a
+-- 8,90 (-11%). Lo sconto sta sulla durata del percorso, non sulla cadenza:
+-- pagare in un'unica rata non cambia la cifra.
 DELETE FROM "ProgramBillingOption";
 INSERT INTO "ProgramBillingOption" ("horizon","billingCycle","isActive","amountCents","currency","updatedAt") VALUES
-  ('PROGRAM_4M','MONTHLY',true,1000,'eur',CURRENT_TIMESTAMP),
+  ('PROGRAM_3M','MONTHLY',true,1000,'eur',CURRENT_TIMESTAMP),
+  ('PROGRAM_3M','QUARTERLY',true,3000,'eur',CURRENT_TIMESTAMP),
   ('PROGRAM_6M','MONTHLY',true,950,'eur',CURRENT_TIMESTAMP),
   ('PROGRAM_6M','QUARTERLY',true,2850,'eur',CURRENT_TIMESTAMP),
   ('PROGRAM_6M','SEMIANNUAL',true,5700,'eur',CURRENT_TIMESTAMP),

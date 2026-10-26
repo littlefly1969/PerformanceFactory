@@ -15,7 +15,7 @@ EVALUATION ──► FREE_CALIBRATING ──► FREE_LEVEL_ESTIMATED ──► C
                                                                soddisfatta
 ```
 
-Dopo `CALIBRATION_COMPLETED` arrivano gli scenari P4/P6/P12 e la scelta del
+Dopo `CALIBRATION_COMPLETED` arrivano gli scenari P3/P6/P12 e la scelta del
 percorso, che porta a `PAYWALL_READY` (vedi `scenari-orizzonte.md`).
 `PAYWALL_READY` conta come calibrazione chiusa: niente più round.
 
@@ -30,7 +30,7 @@ Due regole distinte, in `ConfidencePolicy` (`confidence-policy.ts`):
 
 | Regola | Serve a |
 |---|---|
-| `R_CONSOLIDATION` | consolidare R e generare P4/P6/P12 |
+| `R_CONSOLIDATION` | consolidare R e generare P3/P6/P12 |
 | `LESSON_ELIGIBILITY` | rendere l'atleta eleggibile alla lezione gratuita |
 
 Ogni regola combina in AND confidence complessiva minima, confidence minima per area
@@ -144,7 +144,7 @@ Tutte in `apps/api/src/discovery/calibration/calibration-rules.ts`, senza I/O:
   `20261011090000_confidence_policies` riapre le calibrazioni chiuse così con
   evidenze sotto la regola (senza abbonamento attivo): R torna provvisoria.
 - **Programma prima del paywall**: per il Blueprint (A4.6, A3.9, A4.7) il programma
-  arriva dopo calibrazione → P4/P6/P12 → Program Horizon → paywall. Per chi ha una
+  arriva dopo calibrazione → P3/P6/P12 → Program Horizon → paywall. Per chi ha una
   valutazione AI, `POST /athlete-journey/submit` e `POST /onboarding/submit` (che
   creano la baseline da cui parte il piano) rispondono 409
   `PROGRAM_LOCKED_BEFORE_PAYWALL`, anche a calibrazione completata e a

@@ -1,18 +1,17 @@
 import { ProgramHorizon } from '@prisma/client';
 
 /**
- * Orizzonti del programma (Blueprint A5): 4, 6 o 12 mesi, al posto delle
+ * Orizzonti del programma (Blueprint A5): 3, 6 o 12 mesi, al posto delle
  * vecchie durate di 4, 12 e 52 settimane. Il motore di training lavora a
- * finestre di 14 giorni, quindi ogni orizzonte è un numero pari di settimane:
- * i 4 mesi di ingresso valgono 18 settimane.
+ * finestre di 14 giorni, quindi ogni orizzonte è un numero pari di settimane.
  */
 export const PROGRAM_HORIZON_WEEKS: Record<ProgramHorizon, number> = {
-  PROGRAM_4M: 18,
+  PROGRAM_3M: 12,
   PROGRAM_6M: 26,
   PROGRAM_12M: 52,
 };
 
-export const PROGRAM_WEEKS = [18, 26, 52] as const;
+export const PROGRAM_WEEKS = [12, 26, 52] as const;
 export type ProgramWeeks = (typeof PROGRAM_WEEKS)[number];
 
 export const isProgramWeeks = (value: unknown): value is ProgramWeeks =>
@@ -25,8 +24,8 @@ export const horizonForWeeks = (weeks: number): ProgramHorizon | null =>
 
 export const PROGRAM_DURATIONS = [
   {
-    weeks: 18,
-    label: '4 mesi',
+    weeks: 12,
+    label: '3 mesi',
     description: 'Un primo ciclo per costruire continuità sui tuoi driver.',
   },
   {

@@ -18,6 +18,7 @@ import {
 } from '../discovery/calibration/lesson-gate';
 import { FeatureFlagsService } from '../features/feature-flags.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { distanceBetween } from '../geo/distance';
 import { loadFreeLessonSettings, syncCredits } from './free-lesson-config';
 import { lessonEligibility } from './free-lesson-rules';
 import { holdCalibration, releaseCalibration } from './lesson-hold';
@@ -95,14 +96,32 @@ export class FreeLessonService {
       return { enabled: false as const };
     const settings = await loadFreeLessonSettings(this.prisma);
     const credits = await syncCredits(this.prisma, userId, settings);
-    const [attribution, check] = await Promise.all([
+    const [attribution, check, address] = await Promise.all([
       this.prisma.userAttribution.findUnique({
         where: { userId },
         select: { partnerId: true },
       }),
       checkLesson(this.prisma, userId),
+      this.prisma.userAddress.findUnique({
+        where: { userId },
+        select: { latitude: true, longitude: true },
+      }),
     ]);
     const { phase, missing, clubs } = check;
+    // La distanza si calcola solo con l'indirizzo dell'atleta risolto in
+    // coordinate: altrimenti si dice perche non si puo calcolare.
+    const distance = {
+      available: !!address?.latitude && !!address?.longitude,
+      reason: !address
+        ? ('NO_ADDRESS' as const)
+        : address.latitude === null || address.longitude === null
+          ? ('ADDRESS_NOT_LOCATED' as const)
+          : null,
+    };
+    const clubsWithDistance = clubs.map(({ latitude, longitude, ...club }) => ({
+      ...club,
+      distanceKm: distanceBetween(address, { latitude, longitude }),
+    }));
     const seat = check.seat
       ? await this.prisma.freeLessonSeat.findUniqueOrThrow({
           where: { userId },
@@ -135,7 +154,8 @@ export class FreeLessonService {
         // Un micro-test è un passo della calibrazione e vale come un round.
         calibrationRound: settings.creditsCalibrationRound,
       },
-      clubs,
+      clubs: clubsWithDistance,
+      distance,
       attributedClubId: clubId,
       seat: seat
         ? {

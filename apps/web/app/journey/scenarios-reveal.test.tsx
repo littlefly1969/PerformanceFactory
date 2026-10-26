@@ -26,7 +26,7 @@ const scenarios = (selectedHorizon: Scenarios["selectedHorizon"] = null) =>
     scale: { min: 0, max: 100 },
     selectedHorizon,
     horizons: [
-      { horizon: "PROGRAM_4M", months: 4, drivers: drivers(52), gap: gap(52) },
+      { horizon: "PROGRAM_3M", months: 3, drivers: drivers(52), gap: gap(52) },
       { horizon: "PROGRAM_6M", months: 6, drivers: drivers(61), gap: gap(61) },
       {
         horizon: "PROGRAM_12M",
@@ -42,7 +42,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("P4/P6/P12 reveal", () => {
+describe("P3/P6/P12 reveal", () => {
   it("shows three scenarios marked as provisional and sends the chosen horizon", async () => {
     const onSelect = vi.fn();
     render(
@@ -89,10 +89,10 @@ describe("P4/P6/P12 reveal", () => {
           new Response(
             JSON.stringify([
               {
-                horizon: "PROGRAM_4M",
-                horizonMonths: 4,
+                horizon: "PROGRAM_3M",
+                horizonMonths: 3,
                 monthlyCents: 3900,
-                horizonTotalCents: 15600,
+                horizonTotalCents: 11700,
                 currency: "EUR",
                 savingPercent: 0,
                 billingOptions: [

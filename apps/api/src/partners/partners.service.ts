@@ -14,6 +14,7 @@ import {
   sanitizeTouch,
 } from './attribution';
 import { CreatePartnerDto, UpdatePartnerDto } from './dto/partner.dto';
+import { GeocodingService } from '../geo/geocoding.service';
 
 const REFERRAL_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
 const REFERRAL_LENGTH = 8;
@@ -29,6 +30,8 @@ const partnerSelect = {
   postalCode: true,
   website: true,
   logoUrl: true,
+  latitude: true,
+  longitude: true,
   isActive: true,
   freeLessonsEnabled: true,
   createdAt: true,
@@ -39,7 +42,37 @@ const text = (value: string | undefined) => value?.trim() || null;
 
 @Injectable()
 export class PartnersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly geocoding: GeocodingService,
+  ) {}
+
+  /**
+   * Coordinate della sede, risolte dall'indirizzo quando ci sono tutte le
+   * parti. Un tentativo, non un obbligo: senza risposta restano nulle e
+   * all'atleta si dice che la distanza non si puo calcolare.
+   */
+  private async locate(sede: {
+    street: string | null;
+    postalCode: string | null;
+    city: string | null;
+    province: string | null;
+  }) {
+    const { street, postalCode, city, province } = sede;
+    if (!street || !postalCode || !city || !province)
+      return { latitude: null, longitude: null, geocodedAt: null };
+    const located = await this.geocoding.locate({
+      street,
+      postalCode,
+      city,
+      province,
+    });
+    return {
+      latitude: located?.latitude ?? null,
+      longitude: located?.longitude ?? null,
+      geocodedAt: located ? new Date() : null,
+    };
+  }
 
   async list() {
     const [partners, counts] = await Promise.all([
@@ -63,17 +96,21 @@ export class PartnersService {
   }
 
   async create(input: CreatePartnerDto) {
+    const sede = {
+      city: text(input.city),
+      province: text(input.province)?.toUpperCase() ?? null,
+      address: text(input.address),
+      postalCode: text(input.postalCode),
+    };
     try {
       return await this.prisma.partner.create({
         data: {
           code: input.code,
           name: input.name.trim(),
-          city: text(input.city),
-          province: text(input.province)?.toUpperCase() ?? null,
-          address: text(input.address),
-          postalCode: text(input.postalCode),
+          ...sede,
           website: text(input.website),
           logoUrl: text(input.logoUrl),
+          ...(await this.locate({ ...sede, street: sede.address })),
           ...(input.freeLessonsEnabled !== undefined && {
             freeLessonsEnabled: input.freeLessonsEnabled,
           }),
@@ -93,23 +130,38 @@ export class PartnersService {
   async update(id: string, input: UpdatePartnerDto) {
     const existing = await this.prisma.partner.findUnique({
       where: { id },
-      select: { id: true },
+      select: {
+        id: true,
+        address: true,
+        postalCode: true,
+        city: true,
+        province: true,
+      },
     });
     if (!existing) throw new NotFoundException('Circolo non trovato');
+    const sede = {
+      ...(input.city !== undefined && { city: text(input.city) }),
+      ...(input.province !== undefined && {
+        province: text(input.province)?.toUpperCase() ?? null,
+      }),
+      ...(input.address !== undefined && { address: text(input.address) }),
+      ...(input.postalCode !== undefined && {
+        postalCode: text(input.postalCode),
+      }),
+    };
+    // Le coordinate si rifanno solo quando la sede cambia davvero.
+    const next = { ...existing, ...sede };
+    const moved = (['address', 'postalCode', 'city', 'province'] as const).some(
+      (field) => next[field] !== existing[field],
+    );
     return this.prisma.partner.update({
       where: { id },
       data: {
         ...(input.name !== undefined && { name: input.name.trim() }),
-        ...(input.city !== undefined && { city: text(input.city) }),
-        ...(input.province !== undefined && {
-          province: text(input.province)?.toUpperCase() ?? null,
-        }),
-        ...(input.address !== undefined && { address: text(input.address) }),
-        ...(input.postalCode !== undefined && {
-          postalCode: text(input.postalCode),
-        }),
+        ...sede,
         ...(input.website !== undefined && { website: text(input.website) }),
         ...(input.logoUrl !== undefined && { logoUrl: text(input.logoUrl) }),
+        ...(moved ? await this.locate({ ...next, street: next.address }) : {}),
         ...(input.freeLessonsEnabled !== undefined && {
           freeLessonsEnabled: input.freeLessonsEnabled,
         }),

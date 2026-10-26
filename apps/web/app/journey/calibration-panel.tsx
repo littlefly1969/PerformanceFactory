@@ -209,7 +209,7 @@ export function CalibrationPanel({
           {c.completionReason === "CONFIDENCE_REACHED"
             ? "Le tue risposte sono abbastanza coerenti e complete per una stima affidabile."
             : "I driver ancora poco affidabili restano indicati come tali, senza valori inventati."}{" "}
-          Il prossimo passo sono i tuoi scenari a 4, 6 e 12 mesi.
+          Il prossimo passo sono i tuoi scenari a 3, 6 e 12 mesi.
         </p>
       ) : c.round?.action === "PROPOSE_MICRO_TEST" &&
         c.round.questions[0]?.microTest ? (

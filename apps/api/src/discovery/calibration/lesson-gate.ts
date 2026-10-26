@@ -33,7 +33,13 @@ export async function freeLessonEnabledFor(db: Db, userId: string) {
 export const lessonClubs = (db: Db) =>
   db.partner.findMany({
     where: { isActive: true, freeLessonsEnabled: true },
-    select: { id: true, name: true, city: true },
+    select: {
+      id: true,
+      name: true,
+      city: true,
+      latitude: true,
+      longitude: true,
+    },
     orderBy: { name: 'asc' },
   });
 

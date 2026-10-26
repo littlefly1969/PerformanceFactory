@@ -27,7 +27,7 @@ type EvaluatedRound = {
  * Nuova valutazione dopo una correzione della classifica FIT: stesse
  * evidenze, classifica aggiornata. A calibrazione aperta valgono le regole di
  * sempre. A calibrazione chiusa la nuova R è consolidata solo se soddisfa
- * ancora la regola di consolidamento, e allora P4/P6/P12 si rigenerano su di
+ * ancora la regola di consolidamento, e allora P3/P6/P12 si rigenerano su di
  * essa; altrimenti resta provvisoria e la R consolidata precedente rimane
  * quella mostrata. Il programma già creato non cambia. Va chiamata sotto il
  * lease dell'atleta. Restituisce false se non c'è ancora una valutazione.

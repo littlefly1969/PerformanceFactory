@@ -59,9 +59,9 @@ const COPY = {
     activation: "I prossimi micro-test su misura di tutti gli atleti useranno",
   },
   POTENTIAL: {
-    title: "Scenari P4/P6/P12",
+    title: "Scenari P3/P6/P12",
     description:
-      "Prompt del Performance Engine che, a R consolidata, stima dove può arrivare ogni driver in 4, 6 e 12 mesi. Il backend accetta solo stime entro i criteri versionati: tetto del livello, nessun calo con l'orizzonte, confidenza decrescente.",
+      "Prompt del Performance Engine che, a R consolidata, stima dove può arrivare ogni driver in 3, 6 e 12 mesi. Il backend accetta solo stime entro i criteri versionati: tetto del livello, nessun calo con l'orizzonte, confidenza decrescente.",
     usedBy: "tutti i nuovi reveal",
     instructions: "Istruzioni per gli scenari (modificabili)",
     rules:
@@ -71,7 +71,7 @@ const COPY = {
 } as const;
 
 const HORIZON_LABEL = {
-  PROGRAM_4M: "P4",
+  PROGRAM_3M: "P3",
   PROGRAM_6M: "P6",
   PROGRAM_12M: "P12",
 } as const;
@@ -190,7 +190,7 @@ export function AssessmentPromptEditor({
             <p className="pf-muted">
               Il formato di risposta non si modifica qui: il sistema aggiunge
               sempre le regole fisse ({copy.rules}) e scarta ogni risposta che
-              non le rispetta. Il potenziale P4/P6/P12 non viene chiesto.
+              non le rispetta. Il potenziale P3/P6/P12 non viene chiesto.
             </p>
             <div className="pf-form-actions">
               <button

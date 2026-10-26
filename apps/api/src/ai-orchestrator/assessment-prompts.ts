@@ -26,7 +26,7 @@ import {
  * Cinque famiglie di prompt con lo stesso ciclo di vita (bozze, attivazione,
  * versioni): le domande conoscitive iniziali, la valutazione delle risposte,
  * le domande di calibrazione, i micro-test su misura e gli scenari
- * P4/P6/P12. Al massimo un prompt attivo per famiglia.
+ * P3/P6/P12. Al massimo un prompt attivo per famiglia.
  */
 export const ASSESSMENT_PROMPT_KINDS = [
   'INITIAL_QUESTIONS',
@@ -63,7 +63,7 @@ const KINDS = {
   },
   POTENTIAL: {
     defaultId: 'potential-prompt-default',
-    defaultName: 'scenari P4/P6/P12',
+    defaultName: 'scenari P3/P6/P12',
     defaultPrompt: DEFAULT_POTENTIAL_PROMPT,
     promptType: POTENTIAL_PROMPT_TYPE,
   },

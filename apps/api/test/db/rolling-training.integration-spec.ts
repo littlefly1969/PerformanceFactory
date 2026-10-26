@@ -34,7 +34,7 @@ describe('Rolling calendar and athlete availability with PostgreSQL', () => {
       where: { userId: athlete.id },
       data: {
         profileJson: {
-          program_duration_weeks: { value: 18 },
+          program_duration_weeks: { value: 12 },
           general_training_frequency: { value: '2_3' },
         },
       },
@@ -55,7 +55,7 @@ describe('Rolling calendar and athlete availability with PostgreSQL', () => {
       currentFrequency: '2_3',
       daysPerWeek: 1,
       sessionDurationMinutes: 30,
-      programDurationWeeks: 18,
+      programDurationWeeks: 12,
     };
     for (const bad of [
       { ...payload, daysPerWeek: 8 },
@@ -109,7 +109,7 @@ describe('Rolling calendar and athlete availability with PostgreSQL', () => {
     });
     expect(response.json<{ daysPerWeek: number }>().daysPerWeek).toBe(4);
   });
-  it.each([18, 26, 52])(
+  it.each([12, 26, 52])(
     'preserves the selected %s-week program in discovery, context and home',
     async (weeks) => {
       const athlete = await f.user();

@@ -99,7 +99,7 @@ export async function lifecycleFixture(): Promise<LifecycleFixture> {
                     general_training_frequency: { value: '2_3' },
                     training_days_available: { value: 4 },
                     training_session_duration: { value: 60 },
-                    program_duration_weeks: { value: 18 },
+                    program_duration_weeks: { value: 12 },
                   },
                 },
               },

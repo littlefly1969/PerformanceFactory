@@ -10,7 +10,7 @@ const prices = [
 ];
 
 const blueprintMatrix: Array<[ProgramHorizon, BillingCycle[]]> = [
-  ['PROGRAM_4M', ['MONTHLY']],
+  ['PROGRAM_3M', ['MONTHLY', 'QUARTERLY']],
   ['PROGRAM_6M', ['MONTHLY', 'QUARTERLY', 'SEMIANNUAL']],
   ['PROGRAM_12M', ['MONTHLY', 'QUARTERLY', 'SEMIANNUAL', 'ANNUAL']],
 ];
@@ -19,9 +19,9 @@ const options = blueprintMatrix.flatMap(([horizon, cycles]) =>
   cycles.map((billingCycle) => ({ horizon, billingCycle, isActive: true })),
 );
 
-// Prezzi per combinazione: 4 mesi 10,00/mese, 6 mesi 9,50, 12 mesi 8,90.
+// Prezzi per combinazione: 3 mesi 10,00/mese, 6 mesi 9,50, 12 mesi 8,90.
 const monthlyByHorizon: Record<ProgramHorizon, number> = {
-  PROGRAM_4M: 1000,
+  PROGRAM_3M: 1000,
   PROGRAM_6M: 950,
   PROGRAM_12M: 890,
 };
@@ -46,7 +46,7 @@ describe('buildPaywallOffers', () => {
         offer.billingOptions.map((option) => option.billingCycle),
       ]),
     ).toEqual([
-      ['PROGRAM_4M', 'P4', ['MONTHLY']],
+      ['PROGRAM_3M', 'P3', ['MONTHLY', 'QUARTERLY']],
       ['PROGRAM_6M', 'P6', ['MONTHLY', 'QUARTERLY', 'SEMIANNUAL']],
       ['PROGRAM_12M', 'P12', ['MONTHLY', 'QUARTERLY', 'SEMIANNUAL', 'ANNUAL']],
     ]);
@@ -69,7 +69,7 @@ describe('buildPaywallOffers', () => {
         offer.savingPercent,
       ]),
     ).toEqual([
-      ['PROGRAM_4M', 1000, 4000, 0],
+      ['PROGRAM_3M', 1000, 3000, 0],
       ['PROGRAM_6M', 950, 5700, 5],
       ['PROGRAM_12M', 890, 10680, 11],
     ]);
@@ -92,7 +92,7 @@ describe('buildPaywallOffers', () => {
 
   it('hides inactive combinations, missing prices and empty horizons', () => {
     const offers = buildPaywallOffers(
-      prices.filter((price) => price.billingCycle !== 'MONTHLY'),
+      prices.filter((price) => price.billingCycle !== 'QUARTERLY'),
       options.map((option) =>
         option.horizon === 'PROGRAM_12M' && option.billingCycle !== 'ANNUAL'
           ? { ...option, isActive: false }
@@ -106,7 +106,10 @@ describe('buildPaywallOffers', () => {
         offer.horizon,
         offer.billingOptions.map((option) => option.billingCycle),
       ]),
-    ).toEqual([['PROGRAM_12M', ['ANNUAL']]]);
+    ).toEqual([
+      ['PROGRAM_3M', ['MONTHLY']],
+      ['PROGRAM_12M', ['ANNUAL']],
+    ]);
   });
 });
 

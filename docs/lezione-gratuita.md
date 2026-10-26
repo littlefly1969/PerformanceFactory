@@ -210,6 +210,28 @@ assegnate al coach demo `coach_padel@example.it`. Le lezioni hanno un id
 deterministico (`free-lesson-<codice>-<n>`), quindi rieseguire il seed non le
 duplica: ne aggiorna le date, che restano sempre nel futuro.
 
+## Distanza fra atleta e circolo
+
+L'atleta scrive il suo indirizzo dal profilo (`/user/profile`). Da lì il
+pannello della lezione mostra quanto dista ogni circolo in linea d'aria. La
+distanza esce dalle coordinate di entrambi: quelle del circolo si risolvono dal
+suo indirizzo quando l'admin lo salva, quelle dell'atleta quando salva il suo.
+
+Il geocoding è un tentativo, non un passo obbligatorio: è un servizio esterno
+configurabile con `GEOCODING_URL` (per difetto Nominatim di OpenStreetMap),
+spegnibile con `GEOCODING_ENABLED=false`. Se non risponde o non trova
+l'indirizzo, le coordinate restano vuote e all'atleta si dice perché la
+distanza non si può calcolare, invece di mostrare un numero inventato:
+
+| `distance.reason` | Cosa vede l'atleta |
+|---|---|
+| `NO_ADDRESS` | manca l'indirizzo: lo si aggiunge dal profilo |
+| `ADDRESS_NOT_LOCATED` | l'indirizzo c'è ma non è stato riconosciuto: si può correggere |
+| `null` | la distanza c'è, per i circoli di cui si conosce la sede |
+
+Un circolo senza coordinate ha `distanceKm` nullo anche quando l'atleta è
+localizzato: la sua riga resta senza distanza, le altre la mostrano.
+
 Test: `free-lesson-rules.spec.ts`, `calibration-rules.spec.ts`,
 `test/db/free-lesson.integration-spec.ts` (crediti in parallelo, catalogo fuori
 dal pannello, eleggibilità per regola, capienza con assegnazioni parallele, attesa di

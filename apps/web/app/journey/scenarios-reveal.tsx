@@ -160,7 +160,7 @@ function HorizonOffer({ horizon }: { horizon: ProgramHorizon }) {
 }
 
 /**
- * Reveal a calibrazione chiusa: tre Spider R+P4, R+P6, R+P12 e la scelta del
+ * Reveal a calibrazione chiusa: tre Spider R+P3, R+P6, R+P12 e la scelta del
  * percorso. La scelta porta all'offerta; il pagamento è il passo successivo.
  */
 export function ScenariosReveal({
@@ -179,7 +179,7 @@ export function ScenariosReveal({
       aria-labelledby="pf4-scenarios-title"
     >
       <span className="pf4-kicker">I tuoi scenari</span>
-      <h2 id="pf4-scenarios-title">Dove puoi arrivare in 4, 6 e 12 mesi.</h2>
+      <h2 id="pf4-scenarios-title">Dove puoi arrivare in 3, 6 e 12 mesi.</h2>
       <p>
         Partiamo dalla tua R consolidata. Il potenziale cresce più in fretta
         all&apos;inizio e poi rallenta: dipende dal tuo livello, dal tuo impegno

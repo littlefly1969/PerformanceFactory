@@ -132,7 +132,7 @@ export class AthleteJourneyService {
       evaluation && !saved.baselineId
         ? await this.calibration.view(userId)
         : null;
-    // P4/P6/P12 solo a calibrazione chiusa e con la funzione attiva (A3.9).
+    // P3/P6/P12 solo a calibrazione chiusa e con la funzione attiva (A3.9).
     const scenarios = calibration
       ? await this.scenarios.view(userId, orderedAreas)
       : null;
