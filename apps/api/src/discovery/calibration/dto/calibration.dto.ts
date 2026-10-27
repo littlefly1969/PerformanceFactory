@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  ArrayMaxSize,
+  IsArray,
   IsBoolean,
   IsIn,
   IsInt,
@@ -81,6 +83,15 @@ export class UpdateCalibrationConfigDto {
   @Min(1)
   @Max(4)
   initialQuestionsPerArea?: number;
+
+  /** Parole o frasi vietate nei micro-test generati dall'AI. */
+  @ApiPropertyOptional({ type: [String], maxItems: 100 })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  @MaxLength(60, { each: true })
+  unsafeMicroTestTerms?: string[];
 }
 
 /** Nuova versione di una regola di confidence; null = criterio non applicato. */

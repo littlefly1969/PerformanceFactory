@@ -1,6 +1,7 @@
 import { BadGatewayException, Logger } from '@nestjs/common';
 import {
   DEFAULT_MICRO_TEST_PROMPT,
+  MICRO_TEST_ATTEMPTS,
   MicroTestInput,
   buildMicroTestPrompt,
   generateMicroTests,
@@ -55,6 +56,7 @@ const test = (extra: object = {}) => ({
 
 describe('micro-test generation', () => {
   const previous = process.env.AI_PROVIDER;
+  beforeAll(() => jest.spyOn(Logger.prototype, 'warn').mockImplementation());
   afterEach(() => {
     process.env.AI_PROVIDER = previous;
     jest.mocked(requestStructuredProposal).mockReset();
@@ -331,7 +333,7 @@ describe('micro-test generation', () => {
     ).toBeNull();
   });
 
-  it('refuses an invalid provider output instead of showing it', async () => {
+  it('refuses an invalid provider output instead of showing it, after one retry', async () => {
     process.env.AI_PROVIDER = 'openai';
     jest.mocked(requestStructuredProposal).mockResolvedValue({
       outputText: JSON.stringify({ tests: [test({ areaId: 'altro' })] }),
@@ -339,5 +341,62 @@ describe('micro-test generation', () => {
     await expect(
       generateMicroTests(new Logger('test'), input),
     ).rejects.toBeInstanceOf(BadGatewayException);
+    expect(requestStructuredProposal).toHaveBeenCalledTimes(
+      MICRO_TEST_ATTEMPTS,
+    );
+  });
+
+  it('retries a rejected test once, telling the AI why it was rejected', async () => {
+    process.env.AI_PROVIDER = 'gemini';
+    const reply = (raw: object) =>
+      ({ outputText: JSON.stringify(raw) }) as Awaited<
+        ReturnType<typeof requestStructuredProposal>
+      >;
+    jest
+      .mocked(requestStructuredProposal)
+      .mockResolvedValueOnce(
+        reply({
+          tests: [test({ instructions: 'Fai sprint massimali a rete.' })],
+        }),
+      )
+      .mockResolvedValueOnce(reply({ tests: [test()] }));
+    const result = await generateMicroTests(new Logger('test'), input);
+    expect(result.tests).toHaveLength(1);
+    const calls = jest.mocked(requestStructuredProposal).mock.calls;
+    expect(calls).toHaveLength(2);
+    expect(calls[0][4].user).not.toHaveProperty('previousAttemptRejected');
+    expect(
+      (calls[1][4].user as { previousAttemptRejected: string })
+        .previousAttemptRejected,
+    ).toContain('contenuto non sicuro');
+  });
+
+  it('accepts safety notes that rule out banned content', () => {
+    expect(
+      validateMicroTests(
+        {
+          tests: [
+            test({
+              instructions:
+                'A ritmo non massimale, 10 volée a muro senza sprint: conta quante tornano.',
+              safetyNotes: 'Evita sforzi massimali, non arrivare al cedimento.',
+            }),
+          ],
+        },
+        input,
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('applies the banned terms set in the back office', () => {
+    const custom = { ...input, unsafeTerms: ['volée a muro'] };
+    expect(validateMicroTests({ tests: [test()] }, custom)).toBeNull();
+    expect(buildMicroTestPrompt(custom).system).toContain('volée a muro');
+    expect(
+      validateMicroTests(
+        { tests: [test({ safetyNotes: 'Niente sprint.' })] },
+        { ...input, unsafeTerms: ['sprint'] },
+      ),
+    ).toHaveLength(1);
   });
 });

@@ -14,6 +14,7 @@ import { AiProposalProviderService } from '../../ai-orchestrator/proposal-provid
 import { PrismaService } from '../../prisma/prisma.service';
 import { videoCatalog } from '../../coaching-videos/coaching-videos';
 import { chosenOptions } from '../choice-answers';
+import { loadCalibrationSettings } from './calibration-config';
 
 /**
  * Micro-test come passo del motore (PF-FS-PREPAYWALL §4.4): il motore sceglie
@@ -99,7 +100,7 @@ export async function generateMicroTest(
   step: CalibrationQuestionsResult,
 ) {
   const areaId = step.targetAreas[0];
-  const [prompt, proposed, latest, videos] = await Promise.all([
+  const [prompt, proposed, latest, videos, settings] = await Promise.all([
     loadActiveAssessmentPrompt(prisma, 'MICRO_TEST'),
     prisma.microTest.findMany({
       where: { OR: [{ userId }, { completions: { some: { userId } } }] },
@@ -113,6 +114,7 @@ export async function generateMicroTest(
       select: { areas: { where: { areaId } } },
     }),
     videoCatalog(prisma, areaId),
+    loadCalibrationSettings(prisma),
   ]);
   const driver = input.drivers.find((d) => d.areaId === areaId)!;
   const area = latest.areas[0];
@@ -142,6 +144,7 @@ export async function generateMicroTest(
     ],
     proposedTitles: proposed.map((p) => p.title),
     videos,
+    unsafeTerms: settings.unsafeMicroTestTerms,
   });
   return {
     ...result.tests[0],

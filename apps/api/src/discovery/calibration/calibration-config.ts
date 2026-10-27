@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { hasEntitlement } from '../../payments/subscription-transitions';
+import { cleanUnsafeTerms } from '../../ai-orchestrator/micro-test-safety';
 import { PrismaService } from '../../prisma/prisma.service';
 import {
   CalibrationSettings,
@@ -14,6 +15,7 @@ const select = {
   programBeforePaywall: true,
   questionsPerMicroTest: true,
   initialQuestionsPerArea: true,
+  unsafeMicroTestTerms: true,
 } as const;
 
 /** Parametri correnti; la riga nasce con i valori di default alla prima lettura. */
@@ -33,6 +35,11 @@ export async function updateCalibrationSettings(
   change: Partial<CalibrationSettings>,
   actorId: string,
 ) {
+  if (change.unsafeMicroTestTerms)
+    change = {
+      ...change,
+      unsafeMicroTestTerms: cleanUnsafeTerms(change.unsafeMicroTestTerms),
+    };
   const next = { ...(await loadCalibrationSettings(prisma)), ...change };
   const problems = settingsProblems(next);
   if (problems.length) throw new BadRequestException(problems.join('. '));

@@ -1,4 +1,8 @@
-import { BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Logger,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 
 export type AiFetchOptions = {
   provider: 'openai' | 'gemini';
@@ -9,6 +13,28 @@ export type AiFetchOptions = {
 const DEFAULT_TIMEOUT_MS = 90_000;
 const DEFAULT_RETRIES = 2;
 const MAX_RETRY_AFTER_MS = 30_000;
+
+/**
+ * Quota giornaliera del provider esaurita (per esempio le 20 richieste al
+ * giorno del piano gratuito Gemini): ritentare non serve fino al giorno dopo,
+ * e l'atleta riceve un messaggio leggibile invece della risposta del provider.
+ */
+export class AiQuotaExhaustedException extends ServiceUnavailableException {
+  constructor() {
+    super({
+      code: 'AI_QUOTA_EXHAUSTED',
+      message:
+        'Il nostro assistente ha raggiunto il limite di richieste per oggi. Riprova più tardi.',
+    });
+  }
+}
+
+const logger = new Logger('AiFetch');
+
+/** 429 per quota giornaliera, distinto dal limite al minuto che si ritenta. */
+export function isDailyQuotaError(status: number, body: string) {
+  return status === 429 && /per ?day|perday|requests per day/i.test(body);
+}
 
 function sleep(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -67,6 +93,18 @@ export async function aiFetch(
       }
 
       const retryable = response.status === 429 || response.status >= 500;
+      if (response.status === 429) {
+        const errorText = await response
+          .clone()
+          .text()
+          .catch(() => '');
+        if (isDailyQuotaError(response.status, errorText)) {
+          logger.warn(
+            `AI_QUOTA_EXHAUSTED ${options.provider}: ${errorText.slice(0, 500)}`,
+          );
+          throw new AiQuotaExhaustedException();
+        }
+      }
       if (!retryable || attempt === maxAttempts) {
         const errorText = await response.text().catch(() => '');
         throw new BadRequestException(
@@ -79,7 +117,10 @@ export async function aiFetch(
       continue;
     } catch (error) {
       clearTimeout(timer);
-      if (error instanceof BadRequestException) {
+      if (
+        error instanceof BadRequestException ||
+        error instanceof AiQuotaExhaustedException
+      ) {
         throw error;
       }
       const isAbort = error instanceof Error && error.name === 'AbortError';

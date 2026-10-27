@@ -7,6 +7,7 @@ import {
   validateInitialQuestions,
 } from './initial-questions';
 import { requestStructuredProposal } from './proposal-structured-transport';
+import { AiQuotaExhaustedException } from '../common/ai-fetch';
 
 jest.mock('./proposal-structured-transport', () => ({
   requestStructuredProposal: jest.fn(),
@@ -268,5 +269,16 @@ describe('initial questions', () => {
     await expect(
       generateInitialQuestions(silent(), input),
     ).rejects.toBeInstanceOf(BadGatewayException);
+  });
+
+  it('does not retry when the daily AI quota is exhausted', async () => {
+    process.env.AI_PROVIDER = 'gemini';
+    jest
+      .mocked(requestStructuredProposal)
+      .mockRejectedValue(new AiQuotaExhaustedException());
+    await expect(
+      generateInitialQuestions(silent(), input),
+    ).rejects.toBeInstanceOf(AiQuotaExhaustedException);
+    expect(requestStructuredProposal).toHaveBeenCalledTimes(1);
   });
 });

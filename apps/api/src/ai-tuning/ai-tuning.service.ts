@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AiProposalProviderService } from '../ai-orchestrator/proposal-provider.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { loadCalibrationSettings } from '../discovery/calibration/calibration-config';
 import { CreateEvaluationRunDto } from './dto/create-evaluation-run.dto';
 import { RateEvaluationResultDto } from './dto/rate-evaluation-result.dto';
 import { RunReplayDto } from './dto/run-replay.dto';
@@ -103,8 +104,13 @@ export class AiTuningService {
     return testCalibrationPrompt(this.proposalProvider, basePrompt);
   }
 
-  testMicroTestPrompt(basePrompt: string) {
-    return testMicroTestPrompt(this.proposalProvider, basePrompt);
+  async testMicroTestPrompt(basePrompt: string) {
+    const { unsafeMicroTestTerms } = await loadCalibrationSettings(this.prisma);
+    return testMicroTestPrompt(
+      this.proposalProvider,
+      basePrompt,
+      unsafeMicroTestTerms,
+    );
   }
 
   testPotentialPrompt(basePrompt: string) {
