@@ -181,3 +181,87 @@ test("deploy preserves paths with spaces and waits for healthy services", () => 
     rmSync(temp, { recursive: true, force: true });
   }
 });
+
+test("update pulls published images, backs up, pins the commit tag and keeps volumes", () => {
+  const temp = mkdtempSync(join(tmpdir(), "pf-update-"));
+  try {
+    const envFile = join(temp, ".env.production");
+    const log = join(temp, "calls.jsonl");
+    writeFileSync(
+      envFile,
+      "COMPOSE_PROJECT_NAME=script-test\nIMAGE_TAG=local\nAPI_IMAGE=performancefactory-api:local\nSESSION_SECRET=keep-me\n",
+      { mode: 0o600 },
+    );
+    writeFileSync(
+      join(temp, "docker"),
+      `#!/usr/bin/env node
+const args = process.argv.slice(2);
+require('fs').appendFileSync(process.env.DOCKER_TEST_LOG, JSON.stringify(args) + '\\n');
+const has = (word) => args.includes(word);
+if (has('inspect')) console.log('abcdef1234567890');
+else if (has('ps') && has('--services')) console.log('postgres\\napi');
+else if (has('exec')) process.stdout.write('DUMP');
+else if (has('ls') && has('--format')) console.log('sha-abcdef1\\nsha-old0001\\nmain');
+`,
+      { mode: 0o755 },
+    );
+    const result = spawnSync(
+      "sh",
+      ["infra/scripts/update-prod.sh", "--env-file", envFile],
+      {
+        cwd: root,
+        env: {
+          ...process.env,
+          PATH: `${temp}:${process.env.PATH}`,
+          DOCKER_TEST_LOG: log,
+          IMAGE_PREFIX: "ghcr.io/owner/pf",
+        },
+        encoding: "utf8",
+      },
+    );
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    const env = readFileSync(envFile, "utf8");
+    assert.match(env, /^IMAGE_TAG=sha-abcdef1$/m);
+    assert.match(env, /^API_IMAGE=ghcr\.io\/owner\/pf-api:sha-abcdef1$/m);
+    assert.match(env, /^WEB_IMAGE=ghcr\.io\/owner\/pf-web:sha-abcdef1$/m);
+    assert.match(env, /^SESSION_SECRET=keep-me$/m);
+    assert.equal(statSync(envFile).mode & 0o777, 0o600);
+    assert.match(
+      readFileSync(join(temp, ".deploy-history"), "utf8"),
+      / sha-abcdef1\n$/,
+    );
+    const calls = readFileSync(log, "utf8")
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    assert.ok(
+      calls.some((args) => args.join(" ") === "pull ghcr.io/owner/pf-api:main"),
+    );
+    assert.ok(
+      calls.some(
+        (args) => args.includes("exec") && args.join(" ").includes("pg_dump"),
+      ),
+    );
+    const up = calls.find((args) => args.includes("up"));
+    assert.ok(up.includes("--no-build"));
+    assert.ok(up.includes("--wait"));
+    assert.ok(!calls.some((args) => args.includes("build")));
+    assert.ok(
+      calls.some(
+        (args) => args.join(" ") === "rmi ghcr.io/owner/pf-api:sha-old0001",
+      ),
+    );
+    assert.ok(
+      !calls.some(
+        (args) => args.join(" ") === "rmi ghcr.io/owner/pf-api:sha-abcdef1",
+      ),
+    );
+    assert.ok(
+      !calls.some(
+        (args) => args.includes("prune") || args.includes("--volumes"),
+      ),
+    );
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});

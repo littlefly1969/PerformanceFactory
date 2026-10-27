@@ -97,11 +97,63 @@ se falliscono, il deploy fallisce. Per database già popolati verificare il back
 prima di distribuire nuove migrazioni. Il codice non copia né migra automaticamente
 i dati di un precedente database remoto nel nuovo database locale.
 
-Per usare immagini già pubblicate:
+## Immagini pubblicate da GitHub Actions (consigliato)
+
+Il workflow `.github/workflows/release.yml` parte quando la CI su `main` finisce
+verde. Costruisce le immagini API e web e le pubblica su GitHub Container
+Registry con due tag:
+
+- `ghcr.io/littlefly1969/performancefactory-api:sha-xxxxxxx` (e `-web`), uno per
+  commit, immutabile;
+- `:main`, che punta sempre all'ultima build verde.
+
+Dopo ogni pubblicazione il job `cleanup` tiene solo le ultime versioni di ogni
+pacchetto (5 per difetto, variabile di repository `GHCR_KEEP_VERSIONS`).
+`NEXT_PUBLIC_API_BASE_URL` entra nell'immagine web in build: si cambia con la
+variabile di repository omonima (default
+`https://performancefactory.littlefly.it/api`), poi si rilancia il workflow a
+mano da *Actions → Release images → Run workflow*.
+
+Sul server la configurazione una tantum è il login a `ghcr.io` con un token
+classico che ha solo il permesso `read:packages`:
 
 ```bash
-DEPLOY_MODE=pull infra/scripts/deploy-prod.sh --env-file .env.production
+docker login ghcr.io -u littlefly1969   # come password incollare il token
 ```
+
+Aggiornamento all'ultima build verde:
+
+```bash
+git pull --ff-only origin main
+infra/scripts/update-prod.sh --env-file .env.production
+```
+
+Lo script scarica le immagini, fa un backup `pg_dump` in `backups/` (tiene gli
+ultimi 5), scrive in `.env.production` la versione esatta (`IMAGE_TAG`,
+`API_IMAGE`, `WEB_IMAGE` con il tag `sha-…`), poi esegue `deploy-prod.sh` senza
+build: migrazioni, riavvio e controlli di salute. Registra ogni versione
+distribuita in `.deploy-history` e rimuove le immagini locali più vecchie delle
+ultime 3. Non tocca i volumi.
+
+Versioni distribuite e immagini presenti sul server:
+
+```bash
+infra/scripts/update-prod.sh --env-file .env.production --list
+```
+
+Rollback a una versione precedente:
+
+```bash
+infra/scripts/update-prod.sh --env-file .env.production sha-xxxxxxx
+```
+
+Il rollback cambia il codice ma non annulla le migrazioni già applicate: va bene
+quando le migrazioni sono additive. Se una migrazione va annullata davvero, si
+ripristina il backup creato prima dell'aggiornamento (sezione *Backup e
+ripristino*).
+
+`DEPLOY_MODE=pull` e `DEPLOY_MODE=build` di `deploy-prod.sh` restano disponibili;
+`DEPLOY_MODE=none` usa le immagini già presenti senza build né pull.
 
 Sono configurabili `API_IMAGE`, `WEB_IMAGE`, `IMAGE_TAG`, `POSTGRES_IMAGE`,
 `REDIS_IMAGE` e le porte/bind dell'host. Il server davanti a Docker deve gestire
