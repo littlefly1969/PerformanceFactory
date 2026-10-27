@@ -1,3 +1,7 @@
+import {
+  DEFAULT_UNSAFE_MICRO_TEST_TERMS,
+  unsafeTermsProblems,
+} from '../../ai-orchestrator/micro-test-safety';
 import { ConfidenceRule, checkRule } from './confidence-policy';
 
 /**
@@ -36,6 +40,8 @@ export type CalibrationSettings = {
   questionsPerMicroTest: number;
   /** Domande conoscitive iniziali per driver, scritte dall'AI dopo la classifica FIT. */
   initialQuestionsPerArea: number;
+  /** Parole o frasi vietate nei micro-test generati dall'AI. */
+  unsafeMicroTestTerms: string[];
 };
 
 export const DEFAULT_CALIBRATION_SETTINGS: CalibrationSettings = {
@@ -44,6 +50,7 @@ export const DEFAULT_CALIBRATION_SETTINGS: CalibrationSettings = {
   programBeforePaywall: false,
   questionsPerMicroTest: 0,
   initialQuestionsPerArea: 2,
+  unsafeMicroTestTerms: DEFAULT_UNSAFE_MICRO_TEST_TERMS,
 };
 
 export type EvaluatedDriver = {
@@ -155,5 +162,6 @@ export function settingsProblems(s: CalibrationSettings) {
     problems.push('Le domande per micro-prova vanno da 0 a 50');
   if (s.initialQuestionsPerArea < 1 || s.initialQuestionsPerArea > 4)
     problems.push('Le domande iniziali per driver vanno da 1 a 4');
+  problems.push(...unsafeTermsProblems(s.unsafeMicroTestTerms));
   return problems;
 }

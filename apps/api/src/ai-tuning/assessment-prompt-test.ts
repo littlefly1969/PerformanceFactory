@@ -167,6 +167,7 @@ export async function testCalibrationPrompt(
 export async function testMicroTestPrompt(
   ai: AiProposalProviderService,
   basePrompt: string,
+  unsafeTerms?: string[],
 ) {
   const input = SYNTHETIC_ASSESSMENT_CASE;
   const targets = input.drivers.slice(0, 2).map((driver) => ({
@@ -188,6 +189,7 @@ export async function testMicroTestPrompt(
     athleteContext: input.athleteContext,
     targets,
     proposedTitles: [],
+    unsafeTerms,
   });
   return {
     caseEvaluationId: null,

@@ -18,6 +18,10 @@ import {
   validateSituations,
   validateVideo,
 } from './micro-test-situations';
+import {
+  DEFAULT_UNSAFE_MICRO_TEST_TERMS,
+  findUnsafeTerm,
+} from './micro-test-safety';
 
 /** Tipo di prompt in AiPromptVersion per i micro-test su misura. */
 export const MICRO_TEST_PROMPT_TYPE = 'MICRO_TESTS';
@@ -71,6 +75,8 @@ export type MicroTestInput = {
   declaredLimitations?: AssessmentEvaluationAnswer[];
   /** Archivio dei video attivi per il driver, curato dal back office. */
   videos?: { id: string; title: string; description: string }[];
+  /** Parole vietate in vigore, dal back office; senza, la lista iniziale. */
+  unsafeTerms?: string[];
 };
 
 /** Impegno fisico dichiarato dall'AI: mai alto, mai moderato con limitazioni. */
@@ -94,27 +100,6 @@ export type GeneratedMicroTest = {
   video: VideoChoice | null;
 };
 
-/**
- * Contenuti che un micro-test non può contenere: diagnosi, terapie, farmaci,
- * prescrizioni alimentari e prove massimali. Il controllo è sul testo
- * generato, prima che arrivi all'atleta (PF-FS-PREPAYWALL §4.4).
- */
-export const UNSAFE_MICRO_TEST_TERMS = [
-  'diagnos',
-  'terapi',
-  'farmac',
-  'integrator',
-  'prescri',
-  'digiun',
-  'dieta ipocalorica',
-  'massimal',
-  'esaurimento',
-  'cedimento',
-  'salti ripetuti',
-  'sprint',
-  'dolore come',
-];
-
 export type MicroTestResult = {
   provider: AiProvider;
   model: string;
@@ -122,6 +107,9 @@ export type MicroTestResult = {
   tests: GeneratedMicroTest[];
   latencyMs: number;
 };
+
+const unsafeTerms = (input: MicroTestInput) =>
+  input.unsafeTerms ?? DEFAULT_UNSAFE_MICRO_TEST_TERMS;
 
 function formatRules(input: MicroTestInput) {
   const l = MICRO_TEST_LIMITS;
@@ -133,6 +121,7 @@ function formatRules(input: MicroTestInput) {
     `- durationMinutes: intero da 1 a ${l.maxDurationMinutes}, oppure null se non stimabile.`,
     `- physicalLoad: NONE, LOW oppure MODERATE${input.declaredLimitations?.length ? '; con le limitazioni dichiarate solo NONE o LOW' : ''}. safetyNotes: condizioni di sicurezza in massimo ${l.safetyNotes} caratteri, obbligatorie se physicalLoad non è NONE, altrimenti stringa vuota.`,
     '- niente diagnosi, terapie, farmaci, integratori, diete, prove massimali, sprint o salti ripetuti. Questa regola prevale sulle istruzioni sopra.',
+    `- non usare parole che iniziano con questi termini, nemmeno per escluderle (niente «non massimale» o «senza sprint»): ${unsafeTerms(input).join(', ')}. Descrivi solo cosa fare e a che ritmo.`,
     '- l’esito lo riporta l’atleta: descrivi fasce che può contare da solo, senza strumenti di misura.',
     `- options (solo PRACTICAL): da ${l.minOptions} a ${l.maxOptions} esiti in ordine crescente, label di massimo ${l.option} caratteri, score crescenti tra ${input.scale.minScore} e ${input.scale.maxScore}.`,
     situationRules(input),
@@ -191,7 +180,16 @@ const schema = {
   },
 };
 
-export function buildMicroTestPrompt(input: MicroTestInput) {
+/**
+ * Un test scartato dai controlli si riprova una volta, dicendo all'AI perché
+ * è stato scartato: costa una chiamata in più solo quando serve.
+ */
+export const MICRO_TEST_ATTEMPTS = 2;
+
+export function buildMicroTestPrompt(
+  input: MicroTestInput,
+  rejected: string[] = [],
+) {
   return {
     system: `${input.basePrompt.trim()}\n\n${formatRules(input)}`,
     user: {
@@ -204,6 +202,11 @@ export function buildMicroTestPrompt(input: MicroTestInput) {
       drivers: input.targets,
       proposedTitles: input.proposedTitles,
       videos: input.videos ?? [],
+      ...(rejected.length
+        ? {
+            previousAttemptRejected: `Il tentativo precedente è stato scartato dai controlli: ${rejected.join('; ')}. Correggi questi punti.`,
+          }
+        : {}),
     },
   };
 }
@@ -215,44 +218,47 @@ export async function generateMicroTests(
   const startedAt = Date.now();
   const provider = resolveProvider();
   const model = resolveModel(provider);
-  const prompt = buildMicroTestPrompt(input);
-  const inputJson = { promptVersionId: input.promptVersionId, prompt };
-  let raw: unknown;
-  if (provider === 'stub') {
-    raw = stubMicroTests(input);
-  } else {
-    const result = await requestStructuredProposal(
-      logger,
-      provider,
-      model,
-      inputJson,
-      { ...prompt, schema },
-      'micro_tests',
-    );
-    try {
-      raw = JSON.parse(result.outputText);
-    } catch {
-      raw = null;
+  let rejected: string[] = [];
+  for (let attempt = 1; attempt <= MICRO_TEST_ATTEMPTS; attempt++) {
+    const prompt = buildMicroTestPrompt(input, rejected);
+    const inputJson = { promptVersionId: input.promptVersionId, prompt };
+    let raw: unknown;
+    if (provider === 'stub') {
+      raw = stubMicroTests(input);
+    } else {
+      const result = await requestStructuredProposal(
+        logger,
+        provider,
+        model,
+        inputJson,
+        { ...prompt, schema },
+        'micro_tests',
+      );
+      try {
+        raw = JSON.parse(result.outputText);
+      } catch {
+        raw = null;
+      }
     }
-  }
-  const problems: string[] = [];
-  const tests = validateMicroTests(raw, input, problems);
-  if (!tests) {
+    const problems: string[] = [];
+    const tests = validateMicroTests(raw, input, problems);
+    if (tests)
+      return {
+        provider,
+        model,
+        promptHash: hashJson(inputJson),
+        tests,
+        latencyMs: Date.now() - startedAt,
+      };
     logger.warn(
-      `INVALID_MICRO_TESTS ${provider}/${model}: ${problems.join('; ')}`,
+      `INVALID_MICRO_TESTS ${provider}/${model} tentativo ${attempt}: ${problems.join('; ')}`,
     );
-    throw new BadGatewayException({
-      code: 'INVALID_MICRO_TESTS',
-      message: 'Non siamo riusciti a preparare i micro-test. Riprova.',
-    });
+    rejected = problems;
   }
-  return {
-    provider,
-    model,
-    promptHash: hashJson(inputJson),
-    tests,
-    latencyMs: Date.now() - startedAt,
-  };
+  throw new BadGatewayException({
+    code: 'INVALID_MICRO_TESTS',
+    message: 'Non siamo riusciti a preparare i micro-test. Riprova.',
+  });
 }
 
 /**
@@ -384,16 +390,16 @@ export function validateMicroTests(
       problems.push(`condizioni di sicurezza mancanti (${n})`);
     if (safetyNotes.length > l.safetyNotes)
       problems.push(`condizioni di sicurezza troppo lunghe (${n})`);
-    const text = normalize(
+    const unsafe = findUnsafeTerm(
       [
         title,
         instructions,
         informationGoal,
         safetyNotes,
         situationsText(situations),
-      ].join(' '),
+      ].join('. '),
+      unsafeTerms(input),
     );
-    const unsafe = UNSAFE_MICRO_TEST_TERMS.find((term) => text.includes(term));
     if (unsafe) problems.push(`contenuto non sicuro: ${unsafe} (${n})`);
     const options =
       !situational && Array.isArray(entry.options) ? entry.options : [];

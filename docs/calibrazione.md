@@ -82,10 +82,17 @@ Tutte in `apps/api/src/discovery/calibration/calibration-rules.ts`, senza I/O:
   obiettivo informativo, istruzioni, durata da 1 a 30 minuti o assente, impegno
   fisico `NONE`/`LOW`/`MODERATE` (mai moderato con limitazioni dichiarate) con
   condizioni di sicurezza quando non è `NONE`, nessun contenuto sanitario o
-  massimale (diagnosi, terapie, farmaci, integratori, diete, sprint, salti
-  ripetuti), da 3 a 5 esiti crescenti nella scala, titolo mai proposto. Un test
-  rifiutato non arriva all'atleta: il passo fallisce con «Riprova», senza
-  catalogo di riserva. Il test validato diventa un `MicroTest` dell'atleta e
+  massimale, da 3 a 5 esiti crescenti nella scala, titolo mai proposto. Le
+  parole vietate le gestisce l'amministratore in Calibrazione gratuita
+  (`CalibrationConfig.unsafeMicroTestTerms`, iniziali: diagnosi, terapie,
+  farmaci, integratori, diete, massimali, sprint, salti ripetuti…) e arrivano
+  anche nel prompt; il controllo (`micro-test-safety.ts`) le cerca a inizio
+  parola, senza maiuscole né accenti, e non conta quelle precedute da una
+  negazione nella stessa frase («non massimale», «senza sprint»). Un test
+  rifiutato non arriva all'atleta: si riscrive una volta con il motivo dello
+  scarto, poi il passo fallisce con «Riprova», senza catalogo di riserva. Con la
+  quota giornaliera del provider esaurita (429 «per day») non si ritenta e
+  l'atleta riceve `503 AI_QUOTA_EXHAUSTED` con un messaggio leggibile. Il test validato diventa un `MicroTest` dell'atleta e
   l'unica voce del round, con provenienza (provider, modello, versione e hash del
   prompt). L'atleta vede istruzioni, durata e sicurezza e riporta l'esito; nella
   rivalutazione l'esito entra con `source: MICRO_TEST` e la dicitura «esito

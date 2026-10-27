@@ -11,10 +11,21 @@ type Settings = {
   programBeforePaywall: boolean;
   questionsPerMicroTest: number;
   initialQuestionsPerArea: number;
+  unsafeMicroTestTerms?: string[];
 };
 
 /** Campi modificabili: valori provvisori finché A4-D01 non è deciso. */
-type NumericKey = Exclude<keyof Settings, "programBeforePaywall">;
+type NumericKey = Exclude<
+  keyof Settings,
+  "programBeforePaywall" | "unsafeMicroTestTerms"
+>;
+
+/** Una parola o frase per riga; le righe vuote non contano. */
+const termLines = (text: string) =>
+  text
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
 
 const FIELDS: { key: NumericKey; label: string; hint: string }[] = [
   {
@@ -43,13 +54,17 @@ const URL = `${API_BASE}/admin/calibration-config`;
 
 export default function AdminCalibrationPage() {
   const [settings, setSettings] = useState<Settings>();
+  const [terms, setTerms] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     void secureFetch(URL, { credentials: "include" }).then(async (response) => {
-      if (response.ok) setSettings((await response.json()) as Settings);
-      else setMessage("Parametri non disponibili.");
+      if (response.ok) {
+        const data = (await response.json()) as Settings;
+        setSettings(data);
+        setTerms((data.unsafeMicroTestTerms ?? []).join("\n"));
+      } else setMessage("Parametri non disponibili.");
     });
   }, []);
 
@@ -61,7 +76,11 @@ export default function AdminCalibrationPage() {
       method: "PUT",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(settings),
+      body: JSON.stringify(
+        settings.unsafeMicroTestTerms
+          ? { ...settings, unsafeMicroTestTerms: termLines(terms) }
+          : settings,
+      ),
     });
     setSaving(false);
     const data = (await response.json().catch(() => ({}))) as {
@@ -76,6 +95,7 @@ export default function AdminCalibrationPage() {
       return;
     }
     setSettings(data as Settings);
+    setTerms(((data as Settings).unsafeMicroTestTerms ?? []).join("\n"));
     setMessage("Parametri salvati: valgono dai prossimi round.");
   };
 
@@ -107,6 +127,25 @@ export default function AdminCalibrationPage() {
                 <span className="pf-field-hint">{field.hint}</span>
               </label>
             ))}
+            {settings.unsafeMicroTestTerms && (
+              <label className="pf-field">
+                Parole vietate nei micro-test
+                <textarea
+                  className="pf-textarea"
+                  rows={8}
+                  value={terms}
+                  onChange={(event) => setTerms(event.target.value)}
+                />
+                <span className="pf-field-hint">
+                  Una parola o frase per riga. Un micro-test scritto
+                  dall&apos;AI che le contiene viene scartato e riscritto. Basta
+                  l&apos;inizio della parola («massimal» vale per massimale e
+                  massimali); maiuscole e accenti non contano. Non contano se
+                  precedute da una negazione nella stessa frase («non
+                  massimale», «senza sprint»).
+                </span>
+              </label>
+            )}
             <label className="pf-field">
               <span>
                 <input

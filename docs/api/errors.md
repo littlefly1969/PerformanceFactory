@@ -29,15 +29,16 @@ testo di `message` e destinato alla diagnostica e puo cambiare.
 
 ## Status comuni
 
-| Status | Significato                                               |
-| ------ | --------------------------------------------------------- |
-| `400`  | Payload, parametro o transizione non valida               |
-| `401`  | Credenziali di login non valide                           |
-| `403`  | Autenticazione assente/non valida o accesso insufficiente |
-| `404`  | Risorsa non trovata o non visibile all'attore             |
-| `409`  | Conflitto con una risorsa o uno stato esistente           |
-| `429`  | Rate limit superato                                       |
-| `500`  | Errore inatteso del server                                |
+| Status | Significato                                                       |
+| ------ | ----------------------------------------------------------------- |
+| `400`  | Payload, parametro o transizione non valida                       |
+| `401`  | Credenziali di login non valide                                   |
+| `403`  | Autenticazione assente/non valida o accesso insufficiente         |
+| `404`  | Risorsa non trovata o non visibile all'attore                     |
+| `409`  | Conflitto con una risorsa o uno stato esistente                   |
+| `429`  | Rate limit superato                                               |
+| `500`  | Errore inatteso del server                                        |
+| `503`  | Quota giornaliera del provider AI esaurita (`AI_QUOTA_EXHAUSTED`) |
 
 La specifica OpenAPI collega questi errori a componenti riutilizzabili. Gli
 status effettivamente possibili dipendono dalla singola operazione e dalle

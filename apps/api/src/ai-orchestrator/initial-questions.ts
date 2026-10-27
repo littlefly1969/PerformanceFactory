@@ -1,4 +1,5 @@
 import { BadGatewayException, Logger } from '@nestjs/common';
+import { AiQuotaExhaustedException } from '../common/ai-fetch';
 import { hashJson } from './proposal-audit';
 import { requestStructuredProposal } from './proposal-structured-transport';
 import { resolveModel, resolveProvider } from './provider-config';
@@ -156,6 +157,8 @@ export async function generateInitialQuestions(
           attempts: attempt,
         };
     } catch (error) {
+      // Quota esaurita: un secondo tentativo fallirebbe allo stesso modo.
+      if (error instanceof AiQuotaExhaustedException) throw error;
       problems.push(error instanceof Error ? error.message : 'errore');
     }
     logger.warn(

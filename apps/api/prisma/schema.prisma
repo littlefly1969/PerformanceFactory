@@ -1909,6 +1909,9 @@ model CalibrationConfig {
   questionsPerMicroTest    Int      @default(0)
   /// Domande conoscitive iniziali per driver, scritte dall'AI dopo la classifica FIT.
   initialQuestionsPerArea  Int      @default(2)
+  /// Parole o frasi vietate nei micro-test generati dall'AI, gestite dall'amministratore.
+  /// Contano a inizio parola e non se precedute da una negazione («non massimale»).
+  unsafeMicroTestTerms     String[] @default(["diagnos", "terapi", "farmac", "integrator", "prescri", "digiun", "dieta ipocalorica", "massimal", "esaurimento", "cedimento", "salti ripetuti", "sprint", "dolore come"])
   updatedAt                DateTime @updatedAt
   updatedById              String?
 

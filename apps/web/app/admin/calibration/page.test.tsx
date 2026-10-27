@@ -28,6 +28,7 @@ const settings = {
   maxDays: 30,
   programBeforePaywall: false,
   questionsPerMicroTest: 0,
+  unsafeMicroTestTerms: ["sprint", "farmac"],
 };
 
 const version = (version: number, rule: Record<string, number | null>) => ({
@@ -192,4 +193,25 @@ it("turns on training during calibration only when the admin ticks it", async ()
     screen.getByRole("button", { name: "Salva parametri" }),
   );
   expect(puts[0]).toMatchObject({ programBeforePaywall: true });
+});
+
+it("lets the admin edit the banned words of the micro-tests, one per line", async () => {
+  const puts: Record<string, unknown>[] = [];
+  vi.stubGlobal(
+    "fetch",
+    server((body) => {
+      puts.push(body);
+      return new Response(JSON.stringify(body));
+    }),
+  );
+  render(<Page />);
+  const box = await screen.findByLabelText(/Parole vietate nei micro-test/);
+  expect(box).toHaveValue("sprint\nfarmac");
+  await userEvent.type(box, "\n\n  prova massimale ");
+  await userEvent.click(
+    screen.getByRole("button", { name: "Salva parametri" }),
+  );
+  expect(puts[0]).toMatchObject({
+    unsafeMicroTestTerms: ["sprint", "farmac", "prova massimale"],
+  });
 });
