@@ -182,43 +182,59 @@ test("deploy preserves paths with spaces and waits for healthy services", () => 
   }
 });
 
-test("update pulls published images, backs up, pins the commit tag and keeps volumes", () => {
+function runUpdate(args = [], stubEnv = {}) {
   const temp = mkdtempSync(join(tmpdir(), "pf-update-"));
-  try {
-    const envFile = join(temp, ".env.production");
-    const log = join(temp, "calls.jsonl");
-    writeFileSync(
-      envFile,
-      "COMPOSE_PROJECT_NAME=script-test\nIMAGE_TAG=local\nAPI_IMAGE=performancefactory-api:local\nSESSION_SECRET=keep-me\n",
-      { mode: 0o600 },
-    );
-    writeFileSync(
-      join(temp, "docker"),
-      `#!/usr/bin/env node
+  const envFile = join(temp, ".env.production");
+  const log = join(temp, "calls.jsonl");
+  writeFileSync(
+    envFile,
+    "COMPOSE_PROJECT_NAME=script-test\nIMAGE_TAG=local\nAPI_IMAGE=performancefactory-api:local\nSESSION_SECRET=keep-me\n",
+    { mode: 0o600 },
+  );
+  writeFileSync(
+    join(temp, "docker"),
+    `#!/usr/bin/env node
 const args = process.argv.slice(2);
 require('fs').appendFileSync(process.env.DOCKER_TEST_LOG, JSON.stringify(args) + '\\n');
 const has = (word) => args.includes(word);
+if (has('pull') && process.env.STUB_PULL_FAILS) process.exit(1);
 if (has('inspect')) console.log('abcdef1234567890');
-else if (has('ps') && has('--services')) console.log('postgres\\napi');
+else if (has('config') && has('--services')) console.log(process.env.STUB_EXTERNAL_DB ? 'migrate\\napi\\nweb' : 'postgres\\nmigrate\\napi\\nweb');
 else if (has('exec')) process.stdout.write('DUMP');
 else if (has('ls') && has('--format')) console.log('sha-abcdef1\\nsha-old0001\\nmain');
 `,
-      { mode: 0o755 },
-    );
-    const result = spawnSync(
-      "sh",
-      ["infra/scripts/update-prod.sh", "--env-file", envFile],
-      {
-        cwd: root,
-        env: {
-          ...process.env,
-          PATH: `${temp}:${process.env.PATH}`,
-          DOCKER_TEST_LOG: log,
-          IMAGE_PREFIX: "ghcr.io/owner/pf",
-        },
-        encoding: "utf8",
+    { mode: 0o755 },
+  );
+  const result = spawnSync(
+    "sh",
+    ["infra/scripts/update-prod.sh", "--env-file", envFile, ...args],
+    {
+      cwd: root,
+      env: {
+        ...process.env,
+        ...stubEnv,
+        PATH: `${temp}:${process.env.PATH}`,
+        DOCKER_TEST_LOG: log,
+        IMAGE_PREFIX: "ghcr.io/owner/pf",
       },
-    );
+      encoding: "utf8",
+    },
+  );
+  const calls = readFileSync(log, "utf8")
+    .trim()
+    .split("\n")
+    .map((line) => JSON.parse(line));
+  return { temp, envFile, result, calls };
+}
+
+const deployUp = (calls) =>
+  calls.find(
+    (args) => args.includes("up") && args.includes("--remove-orphans"),
+  );
+
+test("update pulls published images, backs up, pins the commit tag and keeps volumes", () => {
+  const { temp, envFile, result, calls } = runUpdate();
+  try {
     assert.equal(result.status, 0, result.stderr + result.stdout);
     const env = readFileSync(envFile, "utf8");
     assert.match(env, /^IMAGE_TAG=sha-abcdef1$/m);
@@ -226,25 +242,21 @@ else if (has('ls') && has('--format')) console.log('sha-abcdef1\\nsha-old0001\\n
     assert.match(env, /^WEB_IMAGE=ghcr\.io\/owner\/pf-web:sha-abcdef1$/m);
     assert.match(env, /^SESSION_SECRET=keep-me$/m);
     assert.equal(statSync(envFile).mode & 0o777, 0o600);
+    assert.equal(statSync(`${envFile}.bak`).mode & 0o777, 0o600);
     assert.match(
       readFileSync(join(temp, ".deploy-history"), "utf8"),
       / sha-abcdef1\n$/,
     );
-    const calls = readFileSync(log, "utf8")
-      .trim()
-      .split("\n")
-      .map((line) => JSON.parse(line));
     assert.ok(
       calls.some((args) => args.join(" ") === "pull ghcr.io/owner/pf-api:main"),
     );
-    assert.ok(
-      calls.some(
-        (args) => args.includes("exec") && args.join(" ").includes("pg_dump"),
-      ),
+    const dump = calls.findIndex(
+      (args) => args.includes("exec") && args.join(" ").includes("pg_dump"),
     );
-    const up = calls.find((args) => args.includes("up"));
-    assert.ok(up.includes("--no-build"));
-    assert.ok(up.includes("--wait"));
+    assert.ok(dump > 0);
+    assert.ok(dump < calls.indexOf(deployUp(calls)));
+    assert.ok(deployUp(calls).includes("--no-build"));
+    assert.ok(deployUp(calls).includes("--wait"));
     assert.ok(!calls.some((args) => args.includes("build")));
     assert.ok(
       calls.some(
@@ -261,6 +273,44 @@ else if (has('ls') && has('--format')) console.log('sha-abcdef1\\nsha-old0001\\n
         (args) => args.includes("prune") || args.includes("--volumes"),
       ),
     );
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
+
+test("update rolls back to a commit tag kept on the server without pulling", () => {
+  const { temp, envFile, result, calls } = runUpdate(["sha-abcdef1"], {
+    STUB_PULL_FAILS: "1",
+  });
+  try {
+    assert.equal(result.status, 0, result.stderr + result.stdout);
+    assert.ok(!calls.some((args) => args[0] === "pull"));
+    assert.match(readFileSync(envFile, "utf8"), /^IMAGE_TAG=sha-abcdef1$/m);
+    assert.ok(deployUp(calls));
+  } finally {
+    rmSync(temp, { recursive: true, force: true });
+  }
+});
+
+test("update stops before migrations when the database cannot be backed up", () => {
+  const { temp, envFile, result, calls } = runUpdate([], {
+    STUB_EXTERNAL_DB: "1",
+  });
+  try {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /SKIP_BACKUP=1/);
+    assert.equal(deployUp(calls), undefined);
+    assert.match(readFileSync(envFile, "utf8"), /^IMAGE_TAG=local$/m);
+    const skipped = runUpdate([], {
+      STUB_EXTERNAL_DB: "1",
+      SKIP_BACKUP: "1",
+    });
+    try {
+      assert.equal(skipped.result.status, 0, skipped.result.stderr);
+      assert.ok(deployUp(skipped.calls));
+    } finally {
+      rmSync(skipped.temp, { recursive: true, force: true });
+    }
   } finally {
     rmSync(temp, { recursive: true, force: true });
   }

@@ -129,7 +129,8 @@ infra/scripts/update-prod.sh --env-file .env.production
 ```
 
 Lo script scarica le immagini, fa un backup `pg_dump` in `backups/` (tiene gli
-ultimi 5), scrive in `.env.production` la versione esatta (`IMAGE_TAG`,
+ultimi 5; se PostgreSQL è fermo lo avvia da solo, se il backup non riesce si
+ferma prima delle migrazioni), scrive in `.env.production` la versione esatta (`IMAGE_TAG`,
 `API_IMAGE`, `WEB_IMAGE` con il tag `sha-…`), poi esegue `deploy-prod.sh` senza
 build: migrazioni, riavvio e controlli di salute. Registra ogni versione
 distribuita in `.deploy-history` e rimuove le immagini locali più vecchie delle
@@ -146,6 +147,13 @@ Rollback a una versione precedente:
 ```bash
 infra/scripts/update-prod.sh --env-file .env.production sha-xxxxxxx
 ```
+
+Un tag `sha-…` ancora presente sul server (le ultime 3 versioni distribuite) si
+usa senza scaricarlo, anche se nel frattempo è uscito dalla retention di
+ghcr.io.
+
+Con un database esterno (`COMPOSE_PROFILES` senza `local-db`) lo script non può
+fare il dump: fare il backup a mano e lanciarlo con `SKIP_BACKUP=1`.
 
 Il rollback cambia il codice ma non annulla le migrazioni già applicate: va bene
 quando le migrazioni sono additive. Se una migrazione va annullata davvero, si

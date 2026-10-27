@@ -12,7 +12,8 @@ Deploys the API and web images published by GitHub Actions on ghcr.io.
            (a specific commit, also used to roll back).
   --list   Shows the deploy history and the versions available on this server.
 
-Steps: pull the images, back up PostgreSQL, write the version into the env
+Steps: pull the images (a sha-* tag already on this server is used as is),
+back up PostgreSQL, write the version into the env
 file, then run deploy-prod.sh (migrations, restart, health checks). Volumes
 are never removed. Old local images beyond the last KEEP_LOCAL_IMAGES deploys
 are untagged.
@@ -22,9 +23,14 @@ Environment:
   KEEP_LOCAL_IMAGES    Default: 3
   BACKUP_DIR           Default: backups (next to the env file)
   BACKUP_KEEP          Default: 5
-  SKIP_BACKUP=1        Skips the PostgreSQL backup.
+  SKIP_BACKUP=1        Skips the PostgreSQL backup. Required with an external
+                       database (COMPOSE_PROFILES without local-db): back it
+                       up yourself first.
 USAGE
 }
+
+# Temporary copies of the env file and partial dumps hold secrets.
+umask 077
 
 ENV_FILE=".env.production"
 COMPOSE_FILE="infra/docker-compose.prod.example.yml"
@@ -93,6 +99,17 @@ BACKUP_DIR="${BACKUP_DIR:-$ENV_DIR/backups}"
 BACKUP_KEEP="${BACKUP_KEEP:-5}"
 HISTORY_FILE="${DEPLOY_HISTORY_FILE:-$ENV_DIR/.deploy-history}"
 
+ENV_TMP="$ENV_FILE.tmp.$$"
+BACKUP_PART=""
+cleanup() {
+  rm -f "$ENV_TMP"
+  if [ -n "$BACKUP_PART" ]; then
+    rm -f "$BACKUP_PART"
+  fi
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+
 compose() {
   docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" "$@"
 }
@@ -103,7 +120,7 @@ env_value() {
 
 # Replaces KEY=... in the env file (or appends it), keeping its permissions.
 set_env_value() {
-  tmp="$ENV_FILE.tmp.$$"
+  tmp="$ENV_TMP"
   awk -v key="$1" -v value="$2" '
     BEGIN { done = 0 }
     index($0, key "=") == 1 { if (!done) print key "=" value; done = 1; next }
@@ -139,9 +156,28 @@ fi
 
 PREVIOUS_TAG="$(env_value IMAGE_TAG)"
 
-echo "Pulling $API_REPO:$TAG and $WEB_REPO:$TAG..."
-docker pull "$API_REPO:$TAG"
-docker pull "$WEB_REPO:$TAG"
+has_local_image() {
+  docker image inspect --format '{{.Id}}' "$1" >/dev/null 2>&1
+}
+
+# Commit tags never change: a pair already on this server allows a rollback
+# even after the registry retention removed it. "main" is always pulled.
+case "$TAG" in
+  sha-*)
+    if has_local_image "$API_REPO:$TAG" && has_local_image "$WEB_REPO:$TAG"; then
+      echo "Using $TAG already present on this server."
+      PULL=0
+    else
+      PULL=1
+    fi
+    ;;
+  *) PULL=1 ;;
+esac
+if [ "$PULL" -eq 1 ]; then
+  echo "Pulling $API_REPO:$TAG and $WEB_REPO:$TAG..."
+  docker pull "$API_REPO:$TAG"
+  docker pull "$WEB_REPO:$TAG"
+fi
 
 revision_of() {
   docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$1"
@@ -172,13 +208,28 @@ case "$TAG" in
 esac
 echo "Version to deploy: $RELEASE_TAG (running now: ${PREVIOUS_TAG:-none})"
 
-if [ "${SKIP_BACKUP:-0}" != "1" ] && compose ps --status running --services 2>/dev/null | grep -qx postgres; then
+if [ "${SKIP_BACKUP:-0}" = "1" ]; then
+  echo "SKIP_BACKUP=1: no database backup."
+else
+  if ! compose config --services | grep -qx postgres; then
+    echo "PostgreSQL is not managed by this Compose project (external database)." >&2
+    echo "Back it up yourself, then rerun with SKIP_BACKUP=1." >&2
+    exit 1
+  fi
+  # Starts only PostgreSQL if it is stopped: the dump must happen before migrations.
+  compose up -d --wait postgres
   mkdir -p "$BACKUP_DIR"
   chmod 700 "$BACKUP_DIR"
   BACKUP_FILE="$BACKUP_DIR/pf-$(date -u +%Y%m%dT%H%M%SZ)-before-$RELEASE_TAG.dump"
+  BACKUP_PART="$BACKUP_FILE.part"
   echo "Backing up PostgreSQL to $BACKUP_FILE..."
-  compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$BACKUP_FILE.part"
-  mv "$BACKUP_FILE.part" "$BACKUP_FILE"
+  compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$BACKUP_PART"
+  if [ ! -s "$BACKUP_PART" ]; then
+    echo "The backup is empty: deploy stopped." >&2
+    exit 1
+  fi
+  mv "$BACKUP_PART" "$BACKUP_FILE"
+  BACKUP_PART=""
   chmod 600 "$BACKUP_FILE"
   ls -1t "$BACKUP_DIR"/pf-*.dump | tail -n +"$((BACKUP_KEEP + 1))" | while IFS= read -r old; do
     rm -f "$old"
