@@ -41,7 +41,7 @@ export class DiscoveryController {
       'Avvia una bozza anonima del quiz con la configurazione corrente congelata',
   })
   @UseGuards(ThrottlerGuard)
-  @SkipThrottle({ 'register-athlete': true, 'address-search': true })
+  @SkipThrottle({ 'register-athlete': true })
   @Throttle({ 'public-events': { limit: 10, ttl: 60 * 1000 } })
   createDraft() {
     return this.drafts.create();
@@ -52,7 +52,7 @@ export class DiscoveryController {
   @ApiHeader({ name: TOKEN_HEADER, required: true })
   @ApiOperation({ summary: 'Riprende la bozza del quiz entro 7 giorni' })
   @UseGuards(ThrottlerGuard)
-  @SkipThrottle({ 'register-athlete': true, 'address-search': true })
+  @SkipThrottle({ 'register-athlete': true })
   @Throttle({ 'public-events': { limit: 60, ttl: 60 * 1000 } })
   readDraft(@Headers(TOKEN_HEADER) token?: string) {
     return this.drafts.read(token);
@@ -65,7 +65,7 @@ export class DiscoveryController {
     summary: 'Salva il progresso del quiz e proroga la bozza di 7 giorni',
   })
   @UseGuards(ThrottlerGuard)
-  @SkipThrottle({ 'register-athlete': true, 'address-search': true })
+  @SkipThrottle({ 'register-athlete': true })
   @Throttle({ 'public-events': { limit: 120, ttl: 60 * 1000 } })
   saveDraft(
     @Headers(TOKEN_HEADER) token: string | undefined,
@@ -79,7 +79,7 @@ export class DiscoveryController {
   @ApiHeader({ name: TOKEN_HEADER, required: true })
   @ApiOperation({ summary: 'Cancella la bozza del quiz per ricominciare' })
   @UseGuards(ThrottlerGuard)
-  @SkipThrottle({ 'register-athlete': true, 'address-search': true })
+  @SkipThrottle({ 'register-athlete': true })
   @Throttle({ 'public-events': { limit: 20, ttl: 60 * 1000 } })
   async removeDraft(@Headers(TOKEN_HEADER) token?: string) {
     await this.drafts.remove(token);

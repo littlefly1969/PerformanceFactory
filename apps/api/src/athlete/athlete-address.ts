@@ -1,6 +1,8 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
 } from '@nestjs/common';
 import { ApiProperty } from '@nestjs/swagger';
@@ -87,6 +89,37 @@ export const PROVIDER_LOCATION_MAX_AGE_DAYS = 30;
 const PROVIDER_LOCATION_REFRESH_DAYS = 25;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** Richieste a Google per atleta in un minuto: suggerimenti e risoluzioni. */
+export const ADDRESS_SEARCH_LIMITS = { suggestions: 60, resolve: 20 };
+const MINUTE_MS = 60 * 1000;
+
+/**
+ * Limite di frequenza per atleta, in memoria: protegge quota e costi di
+ * Google anche se il browser non rispetta il debounce.
+ */
+export class AddressSearchLimiter {
+  private readonly hits = new Map<string, number[]>();
+
+  take(key: string, limit: number, now = Date.now()) {
+    const recent = (this.hits.get(key) ?? []).filter(
+      (at) => at > now - MINUTE_MS,
+    );
+    if (recent.length >= limit)
+      throw new HttpException(
+        'Troppe ricerche in poco tempo: riprova tra un minuto.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    recent.push(now);
+    // Reinserita in fondo: in testa restano le chiavi usate meno di recente.
+    this.hits.delete(key);
+    this.hits.set(key, recent);
+    if (this.hits.size > 10_000) {
+      const [oldest] = this.hits.keys();
+      this.hits.delete(oldest);
+    }
+  }
+}
+
 /**
  * Indirizzo dell'atleta, scritto e cambiato da lui dall'account. Serve a una
  * cosa sola: dire quanto dista un circolo che offre la lezione gratuita.
@@ -102,6 +135,8 @@ export class AthleteAddressService {
     private readonly geocoding: GeocodingService,
     private readonly places: PlacesService,
   ) {}
+
+  private readonly limiter = new AddressSearchLimiter();
 
   async get(userId: string) {
     const address = await this.prisma.userAddress.findUnique({
@@ -130,7 +165,11 @@ export class AthleteAddressService {
   }
 
   /** Suggerimenti per il testo scritto, nella sessione di ricerca del browser. */
-  async suggestions(input: AddressSuggestionsDto) {
+  async suggestions(userId: string, input: AddressSuggestionsDto) {
+    this.limiter.take(
+      `suggestions:${userId}`,
+      ADDRESS_SEARCH_LIMITS.suggestions,
+    );
     return {
       suggestions: await this.places.suggest(
         input.input.trim(),
@@ -144,6 +183,7 @@ export class AthleteAddressService {
    * anche la scelta firmata da salvare; altrimenti dice cosa manca.
    */
   async resolve(userId: string, input: AddressResolveDto) {
+    this.limiter.take(`resolve:${userId}`, ADDRESS_SEARCH_LIMITS.resolve);
     const result = await this.places.resolve(input.placeId, input.sessionToken);
     if (!result.complete) return result;
     const { place } = result;

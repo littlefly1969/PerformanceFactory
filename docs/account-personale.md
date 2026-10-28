@@ -73,7 +73,7 @@ browser                         API                               Google Places 
 - **Provider non disponibile.** Timeout (`GOOGLE_PLACES_TIMEOUT_MS`, 4 s) o
   errore danno 503: l'indirizzo salvato resta, la bozza resta nel campo e c'è
   «Riprova». Le risposte arrivate dopo una ricerca più recente si scartano.
-- **Frequenza.** Throttler `address-search` per IP: 60 richieste al minuto
+- **Frequenza.** Limite in memoria per atleta: 60 richieste al minuto
   sui suggerimenti, 20 sulle risoluzioni.
 - **Log.** Si registrano solo stato HTTP o timeout, mai testo o indirizzi.
 - **Attribuzione.** Sotto i suggerimenti e sull'indirizzo riconosciuto

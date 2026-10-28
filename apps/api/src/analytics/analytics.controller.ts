@@ -28,7 +28,7 @@ export class AnalyticsController {
   @HttpCode(202)
   @ApiOperation({ summary: 'Eventi anonimi del funnel prima del login' })
   @UseGuards(ThrottlerGuard)
-  @SkipThrottle({ 'register-athlete': true, 'address-search': true })
+  @SkipThrottle({ 'register-athlete': true })
   @Throttle({ 'public-events': { limit: 20, ttl: 60 * 1000 } })
   track(@Body() body: TrackEventsDto) {
     return this.analytics.trackClient(body);

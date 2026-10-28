@@ -26,7 +26,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { SkipThrottle, Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { GoogleOidcService } from './google-oidc.service';
 import { LocalAuthGuard } from '../common/guards/local-auth.guard';
@@ -82,7 +82,6 @@ export class AuthController {
   })
   @ApiBody({ type: RegisterAthleteDto })
   @UseGuards(ThrottlerGuard)
-  @SkipThrottle({ 'address-search': true })
   @Throttle({ 'register-athlete': { limit: 3, ttl: 15 * 60 * 1000 } })
   async registerAthlete(
     @Body() body: RegisterAthleteDto,

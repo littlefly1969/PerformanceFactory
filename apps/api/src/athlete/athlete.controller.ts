@@ -9,7 +9,6 @@ import {
   AthleteAddressDto,
   AthleteAddressService,
 } from './athlete-address';
-import { SkipThrottle, Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import {
   Body,
   Controller,
@@ -80,11 +79,8 @@ export class AthleteController {
   @HttpCode(200)
   @Header('Cache-Control', 'private, no-store')
   @ApiOperation({ summary: 'Suggerimenti di indirizzo da Google Places' })
-  @UseGuards(ThrottlerGuard)
-  @SkipThrottle({ 'register-athlete': true, 'public-events': true })
-  @Throttle({ 'address-search': { limit: 60, ttl: 60 * 1000 } })
-  addressSuggestions(@Body() body: AddressSuggestionsDto) {
-    return this.address.suggestions(body);
+  addressSuggestions(@Req() req: Request, @Body() body: AddressSuggestionsDto) {
+    return this.address.suggestions(req.user.id, body);
   }
   @Post('address/resolve')
   @HttpCode(200)
@@ -92,9 +88,6 @@ export class AthleteController {
   @ApiOperation({
     summary: 'Risolve il suggerimento scelto in un indirizzo completo',
   })
-  @UseGuards(ThrottlerGuard)
-  @SkipThrottle({ 'register-athlete': true, 'public-events': true })
-  @Throttle({ 'address-search': { limit: 20, ttl: 60 * 1000 } })
   resolveAddress(@Req() req: Request, @Body() body: AddressResolveDto) {
     return this.address.resolve(req.user.id, body);
   }

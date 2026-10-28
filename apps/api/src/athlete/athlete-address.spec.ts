@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException } from '@nestjs/common';
 import { AddressSource } from '@prisma/client';
 import { readSelection, signSelection } from './address-selection';
-import { AthleteAddressService } from './athlete-address';
+import { AddressSearchLimiter, AthleteAddressService } from './athlete-address';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { GeocodingService } from '../geo/geocoding.service';
 import type { PlacesService, ResolvedPlace } from '../geo/places.service';
@@ -68,6 +68,17 @@ function setup({
   );
   return { service, userAddress, places, geocoding };
 }
+
+describe('AddressSearchLimiter', () => {
+  it('blocks an athlete over the limit for one minute, not the others', () => {
+    const limiter = new AddressSearchLimiter();
+    limiter.take('u1', 2, 0);
+    limiter.take('u1', 2, 1_000);
+    expect(() => limiter.take('u1', 2, 2_000)).toThrow(/Troppe ricerche/);
+    expect(() => limiter.take('u2', 2, 2_000)).not.toThrow();
+    expect(() => limiter.take('u1', 2, 61_000)).not.toThrow();
+  });
+});
 
 describe('AthleteAddressService', () => {
   it('keeps a historic address but does not call it verified', async () => {
