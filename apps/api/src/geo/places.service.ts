@@ -4,7 +4,7 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { Coordinates, coordinatesOf } from './distance';
-import type { PostalAddress } from './geocoding.service';
+import { addressQuery, type PostalAddress } from './geocoding.service';
 
 const BASE_URL = 'https://places.googleapis.com/v1';
 const DEFAULT_TIMEOUT_MS = 4_000;
@@ -20,6 +20,13 @@ export const AUTOCOMPLETE_FIELD_MASK = [
 export const DETAILS_FIELD_MASK =
   'id,formattedAddress,addressComponents,location';
 export const LOCATION_FIELD_MASK = 'location';
+/** Solo il Place ID: la Text Search così non ha costo, le coordinate a parte. */
+export const SEARCH_FIELD_MASK = 'places.id';
+
+/** Google chiede di non tenere le coordinate oltre 30 giorni senza rinnovarle. */
+export const LOCATION_MAX_AGE_DAYS = 30;
+/** Si rinnovano qualche giorno prima, così un errore del provider non le perde. */
+export const LOCATION_REFRESH_DAYS = 25;
 
 export type PlaceSuggestion = {
   placeId: string;
@@ -60,6 +67,16 @@ export function autocompleteRequest(input: string, sessionToken: string) {
     regionCode: 'it',
     includedRegionCodes: ['it'],
     includedPrimaryTypes: ['street_address', 'premise', 'subpremise', 'route'],
+  };
+}
+
+/** Corpo della Text Search (New) per un indirizzo completo, in Italia. */
+export function searchRequest(address: PostalAddress) {
+  return {
+    textQuery: addressQuery(address),
+    languageCode: 'it',
+    regionCode: 'it',
+    pageSize: 1,
   };
 }
 
@@ -201,6 +218,28 @@ export class PlacesService {
         latitude: Number(payload?.location?.latitude),
         longitude: Number(payload?.location?.longitude),
       });
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Luogo e coordinate di un indirizzo completo, per la sede di un circolo:
+   * Text Search con il solo Place ID, poi le coordinate del luogo. Null se
+   * Google non lo trova o non risponde.
+   */
+  async find(
+    address: PostalAddress,
+  ): Promise<(Coordinates & { placeId: string }) | null> {
+    try {
+      const payload = (await this.call('places:searchText', SEARCH_FIELD_MASK, {
+        method: 'POST',
+        body: JSON.stringify(searchRequest(address)),
+      })) as { places?: Array<{ id?: string }> } | null;
+      const placeId = payload?.places?.[0]?.id;
+      if (!placeId) return null;
+      const location = await this.locate(placeId);
+      return location ? { placeId, ...location } : null;
     } catch {
       return null;
     }

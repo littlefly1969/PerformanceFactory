@@ -1615,6 +1615,9 @@ model Partner {
   latitude  Float?
   longitude Float?
   geocodedAt DateTime?
+  /// Place ID Google della sede, se le coordinate vengono da Google: con esso
+  /// si rinnovano prima dei 30 giorni. Nullo con coordinate Nominatim.
+  placeId   String?
   isActive  Boolean  @default(true)
   /// Il circolo offre la lezione gratuita di gruppo (A4.8, A7.2); spento di default.
   freeLessonsEnabled Boolean @default(false)

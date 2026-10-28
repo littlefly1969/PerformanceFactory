@@ -3,8 +3,9 @@ import { GeocodingService } from './geocoding.service';
 import { PlacesService } from './places.service';
 
 /**
- * Geocoding condiviso, usato dai circoli e dagli indirizzi scritti a mano, e
- * Google Places per l'indirizzo dell'atleta scelto fra i suggerimenti.
+ * Google Places per l'indirizzo dell'atleta scelto fra i suggerimenti e per
+ * le sedi dei circoli; Nominatim quando la chiave manca o Google non trova
+ * la sede, e per gli indirizzi scritti a mano.
  */
 @Module({
   providers: [GeocodingService, PlacesService],
