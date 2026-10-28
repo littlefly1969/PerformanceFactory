@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState, type MutableRefObject } from "react";
 import { athleteRequest, useAthlete } from "../user/_components/use-athlete";
 import "./fit-ranking.css";
 
@@ -17,6 +17,13 @@ export type FitRankingView = {
   options: Record<Sport, Option[]>;
   recalculationPending: boolean;
 };
+/**
+ * Salvataggio di una classifica compilata e non ancora salvata, per chi
+ * ospita l'editor e porta altrove: true se non c'era nulla o è andato a buon fine.
+ */
+export type PendingFitRanking = MutableRefObject<
+  (() => Promise<boolean>) | null
+>;
 
 const EMPTY: Values = {
   padelCurrent: "",
@@ -62,20 +69,26 @@ function Summary({ view }: { view: FitRankingView }) {
   );
 }
 
+const sameValues = (a: Values, b: Values) =>
+  (Object.keys(EMPTY) as (keyof Values)[]).every((k) => a[k] === b[k]);
+
 function RankingForm({
   view,
+  pending,
   onSaved,
   onClose,
 }: {
   view: FitRankingView;
+  pending?: PendingFitRanking;
   onSaved: (next: FitRankingView) => void;
   onClose: () => void;
 }) {
-  const [values, setValues] = useState<Values>(
+  const [initial] = useState<Values>(
     view.ranking
       ? { ...view.ranking, cardNumber: view.ranking.cardNumber ?? "" }
       : EMPTY,
   );
+  const [values, setValues] = useState<Values>(initial);
   const [card, setCard] = useState(!!view.ranking?.cardNumber);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(
@@ -101,7 +114,7 @@ function RankingForm({
       return merged;
     });
   async function save(next: Values) {
-    if (busy) return;
+    if (busy) return false;
     setBusy(true);
     setMessage("");
     try {
@@ -116,11 +129,13 @@ function RankingForm({
           : "",
       );
       if (!saved.recalculationPending) onClose();
+      return true;
     } catch (e) {
       setMessage(
         (e as Error).message ||
           "Non è stato possibile salvare la classifica. Riprova.",
       );
+      return false;
     } finally {
       setBusy(false);
     }
@@ -128,6 +143,15 @@ function RankingForm({
   const complete = SPORTS.every(
     ({ prefix }) => values[`${prefix}Current`] && values[`${prefix}Best`],
   );
+  // Compilata ma non salvata: chi porta altrove la salva prima di uscire.
+  const unsaved = complete && !sameValues(values, initial);
+  useEffect(() => {
+    if (!pending) return;
+    pending.current = unsaved ? () => save(values) : null;
+    return () => {
+      pending.current = null;
+    };
+  });
   return (
     <form
       className="pf-fit-form"
@@ -230,9 +254,11 @@ function RankingForm({
  */
 export function FitRankingEditor({
   onSaved,
+  pending,
   tone = "light",
 }: {
   onSaved?: () => void;
+  pending?: PendingFitRanking;
   tone?: "light" | "dark";
 }) {
   const { data, error, reload } = useAthlete<FitRankingView>(
@@ -267,6 +293,7 @@ export function FitRankingEditor({
       {current && open && (
         <RankingForm
           view={current}
+          pending={pending}
           onClose={() => setOpen(false)}
           onSaved={(next) => {
             setView(next);
