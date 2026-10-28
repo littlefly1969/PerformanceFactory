@@ -19,23 +19,61 @@ type ProposalTexts = {
   objectives?: unknown[];
 };
 
-/** Tutte le stringhe di un valore, in profondità: titoli, corpi, esercizi, consigli. */
-function strings(value: unknown): string[] {
-  if (typeof value === 'string') return [value];
-  if (Array.isArray(value)) return value.flatMap(strings);
-  if (value && typeof value === 'object')
-    return Object.values(value).flatMap(strings);
-  return [];
+const text = (value: unknown) => (typeof value === 'string' ? [value] : []);
+const record = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+const list = (value: unknown): unknown[] =>
+  Array.isArray(value) ? (value as unknown[]) : [];
+
+/** Testi di una seduta: sul programma sportivo in `content`, sulle aree nei metadati. */
+function sessionTexts(content: Record<string, unknown>) {
+  return [
+    ...text(content.goal),
+    ...text(content.prerequisites),
+    ...list(content.exercises).flatMap((value) => {
+      const e = record(value);
+      return [e.name, e.prescription, e.cue, e.demo].flatMap(text);
+    }),
+  ];
+}
+
+/**
+ * Solo i testi che l'atleta legge: sintesi, sedute ed esercizi, obiettivi,
+ * domande e risposte. Identificativi, enum e metadati tecnici aggiunti dal
+ * backend (provider, modello, versione del prompt) restano fuori: l'AI non
+ * potrebbe toglierli riscrivendo il piano.
+ */
+function visibleTexts(proposal: ProposalTexts) {
+  return [
+    ...text(proposal.summaryText),
+    ...proposal.planItems.flatMap((value) => {
+      const item = record(value);
+      const metadata = record(item.metadata);
+      return [
+        ...[item.title, item.body, item.equipment, item.reps].flatMap(text),
+        ...[metadata.equipment, metadata.reps].flatMap(text),
+        ...sessionTexts(record(item.content)),
+        ...sessionTexts(metadata),
+      ];
+    }),
+    ...list(proposal.objectives).flatMap((value) => {
+      const o = record(value);
+      return [o.title, o.targetLabel].flatMap(text);
+    }),
+    ...proposal.questions.flatMap((value) => {
+      const q = record(value);
+      return [
+        ...text(q.text),
+        ...list(q.options).flatMap((o) => text(record(o).label)),
+      ];
+    }),
+  ];
 }
 
 /** Primo termine vietato nei testi della proposta che arrivano all'atleta, o null. */
 export function unsafeTrainingTerm(proposal: ProposalTexts, terms: string[]) {
   if (!terms.length) return null;
-  const { summaryText, planItems, questions, objectives } = proposal;
-  return findUnsafeTerm(
-    strings([summaryText, planItems, questions, objectives]).join('. '),
-    terms,
-  );
+  return findUnsafeTerm(visibleTexts(proposal).join('. '), terms);
 }
 
 /**

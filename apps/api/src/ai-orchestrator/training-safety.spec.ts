@@ -42,6 +42,46 @@ describe('training safety', () => {
     expect(unsafeTrainingTerm(proposal('Sprint finali.'), [])).toBeNull();
   });
 
+  it('ignores technical metadata the athlete never sees', () => {
+    const area = {
+      ...proposal('Riscaldamento.'),
+      planItems: [
+        {
+          type: 'AREA_SESSION',
+          title: 'Mobilità',
+          body: 'Lavoro di area.',
+          metadata: {
+            source: 'area-schedule',
+            provider: 'gemini',
+            model: 'gemini-3.5-flash',
+            exercises: [{ name: 'Gemini stretch', cue: 'Respira.' }],
+          },
+        },
+      ],
+      questions: [{ text: 'Come è andata?', objectiveRef: 'area:gemini' }],
+    };
+    // Solo nei metadati: non blocca.
+    expect(
+      unsafeTrainingTerm(
+        {
+          ...area,
+          planItems: [
+            { ...area.planItems[0], metadata: { provider: 'gemini' } },
+          ],
+        },
+        ['gemini'],
+      ),
+    ).toBeNull();
+    // Nel nome di un esercizio della seduta di area: blocca.
+    expect(unsafeTrainingTerm(area, ['gemini'])).toBe('gemini');
+    expect(
+      unsafeTrainingTerm(
+        { ...area, objectives: [{ title: 'Sprint sotto i 5 secondi' }] },
+        ['sprint'],
+      ),
+    ).toBe('sprint');
+  });
+
   it('makes a single call and no check when the list is empty', async () => {
     const generate = mockGenerate().mockResolvedValue(
       proposal('Sprint finali.'),
