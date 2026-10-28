@@ -219,7 +219,7 @@ export class CoachLessonService {
     return { saved };
   }
 
-  /** Assenza: il beneficio è consumato e R torna a poter chiudersi per soglia. */
+  /** Assenza: il beneficio è consumato, la calibrazione si chiude senza lezione. */
   async markNoShow(
     coachId: string,
     lessonId: string,
@@ -240,7 +240,7 @@ export class CoachLessonService {
         data: { status: 'NO_SHOW' },
       });
       await releaseCalibration(tx, userId);
-      // Il beneficio è usato: da qui basta la regola di confidence (AT-18).
+      // Il beneficio è usato: da qui la chiude l'atleta o la scadenza (AT-18).
       await settleCalibration(tx, userId, now);
       await this.completeIfDone(tx, lessonId);
     });

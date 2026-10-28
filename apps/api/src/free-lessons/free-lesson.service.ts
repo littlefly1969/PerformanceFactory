@@ -288,15 +288,15 @@ export class FreeLessonService {
         data: { status: 'WITHDRAWN', lessonId: null, assignedAt: null },
       });
       await releaseCalibration(tx, userId);
-      // Senza lezione basta la regola di confidence: R può consolidarsi ora.
+      // Senza lezione l'atleta con R consolidata può andare agli scenari.
       await settleCalibration(tx, userId, now);
     });
     return this.view(userId);
   }
 
   /**
-   * L'atleta eleggibile sceglie di non fare la lezione (AT-18): R si consolida
-   * con la sola regola di confidence e il percorso verso il paywall prosegue.
+   * L'atleta eleggibile sceglie di non fare la lezione (AT-18): con R
+   * consolidata può andare agli scenari quando vuole, oppure continuare.
    * Reversibile con una richiesta finché R è aperta.
    */
   async decline(userId: string, now = new Date()) {

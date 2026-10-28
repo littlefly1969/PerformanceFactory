@@ -1,20 +1,33 @@
 import type { Journey } from "../journey-types";
 import type { FreeLessonView } from "./account-data";
-import { isClosed, microTestOpen } from "./calibration-state";
+import {
+  closedUnconsolidated,
+  isClosed,
+  microTestOpen,
+} from "./calibration-state";
 
 export type NextStep = {
-  kind: "scenarios" | "evaluation" | "micro-test" | "questions" | "lesson";
+  kind:
+    | "scenarios"
+    | "evaluation"
+    | "micro-test"
+    | "questions"
+    | "finish"
+    | "lesson";
   kicker: string;
   title: string;
   href: string;
   cta: string;
+  /** Collegamento secondario, per esempio alla lezione mentre si calibra. */
+  secondary?: { href: string; label: string };
 };
 
 /** La calibrazione è il passo proposto: domande, micro-test o valutazione. */
 export const isCalibrationStep = (step: NextStep) =>
   step.kind === "evaluation" ||
   step.kind === "micro-test" ||
-  step.kind === "questions";
+  step.kind === "questions" ||
+  step.kind === "finish";
 
 const microTestRound = (j: Journey) =>
   j.calibration?.round?.action === "PROPOSE_MICRO_TEST";
@@ -22,8 +35,9 @@ const microTestRound = (j: Journey) =>
 /**
  * Il prossimo passo della fase gratuita, uguale per Home e profilo. Decidono
  * lo stato della calibrazione e la fase della lezione restituiti dal backend,
- * mai punteggio o confidenza: con la lezione richiesta, confermata o in
- * validazione il passo è la lezione, non nuove domande.
+ * mai punteggio o confidenza. La calibrazione resta aperta anche con R
+ * consolidata e con la lezione in attesa: si continua finché la chiudono la
+ * lezione svolta, la scelta degli scenari o la scadenza.
  */
 export function nextStep(
   j: Journey,
@@ -32,13 +46,22 @@ export function nextStep(
   const c = j.calibration;
   const phase = lesson?.enabled ? lesson.phase : null;
   if (isClosed(c))
-    return {
-      kind: "scenarios",
-      kicker: "Calibrazione completata",
-      title: "Scopri dove puoi arrivare in 3, 6 e 12 mesi.",
-      href: "/journey/scenari",
-      cta: "I tuoi scenari",
-    };
+    return closedUnconsolidated(c)
+      ? {
+          kind: "scenarios",
+          kicker: "Fase gratuita conclusa",
+          title:
+            "La tua R è una stima poco affidabile: puoi comunque vedere i tuoi scenari.",
+          href: "/journey/scenari",
+          cta: "I tuoi scenari",
+        }
+      : {
+          kind: "scenarios",
+          kicker: "Calibrazione completata",
+          title: "Scopri dove puoi arrivare in 3, 6 e 12 mesi.",
+          href: "/journey/scenari",
+          cta: "I tuoi scenari",
+        };
   if (c?.round?.status === "EVALUATING")
     return {
       kind: "evaluation",
@@ -47,21 +70,13 @@ export function nextStep(
       href: microTestRound(j) ? "/journey/coach" : "/journey/calibrazione",
       cta: "Completa la valutazione",
     };
-  if (
+  const lessonPending =
     c?.status === "FREE_LESSON_VALIDATION" ||
     phase === "REQUESTED" ||
-    phase === "ASSIGNED"
-  )
-    return {
-      kind: "lesson",
-      kicker:
-        phase === "ASSIGNED"
-          ? "Lezione gratuita · confermata"
-          : "Lezione gratuita · richiesta",
-      title: "La tua R si chiude dopo il feedback del coach del circolo.",
-      href: "/journey/circolo",
-      cta: "Gestisci la lezione",
-    };
+    phase === "ASSIGNED";
+  const toLesson = lessonPending
+    ? { href: "/journey/circolo", label: "Gestisci la lezione" }
+    : undefined;
   if (microTestOpen(c))
     return {
       kind: "micro-test",
@@ -69,6 +84,7 @@ export function nextStep(
       title: "Una prova breve ti aspetta.",
       href: "/journey/coach",
       cta: "Fai il micro-test",
+      secondary: toLesson,
     };
   if (c?.round?.status === "OPEN")
     return {
@@ -77,6 +93,7 @@ export function nextStep(
       title: "Hai delle domande da completare.",
       href: "/journey/calibrazione",
       cta: "Riprendi le domande",
+      secondary: toLesson,
     };
   if (phase === "ELIGIBLE")
     return {
@@ -85,6 +102,32 @@ export function nextStep(
       title: "Scegli il circolo per la tua lezione gratuita.",
       href: "/journey/circolo",
       cta: "Scegli il circolo",
+      secondary: {
+        href: "/journey/calibrazione",
+        label: "Continua la calibrazione",
+      },
+    };
+  if (c?.canFinish)
+    return {
+      kind: "finish",
+      kicker: "R consolidata",
+      title: "Puoi vedere i tuoi scenari o continuare a calibrare.",
+      href: "/journey/calibrazione",
+      cta: "Scegli come proseguire",
+    };
+  if (lessonPending)
+    return {
+      kind: "questions",
+      kicker:
+        phase === "ASSIGNED"
+          ? "Lezione gratuita · confermata"
+          : "Lezione gratuita · richiesta",
+      title: c?.ruleMet
+        ? "R consolidata: si chiude dopo il feedback del coach. Intanto puoi continuare."
+        : "Continua la calibrazione mentre aspetti la lezione.",
+      href: "/journey/calibrazione",
+      cta: "Continua la calibrazione",
+      secondary: toLesson,
     };
   return {
     kind: "questions",

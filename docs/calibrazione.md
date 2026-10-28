@@ -5,14 +5,25 @@
 Dopo la prima valutazione AI (vedi `assessment-ai-evaluation.md`) l'atleta entra
 nella fase gratuita. Niente programma: solo round di domande scritte dall'AI sui
 driver con la confidence più bassa. Ogni round rivaluta R e confidence con il prompt
-di valutazione, salvando una nuova valutazione versionata, finché la **regola di
-consolidamento** in vigore è soddisfatta. Nessuna attesa fra i round e nessuna
-chiusura a tempo (specifica PF-FS-PREPAYWALL §4.3 e §7.2).
+di valutazione, salvando una nuova valutazione versionata. Quando la **regola di
+consolidamento** in vigore è soddisfatta R è consolidata, ma la calibrazione resta
+aperta e l'atleta può continuare a rispondere (decisione di Stefano, 28 ottobre
+2026). Nessuna attesa fra i round (specifica PF-FS-PREPAYWALL §4.3).
+
+La calibrazione si chiude solo in tre modi:
+
+1. **lezione gratuita svolta e R consolidata**: il feedback del coach è valutato e
+   la regola è soddisfatta (da sola, alla valutazione che lo verifica);
+2. **scelta dell'atleta**: con R consolidata e nessuna lezione in attesa o da
+   decidere, «Vai ai tuoi scenari» (`POST /athlete-journey/calibration/finish`);
+3. **scadenza** (`deadlineAt`): chiude comunque, anche con R non consolidata o la
+   lezione ancora da fare.
 
 ```
 EVALUATION ──► FREE_CALIBRATING ──► FREE_LEVEL_ESTIMATED ──► CALIBRATION_COMPLETED
-                 round adattivi       livello stimato          regola di consolidamento
-                                                               soddisfatta
+                 round adattivi       livello stimato          lezione svolta + R
+                                                               consolidata, scelta
+                                                               dell'atleta o scadenza
 ```
 
 Dopo `CALIBRATION_COMPLETED` arrivano gli scenari P3/P6/P12 e la scelta del
@@ -49,13 +60,16 @@ confidence complessiva ≥ 50.
 Tutte in `apps/api/src/discovery/calibration/calibration-rules.ts`, senza I/O:
 
 - **Inizio**: alla prima visita dopo la valutazione nasce `AthleteCalibration`, con
-  inizio pari alla data della prima valutazione. `deadlineAt` (inizio + `maxDays`)
-  resta come riferimento indicativo: non chiude e non consolida R.
+  inizio pari alla data della prima valutazione e `deadlineAt` = inizio +
+  `maxDays`. Alla scadenza la calibrazione si chiude (`expireIfDue`, controllata
+  a ogni lettura del percorso e a ogni round) con motivo `DEADLINE_REACHED`.
 - **Driver in focus** (`focusDrivers`): quelli sotto la soglia per area di
   `R_CONSOLIDATION`, dal meno affidabile; se manca solo la confidence complessiva
   (o la regola non ha soglia per area) sono in focus tutti. L'AI riceve tutti i
   driver con il loro focus e chiede solo su quelli in focus: un driver con
-  evidenze sufficienti non riceve domande (AT-07). I round sono tutti `ADAPTIVE`.
+  evidenze sufficienti non riceve domande (AT-07). Con la regola già soddisfatta
+  sono in focus tutti, dal meno affidabile: si continua ad approfondire. I round
+  sono tutti `ADAPTIVE`.
 - **Prossimo passo deciso dall'AI** (§4.2, scelta C; `calibration-questions.ts`):
   `ASK_SINGLE` (1 domanda, quando la risposta cambierà la successiva), `ASK_GROUP`
   (da 2 a 6 domande indipendenti), `REQUEST_CLARIFICATION` (1 domanda neutra su
@@ -128,32 +142,32 @@ Tutte in `apps/api/src/discovery/calibration/calibration-rules.ts`, senza I/O:
   precedenti di ogni driver. La nuova valutazione ha `sequence` successiva e
   `source = CALIBRATION_ROUND`.
 - **Stato dopo la valutazione**:
-  - regola di consolidamento soddisfatta e nessuna lezione in attesa →
+  - feedback del coach valutato (lezione svolta) e regola soddisfatta →
     `CALIBRATION_COMPLETED`, motivo `CONFIDENCE_REACHED`;
   - altrimenti `FREE_LEVEL_ESTIMATED` appena la confidence del livello supera
     `levelConfidenceThreshold`;
   - con un posto richiesto o assegnato alla lezione gratuita, o un feedback del
-    coach non ancora valutato, lo stato è `FREE_LESSON_VALIDATION` e R non si
-    consolida: è la lezione a chiudere R e P con affidabilità, quindi il paywall
-    arriva solo dopo il feedback. Se la regola è già soddisfatta, un nuovo round
-    risponde `409 CALIBRATION_WAITING_LESSON`;
-  - con il livello stimato e la lezione ancora possibile (regola di eleggibilità
-    soddisfatta, un circolo che la offre, nessuna rinuncia né posto già usato) R
-    aspetta la richiesta o la rinuncia esplicita: `409 CALIBRATION_LESSON_CHOICE`.
-    Senza lezione possibile basta la regola di consolidamento
-    (`lesson-gate.ts`, `docs/lezione-gratuita.md`).
+    coach non ancora valutato, lo stato è `FREE_LESSON_VALIDATION`: la
+    calibrazione resta aperta e si continua a rispondere anche con R consolidata,
+    finché il feedback non è valutato o arriva la scadenza.
+- **Scelta degli scenari** (`finishProblem`, `CalibrationService.finish`): con R
+  consolidata l'atleta chiude la calibrazione quando vuole. Non con la lezione in
+  attesa (`409 CALIBRATION_WAITING_LESSON`), con la lezione disponibile ma non
+  ancora richiesta o rifiutata (`409 CALIBRATION_LESSON_CHOICE`), con R non
+  consolidata (`409 CALIBRATION_NOT_READY`) o con una valutazione in corso. Senza
+  lezione possibile (territorio senza circolo, flag spento, rinuncia, assenza) basta
+  R consolidata (`lesson-gate.ts`, `docs/lezione-gratuita.md`).
   La chiusura consolida l'ultima valutazione nella stessa transazione
   (`calibration-completion.ts`): `CALIBRATION_COMPLETED` e
-  `AssessmentEvaluation.status = CONSOLIDATED` non divergono mai, anche quando la
-  prima valutazione soddisfa già la regola o la regola viene abbassata dal back
-  office (la chiusura avviene al round successivo richiesto dall'atleta). Le altre
-  valutazioni restano `PROVISIONAL`.
-- **Tempo e fine dei round non consolidano** (§7.2, AT-27): passati i giorni
-  indicativi R resta provvisoria e il percorso continua; P non viene mostrata come
-  affidabile. I motivi `CLOSING_ASSESSMENT` e `DEADLINE_REACHED`, i round `CLOSING`
-  ed `EXPIRED` restano solo nello storico. La migrazione
-  `20261011090000_confidence_policies` riapre le calibrazioni chiuse così con
-  evidenze sotto la regola (senza abbonamento attivo): R torna provvisoria.
+  `AssessmentEvaluation.status = CONSOLIDATED` non divergono mai. I round lasciati
+  aperti scadono (`EXPIRED`). Le altre valutazioni restano `PROVISIONAL`.
+- **Scadenza** (§7.2): alla data `deadlineAt` la calibrazione si chiude con
+  `DEADLINE_REACHED` anche con R non consolidata. L'ultima valutazione diventa la
+  base di P (`CONSOLIDATED`) ma l'evento `r_consolidated` registra `rule_met:
+  false` e la vista restituisce `ruleMet: false`: profilo, calibrazione e scenari
+  mostrano un avviso chiaro che R è una stima poco affidabile. Round aperti o in
+  valutazione scadono. `CLOSING_ASSESSMENT` e i round `CLOSING` restano solo nello
+  storico.
 - **Programma prima del paywall**: per il Blueprint (A4.6, A3.9, A4.7) il programma
   arriva dopo calibrazione → P3/P6/P12 → Program Horizon → paywall. Per chi ha una
   valutazione AI, `POST /athlete-journey/submit` e `POST /onboarding/submit` (che
@@ -252,13 +266,16 @@ dall'indirizzo, così ricarica e indietro non la ripetono.
 | `POST /admin/confidence-policies/:kind` | `ADMIN` | `{ minOverallConfidence, minAreaConfidence, minAreasAtConfidence, note? }`: nuova versione |
 
 `GET /auth/journey` aggiunge `calibration` (stato, regola di consolidamento in
-vigore, round aperto senza score) durante la fase `EVALUATION`.
+vigore, `ruleMet`, `canFinish`, `deadlineAt`, `daysLeft`, round aperto senza score)
+durante la fase `EVALUATION`. `POST /athlete-journey/calibration/finish` chiude la
+calibrazione con R consolidata (vedi «Scelta degli scenari»).
 
 ## Back office e AI Tuner
 
 - `/admin/calibration`: le due regole di confidence (pubblica nuova versione,
   storico) e i parametri della calibrazione. Default: soglia livello 50, 30 giorni
-  indicativi, programma prima del paywall spento. Quanti driver e quante domande
+  alla scadenza (fissata all'avvio di ogni calibrazione), programma prima del
+  paywall spento. Quanti driver e quante domande
   per passo lo decide l'AI.
 - `/ai-tuner/prompts/calibrazione`: prompt delle domande, con le stesse regole di
   bozza, attivazione e versione del prompt di valutazione (`promptType =

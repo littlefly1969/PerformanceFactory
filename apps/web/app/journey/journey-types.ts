@@ -70,14 +70,21 @@ export type Calibration = {
     | "CALIBRATION_COMPLETED"
     | "PAYWALL_READY";
   day: number;
-  /** Regola di consolidamento in vigore: solo la confidence chiude R. */
+  /** Scadenza della fase gratuita: chiude la calibrazione anche con R non consolidata. */
+  deadlineAt: string;
+  daysLeft: number;
+  /** L'ultima valutazione soddisfa la regola di consolidamento: R consolidata. */
+  ruleMet: boolean;
+  /** R consolidata e nessuna lezione in attesa: l'atleta può andare agli scenari. */
+  canFinish: boolean;
+  /** Regola di consolidamento in vigore: solo la confidence consolida R. */
   consolidationRule: {
     version: number;
     minOverallConfidence: number | null;
     minAreaConfidence: number | null;
     minAreasAtConfidence: number | null;
   };
-  /** CLOSING_ASSESSMENT e DEADLINE_REACHED solo per chiusure storiche. */
+  /** DEADLINE_REACHED: chiusa dalla scadenza; CLOSING_ASSESSMENT solo storico. */
   completionReason:
     | "CONFIDENCE_REACHED"
     | "CLOSING_ASSESSMENT"

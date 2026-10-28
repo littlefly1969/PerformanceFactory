@@ -12,7 +12,7 @@ import { ConfidenceRule, checkRule } from './confidence-policy';
 export type CalibrationStatus =
   | 'FREE_CALIBRATING'
   | 'FREE_LEVEL_ESTIMATED'
-  /** Posto assegnato alla lezione gratuita: solo informativo, non blocca il consolidamento. */
+  /** Lezione richiesta o assegnata: la calibrazione resta aperta fino al feedback del coach. */
   | 'FREE_LESSON_VALIDATION'
   | 'CALIBRATION_COMPLETED'
   /** Orizzonte scelto dopo il reveal di P3/P6/P12: pronto per l'offerta. */
@@ -29,7 +29,7 @@ export const isCalibrationClosed = (status: string) =>
 
 export type CalibrationSettings = {
   levelConfidenceThreshold: number;
-  /** Durata indicativa della fase gratuita: non chiude né consolida R. */
+  /** Durata della fase gratuita: alla scadenza la calibrazione si chiude comunque. */
   maxDays: number;
   /** Decisione 13 aperta: il Blueprint (A4.6) non dà programmi prima del paywall. */
   programBeforePaywall: boolean;
@@ -68,16 +68,25 @@ export type EvaluationConfidence = {
 };
 
 /**
- * Come la lezione gratuita pesa sul consolidamento di R. `pending`: posto
- * richiesto o assegnato, o feedback del coach da valutare. `available`: la
- * lezione si può ancora fare (flag attivo, regola di eleggibilità
+ * Come la lezione gratuita pesa sulla chiusura della calibrazione. `pending`:
+ * posto richiesto o assegnato, o feedback del coach da valutare. `available`:
+ * la lezione si può ancora fare (flag attivo, regola di eleggibilità
  * soddisfatta, un circolo che la offre, nessun posto già usato o ritirato,
- * nessuna rinuncia). Finché l'una o l'altra vale, è la lezione a chiudere R e
- * P e il paywall arriva dopo; senza lezione possibile basta la regola.
+ * nessuna rinuncia). `done`: il feedback del coach è entrato in una
+ * valutazione. Solo la lezione svolta chiude da sola la calibrazione, insieme
+ * a R consolidata; altrimenti la chiude l'atleta o la scadenza.
  */
-export type LessonGate = { pending: boolean; available: boolean };
+export type LessonGate = {
+  pending: boolean;
+  available: boolean;
+  done: boolean;
+};
 
-export const NO_LESSON: LessonGate = { pending: false, available: false };
+export const NO_LESSON: LessonGate = {
+  pending: false,
+  available: false,
+  done: false,
+};
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -88,29 +97,30 @@ export const dayOf = (startedAt: Date, now: Date) =>
  * Driver in focus per il prossimo passo: quelli sotto la soglia per area
  * della regola di consolidamento, dal meno affidabile. Se la regola manca solo
  * per la confidence complessiva (o non ha soglia per area) sono in focus tutti.
- * Quanti e quali approfondire lo decide l'AI (§4.2); regola soddisfatta:
- * nessun driver.
+ * Con la regola soddisfatta la calibrazione resta aperta e si approfondisce
+ * ancora: sono in focus tutti, dal meno affidabile. Quanti e quali approfondire
+ * lo decide l'AI (§4.2).
  */
 export function focusDrivers<T extends EvaluatedDriver>(
   evaluation: { overallConfidence: number; drivers: T[] },
   rule: ConfidenceRule,
 ): T[] {
   const check = checkRule(rule, evaluation);
-  if (check.met) return [];
   const byConfidence = [...evaluation.drivers].sort(
     (a, b) => a.confidence - b.confidence,
   );
+  if (check.met) return byConfidence;
   const below = byConfidence.filter((d) => check.belowAreas.includes(d.areaId));
   return below.length ? below : byConfidence;
 }
 
 /**
- * Stato dopo una valutazione. La calibrazione si chiude e R si consolida solo
- * quando la regola di consolidamento in vigore è soddisfatta e la lezione
- * gratuita non la trattiene: con una lezione in attesa o ancora possibile (a
- * livello stimato) è il feedback del coach a chiudere R e P. Tempo trascorso
- * e numero di round non contano (PF-FS-PREPAYWALL §6.4, §7.2). Il livello
- * stimato segue la sua soglia di back office.
+ * Stato dopo una valutazione. R è consolidata quando la regola di
+ * consolidamento in vigore è soddisfatta, ma la calibrazione resta aperta:
+ * l'atleta può continuare a rispondere. Si chiude da sola solo con la lezione
+ * gratuita svolta (feedback del coach valutato) e R consolidata; senza lezione
+ * la chiude l'atleta quando sceglie gli scenari (`finishProblem`), oppure la
+ * scadenza. Il livello stimato segue la sua soglia di back office.
  */
 export function statusAfterEvaluation(
   current: CalibrationStatus,
@@ -128,10 +138,7 @@ export function statusAfterEvaluation(
   const levelEstimated =
     current === 'FREE_CALIBRATING' &&
     (evaluation.levelConfidence ?? 0) >= settings.levelConfidenceThreshold;
-  const held =
-    lesson.pending ||
-    (lesson.available && (current !== 'FREE_CALIBRATING' || levelEstimated));
-  if (checkRule(rule, evaluation).met && !held)
+  if (checkRule(rule, evaluation).met && lesson.done && !lesson.pending)
     return {
       status: 'CALIBRATION_COMPLETED',
       completionReason: 'CONFIDENCE_REACHED',
@@ -142,6 +149,26 @@ export function statusAfterEvaluation(
     levelEstimated,
   };
 }
+
+/**
+ * Perché l'atleta non può ancora chiudere la calibrazione e andare agli
+ * scenari: R non consolidata, lezione in attesa del feedback del coach,
+ * lezione disponibile da richiedere o rifiutare. Null se può.
+ */
+export function finishProblem(ruleMet: boolean, lesson: LessonGate) {
+  if (!ruleMet) return 'CALIBRATION_NOT_READY' as const;
+  if (lesson.pending) return 'CALIBRATION_WAITING_LESSON' as const;
+  if (lesson.available) return 'CALIBRATION_LESSON_CHOICE' as const;
+  return null;
+}
+
+/** Scadenza della fase gratuita raggiunta: la calibrazione si chiude comunque. */
+export const deadlineReached = (deadlineAt: Date, now: Date) =>
+  deadlineAt.getTime() <= now.getTime();
+
+/** Giorni interi che mancano alla scadenza, zero se è passata. */
+export const daysLeft = (deadlineAt: Date, now: Date) =>
+  Math.max(0, Math.ceil((deadlineAt.getTime() - now.getTime()) / DAY_MS));
 
 /** Stato aperto: la validazione della lezione prevale, poi il livello stimato. */
 export function openStatus(

@@ -9,7 +9,7 @@ import {
 } from './calibration-rules';
 import { checkRule, loadActivePolicy } from './confidence-policy';
 import { lessonSuspended } from './assessment-anomalies';
-import { isLessonPending } from './lesson-evidence';
+import { isLessonDone, isLessonPending } from './lesson-evidence';
 
 type Db = PrismaService | Prisma.TransactionClient;
 
@@ -52,8 +52,8 @@ export async function lessonGate(
   userId: string,
   evaluation: Parameters<typeof checkRule>[1],
 ): Promise<LessonGate> {
-  if (await isLessonPending(db, userId))
-    return { pending: true, available: false };
+  if (await isLessonPending(db, userId)) return { ...NO_LESSON, pending: true };
+  if (await isLessonDone(db, userId)) return { ...NO_LESSON, done: true };
   if (!(await freeLessonEnabledFor(db, userId))) return NO_LESSON;
   const [calibration, seat, clubs, rule, suspended] = await Promise.all([
     db.athleteCalibration.findUnique({
@@ -75,15 +75,16 @@ export async function lessonGate(
     !seat &&
     clubs.length > 0 &&
     checkRule(rule, evaluation).met;
-  return { pending: false, available };
+  return { ...NO_LESSON, available };
 }
 
 /**
  * Riesamina la calibrazione aperta sull'ultima valutazione quando cambia solo
- * la lezione (rinuncia, ritiro, round richiesto a regola già soddisfatta):
- * se la regola di consolidamento è soddisfatta e la lezione non trattiene R,
- * chiude e consolida. Restituisce lo stato della lezione e se ha chiuso. Va
- * chiamata con la riga della calibrazione sotto lock.
+ * la lezione (rinuncia, ritiro, assenza): con la lezione svolta e la regola
+ * di consolidamento soddisfatta chiude e consolida; altrimenti la
+ * calibrazione resta aperta e la chiude l'atleta o la scadenza. Restituisce
+ * lo stato della lezione e se ha chiuso. Va chiamata con la riga della
+ * calibrazione sotto lock.
  */
 export async function settleCalibration(
   tx: Prisma.TransactionClient,
@@ -112,10 +113,7 @@ export async function settleCalibration(
     drivers: latest.areas,
   };
   const gate = await lessonGate(tx, userId, evaluation);
-  const held =
-    gate.pending ||
-    (gate.available && calibration.status !== 'FREE_CALIBRATING');
-  if (held || !checkRule(policy, evaluation).met)
+  if (!gate.done || gate.pending || !checkRule(policy, evaluation).met)
     return { gate, completed: false };
   await completeCalibration(tx, userId, 'CONFIDENCE_REACHED', now, policy.id);
   return { gate, completed: true };

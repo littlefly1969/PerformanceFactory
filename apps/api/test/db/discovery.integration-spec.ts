@@ -1191,11 +1191,12 @@ describe('PF4 discovery to authenticated journey', () => {
       ),
     ).toBe(true);
 
-    // AT-19/AT-27: il tempo trascorso non cambia il tipo di round né chiude R.
+    // AT-19/AT-27: il giorno di calibrazione non cambia il tipo di round né
+    // consolida R; chiude solo la scadenza, qui non ancora raggiunta.
     const past = (days: number) => new Date(Date.now() - days * 86400000);
     await prisma.athleteCalibration.update({
       where: { userId },
-      data: { startedAt: past(40), deadlineAt: past(10) },
+      data: { startedAt: past(40), deadlineAt: past(-10) },
     });
     // Variante AT-25: A fallisce mentre B, che ha ripreso il round, lo sta
     // valutando. Il catch di A non riapre un round che non è più suo.
@@ -1236,7 +1237,7 @@ describe('PF4 discovery to authenticated journey', () => {
       status: 'PROVISIONAL',
       consolidationPolicyId: rule.id,
     });
-    // Anche dopo la durata indicativa la conoscenza dell'atleta prosegue.
+    // Anche dopo molti giorni, prima della scadenza, la calibrazione prosegue.
     expect((await post('calibration/round')).statusCode).toBe(201);
     expect(
       await prisma.calibrationRound.count({
@@ -1260,8 +1261,8 @@ describe('PF4 discovery to authenticated journey', () => {
     expect((await calibration()).status).not.toBe('CALIBRATION_COMPLETED');
     expect((await latest()).status).toBe('PROVISIONAL');
     try {
-      // Regola abbassata dal back office: al prossimo round richiesto la
-      // valutazione corrente la soddisfa, si chiude e si consolida insieme.
+      // Regola abbassata dal back office: R è consolidata, ma la calibrazione
+      // resta aperta e si può continuare finché l'atleta non sceglie gli scenari.
       const lowered = await publishPolicy(
         prisma,
         'R_CONSOLIDATION',
@@ -1278,6 +1279,13 @@ describe('PF4 discovery to authenticated journey', () => {
         where: { userId, status: 'OPEN' },
       });
       expect((await post('calibration/round')).statusCode).toBe(201);
+      expect((await calibration()).status).not.toBe('CALIBRATION_COMPLETED');
+      const open = await prisma.calibrationRound.findFirstOrThrow({
+        where: { userId, status: 'OPEN' },
+      });
+      const view = await app.get(CalibrationService).view(userId);
+      expect(view).toMatchObject({ ruleMet: true, canFinish: true });
+      expect((await post('calibration/finish')).statusCode).toBe(201);
       expect(await calibration()).toMatchObject({
         status: 'CALIBRATION_COMPLETED',
         completionReason: 'CONFIDENCE_REACHED',
@@ -1288,10 +1296,19 @@ describe('PF4 discovery to authenticated journey', () => {
         consolidationPolicyId: lowered.id,
       });
       expect(
+        (
+          await prisma.calibrationRound.findUniqueOrThrow({
+            where: { id: open.id },
+          })
+        ).status,
+      ).toBe('EXPIRED');
+      expect(
         await prisma.analyticsEvent.count({
           where: { userId, name: 'r_consolidated' },
         }),
       ).toBe(1);
+      // Scelta ripetuta: nessun effetto.
+      expect((await post('calibration/finish')).statusCode).toBe(201);
       // La versione precedente resta nello storico.
       expect(
         await prisma.confidencePolicy.count({

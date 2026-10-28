@@ -619,3 +619,16 @@
   display: table;
   margin: 0 auto 18px;
 }
+/* Avviso ben visibile: R chiusa dalla scadenza senza consolidamento. */
+.pf-acc-warning {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-left: 4px solid #a1260d;
+  border-radius: 14px;
+  background: #fbe9e5;
+  color: #5c1407;
+  font-size: 13px;
+}
+.pf-acc-footer > .pf-acc-pill + .pf-acc-pill {
+  margin-top: 10px;
+}

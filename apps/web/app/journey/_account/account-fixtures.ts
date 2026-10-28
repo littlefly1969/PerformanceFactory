@@ -41,9 +41,17 @@ export const situation = (index: number) => ({
     situation: { index, total: 2, label: "Uscita dal fondo", context: "" },
   },
 });
-export const calibration = (round: unknown, status = "FREE_CALIBRATING") => ({
+export const calibration = (
+  round: unknown,
+  status = "FREE_CALIBRATING",
+  extra: Record<string, unknown> = {},
+) => ({
   status,
   day: 9,
+  deadlineAt: "2026-11-20T10:00:00.000Z",
+  daysLeft: 21,
+  ruleMet: false,
+  canFinish: false,
   consolidationRule: {
     version: 1,
     minOverallConfidence: 70,
@@ -54,6 +62,7 @@ export const calibration = (round: unknown, status = "FREE_CALIBRATING") => ({
   roundsCompleted: 2,
   nextRoundKind: "ADAPTIVE",
   round,
+  ...extra,
 });
 export const ROUND = {
   id: "11111111-1111-4111-8111-111111111111",

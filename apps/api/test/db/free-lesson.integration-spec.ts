@@ -482,15 +482,20 @@ describe('Free lesson with PostgreSQL', () => {
     );
   });
 
-  it('holds R open until the coach feedback is evaluated, then closes at threshold', async () => {
-    // Driver già sopra soglia: senza lezione la calibrazione si chiuderebbe.
+  it('keeps calibrating while the lesson is pending, then closes with the coach feedback and R consolidated', async () => {
+    // Driver già sopra soglia: R è consolidata, la lezione è ancora da fare.
     const id = await requested([80, 90]);
     const roundAthlete = await requested([40, 50]);
     const lessonId = await lesson();
     await admin.assign(lessonId, id);
     await admin.assign(lessonId, roundAthlete);
-    await expect(calibration.openRound(id)).rejects.toMatchObject({
+    await expect(calibration.finish(id)).rejects.toMatchObject({
       response: { code: 'CALIBRATION_WAITING_LESSON' },
+    });
+    // Nell'attesa della lezione si continua a calibrare.
+    await calibration.openRound(id);
+    const waiting = await prisma.calibrationRound.findFirstOrThrow({
+      where: { userId: id, status: 'OPEN' },
     });
     expect(await status(id)).toBe('FREE_LESSON_VALIDATION');
 
@@ -568,6 +573,14 @@ describe('Free lesson with PostgreSQL', () => {
     });
     expect(closed.status).toBe('CALIBRATION_COMPLETED');
     expect(closed.completionReason).toBe('CONFIDENCE_REACHED');
+    // Le domande lasciate a metà scadono con la chiusura.
+    expect(
+      (
+        await prisma.calibrationRound.findUniqueOrThrow({
+          where: { id: waiting.id },
+        })
+      ).status,
+    ).toBe('EXPIRED');
     expect(
       await prisma.analyticsEvent.count({
         where: {
@@ -591,9 +604,11 @@ describe('Free lesson with PostgreSQL', () => {
       }),
     ).toBe(1);
 
-    // Assenza: il beneficio è consumato e, con la regola già soddisfatta, R
-    // si consolida subito (AT-18).
+    // Assenza: il beneficio è consumato; con R consolidata l'atleta continua
+    // o sceglie gli scenari (AT-18).
     await coaches.markNoShow(coachId, lessonId, roundAthlete);
+    expect(await status(roundAthlete)).toBe('FREE_LEVEL_ESTIMATED');
+    await calibration.finish(roundAthlete);
     expect(await status(roundAthlete)).toBe('CALIBRATION_COMPLETED');
     expect(
       (await prisma.freeLesson.findUniqueOrThrow({ where: { id: lessonId } }))
@@ -602,6 +617,40 @@ describe('Free lesson with PostgreSQL', () => {
     await expect(
       athletes.request(roundAthlete, partnerId, true),
     ).rejects.toMatchObject({ response: { phase: 'NO_SHOW' } });
+  });
+
+  it('closes at the deadline even with R not consolidated or the lesson still to do', async () => {
+    const id = await requested([40, 50]);
+    await calibration.openRound(id);
+    await prisma.athleteCalibration.update({
+      where: { userId: id },
+      data: { deadlineAt: new Date(Date.now() - 1000) },
+    });
+    expect(await calibration.view(id)).toMatchObject({
+      status: 'CALIBRATION_COMPLETED',
+      completionReason: 'DEADLINE_REACHED',
+      ruleMet: false,
+      canFinish: false,
+      daysLeft: 0,
+      round: null,
+    });
+    // La stima diventa la base di P, ma l'evento dice che R non era consolidata.
+    expect(
+      (
+        await prisma.assessmentEvaluation.findFirstOrThrow({
+          where: { userId: id },
+          orderBy: { sequence: 'desc' },
+        })
+      ).status,
+    ).toBe('CONSOLIDATED');
+    expect(
+      (
+        await prisma.analyticsEvent.findFirstOrThrow({
+          where: { userId: id, name: 'r_consolidated' },
+        })
+      ).properties,
+    ).toEqual({ reason: 'DEADLINE_REACHED', rule_met: false });
+    await expect(calibration.openRound(id)).rejects.toThrow('già completata');
   });
 
   it('lets the athlete withdraw before the lesson and frees the seat', async () => {
@@ -650,17 +699,19 @@ describe('Free lesson with PostgreSQL', () => {
     });
   });
 
-  it('AT-15/AT-16/AT-18: with a lesson possible R waits for it or for an explicit decline', async () => {
+  it('AT-15/AT-16/AT-18: with a lesson possible the scenarios wait for it or for an explicit decline', async () => {
     // Regola di consolidamento soddisfatta, livello stimato, circolo che offre
-    // la lezione: è la lezione a chiudere R, il paywall aspetta.
+    // la lezione: prima degli scenari si richiede o si rifiuta la lezione.
     const id = await athlete([80, 90]);
-    await expect(calibration.openRound(id)).rejects.toMatchObject({
+    await expect(calibration.finish(id)).rejects.toMatchObject({
       response: { code: 'CALIBRATION_LESSON_CHOICE' },
     });
     expect(await status(id)).toBe('FREE_LEVEL_ESTIMATED');
     expect(await athletes.view(id)).toMatchObject({ phase: 'ELIGIBLE' });
-    // Rinuncia esplicita: R si consolida con la sola regola di confidence.
-    expect(await athletes.decline(id)).toMatchObject({ phase: 'CLOSED' });
+    // Rinuncia esplicita: la calibrazione resta aperta, gli scenari si scelgono.
+    expect(await athletes.decline(id)).toMatchObject({ phase: 'DECLINED' });
+    expect(await status(id)).toBe('FREE_LEVEL_ESTIMATED');
+    await calibration.finish(id);
     expect(await status(id)).toBe('CALIBRATION_COMPLETED');
     expect(
       await prisma.analyticsEvent.count({
@@ -703,7 +754,7 @@ describe('Free lesson with PostgreSQL', () => {
       expect(await athletes.view(unserved)).toMatchObject({
         phase: 'UNAVAILABLE',
       });
-      await calibration.openRound(unserved);
+      await calibration.finish(unserved);
       expect(await status(unserved)).toBe('CALIBRATION_COMPLETED');
     } finally {
       await prisma.partner.update({

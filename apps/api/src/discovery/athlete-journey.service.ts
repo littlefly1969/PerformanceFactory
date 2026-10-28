@@ -374,6 +374,12 @@ export class AthleteJourneyService {
     return this.state(userId);
   }
 
+  async calibrationFinish(userId: string) {
+    await this.allowed(userId);
+    await this.calibration.finish(userId);
+    return this.state(userId);
+  }
+
   async calibrationSkip(userId: string, roundId: string) {
     await this.allowed(userId);
     await this.calibration.skipMicroTest(userId, roundId);
