@@ -20,6 +20,25 @@ const LIVE_STATUSES: SubscriptionStatus[] = [
   SubscriptionStatus.PAUSED,
 ];
 
+export type AccountSubscriptionState =
+  | 'NONE'
+  | 'PENDING'
+  | 'ACTIVE'
+  | 'GRACE'
+  | 'PAUSED'
+  | 'ENDED';
+
+/** Stato mostrato nell'account per ogni stato del contratto. */
+const ACCOUNT_STATE: Record<SubscriptionStatus, AccountSubscriptionState> = {
+  ACTIVE: 'ACTIVE',
+  PAYMENT_GRACE: 'GRACE',
+  PAUSED: 'PAUSED',
+  CHECKOUT_PENDING: 'PENDING',
+  CHECKOUT_EXPIRED: 'NONE',
+  CHECKOUT_FAILED: 'NONE',
+  EXPIRED: 'ENDED',
+};
+
 function view(subscription: Subscription) {
   return {
     id: subscription.id,
@@ -53,6 +72,67 @@ export class SubscriptionsService {
     return {
       entitled: subscription ? hasEntitlement(subscription, now) : false,
       subscription: subscription ? view(subscription) : null,
+    };
+  }
+
+  /**
+   * Vista per la pagina account: oltre all'abbonamento in corso mostra un
+   * pagamento non ancora confermato o l'ultimo contratto terminato. Non
+   * cambia `entitled`, che resta quello di status() per checkout e programma.
+   */
+  async account(userId: string, now = new Date()) {
+    const live = await this.liveSubscription(userId);
+    if (live) {
+      const entitled = hasEntitlement(live, now);
+      const deadline = live.entitlementEndAt
+        ? new Date(
+            live.entitlementEndAt.getTime() -
+              cancelNoticeHours() * 60 * 60 * 1000,
+          )
+        : null;
+      const linked =
+        !!live.providerSubscriptionId ||
+        live.provider === PaymentProviderKind.STUB;
+      return {
+        state: ACCOUNT_STATE[live.status],
+        entitled,
+        subscription: view(live),
+        cancelDeadline: deadline,
+        canCancel:
+          entitled &&
+          linked &&
+          !live.cancelAtPeriodEnd &&
+          (!deadline || now <= deadline),
+        canResume: entitled && linked && live.cancelAtPeriodEnd,
+      };
+    }
+    const pending = await this.prisma.subscription.findFirst({
+      where: {
+        userId,
+        status: SubscriptionStatus.CHECKOUT_PENDING,
+        checkoutExpiresAt: { gt: now },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const ended = pending
+      ? null
+      : await this.prisma.subscription.findFirst({
+          where: { userId, status: SubscriptionStatus.EXPIRED },
+          orderBy: [{ endedAt: 'desc' }, { createdAt: 'desc' }],
+        });
+    const shown = pending ?? ended;
+    const state: AccountSubscriptionState = pending
+      ? 'PENDING'
+      : ended
+        ? 'ENDED'
+        : 'NONE';
+    return {
+      state,
+      entitled: false,
+      subscription: shown ? { ...view(shown), endedAt: shown.endedAt } : null,
+      cancelDeadline: null,
+      canCancel: false,
+      canResume: false,
     };
   }
 

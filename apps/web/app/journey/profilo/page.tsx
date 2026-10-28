@@ -1,16 +1,11 @@
 "use client";
-import Image from "next/image";
-import Link from "next/link";
-import { useState } from "react";
-import { LogoutButton } from "../../components/logout-button";
-import { FitRankingEditor } from "../../components/fit-ranking-editor";
-import { AthleteAddress } from "../../components/athlete-address";
+import { useEffect } from "react";
+import { AccountMenu } from "../../components/account-menu";
 import {
   type AthleteProfile,
   type FreeLessonView,
   percent,
   shortName,
-  useProfilePhoto,
   useResource,
 } from "../_account/account-data";
 import { AccountScreen, PillLink } from "../_account/account-shell";
@@ -22,10 +17,8 @@ import {
   useAccountJourney,
 } from "../_account/calibration-state";
 
-/** Intestazione: foto con il tasto per cambiarla, nome, sport ed esperienza. */
+/** Intestazione: avatar con il menu dell'account, nome, sport ed esperienza. */
 function ProfileHeader({ profile }: { profile: AthleteProfile | null }) {
-  const photo = useProfilePhoto();
-  const [menu, setMenu] = useState(false);
   const name = profile?.firstName?.trim() ?? "";
   const meta = [
     profile?.sport,
@@ -38,39 +31,15 @@ function ProfileHeader({ profile }: { profile: AthleteProfile | null }) {
     .join(" · ");
   return (
     <header className="pf-acc-profile-head">
-      <Link
-        href="/benvenuto/foto"
+      <AccountMenu
+        name={name}
+        from="profilo"
         className="pf-acc-avatar"
-        aria-label="Cambia la foto del profilo"
-      >
-        {photo ? (
-          <Image src={photo} alt="" width={64} height={64} unoptimized />
-        ) : (
-          <span aria-hidden="true">{name[0]?.toUpperCase() ?? "·"}</span>
-        )}
-        <span className="pf-acc-avatar-badge" aria-hidden="true">
-          ◉
-        </span>
-      </Link>
+        align="start"
+      />
       <div>
         <h1>{name || "Il tuo profilo"}</h1>
         {meta && <p className="pf-acc-meta">{meta}</p>}
-      </div>
-      <div className="pf-acc-settings">
-        <button
-          type="button"
-          aria-label="Impostazioni"
-          aria-expanded={menu}
-          onClick={() => setMenu(!menu)}
-        >
-          ⚙
-        </button>
-        {menu && (
-          <div className="pf-acc-menu">
-            <Link href="/benvenuto/foto">Cambia foto</Link>
-            <LogoutButton />
-          </div>
-        )}
       </div>
     </header>
   );
@@ -82,7 +51,12 @@ function ProfileHeader({ profile }: { profile: AthleteProfile | null }) {
  * calibrazione. Prima dell'assessment lo Spider è vuoto.
  */
 export default function ProfilePage() {
-  const { journey: j, error, busy, action, refresh } = useAccountJourney();
+  const { journey: j, error, busy, action } = useAccountJourney();
+  useEffect(() => {
+    // Il vecchio richiamo all'indirizzo nel profilo porta all'account.
+    if (window.location.hash === "#indirizzo")
+      window.location.replace("/account/indirizzo?da=profilo");
+  }, []);
   const profile = useResource<AthleteProfile>("/athlete-journey/profile");
   const evaluation = j?.evaluation ?? null;
   const lesson = useResource<FreeLessonView>("/athlete-journey/free-lesson");
@@ -215,22 +189,6 @@ export default function ProfilePage() {
             ? "Ogni risposta e ogni micro-test rendono più nitida l’area che conosciamo meno."
             : "Rispondi all’assessment: lo Spider nasce provvisorio e si definisce mentre ti alleni."}
         </p>
-      </section>
-
-      <section className="pf-acc-card pf-acc-fit pf-acc-address" id="indirizzo">
-        <AthleteAddress onSaved={() => void lesson.reload()} />
-      </section>
-
-      <section className="pf-acc-card pf-acc-fit">
-        <FitRankingEditor
-          onSaved={() => {
-            // La classifica rivaluta driver e confidenza: cambiano anche
-            // Spider, calibrazione ed eleggibilità alla lezione.
-            void profile.reload();
-            void refresh().catch(() => undefined);
-            void lesson.reload();
-          }}
-        />
       </section>
     </AccountScreen>
   );

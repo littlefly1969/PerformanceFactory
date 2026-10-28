@@ -1,33 +1,13 @@
 "use client";
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { API_BASE, secureFetch } from "../lib/api";
 import { LogoutButton } from "../components/logout-button";
+import { AccountMenu } from "../components/account-menu";
 import type { Journey } from "./journey-types";
 import { AccountNav } from "./_account/account-shell";
 import "../start/pf4.css";
 import "./welcome-home.css";
-
-/** Foto del profilo, se l'atleta l'ha caricata nel benvenuto. */
-function useProfilePhoto() {
-  const [image, setImage] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    secureFetch(`${API_BASE}/athlete/profile/photo`)
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data: { image?: string | null } | null) => {
-        if (alive) setImage(data?.image ?? null);
-      })
-      .catch(() => {
-        /* Senza foto resta l'iniziale. */
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-  return image;
-}
 
 /**
  * La lezione si promette solo se il server la rende possibile: funzione attiva
@@ -85,7 +65,6 @@ export function WelcomeHome({
   error?: string;
   onStart: () => void;
 }) {
-  const photo = useProfilePhoto();
   const lesson = useLessonOffered();
   const name = journey.firstName?.trim();
   const answered = Math.min(journey.currentQuestion, journey.count);
@@ -99,13 +78,7 @@ export function WelcomeHome({
           <span className="pf-home-brand">
             <b aria-hidden="true">P</b> Performance Factory
           </span>
-          <span className="pf-home-avatar" aria-label="Il tuo profilo">
-            {photo ? (
-              <Image src={photo} alt="" width={36} height={36} unoptimized />
-            ) : (
-              <span aria-hidden="true">{name?.[0]?.toUpperCase() ?? "·"}</span>
-            )}
-          </span>
+          <AccountMenu name={name} from="home" className="pf-home-avatar" />
         </header>
 
         <h1>{name ? `Ciao ${name}.` : "Ciao."}</h1>

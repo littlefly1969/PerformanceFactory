@@ -6,6 +6,7 @@ import { Module } from '@nestjs/common';
 import { AthleteController } from './athlete.controller';
 import { AthleteService } from './athlete.service';
 import { ProfilePhotoService } from './profile-photo';
+import { AddressLocationWorker } from './address-location.worker';
 @Module({
   imports: [TrainingLifecycleModule, GeoModule],
   controllers: [AthleteController],
@@ -14,6 +15,7 @@ import { ProfilePhotoService } from './profile-photo';
     TrainingAvailabilityService,
     AthleteAddressService,
     ProfilePhotoService,
+    AddressLocationWorker,
   ],
 })
 export class AthleteModule {}

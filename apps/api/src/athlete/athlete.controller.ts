@@ -2,7 +2,13 @@ import {
   TrainingAvailabilityDto,
   TrainingAvailabilityService,
 } from './training-availability';
-import { AthleteAddressDto, AthleteAddressService } from './athlete-address';
+import {
+  AddressResolveDto,
+  AddressSelectionDto,
+  AddressSuggestionsDto,
+  AthleteAddressDto,
+  AthleteAddressService,
+} from './athlete-address';
 import {
   Body,
   Controller,
@@ -68,6 +74,27 @@ export class AthleteController {
   })
   saveAddress(@Req() req: Request, @Body() body: AthleteAddressDto) {
     return this.address.save(req.user.id, body);
+  }
+  @Post('address/suggestions')
+  @HttpCode(200)
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({ summary: 'Suggerimenti di indirizzo da Google Places' })
+  addressSuggestions(@Req() req: Request, @Body() body: AddressSuggestionsDto) {
+    return this.address.suggestions(req.user.id, body);
+  }
+  @Post('address/resolve')
+  @HttpCode(200)
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({
+    summary: 'Risolve il suggerimento scelto in un indirizzo completo',
+  })
+  resolveAddress(@Req() req: Request, @Body() body: AddressResolveDto) {
+    return this.address.resolve(req.user.id, body);
+  }
+  @Post('address/selection')
+  @ApiOperation({ summary: 'Salva l indirizzo scelto fra i suggerimenti' })
+  saveAddressSelection(@Req() req: Request, @Body() body: AddressSelectionDto) {
+    return this.address.saveSelection(req.user.id, body);
   }
   @ApiOperation({ summary: 'Foto profilo, null se non caricata' })
   @Header('Cache-Control', 'private, no-store')

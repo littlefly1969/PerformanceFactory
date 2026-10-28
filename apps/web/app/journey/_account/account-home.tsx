@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AccountMenu } from "../../components/account-menu";
 import type { Journey } from "../journey-types";
 import { AccountScreen, PillLink } from "./account-shell";
 import { isClosed, microTestOpen } from "./calibration-state";
@@ -40,7 +41,14 @@ export function AccountHome({ journey: j }: { journey: Journey }) {
   const name = j.firstName?.trim();
   return (
     <AccountScreen nav="home" coachDot={microTestOpen(j.calibration)}>
-      <h1 className="pf-acc-title">{name ? `Ciao ${name}.` : "Ciao."}</h1>
+      <div className="pf-acc-row">
+        <h1 className="pf-acc-title">{name ? `Ciao ${name}.` : "Ciao."}</h1>
+        <AccountMenu
+          name={name}
+          from="home"
+          className="pf-acc-avatar is-small"
+        />
+      </div>
       <span className="pf-acc-badge">
         {closed ? "R consolidata" : "Profilo provvisorio"}
       </span>

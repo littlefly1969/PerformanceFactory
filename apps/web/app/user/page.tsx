@@ -7,6 +7,7 @@ import type { Home, Session } from "./_components/athlete-types";
 import { displayDate } from "./_components/athlete-types";
 import { sessionArea, sessionMeta } from "./_components/session-format";
 import { ObjectiveCard } from "./obiettivi/objective-card";
+import { AccountMenu } from "../components/account-menu";
 
 function Brand({ name }: { name: string | null }) {
   return (
@@ -21,13 +22,7 @@ function Brand({ name }: { name: string | null }) {
         </svg>
         <span>Performance Factory</span>
       </Link>
-      <Link
-        href="/user/profile"
-        className="pfs-avatar"
-        aria-label="Il tuo profilo"
-      >
-        {name?.trim().charAt(0).toUpperCase() || "·"}
-      </Link>
+      <AccountMenu name={name} from="user" className="pfs-avatar" />
     </>
   );
 }

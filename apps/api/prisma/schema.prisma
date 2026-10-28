@@ -1644,10 +1644,21 @@ model UserAddress {
   latitude   Float?
   longitude  Float?
   geocodedAt DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  /// Da dove viene l'indirizzo: scritto a mano o scelto fra i suggerimenti Google.
+  source     AddressSource @default(MANUAL)
+  /// Place ID Google del suggerimento scelto; serve a rinnovare le coordinate.
+  placeId    String?
+  /// Quando l'atleta ha scelto un indirizzo riconosciuto dal backend.
+  verifiedAt DateTime?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum AddressSource {
+  MANUAL
+  GOOGLE_PLACES
 }
 
 /// Provenienza dell'atleta: prima e ultima sorgente prima della registrazione (A6 ricostruito).

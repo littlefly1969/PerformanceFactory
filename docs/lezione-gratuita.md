@@ -218,14 +218,16 @@ modo una lezione già creata mantiene data, stato e posti assegnati.
 
 ## Distanza fra atleta e circolo
 
-L'atleta scrive il suo indirizzo dal profilo (`/journey/profilo` nella fase
-gratuita, `/user/profile` da abbonato). Da lì la scelta del circolo
-(`/journey/circolo`) mostra quanto dista ogni circolo in linea d'aria. La
-distanza esce dalle coordinate di entrambi: quelle del circolo si risolvono dal
-suo indirizzo quando l'admin lo salva (o al primo giro del seed), quelle
-dell'atleta quando salva il suo.
+L'atleta salva il suo indirizzo dall'account (`/account/indirizzo`, dal menu
+dell'avatar; si veda [Account personale](account-personale.md)). Da lì la
+scelta del circolo (`/journey/circolo`) mostra quanto dista ogni circolo in
+linea d'aria. La distanza esce dalle coordinate di entrambi: quelle del circolo
+si risolvono dal suo indirizzo quando l'admin lo salva (o al primo giro del
+seed), quelle dell'atleta quando sceglie il suo fra i suggerimenti di Google
+Places o, finché Google Places non è configurato, quando lo scrive a mano.
 
-Il geocoding è un tentativo, non un passo obbligatorio: è un servizio esterno
+Per gli indirizzi scritti a mano e per i circoli il geocoding è un tentativo,
+non un passo obbligatorio: è un servizio esterno
 configurabile con `GEOCODING_URL` (per difetto Nominatim di OpenStreetMap),
 spegnibile con `GEOCODING_ENABLED=false`. Se non risponde o non trova
 l'indirizzo, le coordinate restano vuote e all'atleta si dice perché la
@@ -233,8 +235,8 @@ distanza non si può calcolare, invece di mostrare un numero inventato:
 
 | `distance.reason` | Cosa vede l'atleta |
 |---|---|
-| `NO_ADDRESS` | manca l'indirizzo: lo si aggiunge dal profilo |
-| `ADDRESS_NOT_LOCATED` | l'indirizzo c'è ma non è stato riconosciuto: si può correggere |
+| `NO_ADDRESS` | manca l'indirizzo: lo si aggiunge dall'account |
+| `ADDRESS_NOT_LOCATED` | l'indirizzo c'è ma non è stato riconosciuto: si può correggere dall'account |
 | `null` | la distanza c'è, per i circoli di cui si conosce la sede |
 
 Un circolo senza coordinate ha `distanceKm` nullo anche quando l'atleta è
