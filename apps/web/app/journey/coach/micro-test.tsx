@@ -409,6 +409,7 @@ export function MicroTestTab({
   calibration,
   evaluation,
   resultRound,
+  saved,
   next,
   onAnswered,
   onSkip,
@@ -416,6 +417,8 @@ export function MicroTestTab({
   calibration: Calibration | null;
   evaluation: Evaluation | null;
   resultRound: string | null;
+  /** Round il cui esito è stato appena accettato dal server. */
+  saved: string | null;
   /** Prossimo passo dopo il risultato, dallo stato aggiornato. */
   next: NextStep | null;
   onAnswered: (
@@ -438,6 +441,12 @@ export function MicroTestTab({
     round?.action === "PROPOSE_MICRO_TEST" && round.status === "EVALUATING"
       ? round
       : null;
+  // Il risultato richiesto (dall'indirizzo o dopo un invio riuscito) viene
+  // prima del prossimo round: si legge dalla sua API e non si reinvia. Solo
+  // se è proprio quel round a essere rimasto in valutazione, e non lo abbiamo
+  // appena salvato noi, si offre di completarla.
+  if (resultRound && !(stalled?.id === resultRound && saved !== resultRound))
+    return <MicroTestResultView roundId={resultRound} next={next} />;
   if (stalled)
     return (
       <StalledEvaluation
@@ -454,8 +463,6 @@ export function MicroTestTab({
         }
       />
     );
-  if (resultRound && !open)
-    return <MicroTestResultView roundId={resultRound} next={next} />;
   if (!evaluation)
     return (
       <section className="pf-acc-micro">

@@ -268,6 +268,108 @@ describe("Risultato del micro-test", () => {
     },
   );
 
+  const OLD = "22222222-2222-4222-8222-222222222222";
+  const PRACTICAL = {
+    ...ROUND,
+    questions: [
+      {
+        ...question("p1", "Servizio a uscire"),
+        microTest: {
+          instructions: "Dieci servizi.",
+          durationMinutes: 5,
+          safetyNotes: "",
+        },
+      },
+    ],
+  };
+
+  it("shows a requested result before a newly opened micro-test", async () => {
+    window.history.replaceState(null, "", `/journey/coach?round=${OLD}`);
+    const calls = serve({
+      "/auth/journey": journey({ calibration: calibration(ROUND) }),
+      "/athlete-journey/free-lesson": { ...lesson, phase: "LOCKED" },
+      "/calibration/micro-test/": RESULT,
+    });
+    render(<CoachPage />);
+    expect(await screen.findByText("40% → 35%")).toBeInTheDocument();
+    expect(calls.some((c) => c.url.endsWith(`/micro-test/${OLD}`))).toBe(true);
+    expect(
+      screen.queryByRole("button", { name: "Inizia il micro-test" }),
+    ).toBeNull();
+    // La nuova prova resta un'azione esplicita.
+    expect(
+      await screen.findByRole("link", { name: "Fai il micro-test" }),
+    ).toHaveAttribute("href", "/journey/coach");
+  });
+
+  it("does not let a saved result be sent again when the journey cannot be re-read", async () => {
+    let saved = false;
+    const calls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        calls.push(url);
+        if (url.endsWith("/auth/journey"))
+          return saved
+            ? new Response(JSON.stringify({ message: "Non disponibile" }), {
+                status: 503,
+              })
+            : new Response(
+                JSON.stringify(
+                  journey({ calibration: calibration(PRACTICAL) }),
+                ),
+              );
+        if (url.endsWith("/calibration/answers")) {
+          saved = true;
+          return new Response(
+            JSON.stringify(journey({ calibration: calibration(null) })),
+          );
+        }
+        if (url.includes("/calibration/micro-test/"))
+          return new Response(JSON.stringify(RESULT));
+        return new Response(JSON.stringify({ ...lesson, phase: "LOCKED" }));
+      }),
+    );
+    render(<CoachPage />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Inizia il micro-test" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: /Spesso/ }));
+    await userEvent.click(
+      screen.getByRole("button", { name: /Invia l’esito/ }),
+    );
+    expect(await screen.findByText("40% → 35%")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Invia l’esito/ })).toBeNull();
+    expect(window.location.search).toBe(`?round=${ROUND.id}`);
+    expect(
+      calls.filter((u) => u.endsWith("/calibration/answers")),
+    ).toHaveLength(1);
+  });
+
+  it("offers to finish the evaluation of the requested round, not of another", async () => {
+    const stalled = { ...ROUND, status: "EVALUATING", answers: { t1: "o1" } };
+    window.history.replaceState(null, "", `/journey/coach?round=${ROUND.id}`);
+    serve({
+      "/auth/journey": journey({ calibration: calibration(stalled) }),
+      "/athlete-journey/free-lesson": lesson,
+      "/calibration/micro-test/": { ...RESULT, status: "EVALUATING" },
+    });
+    const first = render(<CoachPage />);
+    expect(
+      await screen.findByText("Le tue risposte sono salvate."),
+    ).toBeVisible();
+    first.unmount();
+    window.history.replaceState(null, "", `/journey/coach?round=${OLD}`);
+    serve({
+      "/auth/journey": journey({ calibration: calibration(stalled) }),
+      "/athlete-journey/free-lesson": lesson,
+      "/calibration/micro-test/": RESULT,
+    });
+    render(<CoachPage />);
+    expect(await screen.findByText("40% → 35%")).toBeInTheDocument();
+    expect(screen.queryByText("Le tue risposte sono salvate.")).toBeNull();
+  });
+
   it("keeps the result reachable while it is still being evaluated", async () => {
     window.history.replaceState(null, "", `/journey/coach?round=${ROUND.id}`);
     serve({

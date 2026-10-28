@@ -30,6 +30,7 @@ export default function CoachPage() {
   const lesson = useResource<FreeLessonView>("/athlete-journey/free-lesson");
   const [tab, setTab] = useState<Tab>("micro");
   const [resultRound, setResultRound] = useState<string | null>(null);
+  const [saved, setSaved] = useState<string | null>(null);
   const [failure, setFailure] = useState("");
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -96,6 +97,7 @@ export default function CoachPage() {
             calibration={calibration}
             evaluation={j.evaluation ?? null}
             resultRound={resultRound}
+            saved={saved}
             next={lesson.data === undefined ? null : nextStep(j, lesson.data)}
             onAnswered={async (roundId, answers) => {
               setFailure("");
@@ -117,6 +119,7 @@ export default function CoachPage() {
                 "",
                 `/journey/coach?round=${roundId}`,
               );
+              setSaved(roundId);
               setResultRound(roundId);
               // Valutazione e lezione cambiano con l'esito: si rileggono.
               await Promise.all([

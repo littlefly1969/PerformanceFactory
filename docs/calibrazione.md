@@ -228,7 +228,8 @@ dall'indirizzo, così ricarica e indietro non la ripetono.
   sta valutando, la pagina aspetta e rilegge lo stato senza reinviarle.
 - **Micro-test**: feedback, risultato e video restano; l'azione principale è
   «Torna al riepilogo», «Continua la calibrazione» compare solo se è ancora il
-  passo consentito. Il risultato aperto da `?round=` si legge senza reinviare la
+  passo consentito. Il risultato aperto da `?round=` o appena salvato si legge
+  dalla sua API anche se nel frattempo c'è un nuovo round, senza reinviare la
   prova; rimandare il micro-test riporta al riepilogo.
 - **Prossimo passo**: Home e profilo usano la stessa regola
   (`_account/next-step.ts`) su stato della calibrazione e fase della lezione:
