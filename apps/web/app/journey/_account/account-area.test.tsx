@@ -55,10 +55,10 @@ describe("Profilo dell'atleta", () => {
     expect(
       await screen.findByRole("link", { name: /Scegli il circolo/ }),
     ).toHaveAttribute("href", "/journey/circolo");
-    expect(screen.getByRole("link", { name: /Calibrazione/ })).toHaveAttribute(
-      "href",
-      "/journey/calibrazione",
-    );
+    // Il prossimo passo segue lo stato: qui un micro-test aperto.
+    expect(
+      screen.getByRole("link", { name: /Fai il micro-test/ }),
+    ).toHaveAttribute("href", "/journey/coach");
     expect(
       screen.getByRole("img", { name: /Il tuo Spider provvisorio/ }),
     ).toBeInTheDocument();
@@ -179,7 +179,9 @@ describe("Distanza dei circoli", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/km/)).toBeNull();
     expect(
-      screen.getByRole("link", { name: "Completa l’indirizzo nel tuo account" }),
+      screen.getByRole("link", {
+        name: "Completa l’indirizzo nel tuo account",
+      }),
     ).toHaveAttribute("href", "/account/indirizzo?da=circolo");
   });
 });

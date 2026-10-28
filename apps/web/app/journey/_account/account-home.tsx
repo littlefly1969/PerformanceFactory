@@ -2,33 +2,10 @@ import Link from "next/link";
 import { AccountMenu } from "../../components/account-menu";
 import type { Journey } from "../journey-types";
 import { AccountScreen, PillLink } from "./account-shell";
+import { type FreeLessonView, useResource } from "./account-data";
 import { isClosed, microTestOpen } from "./calibration-state";
+import { nextStep } from "./next-step";
 import { MiniSpider } from "./spiders";
-
-/** Il prossimo passo della fase gratuita, deciso dallo stato del backend. */
-function nextStep(j: Journey) {
-  const c = j.calibration;
-  if (isClosed(c))
-    return {
-      kicker: "Calibrazione completata",
-      title: "Scopri dove puoi arrivare in 3, 6 e 12 mesi.",
-      href: "/journey/scenari",
-      cta: "I tuoi scenari",
-    };
-  if (microTestOpen(c))
-    return {
-      kicker: "Micro-test",
-      title: "Una prova breve ti aspetta.",
-      href: "/journey/coach",
-      cta: "Fai il micro-test",
-    };
-  return {
-    kicker: "Calibrazione in corso",
-    title: "Rendiamo la stima più precisa.",
-    href: "/journey/calibrazione",
-    cta: "Continua",
-  };
-}
 
 /**
  * Home dopo l'assessment: il prossimo passo e lo Spider, che porta al
@@ -36,7 +13,9 @@ function nextStep(j: Journey) {
  */
 export function AccountHome({ journey: j }: { journey: Journey }) {
   const evaluation = j.evaluation!;
-  const step = nextStep(j);
+  // Lo stesso passo del profilo: servono anche la fase della lezione.
+  const lesson = useResource<FreeLessonView>("/athlete-journey/free-lesson");
+  const step = lesson.data === undefined ? null : nextStep(j, lesson.data);
   const closed = isClosed(j.calibration);
   const name = j.firstName?.trim();
   return (
@@ -52,11 +31,13 @@ export function AccountHome({ journey: j }: { journey: Journey }) {
       <span className="pf-acc-badge">
         {closed ? "R consolidata" : "Profilo provvisorio"}
       </span>
-      <section className="pf-acc-lesson" aria-label="Prossimo passo">
-        <span className="pf-acc-kicker">{step.kicker}</span>
-        <h2>{step.title}</h2>
-        <PillLink href={step.href}>{step.cta}</PillLink>
-      </section>
+      {step && (
+        <section className="pf-acc-lesson" aria-label="Prossimo passo">
+          <span className="pf-acc-kicker">{step.kicker}</span>
+          <h2>{step.title}</h2>
+          <PillLink href={step.href}>{step.cta}</PillLink>
+        </section>
+      )}
       <Link className="pf-acc-card pf-acc-home-spider" href="/journey/profilo">
         <MiniSpider
           real={evaluation.drivers.map((d) => d.score)}

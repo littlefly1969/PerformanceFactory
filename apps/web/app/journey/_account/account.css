@@ -96,6 +96,17 @@
 .pf-acc-error {
   color: #a1260d !important;
 }
+/* Conferma breve dopo un'attività conclusa, nei colori esistenti. */
+.pf-acc-confirm {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--acc-lime-soft);
+  font-size: 13px;
+}
+.pf-acc-confirm:focus-visible {
+  outline: 2px solid var(--acc-lime);
+}
 .pf-acc-link {
   display: block;
   margin: 14px auto 0;

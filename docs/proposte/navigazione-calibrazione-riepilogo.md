@@ -1,8 +1,8 @@
 # Specifica: ritorno al riepilogo dopo la calibrazione
 
-Stato: incarico concordato per l'agente; questa PR contiene soltanto la
-specifica. Implementazione e test applicativi devono essere aggiunti prima
-del merge della funzionalità.
+Stato: implementata (vedi «Navigazione e riepilogo» in `docs/calibrazione.md`
+e i test in `apps/web/app/journey/_account/navigation.test.tsx`). Resta da
+fare la verifica manuale su dispositivo mobile e desktop.
 
 Analisi del 28/10/2026 su `main` al commit
 `bf4b9d0968dfd6004a29741c1ca702de818f3273`, dopo il merge della gestione account.
@@ -141,20 +141,20 @@ il percorso previsto per creare il programma e arrivare all'area abbonato.
 
 ## Criteri di accettazione e verifiche dell'agente
 
-- [ ] Round completato e valutato → riepilogo aggiornato, senza nuovo round automatico.
-- [ ] Risposta HTTP di errore o errore di rete → domande, posizione e selezioni locali conservate.
-- [ ] Risposte già salvate con valutazione interrotta → recupero coerente senza duplicazioni.
-- [ ] Micro-test pratico e situazionale conservano feedback, risultato e video, con ritorno al riepilogo.
-- [ ] Consultazione diretta di un risultato e rinuncia a un micro-test hanno uscite comprensibili.
-- [ ] Home e profilo concordano sul prossimo passo nei diversi stati di calibrazione e lezione.
-- [ ] Richiesta, conferma, attesa validazione, rinuncia e indisponibilità della lezione rappresentate correttamente.
-- [ ] Chiusura della calibrazione e preparazione degli scenari non lasciano CTA di calibrazione incoerenti.
-- [ ] Scenari, piano, «Non ora» e checkout mantengono scelte e ritorni corretti.
-- [ ] Pagamento in attesa: uscita sicura e riprova, senza doppio checkout o attivazione anticipata.
-- [ ] Back, ricarica, accessi diretti e riapertura PWA non causano loop o invii duplicati.
-- [ ] Consensi, onboarding, passaggio all'area abbonato e gestione account invariati.
+- [x] Round completato e valutato → riepilogo aggiornato, senza nuovo round automatico.
+- [x] Risposta HTTP di errore o errore di rete → domande, posizione e selezioni locali conservate.
+- [x] Risposte già salvate con valutazione interrotta → recupero coerente senza duplicazioni.
+- [x] Micro-test pratico e situazionale conservano feedback, risultato e video, con ritorno al riepilogo.
+- [x] Consultazione diretta di un risultato e rinuncia a un micro-test hanno uscite comprensibili.
+- [x] Home e profilo concordano sul prossimo passo nei diversi stati di calibrazione e lezione.
+- [x] Richiesta, conferma, attesa validazione, rinuncia e indisponibilità della lezione rappresentate correttamente.
+- [x] Chiusura della calibrazione e preparazione degli scenari non lasciano CTA di calibrazione incoerenti.
+- [x] Scenari, piano, «Non ora» e checkout mantengono scelte e ritorni corretti.
+- [x] Pagamento in attesa: uscita sicura e riprova, senza doppio checkout o attivazione anticipata.
+- [x] Back, ricarica, accessi diretti e riapertura PWA non causano loop o invii duplicati.
+- [x] Consensi, onboarding, passaggio all'area abbonato e gestione account invariati.
 - [ ] Verifica mobile/desktop e accessibilità delle transizioni, mantenendo l'aspetto delle schermate.
-- [ ] Test di regressione pertinenti, lint, typecheck e build secondo `AGENTS.md`; documentazione aggiornata.
+- [x] Test di regressione pertinenti, lint, typecheck e build secondo `AGENTS.md`; documentazione aggiornata.
 
 Partire dai test esistenti in `apps/web/app/journey/_account/account-area.test.tsx`,
 `account-recovery.test.tsx`, `apps/web/app/journey/page.test.tsx`, dai test del

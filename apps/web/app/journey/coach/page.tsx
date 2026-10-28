@@ -1,11 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
-import { postJson } from "../_account/account-data";
+import {
+  type FreeLessonView,
+  postJson,
+  useResource,
+} from "../_account/account-data";
 import { AccountScreen, PillLink } from "../_account/account-shell";
 import {
   microTestOpen,
   useAccountJourney,
 } from "../_account/calibration-state";
+import { nextStep, summaryHref } from "../_account/next-step";
 import { MicroTestTab } from "./micro-test";
 
 type Tab = "ai" | "pro" | "micro";
@@ -22,6 +27,7 @@ const TABS: { tab: Tab; label: string }[] = [
  */
 export default function CoachPage() {
   const { journey: j, error, refresh } = useAccountJourney();
+  const lesson = useResource<FreeLessonView>("/athlete-journey/free-lesson");
   const [tab, setTab] = useState<Tab>("micro");
   const [resultRound, setResultRound] = useState<string | null>(null);
   const [failure, setFailure] = useState("");
@@ -90,6 +96,7 @@ export default function CoachPage() {
             calibration={calibration}
             evaluation={j.evaluation ?? null}
             resultRound={resultRound}
+            next={lesson.data === undefined ? null : nextStep(j, lesson.data)}
             onAnswered={async (roundId, answers) => {
               setFailure("");
               try {
@@ -97,18 +104,25 @@ export default function CoachPage() {
                   roundId,
                   answers,
                 });
-                window.history.replaceState(
-                  null,
-                  "",
-                  `/journey/coach?round=${roundId}`,
-                );
-                setResultRound(roundId);
-                await refresh();
               } catch (e) {
+                // Invio non riuscito: la prova resta aperta con le scelte fatte.
                 setFailure(
-                  e instanceof Error ? e.message : "Esito non salvato.",
+                  `Esito non salvato: ${e instanceof Error ? e.message : "riprova."}`,
                 );
+                return;
               }
+              // Salvato: il risultato si consulta dall'indirizzo senza reinviare.
+              window.history.replaceState(
+                null,
+                "",
+                `/journey/coach?round=${roundId}`,
+              );
+              setResultRound(roundId);
+              // Valutazione e lezione cambiano con l'esito: si rileggono.
+              await Promise.all([
+                refresh().catch(() => undefined),
+                lesson.reload(),
+              ]);
             }}
             onSkip={async (roundId) => {
               setFailure("");
@@ -116,7 +130,7 @@ export default function CoachPage() {
                 await postJson("/athlete-journey/calibration/skip", {
                   roundId,
                 });
-                await refresh();
+                window.location.assign(summaryHref("micro-test-rimandato"));
               } catch (e) {
                 setFailure(e instanceof Error ? e.message : "Riprova.");
               }

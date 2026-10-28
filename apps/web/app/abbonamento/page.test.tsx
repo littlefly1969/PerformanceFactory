@@ -61,4 +61,30 @@ describe("return from the hosted checkout", () => {
     render(<SubscriptionReturnPage />);
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
   });
+  it("offers a safe way back during a long wait, without a new checkout", async () => {
+    vi.useFakeTimers();
+    const replace = at("?checkout=success");
+    const fetch = vi.fn<(url: string) => Promise<Response>>(
+      async () => new Response(JSON.stringify({ entitled: false })),
+    );
+    vi.stubGlobal("fetch", fetch);
+    render(<SubscriptionReturnPage />);
+    for (let i = 0; i < 30; i++) await vi.advanceTimersByTimeAsync(2000);
+    expect(
+      screen.getByRole("heading", {
+        name: "Il pagamento è ancora in verifica.",
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "Torna al tuo percorso" }),
+    ).toHaveProperty("href", expect.stringContaining("/journey"));
+    // Nessun nuovo pagamento e nessuna attivazione dichiarata.
+    expect(
+      fetch.mock.calls.every(([url]) => url === "/api/payments/subscription"),
+    ).toBe(true);
+    expect(replace).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "Verifica di nuovo" }),
+    ).toBeTruthy();
+  });
 });

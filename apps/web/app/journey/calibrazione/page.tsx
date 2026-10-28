@@ -15,6 +15,7 @@ import {
   useAccountJourney,
 } from "../_account/calibration-state";
 import { DarkQuestion, SingleOptions } from "../_account/dark-question";
+import { summaryHref } from "../_account/next-step";
 import { MiniSpider } from "../_account/spiders";
 
 type Round = NonNullable<Calibration["round"]>;
@@ -25,12 +26,15 @@ function RoundQuestions({
   round,
   areaName,
   busy,
+  error,
   onClose,
   onSubmit,
 }: {
   round: Round;
   areaName: (id: string) => string;
   busy: boolean;
+  /** Invio non riuscito: domanda e scelte restano, si può riprovare. */
+  error: string;
   onClose: () => void;
   onSubmit: (answers: Answers) => void;
 }) {
@@ -73,6 +77,18 @@ function RoundQuestions({
         />
       )}
       {busy && <p role="status">Aggiorniamo la tua valutazione…</p>}
+      {error && !busy && (
+        <>
+          <p className="pf-acc-error" role="alert">
+            Risposte non inviate: {error} Le tue scelte sono ancora qui.
+          </p>
+          {last && (
+            <PillButton tone="lime" onClick={() => onSubmit(answers)}>
+              Riprova l’invio
+            </PillButton>
+          )}
+        </>
+      )}
     </DarkQuestion>
   );
 }
@@ -85,8 +101,10 @@ const LESSON_CHOICE = /lezione gratuita/i;
  * La calibrazione si chiude solo con la regola di consolidamento.
  */
 export default function CalibrationPage() {
-  const { journey: j, error, busy, action } = useAccountJourney();
+  const { journey: j, error, busy, action, refresh } = useAccountJourney();
   const [answering, setAnswering] = useState(false);
+  // Round inviato e accettato dal server: si attende il suo esito.
+  const [sent, setSent] = useState<string | null>(null);
   const c = j?.calibration ?? null;
   const evaluation = j?.evaluation ?? null;
   const round = c?.round ?? null;
@@ -99,6 +117,20 @@ export default function CalibrationPage() {
   useEffect(() => {
     if (toMicroTest) window.location.assign("/journey/coach");
   }, [toMicroTest]);
+  // Il round inviato è ancora in valutazione presso un'altra richiesta:
+  // si aspetta e si rilegge, senza reinviare le risposte.
+  const waiting =
+    sent !== null && round?.id === sent && round.status === "EVALUATING";
+  const evaluated = sent !== null && !waiting;
+  useEffect(() => {
+    // Valutazione aggiornata: si torna al riepilogo, nessun nuovo round.
+    if (evaluated) window.location.assign(summaryHref("calibrazione"));
+  }, [evaluated]);
+  const send = async (roundId: string, answers: Answers) => {
+    if (!(await action("calibration/answers", { roundId, answers }))) return;
+    setAnswering(false);
+    setSent(roundId);
+  };
   const areaName = (id: string) =>
     evaluation?.drivers.find((d) => d.id === id)?.name ?? "Calibrazione";
 
@@ -109,13 +141,9 @@ export default function CalibrationPage() {
         round={round}
         areaName={areaName}
         busy={busy}
+        error={error}
         onClose={() => setAnswering(false)}
-        onSubmit={(answers) => {
-          void action("calibration/answers", {
-            roundId: round.id,
-            answers,
-          }).then(() => setAnswering(false));
-        }}
+        onSubmit={(answers) => void send(round.id, answers)}
       />
     );
 
@@ -123,17 +151,21 @@ export default function CalibrationPage() {
   // valutazione con le risposte già fissate, che il server non cambia.
   const stalled = round?.status === "EVALUATING" ? round : null;
   const next = async () => {
-    if (stalled)
-      return void action("calibration/answers", {
-        roundId: stalled.id,
-        answers: stalled.answers ?? {},
-      });
+    if (stalled) return send(stalled.id, stalled.answers ?? {});
     if (microTestOpen(c)) return window.location.assign("/journey/coach");
     if (round?.status === "OPEN") return setAnswering(true);
     if (await action("calibration/round")) setAnswering(true);
   };
   const confidence = evaluation?.overallConfidence ?? 0;
-  const footer = closed ? (
+  const footer = evaluated ? null : waiting ? (
+    <PillButton
+      tone="lime"
+      disabled={busy}
+      onClick={() => void refresh().catch(() => undefined)}
+    >
+      Aggiorna lo stato
+    </PillButton>
+  ) : closed ? (
     <PillLink href="/journey/scenari" tone="lime">
       Vedi dove puoi arrivare
     </PillLink>
@@ -174,6 +206,21 @@ export default function CalibrationPage() {
             </>
           )}
         </p>
+      )}
+      {waiting && (
+        <p role="status">
+          Le tue risposte sono salvate e la valutazione è ancora in corso.
+          Aggiorna tra qualche istante: non serve rispondere di nuovo.
+        </p>
+      )}
+      {stalled && !waiting && (
+        <p role="status">
+          Le tue risposte sono salvate, ma la valutazione si è interrotta.
+          Completala: usiamo le risposte che hai già dato.
+        </p>
+      )}
+      {evaluated && (
+        <p role="status">Valutazione aggiornata. Ti portiamo al riepilogo…</p>
       )}
       {evaluation && c && (
         <>

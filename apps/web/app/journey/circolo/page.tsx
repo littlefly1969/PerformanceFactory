@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   type FreeLessonView,
   type LessonSlot,
@@ -13,6 +13,7 @@ import {
   PillLink,
 } from "../_account/account-shell";
 import { useAccountJourney } from "../_account/calibration-state";
+import { summaryHref } from "../_account/next-step";
 
 const dayKey = (iso: string) => new Date(iso).toDateString();
 const weekday = (iso: string) =>
@@ -72,10 +73,17 @@ export default function ClubPage() {
   const [share, setShare] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  // Esito dell'ultima azione riuscita, con il ritorno al riepilogo.
+  const [done, setDone] = useState("");
+  const outcome = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (done) outcome.current?.focus();
+  }, [done]);
 
-  const call = async (path: string, body: unknown = {}) => {
+  const call = async (path: string, success: string, body: unknown = {}) => {
     setBusy(true);
     setMessage("");
+    setDone("");
     try {
       setData(
         await postJson<FreeLessonView>(
@@ -83,6 +91,7 @@ export default function ClubPage() {
           body,
         ),
       );
+      setDone(success);
       return true;
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Operazione non riuscita.");
@@ -122,13 +131,19 @@ export default function ClubPage() {
       tone="lime"
       disabled={busy || !share || !selected}
       onClick={() =>
-        void call("/request", {
-          partnerId: selected,
-          shareWithCoach: share,
-          ...(slotId && daySlots.some((s) => s.id === slotId)
-            ? { lessonId: slotId }
-            : {}),
-        })
+        void call(
+          "/request",
+          phase === "REQUESTED"
+            ? "Richiesta aggiornata."
+            : "Richiesta inviata: il circolo compone il gruppo.",
+          {
+            partnerId: selected,
+            shareWithCoach: share,
+            ...(slotId && daySlots.some((s) => s.id === slotId)
+              ? { lessonId: slotId }
+              : {}),
+          },
+        )
       }
     >
       {phase === "REQUESTED" ? "Aggiorna la richiesta" : "Richiedi il posto"}
@@ -145,6 +160,18 @@ export default function ClubPage() {
         <p className="pf-acc-error" role="alert">
           {message}
         </p>
+      )}
+      {done && (
+        <section
+          className="pf-acc-card"
+          role="status"
+          tabIndex={-1}
+          ref={outcome}
+          aria-label="Esito"
+        >
+          <p>{done}</p>
+          <PillLink href={summaryHref("lezione")}>Torna al riepilogo</PillLink>
+        </section>
       )}
       {phase === "LOCKED" && (
         <section className="pf-acc-card">
@@ -173,7 +200,7 @@ export default function ClubPage() {
             type="button"
             className="pf-acc-link"
             disabled={busy}
-            onClick={() => void call("/withdraw")}
+            onClick={() => void call("/withdraw", "Hai rinunciato al posto.")}
           >
             Rinuncia al posto
           </button>
@@ -279,7 +306,9 @@ export default function ClubPage() {
               type="button"
               className="pf-acc-link"
               disabled={busy}
-              onClick={() => void call("/decline")}
+              onClick={() =>
+                void call("/decline", "Hai scelto di non fare la lezione.")
+              }
             >
               Preferisco non fare la lezione
             </button>
