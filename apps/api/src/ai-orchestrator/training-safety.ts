@@ -58,7 +58,8 @@ function visibleTexts(proposal: ProposalTexts) {
     }),
     ...list(proposal.objectives).flatMap((value) => {
       const o = record(value);
-      return [o.title, o.targetLabel].flatMap(text);
+      // Come nella scheda obiettivo: area, titolo, bersaglio con unità e scadenza.
+      return [o.area, o.title, o.unit, o.targetLabel, o.deadline].flatMap(text);
     }),
     ...proposal.questions.flatMap((value) => {
       const q = record(value);
