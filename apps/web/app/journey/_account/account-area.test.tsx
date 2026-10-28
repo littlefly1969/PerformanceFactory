@@ -175,12 +175,12 @@ describe("Distanza dei circoli", () => {
     });
     render(<ClubPage />);
     expect(
-      await screen.findByText(/aggiungi il tuo indirizzo nel profilo/),
+      await screen.findByText(/aggiungi il tuo indirizzo nel tuo account/),
     ).toBeInTheDocument();
     expect(screen.queryByText(/km/)).toBeNull();
     expect(
-      screen.getByRole("link", { name: "Vai al profilo" }),
-    ).toHaveAttribute("href", "/journey/profilo#indirizzo");
+      screen.getByRole("link", { name: "Completa l’indirizzo nel tuo account" }),
+    ).toHaveAttribute("href", "/account/indirizzo?da=circolo");
   });
 });
 

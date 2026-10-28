@@ -5,13 +5,19 @@ import "./welcome.css";
 /** Sequenza di benvenuto dopo la creazione account: 4 passi su fondo scuro. */
 export const WELCOME_STEPS = 4;
 
+/**
+ * Con `back` la stessa schermata serve fuori dal benvenuto, dall'account:
+ * al posto dell'avanzamento c'è la freccia per tornare indietro.
+ */
 export function WelcomeShell({
   step,
+  back,
   skipHref,
   children,
   footer,
 }: {
-  step: number;
+  step?: number;
+  back?: string;
   skipHref?: string;
   children: ReactNode;
   footer?: ReactNode;
@@ -20,23 +26,30 @@ export function WelcomeShell({
     <main className="pf-welcome">
       <div className="pf-welcome-device">
         <header className="pf-welcome-header">
-          <div
-            className="pf-welcome-progress"
-            role="progressbar"
-            aria-label="Benvenuto"
-            aria-valuenow={step}
-            aria-valuemin={1}
-            aria-valuemax={WELCOME_STEPS}
-          >
-            {Array.from({ length: WELCOME_STEPS }, (_, i) => (
-              <span
-                key={i}
-                className={
-                  i + 1 === step ? "is-current" : i < step ? "is-done" : ""
-                }
-              />
-            ))}
-          </div>
+          {back && (
+            <Link className="pf-welcome-back" href={back} aria-label="Indietro">
+              ←
+            </Link>
+          )}
+          {step !== undefined && (
+            <div
+              className="pf-welcome-progress"
+              role="progressbar"
+              aria-label="Benvenuto"
+              aria-valuenow={step}
+              aria-valuemin={1}
+              aria-valuemax={WELCOME_STEPS}
+            >
+              {Array.from({ length: WELCOME_STEPS }, (_, i) => (
+                <span
+                  key={i}
+                  className={
+                    i + 1 === step ? "is-current" : i < step ? "is-done" : ""
+                  }
+                />
+              ))}
+            </div>
+          )}
           {skipHref && (
             <Link className="pf-welcome-skip" href={skipHref}>
               Salta
@@ -56,7 +69,7 @@ export function WelcomeIntro({
   title,
   children,
 }: {
-  step: number;
+  step?: number;
   kicker: string;
   title: ReactNode;
   children: ReactNode;
@@ -64,7 +77,9 @@ export function WelcomeIntro({
   return (
     <>
       <span className="pf-welcome-kicker">
-        {String(step).padStart(2, "0")} · {kicker}
+        {step === undefined
+          ? kicker
+          : `${String(step).padStart(2, "0")} · ${kicker}`}
       </span>
       <h1>{title}</h1>
       <p className="pf-welcome-lead">{children}</p>

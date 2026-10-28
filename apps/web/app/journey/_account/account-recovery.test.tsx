@@ -69,40 +69,44 @@ describe("Lezione gratuita prima dell'assessment", () => {
   });
 });
 
-describe("Classifica FIT corretta nel profilo", () => {
-  it("reloads journey, profile and lesson after saving", async () => {
-    const calls = serve({
+describe("Dati personali fuori dal profilo sportivo", () => {
+  it("leaves FIT and address to the account menu, keeping the sport profile", async () => {
+    serve({
       "/auth/journey": journey(),
       "/athlete-journey/profile": PROFILE,
       "/athlete-journey/free-lesson": lesson,
       "/fit-ranking": FIT,
     });
     render(<ProfilePage />);
+    expect(
+      await screen.findByRole("img", { name: /Il tuo Spider/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Dove abiti")).toBeNull();
+    expect(screen.queryAllByRole("combobox")).toHaveLength(0);
     await userEvent.click(
-      await screen.findByRole("button", { name: /Modifica|Aggiungi/ }),
+      screen.getByRole("button", { name: "Il tuo account" }),
     );
-    const save = screen.getByRole("button", { name: "Salva" });
-    const [padelNow, padelBest, tennisNow, tennisBest] =
-      screen.getAllByRole("combobox");
-    await userEvent.selectOptions(padelNow, "3");
-    await userEvent.selectOptions(padelBest, "3");
-    await userEvent.selectOptions(tennisNow, "NONE");
-    await userEvent.selectOptions(tennisBest, "NONE");
-    const count = (path: string) =>
-      calls.filter((c) => c.url.endsWith(path)).length;
-    const before = {
-      journey: count("/auth/journey"),
-      profile: count("/athlete-journey/profile"),
-      lesson: count("/athlete-journey/free-lesson"),
-    };
-    await userEvent.click(save);
-    await waitFor(() => {
-      expect(count("/auth/journey")).toBeGreaterThan(before.journey);
-      expect(count("/athlete-journey/profile")).toBeGreaterThan(before.profile);
-      expect(count("/athlete-journey/free-lesson")).toBeGreaterThan(
-        before.lesson,
-      );
+    expect(
+      screen.getByRole("link", { name: "Tessera e classifiche FIT" }),
+    ).toHaveAttribute("href", "/account/fit?da=profilo");
+    expect(screen.getByRole("link", { name: "Foto" })).toHaveAttribute(
+      "href",
+      "/account/foto?da=profilo",
+    );
+  });
+
+  it("sends the old address anchor to the account", async () => {
+    serve({
+      "/auth/journey": journey(),
+      "/athlete-journey/profile": PROFILE,
+      "/athlete-journey/free-lesson": lesson,
     });
+    const replace = vi.fn();
+    vi.stubGlobal("location", { ...window.location, hash: "#indirizzo", replace });
+    render(<ProfilePage />);
+    await waitFor(() =>
+      expect(replace).toHaveBeenCalledWith("/account/indirizzo?da=profilo"),
+    );
   });
 });
 

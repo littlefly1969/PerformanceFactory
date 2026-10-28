@@ -1,9 +1,9 @@
 # Specifica: gestione dell’account personale dal menu avatar
 
-Stato: bozza di requisiti per una PR da implementare successivamente.
+Stato: implementata; comportamento effettivo in
+[`docs/account-personale.md`](../account-personale.md).
 Analisi del 28/10/2026 su `main` al commit
 `8239b569f5111dddd5180caea2da4b11ac2482e9`.
-Questo documento non implementa la funzionalità.
 
 ## Obiettivo e vincoli concordati
 
@@ -200,22 +200,22 @@ rispettano l’eleggibilità e le fasi già previste, senza anticipare il paywal
 
 ## Criteri di accettazione per l’implementazione successiva
 
-- [ ] Menu avatar coerente nelle aree gratuite e abbonate e nelle pagine di dettaglio interessate.
-- [ ] Quattro destinazioni canoniche: Foto, FIT, Indirizzo, Abbonamento.
+- [x] Menu avatar coerente nelle aree gratuite e abbonate e nelle pagine di dettaglio interessate.
+- [x] Quattro destinazioni canoniche: Foto, FIT, Indirizzo, Abbonamento.
 - [ ] Foto e FIT mantengono le interfacce attuali: nessun ridisegno, confronto visivo mobile/desktop.
-- [ ] Primo inserimento nel benvenuto conservato; modifica successiva senza rientrare nel benvenuto.
-- [ ] Editor FIT e indirizzo rimossi dai profili sportivi, senza rimuovere risultati, coach o altre funzioni.
-- [ ] Vecchi link, accessi diretti, ritorni e richiamo dalla scelta circolo riconciliati.
-- [ ] Account utilizzabile da utente autenticato prima del pagamento, senza saltare consensi o onboarding obbligatorio.
-- [ ] Autocompletamento italiano con selezione riconosciuta e verifica anche sul backend.
-- [ ] Configurazione Google Cloud/Places documentata, chiave protetta, session token e field mask corretti.
-- [ ] Attribuzioni e conservazione dei dati del provider gestite senza cambiare lo stile delle altre schermate.
-- [ ] Test per testo casuale, selezione modificata, dati incompleti, risposte obsolete, timeout e provider non disponibile.
-- [ ] Dati FIT conservati e test dei lease/ricalcoli invariati; foto aggiornata negli avatar.
-- [ ] Indirizzi storici preservati e distanze aggiornate dopo un salvataggio valido.
-- [ ] Abbonamento con dati reali, stati espliciti e azioni consentite; ritorno checkout e diritto di accesso invariati.
-- [ ] Test di navigazione per fase gratuita, assessment in corso, abbonato e assenza di programma.
-- [ ] Nessuna modifica a pannelli amministrativi, prezzi, acquisti o programmi estranea al perimetro richiesto.
+- [x] Primo inserimento nel benvenuto conservato; modifica successiva senza rientrare nel benvenuto.
+- [x] Editor FIT e indirizzo rimossi dai profili sportivi, senza rimuovere risultati, coach o altre funzioni.
+- [x] Vecchi link, accessi diretti, ritorni e richiamo dalla scelta circolo riconciliati.
+- [x] Account utilizzabile da utente autenticato prima del pagamento, senza saltare consensi o onboarding obbligatorio.
+- [x] Autocompletamento italiano con selezione riconosciuta e verifica anche sul backend.
+- [x] Configurazione Google Cloud/Places documentata, chiave protetta, session token e field mask corretti.
+- [x] Attribuzioni e conservazione dei dati del provider gestite senza cambiare lo stile delle altre schermate.
+- [x] Test per testo casuale, selezione modificata, dati incompleti, risposte obsolete, timeout e provider non disponibile.
+- [x] Dati FIT conservati e test dei lease/ricalcoli invariati; foto aggiornata negli avatar.
+- [x] Indirizzi storici preservati e distanze aggiornate dopo un salvataggio valido.
+- [x] Abbonamento con dati reali, stati espliciti e azioni consentite; ritorno checkout e diritto di accesso invariati.
+- [x] Test di navigazione per fase gratuita, assessment in corso, abbonato e assenza di programma.
+- [x] Nessuna modifica a pannelli amministrativi, prezzi, acquisti o programmi estranea al perimetro richiesto.
 - [ ] Documentazione aggiornata, controlli pertinenti e CI della futura implementazione verdi.
 
 Questa PR di specifica non deve essere presentata come funzionalità già

@@ -2,7 +2,14 @@ import {
   TrainingAvailabilityDto,
   TrainingAvailabilityService,
 } from './training-availability';
-import { AthleteAddressDto, AthleteAddressService } from './athlete-address';
+import {
+  AddressResolveDto,
+  AddressSelectionDto,
+  AddressSuggestionsDto,
+  AthleteAddressDto,
+  AthleteAddressService,
+} from './athlete-address';
+import { SkipThrottle, Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import {
   Body,
   Controller,
@@ -68,6 +75,33 @@ export class AthleteController {
   })
   saveAddress(@Req() req: Request, @Body() body: AthleteAddressDto) {
     return this.address.save(req.user.id, body);
+  }
+  @Post('address/suggestions')
+  @HttpCode(200)
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({ summary: 'Suggerimenti di indirizzo da Google Places' })
+  @UseGuards(ThrottlerGuard)
+  @SkipThrottle({ 'register-athlete': true, 'public-events': true })
+  @Throttle({ 'address-search': { limit: 60, ttl: 60 * 1000 } })
+  addressSuggestions(@Body() body: AddressSuggestionsDto) {
+    return this.address.suggestions(body);
+  }
+  @Post('address/resolve')
+  @HttpCode(200)
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({
+    summary: 'Risolve il suggerimento scelto in un indirizzo completo',
+  })
+  @UseGuards(ThrottlerGuard)
+  @SkipThrottle({ 'register-athlete': true, 'public-events': true })
+  @Throttle({ 'address-search': { limit: 20, ttl: 60 * 1000 } })
+  resolveAddress(@Req() req: Request, @Body() body: AddressResolveDto) {
+    return this.address.resolve(req.user.id, body);
+  }
+  @Post('address/selection')
+  @ApiOperation({ summary: 'Salva l indirizzo scelto fra i suggerimenti' })
+  saveAddressSelection(@Req() req: Request, @Body() body: AddressSelectionDto) {
+    return this.address.saveSelection(req.user.id, body);
   }
   @ApiOperation({ summary: 'Foto profilo, null se non caricata' })
   @Header('Cache-Control', 'private, no-store')

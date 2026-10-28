@@ -35,9 +35,9 @@ const when = (iso: string) =>
 /** Senza distanza si dice perché, invece di mostrare un numero inventato. */
 const NO_DISTANCE = {
   NO_ADDRESS:
-    "Non possiamo calcolare quanto distano i circoli: aggiungi il tuo indirizzo nel profilo.",
+    "Non possiamo calcolare quanto distano i circoli: aggiungi il tuo indirizzo nel tuo account.",
   ADDRESS_NOT_LOCATED:
-    "Non possiamo calcolare quanto distano i circoli: il tuo indirizzo non è stato riconosciuto, puoi correggerlo nel profilo.",
+    "Non possiamo calcolare quanto distano i circoli: il tuo indirizzo non è stato riconosciuto, puoi correggerlo nel tuo account.",
 };
 
 /** Città e distanza del circolo, nelle parti che conosciamo. */
@@ -203,8 +203,8 @@ export default function ClubPage() {
           {view.distance?.reason && (
             <p className="pf-acc-muted">
               {NO_DISTANCE[view.distance.reason]}{" "}
-              <a className="pf-acc-link" href="/journey/profilo#indirizzo">
-                Vai al profilo
+              <a className="pf-acc-link" href="/account/indirizzo?da=circolo">
+                Completa l’indirizzo nel tuo account
               </a>
             </p>
           )}

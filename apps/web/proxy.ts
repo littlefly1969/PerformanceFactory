@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const protectedPrefixes = [
+  '/account',
   '/admin',
   '/ai-tuner',
   '/inspect',
@@ -47,6 +48,8 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
+    '/account',
+    '/account/:path*',
     '/admin/:path*',
     '/ai-tuner/:path*',
     '/inspect/:path*',

@@ -62,6 +62,11 @@ function buildThrottlerStorage() {
             ttl: 60 * 1000,
             limit: 20,
           },
+          {
+            name: 'address-search',
+            ttl: 60 * 1000,
+            limit: 60,
+          },
         ],
         storage: buildThrottlerStorage(),
       }),

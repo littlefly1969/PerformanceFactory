@@ -1,0 +1,78 @@
+/* Ricerca assistita dell'indirizzo: lista dei suggerimenti e attribuzione,
+   dentro lo stile dei moduli dell'area atleta. */
+.pf-address-search {
+  position: relative;
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+.pf-address-results {
+  border: 1px solid #0b0b0c1f;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+}
+.pf-address-results ul {
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+}
+.pf-address-results li {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+}
+.pf-address-results li b {
+  font-weight: 500;
+}
+.pf-address-results li small {
+  color: #6d6d70;
+  font-size: 12px;
+}
+.pf-address-results li:hover,
+.pf-address-results li.is-active {
+  background: #0b0b0c0d;
+}
+.pf-address-attribution {
+  margin: 0;
+  padding: 6px 12px 8px;
+  color: #6d6d70;
+  font-size: 11px !important;
+  text-align: right;
+}
+.pf-address-chosen,
+.pf-address-current {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: #0b0b0c0a;
+  text-align: left;
+}
+.pf-address-chosen strong,
+.pf-address-current strong {
+  color: #0b0b0c;
+  font-weight: 500;
+}
+.pf-address-chosen .pf-address-attribution {
+  padding: 0;
+}
+.pf-address-current small {
+  color: #6d6d70;
+}
+.pf-address-problem {
+  color: #a1260d !important;
+}
+.pf-address-problem .pf-acc-link {
+  display: inline;
+  margin: 0;
+  color: inherit;
+  text-decoration: underline;
+}
+.pf-address-search .pf4-cta:disabled {
+  opacity: 0.5;
+}

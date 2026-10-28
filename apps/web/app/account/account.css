@@ -1,0 +1,33 @@
+/* Pagine dell'account: solo l'elenco delle destinazioni è nuovo, il resto
+   usa le schede e i testi dell'area atleta. */
+.pf-account-list .pf-acc-card {
+  display: flex;
+  justify-content: space-between;
+  color: var(--acc-ink);
+  font-size: 16px;
+  text-decoration: none;
+}
+.pf-account-sub dl {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+}
+.pf-account-sub dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 14px;
+}
+.pf-account-sub dt {
+  color: var(--acc-muted);
+}
+.pf-account-sub dd {
+  margin: 0;
+  text-align: right;
+}
+.pf-account-sub .pf-acc-pill {
+  margin-top: 16px;
+}
+.pf-account-sub .pf-acc-pill + .pf-acc-pill {
+  margin-top: 10px;
+}

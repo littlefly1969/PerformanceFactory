@@ -3,6 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { LogoutButton } from "../../components/logout-button";
+import { AccountMenu } from "../../components/account-menu";
 import "../../start/pf4.css";
 import "../../journey/journey.css";
 import "./athlete.css";
@@ -36,9 +37,7 @@ export function AthleteShell({
             <span>Performance Factory</span>
           </Link>
           <div className="pf4-athlete-header-actions">
-            <Link href="/user/profile" aria-label="Il tuo profilo">
-              ○
-            </Link>
+            <AccountMenu from="user" className="pf-account-avatar" />
             <LogoutButton className="pf4-logout" />
           </div>
         </header>

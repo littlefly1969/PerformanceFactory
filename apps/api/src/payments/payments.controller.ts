@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
   Param,
   Post,
@@ -78,6 +79,18 @@ export class PaymentsController {
   @Roles(UserRole.USER)
   subscription(@Req() req: AuthenticatedRequest) {
     return this.subscriptions.status(requireUser(req).id);
+  }
+
+  @Get('subscription/account')
+  @Header('Cache-Control', 'private, no-store')
+  @ApiOperation({
+    summary: 'Abbonamento per la pagina account, anche in verifica o terminato',
+  })
+  @ApiCookieAuth()
+  @UseGuards(AuthenticatedGuard, RolesGuard)
+  @Roles(UserRole.USER)
+  account(@Req() req: AuthenticatedRequest) {
+    return this.subscriptions.account(requireUser(req).id);
   }
 
   @Post('subscription/cancel')

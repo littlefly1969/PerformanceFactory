@@ -108,15 +108,37 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("PF4 athlete experience", () => {
-  it("keeps logout in the profile, reached from the home avatar", async () => {
+  it("opens the account menu, with logout, from the home avatar", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => respond(home)),
     );
     render(<HomePage />);
+    const avatar = await screen.findByRole("button", {
+      name: "Il tuo account",
+    });
+    expect(avatar).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(avatar);
+    expect(avatar).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("link", { name: "Foto" })).toHaveAttribute(
+      "href",
+      "/account/foto?da=user",
+    );
     expect(
-      await screen.findByRole("link", { name: "Il tuo profilo" }),
-    ).toHaveAttribute("href", "/user/profile");
+      screen.getByRole("link", { name: "Tessera e classifiche FIT" }),
+    ).toHaveAttribute("href", "/account/fit?da=user");
+    expect(screen.getByRole("link", { name: "Indirizzo" })).toHaveAttribute(
+      "href",
+      "/account/indirizzo?da=user",
+    );
+    expect(screen.getByRole("link", { name: "Abbonamento" })).toHaveAttribute(
+      "href",
+      "/account/abbonamento?da=user",
+    );
+    expect(screen.getByRole("button", { name: "Esci" })).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("link", { name: "Foto" })).toBeNull();
+    expect(avatar).toHaveFocus();
   });
   it("shows real performance and one prominent session CTA", async () => {
     vi.stubGlobal(

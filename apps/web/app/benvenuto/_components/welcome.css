@@ -83,6 +83,13 @@
   width: 22px;
   background: var(--pf-lime);
 }
+.pf-welcome-back {
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  text-decoration: none;
+  padding: 8px 12px 8px 0;
+}
 .pf-welcome-skip {
   color: var(--pf-muted);
   font-size: 12px;
