@@ -9,6 +9,7 @@ import {
 import * as bcrypt from 'bcrypt';
 import { createHash } from 'crypto';
 import { GeocodingService } from '../src/geo/geocoding.service';
+import { PlacesService } from '../src/geo/places.service';
 
 const prisma = new PrismaClient();
 
@@ -716,6 +717,7 @@ async function main() {
 
   const seedNow = new Date();
   const geocoding = new GeocodingService();
+  const places = new PlacesService();
   for (const [clubIndex, club] of abruzzoClubs.entries()) {
     const existing = await prisma.partner.findUnique({
       where: { code: club.code },
@@ -751,11 +753,20 @@ async function main() {
             province: sede.province,
           }
         : null;
-    const located = query ? await geocoding.locate(query) : null;
+    // Prima Google Places, se c'e la chiave; altrimenti Nominatim.
+    const found = query && places.configured ? await places.find(query) : null;
+    const located = found ?? (query ? await geocoding.locate(query) : null);
     // Nominatim chiede al massimo una richiesta al secondo.
-    if (query && geocoding.configured)
+    if (query && !found && geocoding.configured)
       await new Promise((resolve) => setTimeout(resolve, 1100));
-    const coordinates = located ? { ...located, geocodedAt: new Date() } : {};
+    const coordinates = located
+      ? {
+          latitude: located.latitude,
+          longitude: located.longitude,
+          placeId: found?.placeId ?? null,
+          geocodedAt: new Date(),
+        }
+      : {};
     const partner = existing
       ? located
         ? await prisma.partner.update({

@@ -2,6 +2,7 @@ import { ServiceUnavailableException } from '@nestjs/common';
 import {
   AUTOCOMPLETE_FIELD_MASK,
   DETAILS_FIELD_MASK,
+  SEARCH_FIELD_MASK,
   PlacesService,
   readPlace,
   readSuggestions,
@@ -217,5 +218,42 @@ describe('PlacesService', () => {
     });
     fetchMock.mockRejectedValueOnce(new Error('down'));
     expect(await new PlacesService().locate('ChIJ-place')).toBeNull();
+  });
+
+  it('finds a club address with an ID-only text search, then its location', async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ places: [{ id: 'ChIJ-club' }] })),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ location: { latitude: 42.4, longitude: 14.2 } }),
+        ),
+      );
+    const address = {
+      street: 'Via Roma 12',
+      postalCode: '65121',
+      city: 'Pescara',
+      province: 'PE',
+    };
+    expect(await new PlacesService().find(address)).toEqual({
+      placeId: 'ChIJ-club',
+      latitude: 42.4,
+      longitude: 14.2,
+    });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://places.googleapis.com/v1/places:searchText');
+    expect((init.headers as Record<string, string>)['x-goog-fieldmask']).toBe(
+      SEARCH_FIELD_MASK,
+    );
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      textQuery: 'Via Roma 12, 65121 Pescara, PE, Italia',
+      regionCode: 'it',
+      pageSize: 1,
+    });
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({})));
+    expect(await new PlacesService().find(address)).toBeNull();
+    fetchMock.mockResolvedValueOnce(new Response('{}', { status: 403 }));
+    expect(await new PlacesService().find(address)).toBeNull();
   });
 });

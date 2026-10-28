@@ -15,10 +15,16 @@ import {
 } from './attribution';
 import { CreatePartnerDto, UpdatePartnerDto } from './dto/partner.dto';
 import { ClubImageKind, clubImagePath, decodeClubImage } from './club-image';
-import { GeocodingService } from '../geo/geocoding.service';
+import { GeocodingService, type PostalAddress } from '../geo/geocoding.service';
+import {
+  LOCATION_MAX_AGE_DAYS,
+  LOCATION_REFRESH_DAYS,
+  PlacesService,
+} from '../geo/places.service';
 
 const REFERRAL_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
 const REFERRAL_LENGTH = 8;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 const partnerSelect = {
   id: true,
@@ -70,6 +76,18 @@ type Sede = {
   province: string | null;
 };
 
+/** La sede come indirizzo da risolvere, solo se ha tutte le parti. */
+function postalAddress({
+  address,
+  postalCode,
+  city,
+  province,
+}: Sede): PostalAddress | null {
+  return address && postalCode && city && province
+    ? { street: address, postalCode, city, province }
+    : null;
+}
+
 /** Un'immagine nuova aggiorna la sua versione; null la rimuove. */
 function imageUpdate(kind: ClubImageKind, value: string | null | undefined) {
   if (value === undefined) return {};
@@ -84,28 +102,102 @@ export class PartnersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly geocoding: GeocodingService,
+    private readonly places: PlacesService,
   ) {}
 
   /**
    * Coordinate della sede, risolte dall'indirizzo quando ci sono tutte le
-   * parti. Un tentativo, non un obbligo: senza risposta restano nulle e
-   * all'atleta si dice che la distanza non si puo calcolare.
+   * parti: con Google Places se la chiave c'e, altrimenti (o se Google non la
+   * trova) con Nominatim. Un tentativo, non un obbligo: senza risposta restano
+   * nulle e all'atleta si dice che la distanza non si puo calcolare.
    */
-  private async locate({ address, postalCode, city, province }: Sede) {
+  private async locate(sede: Sede) {
+    const query = postalAddress(sede);
+    const found =
+      query && this.places.configured ? await this.places.find(query) : null;
     const located =
-      address && postalCode && city && province
-        ? await this.geocoding.locate({
-            street: address,
-            postalCode,
-            city,
-            province,
-          })
-        : null;
+      found ?? (query ? await this.geocoding.locate(query) : null);
     return {
       latitude: located?.latitude ?? null,
       longitude: located?.longitude ?? null,
       geocodedAt: located ? new Date() : null,
+      placeId: found?.placeId ?? null,
     };
+  }
+
+  /**
+   * Rinnova prima dei 30 giorni le coordinate arrivate da Google; se il
+   * rinnovo non riesce e il limite e passato le toglie, tenendo il Place ID
+   * per riprovare. Le sedi complete senza Place ID (salvate senza chiave o
+   * trovate solo da Nominatim) passano a Google appena le trova.
+   */
+  async refreshClubLocations(now = new Date(), batch = 100) {
+    const result = { refreshed: 0, cleared: 0, moved: 0 };
+    if (!this.places.configured) return result;
+    const stale = new Date(now.getTime() - LOCATION_REFRESH_DAYS * DAY_MS);
+    const limit = now.getTime() - LOCATION_MAX_AGE_DAYS * DAY_MS;
+    const google = await this.prisma.partner.findMany({
+      where: {
+        placeId: { not: null },
+        OR: [{ geocodedAt: null }, { geocodedAt: { lt: stale } }],
+      },
+      select: { id: true, placeId: true, geocodedAt: true },
+      orderBy: { geocodedAt: { sort: 'asc', nulls: 'first' } },
+      take: batch,
+    });
+    for (const row of google) {
+      const location = await this.places.locate(row.placeId!);
+      // L'admin puo aver cambiato sede mentre Google rispondeva: si scrive
+      // solo sulla riga com'era quando e stata letta.
+      const unchanged = {
+        id: row.id,
+        placeId: row.placeId,
+        geocodedAt: row.geocodedAt,
+      };
+      if (location) {
+        const { count } = await this.prisma.partner.updateMany({
+          where: unchanged,
+          data: { ...location, geocodedAt: now },
+        });
+        result.refreshed += count;
+      } else if (row.geocodedAt && row.geocodedAt.getTime() < limit) {
+        const { count } = await this.prisma.partner.updateMany({
+          where: unchanged,
+          data: { latitude: null, longitude: null, geocodedAt: null },
+        });
+        result.cleared += count;
+      }
+    }
+    const others = await this.prisma.partner.findMany({
+      where: {
+        placeId: null,
+        address: { not: null },
+        postalCode: { not: null },
+        city: { not: null },
+        province: { not: null },
+      },
+      select: {
+        id: true,
+        address: true,
+        postalCode: true,
+        city: true,
+        province: true,
+      },
+      orderBy: { name: 'asc' },
+      take: batch,
+    });
+    for (const row of others) {
+      const query = postalAddress(row);
+      const found = query ? await this.places.find(query) : null;
+      if (!found) continue;
+      const { id, ...sede } = row;
+      const { count } = await this.prisma.partner.updateMany({
+        where: { id, placeId: null, ...sede },
+        data: { ...found, geocodedAt: now },
+      });
+      result.moved += count;
+    }
+    return result;
   }
 
   async list() {

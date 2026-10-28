@@ -16,7 +16,11 @@ import {
 } from 'class-validator';
 import { PrismaService } from '../prisma/prisma.service';
 import { GeocodingService } from '../geo/geocoding.service';
-import { PlacesService } from '../geo/places.service';
+import {
+  LOCATION_MAX_AGE_DAYS,
+  LOCATION_REFRESH_DAYS,
+  PlacesService,
+} from '../geo/places.service';
 import { readSelection, signSelection } from './address-selection';
 
 const PROVINCE = /^[A-Za-z]{2}$/;
@@ -83,10 +87,8 @@ export class AddressSelectionDto {
   selection!: string;
 }
 
-/** Google chiede di non tenere le coordinate oltre 30 giorni senza rinnovarle. */
-export const PROVIDER_LOCATION_MAX_AGE_DAYS = 30;
-/** Si rinnovano qualche giorno prima, così un errore del provider non le perde. */
-const PROVIDER_LOCATION_REFRESH_DAYS = 25;
+export const PROVIDER_LOCATION_MAX_AGE_DAYS = LOCATION_MAX_AGE_DAYS;
+const PROVIDER_LOCATION_REFRESH_DAYS = LOCATION_REFRESH_DAYS;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Richieste a Google per atleta in un minuto: suggerimenti e risoluzioni. */

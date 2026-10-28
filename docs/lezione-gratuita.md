@@ -223,10 +223,12 @@ dell'avatar; si veda [Account personale](account-personale.md)). Da lì la
 scelta del circolo (`/journey/circolo`) mostra quanto dista ogni circolo in
 linea d'aria. La distanza esce dalle coordinate di entrambi: quelle del circolo
 si risolvono dal suo indirizzo quando l'admin lo salva (o al primo giro del
-seed), quelle dell'atleta quando sceglie il suo fra i suggerimenti di Google
+seed), con Google Places se configurato e altrimenti con il geocoding qui
+sotto (si veda [Account personale](account-personale.md#sedi-dei-circoli)),
+quelle dell'atleta quando sceglie il suo fra i suggerimenti di Google
 Places o, finché Google Places non è configurato, quando lo scrive a mano.
 
-Per gli indirizzi scritti a mano e per i circoli il geocoding è un tentativo,
+Per gli indirizzi scritti a mano e per i circoli senza Google il geocoding è un tentativo,
 non un passo obbligatorio: è un servizio esterno
 configurabile con `GEOCODING_URL` (per difetto Nominatim di OpenStreetMap),
 spegnibile con `GEOCODING_ENABLED=false`. Se non risponde o non trova

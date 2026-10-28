@@ -98,6 +98,25 @@ di suggerimenti o risposte. Gli indirizzi già salvati prima di questa
 modifica restano `MANUAL`, senza verifica: si chiede la scelta solo quando
 l'atleta li cambia. La selezione non prova la residenza.
 
+### Sedi dei circoli
+
+Con la chiave anche la sede del circolo si risolve con Google, quando l'admin
+la salva o la cambia e al primo giro del seed: Text Search (New)
+`places:searchText` con il solo `places.id` (livello IDs Only, senza costo),
+poi le coordinate con Place Details `location`. `Partner.placeId` tiene il
+Place ID. Se Google non trova la sede o non risponde si ripiega su
+Nominatim, e allora `placeId` resta nullo.
+
+Lo stesso worker, al primo giro un minuto dopo l'avvio e poi ogni giorno:
+
+- rinnova le coordinate Google dei circoli dopo 25 giorni; oltre i 30 senza
+  rinnovo le cancella ma tiene il Place ID, e riprova al giro dopo;
+- passa a Google i circoli con sede completa e senza Place ID (salvati
+  prima della chiave o trovati solo da Nominatim), appena Google li trova.
+
+Ogni scrittura vale solo se la riga non è cambiata nel frattempo: una sede
+modificata dall'admin durante il giro non viene sovrascritta.
+
 ### Configurazione Google Cloud
 
 1. Creare (o scegliere) un progetto in Google Cloud Console e collegare un
