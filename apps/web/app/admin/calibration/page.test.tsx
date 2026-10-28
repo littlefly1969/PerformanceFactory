@@ -29,6 +29,7 @@ const settings = {
   programBeforePaywall: false,
   questionsPerMicroTest: 0,
   unsafeMicroTestTerms: ["sprint", "farmac"],
+  unsafeTrainingTerms: [] as string[],
 };
 
 const version = (version: number, rule: Record<string, number | null>) => ({
@@ -213,5 +214,27 @@ it("lets the admin edit the banned words of the micro-tests, one per line", asyn
   );
   expect(puts[0]).toMatchObject({
     unsafeMicroTestTerms: ["sprint", "farmac", "prova massimale"],
+  });
+});
+
+it("starts the training list empty and saves the words the admin adds", async () => {
+  const puts: Record<string, unknown>[] = [];
+  vi.stubGlobal(
+    "fetch",
+    server((body) => {
+      puts.push(body);
+      return new Response(JSON.stringify(body));
+    }),
+  );
+  render(<Page />);
+  const box = await screen.findByLabelText(/Parole vietate negli allenamenti/);
+  expect(box).toHaveValue("");
+  await userEvent.type(box, "fino a cedimento");
+  await userEvent.click(
+    screen.getByRole("button", { name: "Salva parametri" }),
+  );
+  expect(puts[0]).toMatchObject({
+    unsafeMicroTestTerms: ["sprint", "farmac"],
+    unsafeTrainingTerms: ["fino a cedimento"],
   });
 });

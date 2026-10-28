@@ -59,6 +59,10 @@ const makePrismaMock = () => {
     `${prefix}-${list.length + 1}`;
 
   const prismaMock = createPrismaTestFake({
+    // Parametri di default: lista vuota di parole vietate negli allenamenti.
+    calibrationConfig: {
+      upsert: ({ create }: { create: Record<string, unknown> }) => create,
+    },
     user: {
       findUnique: ({ where }: { where: { id: string } }) =>
         users.find((user) => user.id === where.id) ?? null,

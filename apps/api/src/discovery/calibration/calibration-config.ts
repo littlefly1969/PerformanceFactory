@@ -16,6 +16,7 @@ const select = {
   questionsPerMicroTest: true,
   initialQuestionsPerArea: true,
   unsafeMicroTestTerms: true,
+  unsafeTrainingTerms: true,
 } as const;
 
 /** Parametri correnti; la riga nasce con i valori di default alla prima lettura. */
@@ -35,11 +36,9 @@ export async function updateCalibrationSettings(
   change: Partial<CalibrationSettings>,
   actorId: string,
 ) {
-  if (change.unsafeMicroTestTerms)
-    change = {
-      ...change,
-      unsafeMicroTestTerms: cleanUnsafeTerms(change.unsafeMicroTestTerms),
-    };
+  for (const key of ['unsafeMicroTestTerms', 'unsafeTrainingTerms'] as const)
+    if (change[key])
+      change = { ...change, [key]: cleanUnsafeTerms(change[key]) };
   const next = { ...(await loadCalibrationSettings(prisma)), ...change };
   const problems = settingsProblems(next);
   if (problems.length) throw new BadRequestException(problems.join('. '));

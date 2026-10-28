@@ -92,6 +92,15 @@ export class UpdateCalibrationConfigDto {
   @IsString({ each: true })
   @MaxLength(60, { each: true })
   unsafeMicroTestTerms?: string[];
+
+  /** Parole o frasi vietate negli allenamenti generati dall'AI; vuota = nessun controllo. */
+  @ApiPropertyOptional({ type: [String], maxItems: 100 })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsString({ each: true })
+  @MaxLength(60, { each: true })
+  unsafeTrainingTerms?: string[];
 }
 
 /** Nuova versione di una regola di confidence; null = criterio non applicato. */

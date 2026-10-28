@@ -29,6 +29,10 @@ In AUTO le approvazioni riportano `approvalSource=SYSTEM`, data e approvatore ut
 
 La pubblicazione verifica il numero di sessioni del calendario, pubblica il questionario e completa il comando nella stessa transazione. Tutte le sessioni ereditano l'approvazione del piano. Una ripetizione non duplica sessioni o audit.
 
+## Parole vietate
+
+L'amministratore può vietare parole o frasi nei piani scritti dall'AI da Admin › Calibrazione gratuita («Parole vietate negli allenamenti», `CalibrationConfig.unsafeTrainingTerms`). La lista parte vuota: senza parole non c'è nessun controllo e nessuna chiamata in più. Con almeno una parola vale per il programma sportivo, le sedute di area a calendario e i cicli di area (`generateSafeProposal` in `ai-orchestrator/training-safety.ts`). Le parole arrivano nel prompt di sistema, e il controllo dei micro-test (`findUnsafeTerm`: inizio parola, niente maiuscole né accenti, esclusione diretta ammessa) viene applicato ai testi che l'atleta legge: sintesi, sedute, esercizi, obiettivi, domande e risposte (non ai metadati tecnici come provider o versione del prompt). Un piano che ne contiene una si riscrive una volta indicando all'AI il termine scartato; al secondo scarto l'operazione registra `UNSAFE_TRAINING_CONTENT` e riprova con il backoff abituale.
+
 ## Chiusura e contesto
 
 Ogni sessione deve essere completata o esplicitamente saltata. Quando anche il check-in di training è stato inviato, `CycleCompletionService` chiude il ciclo e accoda il successivo nella stessa transazione. Non chiama l'AI nel controller né durante questa transazione. Il worker riprende anche una chiusura mancata a causa di un riavvio fra salvataggio del feedback e valutazione del ciclo.

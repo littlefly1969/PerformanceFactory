@@ -1,7 +1,9 @@
 import { persistAreaProposal } from './cycle-persistence';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, Logger } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { loadCalibrationSettings } from '../discovery/calibration/calibration-config';
+import { generateSafeProposal } from './training-safety';
 import { buildAiCycleContext, levelFromSnapshot } from './cycle-context';
 import {
   assertPreviousCycleCompleted,
@@ -19,6 +21,7 @@ import {
   CycleProposalInput,
 } from './proposal-provider.service';
 
+const logger = new Logger('CycleGeneration');
 export async function runProposalBatch(
   prisma: PrismaService,
   aiProposalProvider: AiProposalProviderService,
@@ -134,8 +137,13 @@ export async function runCycleForArea(
     area,
     reason,
   );
-  const proposal =
-    await aiProposalProvider.generateCycleProposal(proposalInput);
+  const { unsafeTrainingTerms } = await loadCalibrationSettings(prisma);
+  const proposal = await generateSafeProposal(
+    logger,
+    proposalInput,
+    unsafeTrainingTerms,
+    (input) => aiProposalProvider.generateCycleProposal(input),
+  );
 
   return persistAreaProposal(prisma, userId, area, actorId, proposal);
 }

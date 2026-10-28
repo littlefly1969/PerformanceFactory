@@ -173,6 +173,10 @@ export type CycleProposalInput = {
   scale: AiScaleConfig;
   previousSnapshot: AiSnapshotInput;
   context: AiCycleContext;
+  /** Parole vietate negli allenamenti, dal back office (`generateSafeProposal`). */
+  unsafeTerms?: string[];
+  /** Termine che ha fatto scartare il tentativo precedente. */
+  rejectedTerm?: string;
 };
 
 export type AiProvider = 'stub' | 'openai' | 'gemini';

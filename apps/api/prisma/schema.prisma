@@ -1923,6 +1923,9 @@ model CalibrationConfig {
   /// Parole o frasi vietate nei micro-test generati dall'AI, gestite dall'amministratore.
   /// Contano a inizio parola e non se precedute da una negazione («non massimale»).
   unsafeMicroTestTerms     String[] @default(["diagnos", "terapi", "farmac", "integrator", "prescri", "digiun", "dieta ipocalorica", "massimal", "esaurimento", "cedimento", "salti ripetuti", "sprint", "dolore come"])
+  /// Parole o frasi vietate negli allenamenti generati dall'AI, stesso controllo dei micro-test.
+  /// Vuota: nessun controllo.
+  unsafeTrainingTerms      String[] @default([])
   updatedAt                DateTime @updatedAt
   updatedById              String?
 

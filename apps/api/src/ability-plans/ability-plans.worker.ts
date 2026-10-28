@@ -17,6 +17,8 @@ import {
 import { persistAreaProposal } from '../ai-orchestrator/cycle-persistence';
 import { publishCycle } from '../ai-orchestrator/cycle-publication';
 import { AbilityPlansService } from './ability-plans.service';
+import { generateSafeProposal } from '../ai-orchestrator/training-safety';
+import { loadCalibrationSettings } from '../discovery/calibration/calibration-config';
 import { assignAbilityProfessional } from './ability-assignment';
 @Injectable()
 export class AbilityPlansWorker
@@ -142,9 +144,18 @@ export class AbilityPlansWorker
               'Sedute di area per la finestra sportiva corrente',
             )
           : null;
+        const { unsafeTrainingTerms } = await loadCalibrationSettings(
+          this.prisma,
+        );
         const proposal = scheduled
-          ? await generateAreaScheduleProposal(this.logger, scheduled)
-          : await this.provider.generateCycleProposal(
+          ? await generateSafeProposal(
+              this.logger,
+              scheduled,
+              unsafeTrainingTerms,
+              (input) => generateAreaScheduleProposal(this.logger, input),
+            )
+          : await generateSafeProposal(
+              this.logger,
               await prepareCycleProposalInput(
                 this.prisma,
                 this.provider,
@@ -152,6 +163,8 @@ export class AbilityPlansWorker
                 area,
                 'Piano iniziale o successivo per abilità, richiesto dall’atleta',
               ),
+              unsafeTrainingTerms,
+              (input) => this.provider.generateCycleProposal(input),
             );
         if (
           !proposal.planItems?.length ||

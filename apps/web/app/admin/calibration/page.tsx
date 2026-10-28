@@ -12,13 +12,19 @@ type Settings = {
   questionsPerMicroTest: number;
   initialQuestionsPerArea: number;
   unsafeMicroTestTerms?: string[];
+  unsafeTrainingTerms?: string[];
 };
 
+type TermKey = "unsafeMicroTestTerms" | "unsafeTrainingTerms";
+
 /** Campi modificabili: valori provvisori finché A4-D01 non è deciso. */
-type NumericKey = Exclude<
-  keyof Settings,
-  "programBeforePaywall" | "unsafeMicroTestTerms"
->;
+type NumericKey = Exclude<keyof Settings, "programBeforePaywall" | TermKey>;
+
+/** Testo delle aree di testo: una parola o frase per riga. */
+const termTexts = (settings: Settings) =>
+  Object.fromEntries(
+    TERM_FIELDS.map(({ key }) => [key, (settings[key] ?? []).join("\n")]),
+  );
 
 /** Una parola o frase per riga; le righe vuote non contano. */
 const termLines = (text: string) =>
@@ -50,11 +56,28 @@ const FIELDS: { key: NumericKey; label: string; hint: string }[] = [
   },
 ];
 
+const MATCHING_HINT =
+  "Una parola o frase per riga. Basta l'inizio della parola («massimal» vale per massimale e massimali); maiuscole e accenti non contano. Non contano solo se la frase le esclude direttamente («non massimale», «senza sprint», «evita sforzi massimali»): «nessuna pausa tra sprint» o «non evitare gli sprint» restano vietate.";
+
+/** Parole vietate nei contenuti scritti dall'AI, una lista per tipo di contenuto. */
+const TERM_FIELDS: { key: TermKey; label: string; hint: string }[] = [
+  {
+    key: "unsafeMicroTestTerms",
+    label: "Parole vietate nei micro-test",
+    hint: `Un micro-test che le contiene viene scartato e riscritto. ${MATCHING_HINT}`,
+  },
+  {
+    key: "unsafeTrainingTerms",
+    label: "Parole vietate negli allenamenti",
+    hint: `Vale per il programma sportivo e per le sedute di area. Un piano che le contiene viene riscritto una volta, poi la generazione si ferma e riprova più tardi. Vuota: nessun controllo. ${MATCHING_HINT}`,
+  },
+];
+
 const URL = `${API_BASE}/admin/calibration-config`;
 
 export default function AdminCalibrationPage() {
   const [settings, setSettings] = useState<Settings>();
-  const [terms, setTerms] = useState("");
+  const [terms, setTerms] = useState<Partial<Record<TermKey, string>>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -63,7 +86,7 @@ export default function AdminCalibrationPage() {
       if (response.ok) {
         const data = (await response.json()) as Settings;
         setSettings(data);
-        setTerms((data.unsafeMicroTestTerms ?? []).join("\n"));
+        setTerms(termTexts(data));
       } else setMessage("Parametri non disponibili.");
     });
   }, []);
@@ -76,11 +99,15 @@ export default function AdminCalibrationPage() {
       method: "PUT",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(
-        settings.unsafeMicroTestTerms
-          ? { ...settings, unsafeMicroTestTerms: termLines(terms) }
-          : settings,
-      ),
+      body: JSON.stringify({
+        ...settings,
+        ...Object.fromEntries(
+          TERM_FIELDS.filter(({ key }) => settings[key]).map(({ key }) => [
+            key,
+            termLines(terms[key] ?? ""),
+          ]),
+        ),
+      }),
     });
     setSaving(false);
     const data = (await response.json().catch(() => ({}))) as {
@@ -95,7 +122,7 @@ export default function AdminCalibrationPage() {
       return;
     }
     setSettings(data as Settings);
-    setTerms(((data as Settings).unsafeMicroTestTerms ?? []).join("\n"));
+    setTerms(termTexts(data as Settings));
     setMessage("Parametri salvati: valgono dai prossimi round.");
   };
 
@@ -127,26 +154,20 @@ export default function AdminCalibrationPage() {
                 <span className="pf-field-hint">{field.hint}</span>
               </label>
             ))}
-            {settings.unsafeMicroTestTerms && (
-              <label className="pf-field">
-                Parole vietate nei micro-test
+            {TERM_FIELDS.filter(({ key }) => settings[key]).map((field) => (
+              <label className="pf-field" key={field.key}>
+                {field.label}
                 <textarea
                   className="pf-textarea"
                   rows={8}
-                  value={terms}
-                  onChange={(event) => setTerms(event.target.value)}
+                  value={terms[field.key] ?? ""}
+                  onChange={(event) =>
+                    setTerms({ ...terms, [field.key]: event.target.value })
+                  }
                 />
-                <span className="pf-field-hint">
-                  Una parola o frase per riga. Un micro-test scritto
-                  dall&apos;AI che le contiene viene scartato e riscritto. Basta
-                  l&apos;inizio della parola («massimal» vale per massimale e
-                  massimali); maiuscole e accenti non contano. Non contano solo
-                  se la frase le esclude direttamente («non massimale», «senza
-                  sprint», «evita sforzi massimali»): «nessuna pausa tra sprint»
-                  o «non evitare gli sprint» restano vietate.
-                </span>
+                <span className="pf-field-hint">{field.hint}</span>
               </label>
-            )}
+            ))}
             <label className="pf-field">
               <span>
                 <input

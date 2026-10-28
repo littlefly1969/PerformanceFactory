@@ -53,7 +53,7 @@ describe('micro-test safety terms', () => {
       cleanUnsafeTerms([' Sprint ', 'sprint', '', 'Dieta  Ipocalorica']),
     ).toEqual(['sprint', 'dieta ipocalorica']);
     expect(unsafeTermsProblems(terms)).toEqual([]);
-    expect(unsafeTermsProblems([])).toHaveLength(1);
+    expect(unsafeTermsProblems([])).toEqual([]);
     expect(unsafeTermsProblems(['...'])).toHaveLength(1);
     expect(unsafeTermsProblems(['x'.repeat(61)])).toHaveLength(1);
   });

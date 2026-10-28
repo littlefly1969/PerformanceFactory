@@ -128,13 +128,12 @@ export function cleanUnsafeTerms(terms: string[]) {
   ];
 }
 
-export function unsafeTermsProblems(terms: string[]) {
+/** Problemi di una lista di parole vietate; `where` dice a quali contenuti vale. */
+export function unsafeTermsProblems(terms: string[], where = 'nei micro-test') {
   const problems: string[] = [];
   const { maxTerms, maxLength } = UNSAFE_TERMS_LIMITS;
-  if (!terms.length)
-    problems.push('Serve almeno una parola vietata nei micro-test');
   if (terms.length > maxTerms)
-    problems.push(`Al massimo ${maxTerms} parole vietate nei micro-test`);
+    problems.push(`Al massimo ${maxTerms} parole vietate ${where}`);
   for (const term of terms) {
     if (term.length > maxLength)
       problems.push(`«${term.slice(0, 20)}…» supera ${maxLength} caratteri`);

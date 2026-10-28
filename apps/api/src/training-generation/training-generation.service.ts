@@ -1,5 +1,5 @@
 import { validateTrainingSchedule } from '../ai-orchestrator/training-schedule';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { TrainingLifecycleOperation } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -8,9 +8,12 @@ import {
 } from '../ai-orchestrator/proposal-provider.service';
 import { persistTrainingProposal } from '../ai-orchestrator/training-generation';
 import { LifecycleError } from '../training-lifecycle/training-lifecycle.policy';
+import { generateSafeProposal } from '../ai-orchestrator/training-safety';
+import { loadCalibrationSettings } from '../discovery/calibration/calibration-config';
 
 @Injectable()
 export class TrainingGenerationService {
+  private readonly logger = new Logger(TrainingGenerationService.name);
   constructor(
     private readonly prisma: PrismaService,
     private readonly provider: AiProposalProviderService,
@@ -21,7 +24,13 @@ export class TrainingGenerationService {
     context: TrainingProposalInput,
     leaseToken: string,
   ) {
-    const proposal = await this.provider.generateTrainingProposal(context);
+    const { unsafeTrainingTerms } = await loadCalibrationSettings(this.prisma);
+    const proposal = await generateSafeProposal(
+      this.logger,
+      context,
+      unsafeTrainingTerms,
+      (input) => this.provider.generateTrainingProposal(input),
+    );
     if (!proposal.planItems?.length || !proposal.questions?.length)
       throw new LifecycleError('INVALID_AI_OUTPUT');
     validateTrainingSchedule(

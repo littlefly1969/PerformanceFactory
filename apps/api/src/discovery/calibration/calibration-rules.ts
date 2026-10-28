@@ -42,6 +42,8 @@ export type CalibrationSettings = {
   initialQuestionsPerArea: number;
   /** Parole o frasi vietate nei micro-test generati dall'AI. */
   unsafeMicroTestTerms: string[];
+  /** Parole o frasi vietate negli allenamenti generati dall'AI; vuota = nessun controllo. */
+  unsafeTrainingTerms: string[];
 };
 
 export const DEFAULT_CALIBRATION_SETTINGS: CalibrationSettings = {
@@ -51,6 +53,7 @@ export const DEFAULT_CALIBRATION_SETTINGS: CalibrationSettings = {
   questionsPerMicroTest: 0,
   initialQuestionsPerArea: 2,
   unsafeMicroTestTerms: DEFAULT_UNSAFE_MICRO_TEST_TERMS,
+  unsafeTrainingTerms: [],
 };
 
 export type EvaluatedDriver = {
@@ -162,6 +165,11 @@ export function settingsProblems(s: CalibrationSettings) {
     problems.push('Le domande per micro-prova vanno da 0 a 50');
   if (s.initialQuestionsPerArea < 1 || s.initialQuestionsPerArea > 4)
     problems.push('Le domande iniziali per driver vanno da 1 a 4');
+  if (!s.unsafeMicroTestTerms.length)
+    problems.push('Serve almeno una parola vietata nei micro-test');
   problems.push(...unsafeTermsProblems(s.unsafeMicroTestTerms));
+  problems.push(
+    ...unsafeTermsProblems(s.unsafeTrainingTerms, 'negli allenamenti'),
+  );
   return problems;
 }
