@@ -27,21 +27,25 @@ import { reevaluateForRanking } from '../fit-ranking/ranking-reevaluation';
 import {
   CalibrationStatus,
   dayOf,
-  daysLeft,
   deadlineReached,
-  finishProblem,
   isCalibrationClosed,
   focusDrivers,
   statusAfterEvaluation,
 } from './calibration-rules';
-import { checkRule, loadActivePolicy } from './confidence-policy';
+import { loadActivePolicy } from './confidence-policy';
 import { lessonGate } from './lesson-gate';
+import {
+  closingView,
+  expireCalibration,
+  finishCalibration,
+  latestRule,
+  publicRound,
+} from './calibration-closing';
 import {
   generateMicroTest,
   microTestQuestions,
   microTestBalance,
   microTestsByArea,
-  publicMicroTest,
   roundEvidence,
   skipMicroTest,
   validRoundAnswers,
@@ -52,25 +56,6 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Id domanda → valore scelto, o elenco di valori se la domanda è multipla. */
 type Answers = Record<string, string | string[]>;
-
-/** Perché l'atleta non può ancora andare agli scenari (`finishProblem`). */
-const FINISH_PROBLEMS = {
-  CALIBRATION_NOT_READY: {
-    code: 'CALIBRATION_NOT_READY',
-    message:
-      'Ti conosciamo ancora troppo poco: continua la calibrazione per consolidare la tua R.',
-  },
-  CALIBRATION_WAITING_LESSON: {
-    code: 'CALIBRATION_WAITING_LESSON',
-    message:
-      'La tua R si chiude dopo la lezione con il coach del circolo. Intanto puoi continuare la calibrazione.',
-  },
-  CALIBRATION_LESSON_CHOICE: {
-    code: 'CALIBRATION_LESSON_CHOICE',
-    message:
-      'Hai sbloccato la lezione gratuita al circolo: richiedila, oppure dicci che preferisci non farla.',
-  },
-} as const;
 
 /** Annulla la transazione quando il round non è più di questa richiesta. */
 class RoundNotOwned extends Error {}
@@ -170,39 +155,7 @@ export class CalibrationService {
       !deadlineReached(calibration.deadlineAt, now)
     )
       return calibration;
-    await this.prisma.$transaction(async (tx) => {
-      await lockCalibration(tx, userId);
-      const [current, latest, policy] = await Promise.all([
-        tx.athleteCalibration.findUniqueOrThrow({ where: { userId } }),
-        tx.assessmentEvaluation.findFirstOrThrow({
-          where: { userId },
-          orderBy: { sequence: 'desc' },
-          select: {
-            overallConfidence: true,
-            areas: { select: { areaId: true, confidence: true } },
-          },
-        }),
-        loadActivePolicy(tx, 'R_CONSOLIDATION'),
-      ]);
-      if (isCalibrationClosed(current.status)) return;
-      // Anche una valutazione rimasta a metà non conta più.
-      await tx.calibrationRound.updateMany({
-        where: { userId, status: 'EVALUATING' },
-        data: { status: 'EXPIRED', evaluationToken: null },
-      });
-      const met = checkRule(policy, {
-        overallConfidence: latest.overallConfidence,
-        drivers: latest.areas,
-      }).met;
-      await completeCalibration(
-        tx,
-        userId,
-        'DEADLINE_REACHED',
-        now,
-        policy.id,
-        met,
-      );
-    });
+    await expireCalibration(this.prisma, userId, now);
     return this.prisma.athleteCalibration.findUnique({ where: { userId } });
   }
 
@@ -213,8 +166,8 @@ export class CalibrationService {
   async view(userId: string, now = new Date()) {
     const calibration = await this.expireIfDue(userId, now);
     if (!calibration) return null;
-    const [policy, open, evaluations, latest] = await Promise.all([
-      loadActivePolicy(this.prisma, 'R_CONSOLIDATION'),
+    const [rule, open, evaluations] = await Promise.all([
+      latestRule(this.prisma, userId),
       this.prisma.calibrationRound.findFirst({
         where: { userId, status: { in: ['OPEN', 'EVALUATING'] } },
         orderBy: { sequence: 'desc' },
@@ -222,38 +175,14 @@ export class CalibrationService {
       this.prisma.calibrationRound.count({
         where: { userId, status: 'EVALUATED' },
       }),
-      this.prisma.assessmentEvaluation.findFirstOrThrow({
-        where: { userId },
-        orderBy: { sequence: 'desc' },
-        select: {
-          overallConfidence: true,
-          areas: { select: { areaId: true, confidence: true } },
-        },
-      }),
     ]);
+    const { policy } = rule;
     const completed = isCalibrationClosed(calibration.status);
-    const evaluation = {
-      overallConfidence: latest.overallConfidence,
-      drivers: latest.areas,
-    };
-    const ruleMet = checkRule(policy, evaluation).met;
-    const canFinish =
-      !completed &&
-      open?.status !== 'EVALUATING' &&
-      finishProblem(
-        ruleMet,
-        await lessonGate(this.prisma, userId, evaluation),
-      ) === null;
     return {
       status: calibration.status as CalibrationStatus,
       startedAt: calibration.startedAt,
       day: dayOf(calibration.startedAt, now),
-      deadlineAt: calibration.deadlineAt,
-      daysLeft: daysLeft(calibration.deadlineAt, now),
-      /** L'ultima valutazione soddisfa la regola di consolidamento: R consolidata. */
-      ruleMet,
-      /** L'atleta può chiudere la calibrazione e andare agli scenari. */
-      canFinish,
+      ...(await closingView(this.prisma, userId, calibration, rule, open, now)),
       consolidationRule: {
         version: policy.version,
         minOverallConfidence: policy.minOverallConfidence,
@@ -265,31 +194,7 @@ export class CalibrationService {
       roundsCompleted: evaluations,
       // Il prossimo round è sempre disponibile finché la calibrazione è aperta.
       nextRoundKind: completed ? null : ('ADAPTIVE' as const),
-      round: open
-        ? {
-            id: open.id,
-            kind: open.kind,
-            // Una domanda, un gruppo o un chiarimento: il motivo resta interno.
-            action: open.action,
-            status: open.status,
-            // Lo score delle opzioni resta sul server: l'atleta vede solo le etichette.
-            questions: (open.questionsJson as CalibrationQuestion[]).map(
-              (q) => ({
-                id: q.id,
-                areaId: q.areaId,
-                text: q.text,
-                multiple: q.multiple ?? false,
-                options: q.options.map(({ value, label, exclusive }) => ({
-                  value,
-                  label,
-                  ...(exclusive ? { exclusive } : {}),
-                })),
-                ...publicMicroTest(q, open.answersJson),
-              }),
-            ),
-            answers: open.answersJson as Answers,
-          }
-        : null,
+      round: open ? publicRound(open) : null,
     };
   }
 
@@ -419,47 +324,7 @@ export class CalibrationService {
     if (isCalibrationClosed(calibration.status)) return;
     const lease = await this.claim(userId);
     try {
-      await this.prisma.$transaction(async (tx) => {
-        await lockCalibration(tx, userId);
-        const current = await tx.athleteCalibration.findUniqueOrThrow({
-          where: { userId },
-        });
-        if (isCalibrationClosed(current.status)) return;
-        const [latest, policy, evaluating] = await Promise.all([
-          tx.assessmentEvaluation.findFirstOrThrow({
-            where: { userId },
-            orderBy: { sequence: 'desc' },
-            select: {
-              overallConfidence: true,
-              areas: { select: { areaId: true, confidence: true } },
-            },
-          }),
-          loadActivePolicy(tx, 'R_CONSOLIDATION'),
-          tx.calibrationRound.count({
-            where: { userId, status: 'EVALUATING' },
-          }),
-        ]);
-        if (evaluating)
-          throw new ConflictException(
-            'Stiamo ancora valutando le tue ultime risposte: riprova tra poco.',
-          );
-        const evaluation = {
-          overallConfidence: latest.overallConfidence,
-          drivers: latest.areas,
-        };
-        const problem = finishProblem(
-          checkRule(policy, evaluation).met,
-          await lessonGate(tx, userId, evaluation),
-        );
-        if (problem) throw new ConflictException(FINISH_PROBLEMS[problem]);
-        await completeCalibration(
-          tx,
-          userId,
-          'CONFIDENCE_REACHED',
-          now,
-          policy.id,
-        );
-      });
+      await finishCalibration(this.prisma, userId, now);
     } finally {
       await this.release(userId, lease);
     }
