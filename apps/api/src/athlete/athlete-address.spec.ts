@@ -175,15 +175,50 @@ describe('AthleteAddressService', () => {
     });
   });
 
+  /** Righe in memoria: updateMany scrive solo dove tutti i campi coincidono. */
+  function store(rows: Record<string, unknown>[]) {
+    const updateMany = jest.fn(
+      ({
+        where,
+        data,
+      }: {
+        where: Record<string, unknown>;
+        data: Record<string, unknown>;
+      }) => {
+        const same = (a: unknown, b: unknown) =>
+          a instanceof Date && b instanceof Date
+            ? a.getTime() === b.getTime()
+            : a === b;
+        const hits = rows.filter((row) =>
+          Object.entries(where).every(([k, v]) => same(row[k], v)),
+        );
+        hits.forEach((row) => Object.assign(row, data));
+        return Promise.resolve({ count: hits.length });
+      },
+    );
+    return updateMany;
+  }
+
   it('refreshes Google coordinates and drops them after 30 days without a refresh', async () => {
     const { service, userAddress, places } = setup();
     const now = new Date('2026-10-28T00:00:00Z');
     const days = (n: number) => new Date(now.getTime() - n * 86_400_000);
-    userAddress.findMany.mockResolvedValue([
-      { userId: 'fresh', placeId: 'p1', geocodedAt: days(26) },
-      { userId: 'retry', placeId: 'p2', geocodedAt: days(27) },
-      { userId: 'old', placeId: 'p3', geocodedAt: days(31) },
-    ]);
+    const row = (userId: string, placeId: string, age: number) => ({
+      userId,
+      placeId,
+      source: AddressSource.GOOGLE_PLACES,
+      geocodedAt: days(age),
+      latitude: 9,
+      longitude: 9,
+    });
+    const rows = [
+      row('fresh', 'p1', 26),
+      row('retry', 'p2', 27),
+      row('old', 'p3', 31),
+    ];
+    userAddress.findMany.mockResolvedValue(rows.map((r) => ({ ...r })));
+    const updateMany = store(rows);
+    Object.assign(userAddress, { updateMany });
     places.locate
       .mockResolvedValueOnce({ latitude: 1, longitude: 2 })
       .mockResolvedValueOnce(null)
@@ -192,14 +227,57 @@ describe('AthleteAddressService', () => {
       refreshed: 1,
       cleared: 1,
     });
-    expect(userAddress.update).toHaveBeenCalledWith({
-      where: { userId: 'fresh' },
-      data: { latitude: 1, longitude: 2, geocodedAt: now },
+    expect(rows[0]).toMatchObject({
+      latitude: 1,
+      longitude: 2,
+      geocodedAt: now,
     });
-    expect(userAddress.update).toHaveBeenCalledWith({
-      where: { userId: 'old' },
-      data: { latitude: null, longitude: null, geocodedAt: null },
-    });
-    expect(userAddress.update).toHaveBeenCalledTimes(2);
+    expect(rows[1]).toMatchObject({ latitude: 9, geocodedAt: days(27) });
+    expect(rows[2]).toMatchObject({ latitude: null, geocodedAt: null });
   });
+
+  it.each([
+    ['refresh', { latitude: 1, longitude: 2 }, 26],
+    ['removal', null, 31],
+  ])(
+    'leaves alone an address saved while the %s was waiting for Google',
+    async (_branch, location, age) => {
+      const { service, userAddress, places } = setup();
+      const now = new Date('2026-10-28T00:00:00Z');
+      const row = {
+        userId: 'u1',
+        placeId: 'old-place',
+        source: AddressSource.GOOGLE_PLACES,
+        geocodedAt: new Date(now.getTime() - age * 86_400_000),
+        latitude: 9,
+        longitude: 9,
+      };
+      userAddress.findMany.mockResolvedValue([{ ...row }]);
+      Object.assign(userAddress, { updateMany: store([row]) });
+      let answer: (value: unknown) => void = () => {};
+      places.locate.mockReturnValueOnce(
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+      );
+      const running = service.refreshProviderLocations(now);
+      await new Promise((r) => setImmediate(r));
+      // Nel frattempo l'atleta sceglie un altro indirizzo.
+      const saved = new Date(now.getTime() - 1_000);
+      Object.assign(row, {
+        placeId: 'new-place',
+        latitude: 45,
+        longitude: 7,
+        geocodedAt: saved,
+      });
+      answer(location);
+      expect(await running).toEqual({ refreshed: 0, cleared: 0 });
+      expect(row).toMatchObject({
+        placeId: 'new-place',
+        latitude: 45,
+        longitude: 7,
+        geocodedAt: saved,
+      });
+    },
+  );
 });

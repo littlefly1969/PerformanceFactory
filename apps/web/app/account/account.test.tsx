@@ -253,6 +253,28 @@ describe("Indirizzo assistito", () => {
     expect(saveButton()).toBeDisabled();
   });
 
+  it("ignores a choice that resolves after the text was changed", async () => {
+    let answer: ((value: unknown) => void) | undefined;
+    addressRoutes({
+      "/athlete/address/resolve": () =>
+        new Promise((resolve) => {
+          answer = resolve;
+        }),
+    });
+    render(<AccountAddressPage />);
+    const box = await searchBox();
+    await userEvent.type(box, "via roma 12");
+    await userEvent.click(
+      within(await screen.findByRole("listbox")).getByText("Via Roma 12"),
+    );
+    await waitFor(() => expect(answer).toBeDefined());
+    await userEvent.type(box, "3");
+    answer!(RESOLVED);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText("Indirizzo riconosciuto")).toBeNull();
+    expect(saveButton()).toBeDisabled();
+  });
+
   it("says what is missing from an incomplete place and keeps saving off", async () => {
     addressRoutes();
     render(<AccountAddressPage />);

@@ -231,7 +231,11 @@ function AddressSearch({ onSaved }: { onSaved: (view: AddressView) => void }) {
           placeholder="Via e numero civico, città"
           value={query}
           onChange={(event) => {
+            // Ogni risposta ancora in volo (ricerca o scelta) non vale più.
+            latest.current++;
             picked.current = null;
+            setLoading(false);
+            setFailed(null);
             setQuery(event.target.value);
             // Il testo cambiato annulla la scelta: va riconosciuto di nuovo.
             setChosen(null);

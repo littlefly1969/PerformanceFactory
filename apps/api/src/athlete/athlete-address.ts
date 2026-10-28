@@ -251,18 +251,26 @@ export class AthleteAddressService {
     const limit = now.getTime() - PROVIDER_LOCATION_MAX_AGE_DAYS * DAY_MS;
     for (const row of rows) {
       const location = await this.places.locate(row.placeId!);
+      // L'atleta può aver salvato un altro indirizzo mentre Google
+      // rispondeva: si scrive solo sulla riga com'era quando è stata letta.
+      const unchanged = {
+        userId: row.userId,
+        source: AddressSource.GOOGLE_PLACES,
+        placeId: row.placeId,
+        geocodedAt: row.geocodedAt,
+      };
       if (location) {
-        await this.prisma.userAddress.update({
-          where: { userId: row.userId },
+        const { count } = await this.prisma.userAddress.updateMany({
+          where: unchanged,
           data: { ...location, geocodedAt: now },
         });
-        refreshed++;
+        refreshed += count;
       } else if (row.geocodedAt && row.geocodedAt.getTime() < limit) {
-        await this.prisma.userAddress.update({
-          where: { userId: row.userId },
+        const { count } = await this.prisma.userAddress.updateMany({
+          where: unchanged,
           data: { latitude: null, longitude: null, geocodedAt: null },
         });
-        cleared++;
+        cleared += count;
       }
     }
     return { refreshed, cleared };
