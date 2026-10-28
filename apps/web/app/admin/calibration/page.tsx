@@ -140,9 +140,10 @@ export default function AdminCalibrationPage() {
                   Una parola o frase per riga. Un micro-test scritto
                   dall&apos;AI che le contiene viene scartato e riscritto. Basta
                   l&apos;inizio della parola («massimal» vale per massimale e
-                  massimali); maiuscole e accenti non contano. Non contano se
-                  precedute da una negazione nella stessa frase («non
-                  massimale», «senza sprint»).
+                  massimali); maiuscole e accenti non contano. Non contano solo
+                  se la frase le esclude direttamente («non massimale», «senza
+                  sprint», «evita sforzi massimali»): «nessuna pausa tra sprint»
+                  o «non evitare gli sprint» restano vietate.
                 </span>
               </label>
             )}

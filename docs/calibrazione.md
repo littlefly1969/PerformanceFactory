@@ -87,8 +87,12 @@ Tutte in `apps/api/src/discovery/calibration/calibration-rules.ts`, senza I/O:
   (`CalibrationConfig.unsafeMicroTestTerms`, iniziali: diagnosi, terapie,
   farmaci, integratori, diete, massimali, sprint, salti ripetuti…) e arrivano
   anche nel prompt; il controllo (`micro-test-safety.ts`) le cerca a inizio
-  parola, senza maiuscole né accenti, e non conta quelle precedute da una
-  negazione nella stessa frase («non massimale», «senza sprint»). Un test
+  parola, senza maiuscole né accenti, e non conta quelle che la frase esclude
+  davvero («non massimale», «senza sprint», «evita sforzi massimali»): fra la
+  negazione e il termine sono ammessi solo articoli, preposizioni, poche parole
+  ponte (sforzo, ritmo, intensità, arrivare…) e altri termini vietati, e una
+  doppia negazione («non evitare gli sprint») non esclude. «Nessuna pausa tra
+  sprint» resta vietata. Un test
   rifiutato non arriva all'atleta: si riscrive una volta con il motivo dello
   scarto, poi il passo fallisce con «Riprova», senza catalogo di riserva. Con la
   quota giornaliera del provider esaurita (429 «per day») non si ritenta e
