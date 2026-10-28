@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AccountMenu } from "../../components/account-menu";
 import {
   type AthleteProfile,
@@ -16,6 +16,12 @@ import {
   microTestOpen,
   useAccountJourney,
 } from "../_account/calibration-state";
+import {
+  OUTCOMES,
+  type Outcome,
+  nextStep,
+  readOutcome,
+} from "../_account/next-step";
 
 /** Intestazione: avatar con il menu dell'account, nome, sport ed esperienza. */
 function ProfileHeader({ profile }: { profile: AthleteProfile | null }) {
@@ -52,11 +58,25 @@ function ProfileHeader({ profile }: { profile: AthleteProfile | null }) {
  */
 export default function ProfilePage() {
   const { journey: j, error, busy, action } = useAccountJourney();
+  const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const confirmation = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
     // Il vecchio richiamo all'indirizzo nel profilo porta all'account.
-    if (window.location.hash === "#indirizzo")
+    if (window.location.hash === "#indirizzo") {
       window.location.replace("/account/indirizzo?da=profilo");
+      return;
+    }
+    // Ritorno da un'attività conclusa: la conferma si mostra una volta,
+    // ricarica e indietro ritrovano il riepilogo senza ripeterla.
+    const done = readOutcome(window.location.search);
+    if (!done) return;
+    setOutcome(done);
+    window.history.replaceState(null, "", "/journey/profilo");
   }, []);
+  // La conferma riceve il focus quando i dati aggiornati sono sullo schermo.
+  useEffect(() => {
+    if (outcome && j) confirmation.current?.focus();
+  }, [outcome, j]);
   const profile = useResource<AthleteProfile>("/athlete-journey/profile");
   const evaluation = j?.evaluation ?? null;
   const lesson = useResource<FreeLessonView>("/athlete-journey/free-lesson");
@@ -86,9 +106,20 @@ export default function ProfilePage() {
       )
     : 0;
   const started = j?.phase === "ASSESSMENT" || j?.phase === "PROCESSING";
+  const step = j && lesson.data !== undefined ? nextStep(j, lesson.data) : null;
   return (
     <AccountScreen nav="profile" coachDot={microTestOpen(calibration)}>
       <ProfileHeader profile={profile.data ?? null} />
+      {outcome && j && (
+        <p
+          className="pf-acc-confirm"
+          role="status"
+          tabIndex={-1}
+          ref={confirmation}
+        >
+          {OUTCOMES[outcome]} Qui trovi R, affidabilità e il prossimo passo.
+        </p>
+      )}
       {error && (
         <p className="pf-acc-error" role="alert">
           {error}
@@ -147,19 +178,15 @@ export default function ProfilePage() {
             Soglia di completezza{" "}
             {rule === null ? "da definire" : percent(rule)}
           </small>
-          <div className="pf-acc-phase">
-            <div>
-              <span className="pf-acc-kicker">Fase gratuita</span>
-              <strong>
-                {closed ? "Calibrazione completata" : "Calibrazione in corso"}
-              </strong>
+          {step && (
+            <div className="pf-acc-phase" aria-label="Prossimo passo">
+              <div>
+                <span className="pf-acc-kicker">Fase gratuita</span>
+                <strong>{step.kicker}</strong>
+              </div>
+              <PillLink href={step.href}>{step.cta}</PillLink>
             </div>
-            <PillLink
-              href={closed ? "/journey/scenari" : "/journey/calibrazione"}
-            >
-              {closed ? "I tuoi scenari" : "Calibrazione"}
-            </PillLink>
-          </div>
+          )}
         </section>
       )}
 

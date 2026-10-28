@@ -9,6 +9,11 @@ import {
   useResource,
 } from "../_account/account-data";
 import { PillButton, PillLink } from "../_account/account-shell";
+import {
+  type NextStep,
+  isCalibrationStep,
+  summaryHref,
+} from "../_account/next-step";
 
 type Round = NonNullable<Calibration["round"]>;
 type Item = Round["questions"][number];
@@ -291,25 +296,48 @@ function VideoBox({ video }: { video: NonNullable<MicroTestResult["video"]> }) {
   );
 }
 
-/** Risultato: confidenza del driver prima e dopo, commento e video. */
-export function MicroTestResultView({ roundId }: { roundId: string }) {
+/** Ritorno esplicito al riepilogo, che rilegge lo stato aggiornato. */
+const BackToSummary = ({ href = "/journey/profilo" }: { href?: string }) => (
+  <PillLink href={href}>Torna al riepilogo</PillLink>
+);
+
+/**
+ * Risultato: confidenza del driver prima e dopo, commento e video. Si legge
+ * soltanto: aprirlo dall'indirizzo non reinvia la prova. Poi si torna al
+ * riepilogo; la calibrazione prosegue solo se è ancora il passo consentito.
+ */
+export function MicroTestResultView({
+  roundId,
+  next,
+}: {
+  roundId: string;
+  next: NextStep | null;
+}) {
   const { data, error, reload } = useResource<MicroTestResult>(
     `/athlete-journey/calibration/micro-test/${roundId}`,
   );
   if (error)
     return (
-      <p className="pf-acc-error" role="alert">
-        {error}
-      </p>
+      <section className="pf-acc-micro">
+        <p className="pf-acc-error" role="alert">
+          {error}
+        </p>
+        <PillButton tone="outline" arrow={false} onClick={() => void reload()}>
+          Riprova
+        </PillButton>
+        <BackToSummary />
+      </section>
     );
   if (!data) return null;
   if (data.status !== "EVALUATED")
     return (
       <section className="pf-acc-micro" role="status">
         <h2>Aggiorniamo la tua valutazione…</h2>
+        <p>Le tue risposte sono salvate: non serve rifare la prova.</p>
         <PillButton tone="outline" arrow={false} onClick={() => void reload()}>
           Aggiorna
         </PillButton>
+        <BackToSummary />
       </section>
     );
   const before = data.confidence?.before ?? null;
@@ -339,9 +367,12 @@ export function MicroTestResultView({ roundId }: { roundId: string }) {
       <h3>{headline(data)}</h3>
       {data.summary && <p>{data.summary}</p>}
       {data.video && <VideoBox video={data.video} />}
-      <PillLink href="/journey/calibrazione" tone="outline">
-        Continua la calibrazione
-      </PillLink>
+      <BackToSummary href={summaryHref("micro-test")} />
+      {next && isCalibrationStep(next) && (
+        <a className="pf-acc-link" href={next.href}>
+          {next.cta}
+        </a>
+      )}
     </section>
   );
 }
@@ -378,12 +409,18 @@ export function MicroTestTab({
   calibration,
   evaluation,
   resultRound,
+  saved,
+  next,
   onAnswered,
   onSkip,
 }: {
   calibration: Calibration | null;
   evaluation: Evaluation | null;
   resultRound: string | null;
+  /** Round il cui esito è stato appena accettato dal server. */
+  saved: string | null;
+  /** Prossimo passo dopo il risultato, dallo stato aggiornato. */
+  next: NextStep | null;
   onAnswered: (
     roundId: string,
     answers: Record<string, string>,
@@ -404,6 +441,12 @@ export function MicroTestTab({
     round?.action === "PROPOSE_MICRO_TEST" && round.status === "EVALUATING"
       ? round
       : null;
+  // Il risultato richiesto (dall'indirizzo o dopo un invio riuscito) viene
+  // prima del prossimo round: si legge dalla sua API e non si reinvia. Solo
+  // se è proprio quel round a essere rimasto in valutazione, e non lo abbiamo
+  // appena salvato noi, si offre di completarla.
+  if (resultRound && !(stalled?.id === resultRound && saved !== resultRound))
+    return <MicroTestResultView roundId={resultRound} next={next} />;
   if (stalled)
     return (
       <StalledEvaluation
@@ -420,8 +463,6 @@ export function MicroTestTab({
         }
       />
     );
-  if (resultRound && !open)
-    return <MicroTestResultView roundId={resultRound} />;
   if (!evaluation)
     return (
       <section className="pf-acc-micro">

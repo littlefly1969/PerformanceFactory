@@ -213,6 +213,33 @@ e ore fra round da `CalibrationConfig`, riapertura delle chiusure a tempo deboli
 `20261013090000_calibration_next_step` (decisione del passo sul round, via driver e
 domande per round).
 
+## Navigazione e riepilogo
+
+`/journey/profilo` è il riepilogo della fase gratuita: ogni attività conclusa
+ci riporta l'atleta con una conferma breve (`?esito=calibrazione`,
+`micro-test`, `micro-test-rimandato`, `lezione`; altri valori si ignorano).
+La conferma riceve il focus, non promette aumenti di affidabilità e sparisce
+dall'indirizzo, così ricarica e indietro non la ripetono.
+
+- **Round di domande**: dopo `calibration/answers` accettato e valutato si va al
+  riepilogo, senza aprire un nuovo round. Se l'invio fallisce (errore HTTP o di
+  rete) domanda, posizione e scelte restano e si può riprovare. Un round
+  `EVALUATING` si completa con le risposte salvate; se un'altra richiesta lo
+  sta valutando, la pagina aspetta e rilegge lo stato senza reinviarle.
+- **Micro-test**: feedback, risultato e video restano; l'azione principale è
+  «Torna al riepilogo», «Continua la calibrazione» compare solo se è ancora il
+  passo consentito. Il risultato aperto da `?round=` o appena salvato si legge
+  dalla sua API anche se nel frattempo c'è un nuovo round, senza reinviare la
+  prova; rimandare il micro-test riporta al riepilogo.
+- **Prossimo passo**: Home e profilo usano la stessa regola
+  (`_account/next-step.ts`) su stato della calibrazione e fase della lezione:
+  scenari a R chiusa, valutazione da completare, lezione richiesta o confermata,
+  micro-test, domande aperte, lezione da scegliere, poi calibrazione.
+- **Circolo**: richiesta, aggiornamento, ritiro e rinuncia mostrano l'esito e
+  «Torna al riepilogo».
+- **Attesa del pagamento** (`/abbonamento`): oltre a «Verifica di nuovo», «Torna
+  al tuo percorso» senza nuovo checkout; l'attivazione resta del webhook.
+
 ## API
 
 | Metodo e percorso | Ruolo | Effetto |
@@ -249,6 +276,7 @@ round. Test (casi di accettazione della specifica: AT-10, AT-11, AT-12, AT-13, A
 AT-25, AT-27): `calibration-rules.spec.ts`, `confidence-policy.spec.ts`, `calibration-questions.spec.ts`,
 `micro-test-generation.spec.ts`, `test/db/discovery.integration-spec.ts`,
 `test/db/micro-test-step.integration-spec.ts`, `app/journey/calibration-panel.test.tsx`,
+`app/journey/_account/navigation.test.tsx`,
 `app/admin/calibration/page.test.tsx`, `app/ai-tuner/prompts/calibrazione/page.test.tsx`.
 
 ## Aperto

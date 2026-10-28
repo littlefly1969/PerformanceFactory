@@ -82,6 +82,13 @@ export default function SubscriptionReturnPage() {
           <button className="pf4-cta" onClick={retry}>
             Verifica di nuovo
           </button>
+          <p>
+            Puoi anche tornare al tuo percorso: non avviamo un nuovo pagamento e
+            il programma si attiva appena arriva la conferma.
+          </p>
+          <Link className="pf4-cta" href="/journey">
+            Torna al tuo percorso
+          </Link>
         </section>
       )}
       {status === "CANCELLED" && (
