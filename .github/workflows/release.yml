@@ -1,0 +1,108 @@
+name: Release images
+
+# Costruisce le immagini API e web e le pubblica su ghcr.io solo dopo una CI
+# verde su main. Il server poi le scarica con infra/scripts/update-prod.sh.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-images
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/performancefactory
+  # URL pubblico dell'API, letto dal browser: entra nell'immagine web in build.
+  NEXT_PUBLIC_API_BASE_URL: ${{ vars.NEXT_PUBLIC_API_BASE_URL || 'https://performancefactory.littlefly.it/api' }}
+
+jobs:
+  publish:
+    name: Build and push (${{ matrix.app }})
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        app: [api, web]
+    steps:
+      - name: Resolve commit and tags
+        id: meta
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          image="$(echo "${IMAGE_PREFIX}-${{ matrix.app }}" | tr '[:upper:]' '[:lower:]')"
+          short="$(echo "$HEAD_SHA" | cut -c1-7)"
+          {
+            echo "sha=$HEAD_SHA"
+            echo "image=$image"
+            echo "tags=$image:sha-$short,$image:main"
+            echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.meta.outputs.sha }}
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: apps/${{ matrix.app }}/Dockerfile
+          target: ${{ matrix.app == 'api' && 'runner' || '' }}
+          platforms: linux/amd64
+          push: true
+          # Una sola versione per push: niente manifest di attestazione separati.
+          provenance: false
+          sbom: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.meta.outputs.sha }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.created }}
+            org.opencontainers.image.title=performancefactory-${{ matrix.app }}
+          build-args: |
+            NEXT_PUBLIC_API_BASE_URL=${{ env.NEXT_PUBLIC_API_BASE_URL }}
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
+
+  cleanup:
+    name: Keep only the latest versions
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: .github/scripts
+      - name: Delete old image versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+          KEEP: ${{ vars.GHCR_KEEP_VERSIONS || '5' }}
+        run: |
+          for app in api web; do
+            .github/scripts/prune-ghcr-versions.sh "$OWNER" "performancefactory-$app" "$KEEP"
+          done

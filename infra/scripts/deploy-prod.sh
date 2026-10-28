@@ -6,7 +6,8 @@ usage() {
 Usage: infra/scripts/deploy-prod.sh --env-file PATH [--compose-file PATH]
 
 Environment:
-  DEPLOY_MODE=build|pull   Default: build
+  DEPLOY_MODE=build|pull|none   Default: build
+                                none uses images already present locally
 
 The script validates the production Compose config, builds or pulls images,
 starts PostgreSQL/Redis, applies migrations, and waits for healthy API/web.
@@ -67,9 +68,9 @@ fi
 
 DEPLOY_MODE="${DEPLOY_MODE:-build}"
 case "$DEPLOY_MODE" in
-  build|pull) ;;
+  build|pull|none) ;;
   *)
-    echo "DEPLOY_MODE must be build or pull, got: $DEPLOY_MODE" >&2
+    echo "DEPLOY_MODE must be build, pull or none, got: $DEPLOY_MODE" >&2
     exit 2
     ;;
 esac
@@ -81,16 +82,21 @@ compose() {
 echo "Validating Compose configuration..."
 compose config >/dev/null
 
+UP_BUILD_FLAG=""
 if [ "$DEPLOY_MODE" = "pull" ]; then
   echo "Pulling configured images..."
   compose pull
+elif [ "$DEPLOY_MODE" = "none" ]; then
+  echo "Using application images already present locally..."
+  UP_BUILD_FLAG="--no-build"
 else
   echo "Building application images..."
   compose build api web
 fi
 
 echo "Starting services and removing orphan containers for this Compose project..."
-compose up -d --remove-orphans --wait --wait-timeout "${DEPLOY_WAIT_TIMEOUT:-180}"
+# shellcheck disable=SC2086
+compose up -d --remove-orphans $UP_BUILD_FLAG --wait --wait-timeout "${DEPLOY_WAIT_TIMEOUT:-180}"
 
 echo "Service status:"
 compose ps
