@@ -227,6 +227,14 @@ export function buildSystemPrompt(input: CycleProposalInput) {
       ].join('\n'),
     );
   }
+  if (input.unsafeTerms?.length)
+    sections.push(
+      `Contenuti vietati (regola dell amministratore, prevale sulle istruzioni sopra): non usare parole che iniziano con questi termini, nemmeno per escluderle: ${input.unsafeTerms.join(', ')}.${
+        input.rejectedTerm
+          ? ` Il tentativo precedente è stato scartato perché conteneva «${input.rejectedTerm}».`
+          : ''
+      }`,
+    );
   return sections.join('\n\n');
 }
 

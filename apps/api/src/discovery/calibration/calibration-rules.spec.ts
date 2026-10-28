@@ -202,6 +202,16 @@ describe('calibration rules', () => {
     expect(settingsProblems(settings)).toEqual([]);
   });
 
+  it('needs banned words for the micro-tests, while the training list may stay empty', () => {
+    expect(settings.unsafeTrainingTerms).toEqual([]);
+    expect(
+      settingsProblems({ ...settings, unsafeMicroTestTerms: [] }),
+    ).toHaveLength(1);
+    expect(
+      settingsProblems({ ...settings, unsafeTrainingTerms: ['x'.repeat(61)] }),
+    ).toHaveLength(1);
+  });
+
   it('accepts 0-50 questions per micro-test, 0 meaning no indication', () => {
     expect(settings.questionsPerMicroTest).toBe(0);
     expect(
