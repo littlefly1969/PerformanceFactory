@@ -14,6 +14,13 @@ describe('micro-test safety terms', () => {
     ['Ripeti fino a esaurimento delle forze.', 'esaurimento'],
     ['Non fermarti. Sprint fino alla rete.', 'sprint'],
     ['Una DIAGNOSI del dolore al gomito.', 'diagnos'],
+    // La negazione riguarda altro: lo sprint resta prescritto.
+    ['Nessuna pausa tra sprint.', 'sprint'],
+    ['Esegui senza pause sprint brevi.', 'sprint'],
+    ['Non fermarti mai fai sprint.', 'sprint'],
+    // Doppia negazione: escludere l'esclusione chiede gli sprint.
+    ['Non evitare gli sprint.', 'sprint'],
+    ['Senza evitare il cedimento.', 'cedimento'],
   ])('finds banned content in %p', (text, term) => {
     expect(findUnsafeTerm(text, terms)).toBe(term);
   });
@@ -25,6 +32,8 @@ describe('micro-test safety terms', () => {
     'Non arrivare mai al cedimento.',
     'Un ritmo submassimale, a passo tranquillo.',
     'Nessuna terapia: è solo un esercizio di tecnica.',
+    'Niente sprint o salti ripetuti.',
+    'Evita sforzi massimali, non arrivare al cedimento.',
   ])('lets a negated or harmless phrase through: %p', (text) => {
     expect(findUnsafeTerm(text, terms)).toBeNull();
   });

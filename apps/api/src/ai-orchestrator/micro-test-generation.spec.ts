@@ -388,6 +388,19 @@ describe('micro-test generation', () => {
     ).toHaveLength(1);
   });
 
+  it.each([
+    'Nessuna pausa tra sprint: conta quante volée tornano.',
+    'Esegui senza pause sprint brevi verso la rete.',
+    'Non evitare gli sprint verso la rete.',
+  ])(
+    'rejects a test that still prescribes banned content: %p',
+    (instructions) => {
+      expect(
+        validateMicroTests({ tests: [test({ instructions })] }, input),
+      ).toBeNull();
+    },
+  );
+
   it('applies the banned terms set in the back office', () => {
     const custom = { ...input, unsafeTerms: ['volée a muro'] };
     expect(validateMicroTests({ tests: [test()] }, custom)).toBeNull();
