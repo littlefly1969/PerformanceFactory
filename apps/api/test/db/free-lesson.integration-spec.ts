@@ -653,6 +653,31 @@ describe('Free lesson with PostgreSQL', () => {
     await expect(calibration.openRound(id)).rejects.toThrow('già completata');
   });
 
+  it('never saves a round generated while the deadline closed the calibration', async () => {
+    const id = await requested([40, 50]);
+    const generate = ai.generateCalibrationQuestions.bind(ai);
+    // L'AI risponde dopo che una lettura del percorso ha chiuso per scadenza.
+    const late = jest
+      .spyOn(ai, 'generateCalibrationQuestions')
+      .mockImplementationOnce(async (input) => {
+        await prisma.athleteCalibration.update({
+          where: { userId: id },
+          data: { deadlineAt: new Date(Date.now() - 1000) },
+        });
+        await calibration.expireIfDue(id);
+        return generate(input);
+      });
+    try {
+      await calibration.openRound(id);
+    } finally {
+      late.mockRestore();
+    }
+    expect(await status(id)).toBe('CALIBRATION_COMPLETED');
+    expect(await prisma.calibrationRound.count({ where: { userId: id } })).toBe(
+      0,
+    );
+  });
+
   it('lets the athlete withdraw before the lesson and frees the seat', async () => {
     const id = await requested([40, 50]);
     const lessonId = await lesson(1);

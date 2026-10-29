@@ -36,6 +36,7 @@ import { loadActivePolicy } from './confidence-policy';
 import { lessonGate } from './lesson-gate';
 import {
   closingView,
+  lockOpenCalibration,
   expireCalibration,
   finishCalibration,
   latestRule,
@@ -273,6 +274,8 @@ export class CalibrationService {
           ? await generateMicroTest(this.prisma, this.ai, userId, input, result)
           : null;
       await this.prisma.$transaction(async (tx) => {
+        // Chiusa (per esempio dalla scadenza) mentre l'AI lavorava: niente round.
+        if (!(await lockOpenCalibration(tx, userId, new Date()))) return;
         const questions = test
           ? await microTestQuestions(tx, userId, test)
           : result.questions;

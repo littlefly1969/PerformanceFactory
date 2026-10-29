@@ -5,6 +5,7 @@ import { completeCalibration } from './calibration-completion';
 import { CalibrationQuestion } from '../../ai-orchestrator/calibration-questions';
 import {
   daysLeft,
+  deadlineReached,
   finishProblem,
   isCalibrationClosed,
 } from './calibration-rules';
@@ -55,6 +56,26 @@ export async function latestRule(db: Db, userId: string) {
     drivers: latest.areas,
   };
   return { evaluation, policy, met: checkRule(policy, evaluation).met };
+}
+
+/**
+ * Blocca la riga della calibrazione e dice se è ancora aperta e non scaduta:
+ * serializza il salvataggio di un nuovo passo con la chiusura, che prende lo
+ * stesso lock.
+ */
+export async function lockOpenCalibration(
+  tx: Prisma.TransactionClient,
+  userId: string,
+  now: Date,
+) {
+  await lockCalibration(tx, userId);
+  const current = await tx.athleteCalibration.findUniqueOrThrow({
+    where: { userId },
+  });
+  return (
+    !isCalibrationClosed(current.status) &&
+    !deadlineReached(current.deadlineAt, now)
+  );
 }
 
 /**
