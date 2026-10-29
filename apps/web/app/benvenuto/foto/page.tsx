@@ -1,7 +1,12 @@
 "use client";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useRef } from "react";
 import { WelcomeIntro, WelcomeShell } from "../_components/welcome-shell";
-import { FitRankingEditor } from "../../components/fit-ranking-editor";
+import {
+  FitRankingEditor,
+  type PendingFitRanking,
+} from "../../components/fit-ranking-editor";
 import { PhotoTile, useProfilePhotoUpload } from "./photo-tile";
 
 const NEXT = "/benvenuto/spider";
@@ -10,12 +15,24 @@ const NEXT = "/benvenuto/spider";
 export default function WelcomePhotoPage() {
   const photo = useProfilePhotoUpload();
   const { image, busy, error } = photo;
+  const router = useRouter();
+  const ranking: PendingFitRanking = useRef(null);
   return (
     <WelcomeShell
       step={1}
       skipHref={NEXT}
       footer={
-        <Link className="pf-welcome-cta" href={NEXT}>
+        <Link
+          className="pf-welcome-cta"
+          href={NEXT}
+          onClick={async (event) => {
+            // Classifica compilata senza «Salva»: si salva qui, non si perde.
+            const save = ranking.current;
+            if (!save) return;
+            event.preventDefault();
+            if (await save()) router.push(NEXT);
+          }}
+        >
           {image ? "Continua" : "Lo farò dopo"}
         </Link>
       }
@@ -28,7 +45,7 @@ export default function WelcomePhotoPage() {
         <PhotoTile {...photo} />
         {busy && image && <p className="pf-welcome-note">Caricamento…</p>}
         {/* Classifica FIT: dato di configurazione del profilo, non una domanda del percorso. */}
-        <FitRankingEditor tone="dark" />
+        <FitRankingEditor tone="dark" pending={ranking} />
         {error && (
           <p role="alert" className="pf-welcome-error">
             {error}

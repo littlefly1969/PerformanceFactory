@@ -3,6 +3,9 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import WelcomePhotoPage from "./page";
 
+const push = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+
 vi.mock("@/app/lib/api", () => ({
   API_BASE: "/api",
   secureFetch: (input: RequestInfo, init?: RequestInit) => fetch(input, init),
@@ -67,5 +70,50 @@ describe("benvenuto 01 · foto profilo", () => {
     render(<WelcomePhotoPage />);
     expect(await screen.findByAltText("La tua foto profilo")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Cambia foto profilo" })).toBeTruthy();
+  });
+
+  it("salva la classifica compilata anche senza «Salva» prima di continuare", async () => {
+    const posts: unknown[] = [];
+    const empty = {
+      ranking: null,
+      options: {
+        PADEL: [
+          { value: "3", label: "3ª fascia" },
+          { value: "NONE", label: "Nessuna classifica" },
+        ],
+        TENNIS: [{ value: "NONE", label: "Nessuna classifica" }],
+      },
+      recalculationPending: false,
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (!url.endsWith("/athlete-journey/fit-ranking"))
+          return new Response(JSON.stringify({ image: null }));
+        if (init?.method !== "POST") return new Response(JSON.stringify(empty));
+        const body = JSON.parse(String(init.body));
+        posts.push(body);
+        return new Response(JSON.stringify({ ...empty, ranking: body }));
+      }),
+    );
+    render(<WelcomePhotoPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Aggiungi" }));
+    const [padelNow, padelBest, tennisNow, tennisBest] =
+      screen.getAllByRole("combobox");
+    await userEvent.selectOptions(padelNow, "3");
+    await userEvent.selectOptions(padelBest, "3");
+    await userEvent.selectOptions(tennisNow, "NONE");
+    await userEvent.selectOptions(tennisBest, "NONE");
+    await userEvent.click(screen.getByRole("link", { name: "Lo farò dopo" }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/benvenuto/spider"));
+    expect(posts).toEqual([
+      {
+        padelCurrent: "3",
+        padelBest: "3",
+        tennisCurrent: "NONE",
+        tennisBest: "NONE",
+        cardNumber: "",
+      },
+    ]);
   });
 });
