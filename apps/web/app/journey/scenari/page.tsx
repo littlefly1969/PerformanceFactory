@@ -7,7 +7,11 @@ import {
   PillButton,
   PillLink,
 } from "../_account/account-shell";
-import { isClosed, useAccountJourney } from "../_account/calibration-state";
+import {
+  closedUnconsolidated,
+  isClosed,
+  useAccountJourney,
+} from "../_account/calibration-state";
 import { MiniSpider } from "../_account/spiders";
 
 const COPY: Record<number, string> = {
@@ -39,6 +43,14 @@ export default function ScenariosPage() {
       {error && (
         <p className="pf-acc-error" role="alert">
           {error}
+        </p>
+      )}
+      {closedUnconsolidated(j?.calibration) && (
+        <p className="pf-acc-warning" role="status">
+          <strong>Attenzione: la tua R è una stima poco affidabile.</strong> La
+          fase gratuita è scaduta prima che ti conoscessimo abbastanza: questi
+          scenari partono da dati parziali e potranno cambiare molto con il
+          percorso.
         </p>
       )}
       {j && !closed && (

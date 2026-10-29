@@ -2,7 +2,11 @@
 import { useEffect, useState } from "react";
 import { MultiChoiceStep } from "../choice-options";
 import type { Calibration } from "../journey-types";
-import { percent } from "../_account/account-data";
+import {
+  type FreeLessonView,
+  percent,
+  useResource,
+} from "../_account/account-data";
 import {
   AccountScreen,
   AccountTopBar,
@@ -10,7 +14,9 @@ import {
   PillLink,
 } from "../_account/account-shell";
 import {
+  closedUnconsolidated,
   isClosed,
+  isConsolidated,
   microTestOpen,
   useAccountJourney,
 } from "../_account/calibration-state";
@@ -97,8 +103,10 @@ const LESSON_CHOICE = /lezione gratuita/i;
 
 /**
  * Stato della calibrazione: quanto ti conosciamo rispetto alla soglia, area
- * per area, e il prossimo passo scelto dall'AI (domande o micro-test).
- * La calibrazione si chiude solo con la regola di consolidamento.
+ * per area, e il prossimo passo scelto dall'AI (domande o micro-test). Si
+ * continua anche con R consolidata o la lezione in attesa; la calibrazione
+ * si chiude con la lezione svolta, con la scelta degli scenari o alla
+ * scadenza.
  */
 export default function CalibrationPage() {
   const { journey: j, error, busy, action, refresh } = useAccountJourney();
@@ -109,6 +117,14 @@ export default function CalibrationPage() {
   const evaluation = j?.evaluation ?? null;
   const round = c?.round ?? null;
   const closed = isClosed(c);
+  const consolidated = isConsolidated(c);
+  const expiredWeak = closedUnconsolidated(c);
+  const lesson = useResource<FreeLessonView>("/athlete-journey/free-lesson");
+  const phase = lesson.data?.enabled ? lesson.data.phase : null;
+  const lessonPending =
+    c?.status === "FREE_LESSON_VALIDATION" ||
+    phase === "REQUESTED" ||
+    phase === "ASSIGNED";
   const rule = c?.consolidationRule;
   const areaRule =
     rule?.minAreaConfidence ?? rule?.minOverallConfidence ?? null;
@@ -156,6 +172,11 @@ export default function CalibrationPage() {
     if (round?.status === "OPEN") return setAnswering(true);
     if (await action("calibration/round")) setAnswering(true);
   };
+  // R consolidata: l'atleta chiude la calibrazione e sceglie lo scenario.
+  const finish = async () => {
+    if (await action("calibration/finish"))
+      window.location.assign("/journey/scenari");
+  };
   const confidence = evaluation?.overallConfidence ?? 0;
   const footer = evaluated ? null : waiting ? (
     <PillButton
@@ -169,20 +190,32 @@ export default function CalibrationPage() {
     <PillLink href="/journey/scenari" tone="lime">
       Vedi dove puoi arrivare
     </PillLink>
-  ) : c?.status === "FREE_LESSON_VALIDATION" ? (
-    <PillLink href="/journey/circolo" tone="lime">
-      La tua lezione gratuita
-    </PillLink>
   ) : (
-    <PillButton tone="lime" disabled={busy || !c} onClick={() => void next()}>
-      {busy
-        ? "Prepariamo il prossimo passo…"
-        : stalled
-          ? "Completa la valutazione"
-          : microTestOpen(c)
-            ? "Fai il micro-test"
-            : "Continua la calibrazione"}
-    </PillButton>
+    <>
+      <PillButton tone="lime" disabled={busy || !c} onClick={() => void next()}>
+        {busy
+          ? "Prepariamo il prossimo passo…"
+          : stalled
+            ? "Completa la valutazione"
+            : microTestOpen(c)
+              ? "Fai il micro-test"
+              : "Continua la calibrazione"}
+      </PillButton>
+      {c?.canFinish && (
+        <PillButton
+          tone="outline"
+          disabled={busy}
+          onClick={() => void finish()}
+        >
+          Vai ai tuoi scenari
+        </PillButton>
+      )}
+      {lessonPending && (
+        <a className="pf-acc-link" href="/journey/circolo">
+          La tua lezione gratuita
+        </a>
+      )}
+    </>
   );
   return (
     <AccountScreen
@@ -192,10 +225,22 @@ export default function CalibrationPage() {
       footer={footer}
     >
       <h1 className="pf-acc-title">
-        {closed
-          ? "La tua R è consolidata."
-          : "La calibrazione si chiude quando ti conosciamo abbastanza."}
+        {expiredWeak
+          ? "La fase gratuita è finita."
+          : closed
+            ? "La tua R è consolidata."
+            : consolidated
+              ? "La tua R è consolidata. Puoi continuare a calibrare."
+              : "La calibrazione si chiude quando ti conosciamo abbastanza."}
       </h1>
+      {expiredWeak && (
+        <p className="pf-acc-warning" role="status">
+          <strong>Attenzione: la tua R è una stima poco affidabile.</strong> La
+          fase gratuita è scaduta prima che ti conoscessimo abbastanza. Gli
+          scenari a 3, 6 e 12 mesi partono da questa stima e potranno cambiare
+          molto quando inizierai il percorso.
+        </p>
+      )}
       {error && (
         <p className="pf-acc-error" role="alert">
           {error}
@@ -228,17 +273,21 @@ export default function CalibrationPage() {
             <MiniSpider
               real={evaluation.drivers.map((d) => d.score)}
               scale={evaluation.scale}
-              provisional={!closed}
+              provisional={!consolidated}
               size={120}
             />
             <div>
               <span className="pf-acc-badge">
-                {closed ? "R consolidata" : "Profilo provvisorio"}
+                {consolidated ? "R consolidata" : "Profilo provvisorio"}
               </span>
               <p>
                 {closed
                   ? "Il prossimo passo sono i tuoi scenari a 3, 6 e 12 mesi."
-                  : `Sei al giorno ${c.day} di calibrazione.`}
+                  : `Sei al giorno ${c.day} di calibrazione. ${
+                      c.daysLeft === 1
+                        ? "Manca 1 giorno"
+                        : `Mancano ${c.daysLeft} giorni`
+                    } alla fine della fase gratuita.`}
               </p>
             </div>
           </div>
@@ -269,10 +318,18 @@ export default function CalibrationPage() {
                 : percent(rule.minOverallConfidence)}
             </small>
           </div>
-          {c.status === "FREE_LESSON_VALIDATION" && (
+          {lessonPending && (
             <p role="status">
-              Hai chiesto la lezione gratuita: la tua R si chiude dopo il
-              feedback del coach del circolo.
+              Hai chiesto la lezione gratuita: la calibrazione si chiude dopo il
+              feedback del coach del circolo. Intanto puoi continuare a
+              rispondere.
+            </p>
+          )}
+          {!closed && c.ruleMet && phase === "ELIGIBLE" && (
+            <p role="status">
+              Hai sbloccato la lezione gratuita: richiedila, oppure dicci che
+              preferisci non farla, per vedere i tuoi scenari.{" "}
+              <a href="/journey/circolo">Scegli il circolo</a>
             </p>
           )}
           <ul className="pf-acc-areas">
@@ -282,7 +339,9 @@ export default function CalibrationPage() {
                 <li key={d.id}>
                   <span>{d.name}</span>
                   <small className={enough ? "is-ok" : undefined}>
-                    {closed || enough ? "Sufficiente" : "Provvisoria"}
+                    {(closed && !expiredWeak) || enough
+                      ? "Sufficiente"
+                      : "Provvisoria"}
                   </small>
                 </li>
               );

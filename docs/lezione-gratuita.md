@@ -9,21 +9,25 @@ attendibile, secondo la regola di eleggibilità `LESSON_ELIGIBILITY` del back
 office, con il livello stimato e almeno un circolo che offre la lezione. I crediti
 di interazione restano solo come barra di progresso (OP-01). L'atleta richiede il
 posto; l'admin compone i gruppi per livello; il coach dà il suo feedback, che entra
-nella valutazione successiva come fonte distinta e chiude R e P.
+nella valutazione successiva come fonte distinta e, con R consolidata, chiude la
+calibrazione.
 
 ```
 FREE_CALIBRATING ──► FREE_LEVEL_ESTIMATED ──► FREE_LESSON_VALIDATION ──► CALIBRATION_COMPLETED
-                      lezione possibile:        posto richiesto o           regola di consolidamento
-                      R aspetta la richiesta    assegnato: R non si         soddisfatta dopo il
-                      o la rinuncia             consolida fino al feedback  feedback (o la rinuncia)
+                      lezione possibile:        posto richiesto o           feedback valutato e
+                      richiederla o             assegnato: si continua      R consolidata
+                      rifiutarla prima          a calibrare
+                      degli scenari
 ```
 
-**Quando la lezione chiude R** (decisione di Stefano, 8 ottobre 2026): il paywall
-arriva solo dopo la lezione, che chiude R e P con affidabilità. Se la lezione è
-possibile, R non si consolida finché il feedback non è valutato, o finché l'atleta
-non sceglie esplicitamente di non farla. Se la lezione non è possibile (territorio
-senza circolo, flag spento, livello non stimato, beneficio già usato), basta la
-regola di consolidamento.
+**Quando la lezione chiude la calibrazione** (decisioni di Stefano, 8 e 28
+ottobre 2026): il paywall arriva dopo la lezione. Nell'attesa l'atleta continua a
+calibrare, anche con R già consolidata. La calibrazione si chiude da sola quando il
+feedback è valutato e R è consolidata. Se la lezione è possibile, prima degli
+scenari va richiesta o rifiutata. Senza lezione (territorio senza circolo, flag
+spento, rinuncia, assenza) l'atleta con R consolidata sceglie quando andare agli
+scenari. In ogni caso la scadenza della fase gratuita chiude la calibrazione
+(`docs/calibrazione.md`).
 
 Tutto è dietro il feature flag `free_lesson` (spento di default, come
 `referral_share`).
@@ -50,13 +54,14 @@ progetto `notes/slice4-lezione-gratuita.md`.
   capienza si verificano quando l'admin assegna. La richiesta registra versione
   della regola e valutazione usate (`eligibilityPolicyId`,
   `eligibilityEvaluationId`, §10.3).
-- **R aspetta la lezione** (`discovery/calibration/lesson-gate.ts`). Con la lezione
-  possibile o in corso la regola di consolidamento non chiude la calibrazione; un
-  nuovo round a regola soddisfatta risponde `409 CALIBRATION_LESSON_CHOICE` (lezione
-  da richiedere o rifiutare) o `409 CALIBRATION_WAITING_LESSON` (posto in attesa).
-  Rinuncia, ritiro e assenza riesaminano subito la calibrazione
-  (`settleCalibration`): con la regola soddisfatta R si consolida. Il tempo non
-  chiude R e la data della lezione non ha vincoli di scadenza.
+- **Gli scenari aspettano la lezione** (`discovery/calibration/lesson-gate.ts`).
+  Con la lezione possibile o in corso la calibrazione resta aperta e i round
+  continuano; la scelta degli scenari risponde `409 CALIBRATION_LESSON_CHOICE`
+  (lezione da richiedere o rifiutare) o `409 CALIBRATION_WAITING_LESSON` (posto in
+  attesa). Rinuncia, ritiro e assenza riesaminano la calibrazione
+  (`settleCalibration`), che si chiude da sola solo con il feedback valutato e R
+  consolidata. La data della lezione non ha vincoli, ma la scadenza della fase
+  gratuita chiude comunque la calibrazione, anche con un posto assegnato.
 - **Rinuncia reversibile** (`POST /athlete-journey/free-lesson/decline`, AT-18).
   Solo in fase `ELIGIBLE`; salva `AthleteCalibration.lessonDeclinedAt`. Finché R è
   aperta l'atleta può ancora richiedere il posto, e la richiesta annulla la
@@ -156,7 +161,7 @@ del catalogo non ha atleta né lotto, uno su misura li ha entrambi),
 | `GET /athlete-journey/free-lesson` | `USER` | fase, crediti, circoli, posto; `{ enabled: false }` a flag spento |
 | `POST /athlete-journey/free-lesson/request` | `USER` | `{ partnerId, shareWithCoach: true }` |
 | `POST /athlete-journey/free-lesson/withdraw` | `USER` | ritira la richiesta o il posto prima della lezione |
-| `POST /athlete-journey/free-lesson/decline` | `USER` | sceglie di non fare la lezione: R si consolida con la regola |
+| `POST /athlete-journey/free-lesson/decline` | `USER` | sceglie di non fare la lezione: con R consolidata può andare agli scenari |
 | `GET /admin/free-lessons` | `ADMIN` | parametri, circoli, coach, lezioni, richieste, micro-test |
 | `PUT /admin/free-lessons/config` | `ADMIN` | parametri dei crediti |
 | `PATCH /admin/free-lessons/clubs/:id` | `ADMIN` | `{ freeLessonsEnabled }` |

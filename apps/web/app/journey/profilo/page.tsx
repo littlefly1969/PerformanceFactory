@@ -12,7 +12,8 @@ import { AccountScreen, PillLink } from "../_account/account-shell";
 import { AssessmentLessonCard, FreeLessonCard } from "../_account/lesson-card";
 import { ProfileSpider } from "../_account/spiders";
 import {
-  isClosed,
+  closedUnconsolidated,
+  isConsolidated,
   microTestOpen,
   useAccountJourney,
 } from "../_account/calibration-state";
@@ -84,7 +85,9 @@ export default function ProfilePage() {
   const offered =
     !!lesson.data?.enabled && (lesson.data.clubs?.length ?? 0) > 0;
   const calibration = j?.calibration ?? null;
-  const closed = isClosed(calibration);
+  // R consolidata anche a calibrazione aperta: si può continuare a rispondere.
+  const closed = isConsolidated(calibration);
+  const expiredWeak = closedUnconsolidated(calibration);
   const rule = calibration?.consolidationRule.minOverallConfidence ?? null;
   const global = profile.data?.global ?? null;
   const axes = evaluation
@@ -164,11 +167,19 @@ export default function ProfilePage() {
               <small>Confidenza complessiva {percent(global.confidence)}</small>
             </div>
           </div>
-          <p>
-            {closed
-              ? "La stima è consolidata: le tue risposte bastano per un valore affidabile."
-              : "La stima si basa su dati ancora parziali. L’intervallo si stringe man mano che completi le aree."}
-          </p>
+          {expiredWeak ? (
+            <p className="pf-acc-warning" role="status">
+              <strong>Attenzione: stima poco affidabile.</strong> La fase
+              gratuita è scaduta prima che ti conoscessimo abbastanza: R e i
+              tuoi scenari partono da dati ancora parziali.
+            </p>
+          ) : (
+            <p>
+              {closed
+                ? "La stima è consolidata: le tue risposte bastano per un valore affidabile."
+                : "La stima si basa su dati ancora parziali. L’intervallo si stringe man mano che completi le aree."}
+            </p>
+          )}
           <p className="pf-acc-muted">
             R non è la media dei sei punteggi: ogni area pesa per quanto la
             conosciamo. P3, P6 e P12 si mostrano quando la calibrazione è

@@ -27,18 +27,26 @@ import { reevaluateForRanking } from '../fit-ranking/ranking-reevaluation';
 import {
   CalibrationStatus,
   dayOf,
+  deadlineReached,
   isCalibrationClosed,
   focusDrivers,
   statusAfterEvaluation,
 } from './calibration-rules';
 import { loadActivePolicy } from './confidence-policy';
-import { lessonGate, settleCalibration } from './lesson-gate';
+import { lessonGate } from './lesson-gate';
+import {
+  closingView,
+  lockOpenCalibration,
+  expireCalibration,
+  finishCalibration,
+  latestRule,
+  publicRound,
+} from './calibration-closing';
 import {
   generateMicroTest,
   microTestQuestions,
   microTestBalance,
   microTestsByArea,
-  publicMicroTest,
   roundEvidence,
   skipMicroTest,
   validRoundAnswers,
@@ -55,9 +63,12 @@ class RoundNotOwned extends Error {}
 
 /**
  * Calibrazione gratuita dopo la prima valutazione: round di domande scritte
- * dall'AI sui driver meno affidabili, nuova valutazione a ogni round, chiusura
- * solo quando la regola di consolidamento è soddisfatta. Nessuna attesa fra i
- * round (PF-FS-PREPAYWALL §4.3): resta solo il lease tecnico per atleta.
+ * dall'AI sui driver meno affidabili, nuova valutazione a ogni round. R si
+ * consolida con la regola di consolidamento, ma si può continuare anche dopo:
+ * la calibrazione si chiude con la lezione svolta e R consolidata, quando
+ * l'atleta con R consolidata sceglie gli scenari, oppure alla scadenza.
+ * Nessuna attesa fra i round (PF-FS-PREPAYWALL §4.3): resta solo il lease
+ * tecnico per atleta.
  */
 @Injectable()
 export class CalibrationService {
@@ -133,14 +144,31 @@ export class CalibrationService {
   }
 
   /**
-   * Stato mostrato all'atleta: round aperto senza punteggi. Il giorno della
-   * fase gratuita è solo informativo: la scadenza non chiude R.
+   * Chiude la calibrazione alla scadenza della fase gratuita, anche con R non
+   * consolidata o la lezione ancora da fare: i round aperti scadono. Restituisce
+   * la calibrazione aggiornata.
+   */
+  async expireIfDue(userId: string, now = new Date()) {
+    const calibration = await this.ensureStarted(userId);
+    if (
+      !calibration ||
+      isCalibrationClosed(calibration.status) ||
+      !deadlineReached(calibration.deadlineAt, now)
+    )
+      return calibration;
+    await expireCalibration(this.prisma, userId, now);
+    return this.prisma.athleteCalibration.findUnique({ where: { userId } });
+  }
+
+  /**
+   * Stato mostrato all'atleta: round aperto senza punteggi, R consolidata o
+   * no, se può già andare agli scenari e quanti giorni mancano alla scadenza.
    */
   async view(userId: string, now = new Date()) {
-    const calibration = await this.ensureStarted(userId);
+    const calibration = await this.expireIfDue(userId, now);
     if (!calibration) return null;
-    const [policy, open, evaluations] = await Promise.all([
-      loadActivePolicy(this.prisma, 'R_CONSOLIDATION'),
+    const [rule, open, evaluations] = await Promise.all([
+      latestRule(this.prisma, userId),
       this.prisma.calibrationRound.findFirst({
         where: { userId, status: { in: ['OPEN', 'EVALUATING'] } },
         orderBy: { sequence: 'desc' },
@@ -149,11 +177,13 @@ export class CalibrationService {
         where: { userId, status: 'EVALUATED' },
       }),
     ]);
+    const { policy } = rule;
     const completed = isCalibrationClosed(calibration.status);
     return {
       status: calibration.status as CalibrationStatus,
       startedAt: calibration.startedAt,
       day: dayOf(calibration.startedAt, now),
+      ...(await closingView(this.prisma, userId, calibration, rule, open, now)),
       consolidationRule: {
         version: policy.version,
         minOverallConfidence: policy.minOverallConfidence,
@@ -163,39 +193,15 @@ export class CalibrationService {
       completedAt: calibration.completedAt,
       completionReason: calibration.completionReason,
       roundsCompleted: evaluations,
-      // Il prossimo round è sempre disponibile finché R non è consolidata.
+      // Il prossimo round è sempre disponibile finché la calibrazione è aperta.
       nextRoundKind: completed ? null : ('ADAPTIVE' as const),
-      round: open
-        ? {
-            id: open.id,
-            kind: open.kind,
-            // Una domanda, un gruppo o un chiarimento: il motivo resta interno.
-            action: open.action,
-            status: open.status,
-            // Lo score delle opzioni resta sul server: l'atleta vede solo le etichette.
-            questions: (open.questionsJson as CalibrationQuestion[]).map(
-              (q) => ({
-                id: q.id,
-                areaId: q.areaId,
-                text: q.text,
-                multiple: q.multiple ?? false,
-                options: q.options.map(({ value, label, exclusive }) => ({
-                  value,
-                  label,
-                  ...(exclusive ? { exclusive } : {}),
-                })),
-                ...publicMicroTest(q, open.answersJson),
-              }),
-            ),
-            answers: open.answersJson as Answers,
-          }
-        : null,
+      round: open ? publicRound(open) : null,
     };
   }
 
   /** Apre il prossimo round: domande AI sui driver sotto soglia. */
   async openRound(userId: string, now = new Date()) {
-    const calibration = await this.ensureStarted(userId);
+    const calibration = await this.expireIfDue(userId, now);
     if (!calibration)
       throw new ConflictException('Completa prima la valutazione iniziale');
     if (isCalibrationClosed(calibration.status))
@@ -230,30 +236,6 @@ export class CalibrationService {
         { overallConfidence: latest.overallConfidence, drivers },
         policy,
       );
-      // La valutazione corrente soddisfa la regola in vigore (per esempio
-      // abbassata dal back office): si consolida senza nuove domande.
-      if (!focus.length) {
-        const { gate, completed } = await this.prisma.$transaction(
-          async (tx) => {
-            await lockCalibration(tx, userId);
-            return settleCalibration(tx, userId, now);
-          },
-        );
-        if (completed) return;
-        if (gate.pending)
-          throw new ConflictException({
-            code: 'CALIBRATION_WAITING_LESSON',
-            message:
-              'La tua R si chiude dopo la lezione con il coach del circolo.',
-          });
-        if (gate.available)
-          throw new ConflictException({
-            code: 'CALIBRATION_LESSON_CHOICE',
-            message:
-              'La tua R si chiude con la lezione gratuita al circolo: richiedila, oppure dicci che preferisci non farla.',
-          });
-        return;
-      }
       const asked = await this.askedQuestions(userId, rounds);
       const microTests = microTestsByArea(rounds);
       const { questionsPerMicroTest } = await loadCalibrationSettings(
@@ -292,6 +274,8 @@ export class CalibrationService {
           ? await generateMicroTest(this.prisma, this.ai, userId, input, result)
           : null;
       await this.prisma.$transaction(async (tx) => {
+        // Chiusa (per esempio dalla scadenza) mentre l'AI lavorava: niente round.
+        if (!(await lockOpenCalibration(tx, userId, new Date()))) return;
         const questions = test
           ? await microTestQuestions(tx, userId, test)
           : result.questions;
@@ -332,6 +316,24 @@ export class CalibrationService {
   }
 
   /**
+   * L'atleta con R consolidata sceglie di vedere gli scenari: la calibrazione
+   * si chiude. Non con una lezione in attesa o ancora da richiedere o
+   * rifiutare, né con un round in corso. Idempotente.
+   */
+  async finish(userId: string, now = new Date()) {
+    const calibration = await this.expireIfDue(userId, now);
+    if (!calibration)
+      throw new ConflictException('Completa prima la valutazione iniziale');
+    if (isCalibrationClosed(calibration.status)) return;
+    const lease = await this.claim(userId);
+    try {
+      await finishCalibration(this.prisma, userId, now);
+    } finally {
+      await this.release(userId, lease);
+    }
+  }
+
+  /**
    * Salva le risposte del round e rivaluta R e confidence di tutti i driver.
    * Le risposte si fissano una sola volta, nel passaggio OPEN → EVALUATING; chi
    * riprende un round già in valutazione (lease scaduto) valuta quelle salvate.
@@ -342,6 +344,7 @@ export class CalibrationService {
     answers: Answers,
     now = new Date(),
   ) {
+    await this.expireIfDue(userId, now);
     const round = await this.prisma.calibrationRound.findFirst({
       where: { id: roundId, userId },
     });

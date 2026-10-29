@@ -117,6 +117,14 @@ export class AthleteJourneyController {
     return this.journey.calibrationRound(req.user.id);
   }
   @ApiOperation({
+    summary:
+      'Chiude la calibrazione con R consolidata e porta agli scenari, se nessuna lezione è in attesa',
+  })
+  @Post('calibration/finish')
+  calibrationFinish(@Req() req: { user: { id: string } }) {
+    return this.journey.calibrationFinish(req.user.id);
+  }
+  @ApiOperation({
     summary: 'Risponde al round di calibrazione e aggiorna R e confidence',
   })
   @Post('calibration/answers')

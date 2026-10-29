@@ -51,9 +51,9 @@ export async function lockCalibration(
 
 /**
  * La lezione è in attesa finché il posto è richiesto o assegnato, o il
- * feedback del coach non è ancora entrato in una valutazione: in quel tempo R
- * non si consolida e il paywall resta chiuso, perché è la lezione a chiudere
- * R e P con affidabilità (A4.8, «R_NOT_FINAL»).
+ * feedback del coach non è ancora entrato in una valutazione: in quel tempo la
+ * calibrazione resta aperta (si può continuare a rispondere) e il paywall
+ * resta chiuso, perché è la lezione a chiudere R e P (A4.8, «R_NOT_FINAL»).
  */
 export async function isLessonPending(db: Db, userId: string) {
   const [seats, unevaluated] = await Promise.all([
@@ -63,6 +63,18 @@ export async function isLessonPending(db: Db, userId: string) {
     db.coachLessonFeedback.count({ where: { userId, evaluationId: null } }),
   ]);
   return seats + unevaluated > 0;
+}
+
+/**
+ * La lezione è svolta quando il feedback del coach è entrato in una
+ * valutazione: da lì, con R consolidata, la calibrazione si chiude.
+ */
+export async function isLessonDone(db: Db, userId: string) {
+  return (
+    (await db.coachLessonFeedback.count({
+      where: { userId, evaluationId: { not: null } },
+    })) > 0
+  );
 }
 
 /**

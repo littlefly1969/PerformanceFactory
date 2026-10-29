@@ -7,6 +7,14 @@ import type { Calibration, Journey } from "../journey-types";
 export const isClosed = (c: Calibration | null | undefined) =>
   c?.status === "CALIBRATION_COMPLETED" || c?.status === "PAYWALL_READY";
 
+/** R consolidata: regola soddisfatta, a calibrazione aperta o chiusa. */
+export const isConsolidated = (c: Calibration | null | undefined) =>
+  !!c?.ruleMet || (isClosed(c) && c?.completionReason !== "DEADLINE_REACHED");
+
+/** Chiusa dalla scadenza senza R consolidata: la stima resta poco affidabile. */
+export const closedUnconsolidated = (c: Calibration | null | undefined) =>
+  isClosed(c) && c?.completionReason === "DEADLINE_REACHED" && !c.ruleMet;
+
 /** C'è un micro-test proposto dall'AI che aspetta l'atleta. */
 export const microTestOpen = (c: Calibration | null | undefined) =>
   c?.round?.action === "PROPOSE_MICRO_TEST" && c.round.status === "OPEN";

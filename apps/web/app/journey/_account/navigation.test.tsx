@@ -237,7 +237,7 @@ describe("Risultato del micro-test", () => {
       "a lesson waiting for validation",
       calibration(null, "FREE_LESSON_VALIDATION"),
       { ...lesson, phase: "REQUESTED" },
-      false,
+      true,
     ],
   ])(
     "leads back to the summary from a direct link, with %s",
@@ -446,13 +446,30 @@ describe("Prossimo passo uguale in Home e profilo", () => {
       "lesson requested",
       calibration(null, "FREE_LESSON_VALIDATION"),
       { ...lesson, phase: "REQUESTED" },
-      "/journey/circolo",
+      "/journey/calibrazione",
     ],
     [
-      "lesson confirmed",
-      calibration(null, "FREE_LESSON_VALIDATION"),
+      "lesson confirmed and R consolidated",
+      calibration(null, "FREE_LESSON_VALIDATION", { ruleMet: true }),
       { ...lesson, phase: "ASSIGNED" },
-      "/journey/circolo",
+      "/journey/calibrazione",
+    ],
+    [
+      "R consolidated without a lesson",
+      calibration(null, "FREE_LEVEL_ESTIMATED", {
+        ruleMet: true,
+        canFinish: true,
+      }),
+      { ...lesson, phase: "DECLINED" },
+      "/journey/calibrazione",
+    ],
+    [
+      "calibration closed by the deadline",
+      calibration(null, "CALIBRATION_COMPLETED", {
+        completionReason: "DEADLINE_REACHED",
+      }),
+      { ...lesson, phase: "CLOSED" },
+      "/journey/scenari",
     ],
     [
       "lesson locked",
