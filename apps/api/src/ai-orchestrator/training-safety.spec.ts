@@ -82,6 +82,36 @@ describe('training safety', () => {
     ).toBe('sprint');
   });
 
+  it('checks unit, deadline and area of objectives as shown on the card', () => {
+    const objective = {
+      area: 'Velocità',
+      title: 'Partenze più rapide',
+      unit: null,
+      target: 10,
+      targetLabel: null,
+      deadline: 'Entro fine blocco',
+      source: 'CHECKIN',
+    };
+    const withObjective = (o: Record<string, unknown>) => ({
+      ...proposal('Lavoro tecnico.'),
+      objectives: [{ ...objective, ...o }],
+    });
+    expect(unsafeTrainingTerm(withObjective({}), ['sprint'])).toBeNull();
+    expect(
+      unsafeTrainingTerm(withObjective({ unit: 'sprint' }), ['sprint']),
+    ).toBe('sprint');
+    expect(
+      unsafeTrainingTerm(withObjective({ deadline: 'Dopo dieci sprint' }), [
+        'sprint',
+      ]),
+    ).toBe('sprint');
+    expect(
+      unsafeTrainingTerm(withObjective({ area: 'Sprint' }), ['sprint']),
+    ).toBe('sprint');
+    // L'enum della fonte non è testo dell'AI.
+    expect(unsafeTrainingTerm(withObjective({}), ['checkin'])).toBeNull();
+  });
+
   it('makes a single call and no check when the list is empty', async () => {
     const generate = mockGenerate().mockResolvedValue(
       proposal('Sprint finali.'),
