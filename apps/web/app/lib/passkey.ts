@@ -31,8 +31,31 @@ export const supportsPasskeys = () =>
 export const supportsPasskeyAutofill = async () =>
   supportsPasskeys() && (await browserSupportsWebAuthnAutofill());
 
+/**
+ * Il server tiene un solo challenge per sessione e la libreria una sola
+ * richiesta WebAuthn: vale sempre l'ultimo tentativo. Le richieste di opzioni
+ * vanno una alla volta, e un tentativo superato non apre più Face ID.
+ */
+let latestAttempt = 0;
+let optionsInFlight: Promise<unknown> = Promise.resolve();
+
 /** Interrompe una richiesta passkey ancora aperta, ad esempio l'autofill. */
-export const cancelPasskeyRequest = () => WebAuthnAbortService.cancelCeremony();
+export const cancelPasskeyRequest = () => {
+  latestAttempt += 1;
+  WebAuthnAbortService.cancelCeremony();
+};
+
+async function loginOptions() {
+  const previous = optionsInFlight;
+  let release = () => {};
+  optionsInFlight = new Promise<void>((resolve) => (release = resolve));
+  await previous.catch(() => undefined);
+  try {
+    return await postJson('/auth/passkeys/login/options');
+  } finally {
+    release();
+  }
+}
 
 async function errorMessage(response: Response, fallback: string) {
   try {
@@ -68,7 +91,8 @@ async function postJson(path: string, body?: unknown) {
 export async function loginWithPasskey(
   autofill = false,
 ): Promise<PasskeyLoginResult> {
-  const optionsResponse = await postJson('/auth/passkeys/login/options');
+  const attempt = ++latestAttempt;
+  const optionsResponse = await loginOptions();
   if (!optionsResponse.ok) {
     throw new Error(
       await errorMessage(
@@ -77,10 +101,14 @@ export async function loginWithPasskey(
       ),
     );
   }
+  const optionsJSON = await optionsResponse.json();
+  // Un click arrivato nel frattempo ha la precedenza: niente startAuthentication
+  // che annullerebbe il suo Face ID.
+  if (attempt !== latestAttempt) throw new PasskeyCancelled();
   let response;
   try {
     response = await startAuthentication({
-      optionsJSON: await optionsResponse.json(),
+      optionsJSON,
       useBrowserAutofill: autofill,
     });
   } catch (error) {
