@@ -11,9 +11,10 @@ Requisiti di partenza: [specifica](proposte/gestione-account-personale.md).
 | Foto | `/account/foto` | La schermata foto del benvenuto, con la freccia indietro al posto dell'avanzamento. |
 | Tessera e classifiche FIT | `/account/fit` | Lo stesso editor FIT del profilo, invariato. |
 | Indirizzo | `/account/indirizzo` | Unico editor dell'indirizzo, con la ricerca assistita. |
+| Face ID e impronta | `/account/accesso` | Attiva una passkey sul dispositivo in uso, elenca ed elimina quelle esistenti. |
 | Abbonamento | `/account/abbonamento` | Dati reali del contratto, disdetta e revoca quando consentite. |
 
-`/account` elenca le quattro voci. Il menu compare nelle home gratuite
+`/account` elenca le cinque voci. Il menu compare nelle home gratuite
 (prima e dopo l'assessment), nel profilo sportivo `/journey/profilo`, nella
 home abbonato `/user` e nell'intestazione delle pagine `/user/*`; contiene
 anche «Esci». È un pulsante con `aria-expanded`: si apre con tastiera o touch,

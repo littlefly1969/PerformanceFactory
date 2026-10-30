@@ -31,3 +31,11 @@
 .pf-account-sub .pf-acc-pill + .pf-acc-pill {
   margin-top: 10px;
 }
+/* Elimina accanto alla data della passkey, non sotto. */
+.pf-account-sub .pf-passkey-remove {
+  display: inline;
+  margin: 0 0 0 8px;
+  padding: 0;
+  text-decoration: underline;
+  cursor: pointer;
+}

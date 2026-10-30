@@ -103,6 +103,7 @@ model User {
   consents             Consent[]
   consentDocuments     ConsentDocument[]
   authIdentities       AuthIdentity[]
+  passkeys             Passkey[]
   assignments          UserAssignment[]
   currentStates        CurrentState[]
   kpiDaily             KpiDaily[]
@@ -2132,4 +2133,28 @@ model CoachLessonFeedback {
 
   @@unique([lessonId, userId, areaId])
   @@index([userId, evaluationId])
+}
+
+/// Passkey WebAuthn (Face ID, impronta, chiave di sicurezza) per accedere senza password.
+/// Il server conserva solo la chiave pubblica: il segreto resta sul dispositivo.
+model Passkey {
+  id           String    @id @default(uuid())
+  userId       String
+  /// ID della credenziale in base64url, come lo restituisce il browser.
+  credentialId String    @unique
+  publicKey    Bytes
+  /// Contatore delle firme: se torna indietro la credenziale potrebbe essere clonata.
+  counter      BigInt    @default(0)
+  transports   String[]
+  /// singleDevice oppure multiDevice (passkey sincronizzata in iCloud o Google).
+  deviceType   String
+  backedUp     Boolean   @default(false)
+  /// Nome mostrato in Account, ricavato dal dispositivo alla registrazione.
+  name         String
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

@@ -1,8 +1,9 @@
-/** Le quattro destinazioni canoniche dell'account, nell'ordine del menu. */
+/** Le destinazioni canoniche dell'account, nell'ordine del menu. */
 export const ACCOUNT_LINKS = [
   { href: "/account/foto", label: "Foto" },
   { href: "/account/fit", label: "Tessera e classifiche FIT" },
   { href: "/account/indirizzo", label: "Indirizzo" },
+  { href: "/account/accesso", label: "Face ID e impronta" },
   { href: "/account/abbonamento", label: "Abbonamento" },
 ] as const;
 
