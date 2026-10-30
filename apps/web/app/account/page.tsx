@@ -9,7 +9,7 @@ import { useAccountGate, useAccountReturn } from "./account-gate";
 import { ACCOUNT_LINKS } from "./account-links";
 import "./account.css";
 
-/** Il tuo account: le quattro destinazioni del menu avatar in una pagina. */
+/** Il tuo account: le destinazioni del menu avatar in una pagina. */
 export default function AccountPage() {
   const home = useAccountGate();
   const back = useAccountReturn(home);

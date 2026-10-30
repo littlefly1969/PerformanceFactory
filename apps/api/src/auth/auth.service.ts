@@ -34,6 +34,13 @@ type LogoutCarrier = {
   raw?: { session?: LogoutSession };
 };
 
+/** Perché un account disattivato non può accedere, con password o passkey. */
+export function inactiveAccountMessage(onboardingStatus?: string | null) {
+  return onboardingStatus === 'REJECTED'
+    ? 'Candidatura rifiutata. Puoi riproporre una nuova richiesta di registrazione.'
+    : 'Account in attesa di attivazione amministratore';
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -52,13 +59,8 @@ export class AuthService {
       throw new UnauthorizedException('Credenziali non valide');
     }
     if (user.isActive === false) {
-      if (user.onboardingAssessment?.status === 'REJECTED') {
-        throw new UnauthorizedException(
-          'Candidatura rifiutata. Puoi riproporre una nuova richiesta di registrazione.',
-        );
-      }
       throw new UnauthorizedException(
-        'Account in attesa di attivazione amministratore',
+        inactiveAccountMessage(user.onboardingAssessment?.status),
       );
     }
 

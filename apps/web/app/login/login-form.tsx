@@ -5,6 +5,14 @@ import { useEffect, useState } from "react";
 import "./login.css";
 import { API_BASE, secureFetch, storeAccessToken } from "@/app/lib/api";
 import { clearAttribution } from "@/app/lib/attribution";
+import {
+  PasskeyCancelled,
+  cancelPasskeyRequest,
+  loginWithPasskey,
+  supportsPasskeyAutofill,
+  supportsPasskeys,
+  type PasskeyLoginResult,
+} from "@/app/lib/passkey";
 
 const pendingAdminActivationMessage =
   "L'amministratore sta valutando la tua richiesta e ti accettera.";
@@ -34,11 +42,40 @@ function GoogleIcon() {
   );
 }
 
+function PasskeyIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24">
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.6"
+        d="M7 3H5a2 2 0 0 0-2 2v2m14-4h2a2 2 0 0 1 2 2v2M7 21H5a2 2 0 0 1-2-2v-2m14 4h2a2 2 0 0 0 2-2v-2M9 9v1m6-1v1m-3-1v4h-1m-2 3a4 4 0 0 0 6 0"
+      />
+    </svg>
+  );
+}
+
+/** Dopo un accesso riuscito, con password o passkey: si entra nell'app. */
+function enterApp(user: PasskeyLoginResult) {
+  storeAccessToken(user.accessToken);
+  // Chi accede non è più un visitatore anonimo: niente attribuzione residua.
+  clearAttribution();
+  window.location.href = "/";
+}
+
+function passkeyError(error: unknown) {
+  return error instanceof Error && error.message
+    ? error.message
+    : "Accesso con passkey non riuscito.";
+}
+
 export function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [passkeys, setPasskeys] = useState(false);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -47,6 +84,34 @@ export function LoginForm() {
       setMessage(error);
     }
   }, []);
+
+  useEffect(() => {
+    setPasskeys(supportsPasskeys());
+    let alive = true;
+    // Dove il browser lo consente, la passkey compare già nel campo e-mail.
+    void supportsPasskeyAutofill().then((autofill) => {
+      if (!alive || !autofill) return;
+      loginWithPasskey(true).then(enterApp, (error: unknown) => {
+        if (alive && !(error instanceof PasskeyCancelled))
+          setMessage(passkeyError(error));
+      });
+    });
+    return () => {
+      alive = false;
+      cancelPasskeyRequest();
+    };
+  }, []);
+
+  const startPasskeyLogin = async () => {
+    setMessage(null);
+    setLoading(true);
+    try {
+      enterApp(await loginWithPasskey());
+    } catch (error) {
+      if (!(error instanceof PasskeyCancelled)) setMessage(passkeyError(error));
+      setLoading(false);
+    }
+  };
 
   const startGoogleLogin = () => {
     const returnTo = `${window.location.origin}/`;
@@ -92,15 +157,11 @@ export function LoginForm() {
       role?: string;
       accessToken?: string;
     };
-    storeAccessToken(user.accessToken);
-    // Chi accede non è più un visitatore anonimo: niente attribuzione residua.
-    clearAttribution();
     setMessage(
       `Accesso effettuato come ${user.email ?? "utente"} (${user.role ?? "ruolo"})`,
     );
     setLoading(false);
-
-    window.location.href = "/";
+    enterApp(user);
   };
 
   return (
@@ -119,7 +180,7 @@ export function LoginForm() {
             <span>E-mail</span>
             <input
               type="email"
-              autoComplete="username"
+              autoComplete="username webauthn"
               placeholder="mario@email.com"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
@@ -146,6 +207,17 @@ export function LoginForm() {
             <GoogleIcon />
             <span>Accedi con Google</span>
           </button>
+          {passkeys && (
+            <button
+              className="pf-login-google"
+              type="button"
+              onClick={() => void startPasskeyLogin()}
+              disabled={loading}
+            >
+              <PasskeyIcon />
+              <span>Accedi con Face ID o impronta</span>
+            </button>
+          )}
           {message && (
             <p className="pf-login-message" role="alert">
               {message}

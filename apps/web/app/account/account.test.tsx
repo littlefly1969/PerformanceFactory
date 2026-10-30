@@ -67,13 +67,14 @@ describe("Accesso all'account", () => {
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/journey"));
   });
 
-  it("lists the four destinations and goes back to the subscriber home", async () => {
+  it("lists the account destinations and goes back to the subscriber home", async () => {
     serve({ "/auth/journey": { phase: "COMPLETE" } });
     render(<AccountPage />);
     for (const [name, href] of [
       ["Foto", "/account/foto?da=account"],
       ["Tessera e classifiche FIT", "/account/fit?da=account"],
       ["Indirizzo", "/account/indirizzo?da=account"],
+      ["Face ID e impronta", "/account/accesso?da=account"],
       ["Abbonamento", "/account/abbonamento?da=account"],
     ])
       expect(

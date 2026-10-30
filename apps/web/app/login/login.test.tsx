@@ -12,10 +12,20 @@ vi.mock("../lib/api", () => ({
   secureFetch: vi.fn(),
   storeAccessToken: vi.fn(),
 }));
+const passkey = vi.hoisted(() => ({
+  PasskeyCancelled: class PasskeyCancelled extends Error {},
+  cancelPasskeyRequest: vi.fn(),
+  loginWithPasskey: vi.fn(),
+  supportsPasskeyAutofill: vi.fn(async () => false),
+  supportsPasskeys: vi.fn(() => false),
+}));
+vi.mock("../lib/passkey", () => passkey);
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   vi.unstubAllGlobals();
+  passkey.supportsPasskeys.mockReturnValue(false);
+  passkey.supportsPasskeyAutofill.mockResolvedValue(false);
 });
 it("offers credentials, Google login and the quiz without saved accounts", () => {
   render(<LoginPage />);
@@ -83,4 +93,71 @@ it("starts Google login with a return to the application router", async () => {
   expect(target.pathname).toBe("/api/auth/google/login");
   expect(target.searchParams.get("returnTo")).toBe("https://performance.example/");
   expect(secureFetch).not.toHaveBeenCalled();
+});
+
+const stubLocation = () => {
+  const location = { href: "", origin: "https://performance.example", search: "" };
+  vi.stubGlobal("window", new Proxy(window, {
+    get: (target, key) => key === "location" ? location : Reflect.get(target, key),
+  }));
+  return location;
+};
+
+it("hides the passkey button where the browser has no passkeys", () => {
+  render(<LoginPage />);
+  expect(
+    screen.queryByRole("button", { name: "Accedi con Face ID o impronta" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText("E-mail")).toHaveAttribute(
+    "autocomplete",
+    "username webauthn",
+  );
+});
+
+it("enters the app with Face ID or fingerprint", async () => {
+  passkey.supportsPasskeys.mockReturnValue(true);
+  passkey.loginWithPasskey.mockResolvedValue({ accessToken: "tok" });
+  const location = stubLocation();
+  render(<LoginPage />);
+  await userEvent.click(
+    screen.getByRole("button", { name: "Accedi con Face ID o impronta" }),
+  );
+  await waitFor(() => expect(location.href).toBe("/"));
+  expect(passkey.loginWithPasskey).toHaveBeenCalledWith();
+  expect(storeAccessToken).toHaveBeenCalledWith("tok");
+  expect(secureFetch).not.toHaveBeenCalled();
+});
+
+it("stays quiet when the user closes Face ID and explains real failures", async () => {
+  passkey.supportsPasskeys.mockReturnValue(true);
+  passkey.loginWithPasskey.mockRejectedValueOnce(new passkey.PasskeyCancelled());
+  render(<LoginPage />);
+  const button = screen.getByRole("button", {
+    name: "Accedi con Face ID o impronta",
+  });
+  await userEvent.click(button);
+  await waitFor(() => expect(button).toBeEnabled());
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+  passkey.loginWithPasskey.mockRejectedValueOnce(
+    new Error("Passkey non riconosciuta: accedi con e-mail e password."),
+  );
+  await userEvent.click(button);
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Passkey non riconosciuta",
+  );
+  expect(storeAccessToken).not.toHaveBeenCalled();
+});
+
+it("offers the saved passkey from the e-mail field when autofill is available", async () => {
+  passkey.supportsPasskeys.mockReturnValue(true);
+  passkey.supportsPasskeyAutofill.mockResolvedValue(true);
+  passkey.loginWithPasskey.mockResolvedValue({ accessToken: "auto" });
+  const location = stubLocation();
+  const { unmount } = render(<LoginPage />);
+  await waitFor(() => expect(location.href).toBe("/"));
+  expect(passkey.loginWithPasskey).toHaveBeenCalledWith(true);
+  expect(storeAccessToken).toHaveBeenCalledWith("auto");
+  unmount();
+  expect(passkey.cancelPasskeyRequest).toHaveBeenCalled();
 });

@@ -7,7 +7,8 @@ Le operazioni protette accettano due credenziali alternative:
 - cookie di sessione HTTP-only, predefinito `pf.sid`;
 - header `Authorization: Bearer <token>`.
 
-Il cookie viene creato da `POST /api/auth/login` oppure dal flusso Google OIDC.
+Il cookie viene creato da `POST /api/auth/login`, dal flusso Google OIDC oppure
+da una passkey (`POST /api/auth/passkeys/login/verify`).
 Le sessioni usano Redis quando `REDIS_URL` e configurato. In produzione Redis e
 obbligatorio; il fallback in memoria e limitato allo sviluppo.
 
@@ -62,3 +63,31 @@ Google e usato esclusivamente come identity provider. Il callback applicativo
 crea o ripristina la sessione PerformanceFactory e poi reindirizza al frontend.
 Per dettagli su state, pending registration e configurazione vedere
 [Google OIDC](../../apps/api/docs/google-oidc.md).
+
+## Passkey (Face ID, impronta)
+
+Le passkey WebAuthn sono un accesso in più: password e Google restano validi.
+Il server conserva solo la chiave pubblica (tabella `Passkey`); il dato
+biometrico e la chiave privata restano sul dispositivo, sincronizzati da
+iCloud o Google Password Manager.
+
+| Endpoint | Accesso | Uso |
+| --- | --- | --- |
+| `GET /api/auth/passkeys` | autenticato | Elenco delle passkey dell'utente |
+| `POST /api/auth/passkeys/register/options` | autenticato | Challenge per crearne una |
+| `POST /api/auth/passkeys/register/verify` | autenticato | Verifica e salva la passkey |
+| `DELETE /api/auth/passkeys/:id` | autenticato | Elimina una passkey propria |
+| `POST /api/auth/passkeys/login/options` | pubblico, 20/min | Challenge per l'accesso |
+| `POST /api/auth/passkeys/login/verify` | pubblico, 20/min | Verifica, rigenera la sessione e risponde come il login |
+
+- Il dominio (`rpID`) e gli origin ammessi derivano da `WEB_ORIGIN`: le passkey
+  valgono solo su quel dominio. In sviluppo serve `localhost`: WebAuthn non
+  accetta indirizzi IP come `127.0.0.1`. Per un
+  dominio padre diverso si può impostare `WEBAUTHN_RP_ID`.
+- Il challenge vive nella sessione per 5 minuti e si consuma al primo uso.
+- Si richiede sempre la verifica dell'utente (Face ID, impronta o PIN).
+- L'accesso con passkey applica gli stessi blocchi del login per account non
+  attivi o candidature rifiutate.
+- Nella web app installata su iOS la richiesta parte solo da un tocco: il
+  login mostra il pulsante «Accedi con Face ID o impronta» e, dove il browser
+  lo supporta, propone la passkey già dal campo e-mail.
