@@ -424,9 +424,14 @@ describe("PF5 assessment intro and questions", () => {
       }),
     ).toBeInTheDocument();
     expect(requests.filter((url) => url.endsWith("/evaluate"))).toHaveLength(1);
+    // Come nella demo PF10: si prosegue con la calibrazione.
     expect(
-      screen.getByRole("link", { name: /Vai al tuo profilo/ }),
-    ).toHaveAttribute("href", "/journey/profilo");
+      screen.getByRole("link", { name: /Continua la calibrazione/ }),
+    ).toHaveAttribute("href", "/journey/calibrazione");
+    expect(screen.getByRole("meter", { name: "Calibrazione" })).toHaveAttribute(
+      "aria-valuenow",
+      "30",
+    );
     expect(requests.some((url) => url.endsWith("/submit"))).toBe(false);
   });
 

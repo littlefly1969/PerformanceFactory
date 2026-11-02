@@ -100,16 +100,19 @@ export function AccountScreen({
   footer,
   nav,
   coachDot,
+  tone = "light",
 }: {
   children: ReactNode;
   top?: ReactNode;
   footer?: ReactNode;
   nav?: AccountTab;
   coachDot?: boolean;
+  /** Scura per i momenti di passaggio, come l'esito dell'assessment nella demo. */
+  tone?: "light" | "dark";
 }) {
   return (
     <main
-      className={`pf-acc${nav ? " has-nav" : ""}${footer ? " has-footer" : ""}`}
+      className={`pf-acc${nav ? " has-nav" : ""}${footer ? " has-footer" : ""}${tone === "dark" ? " is-dark" : ""}`}
     >
       <div className="pf-acc-frame">
         {top}
