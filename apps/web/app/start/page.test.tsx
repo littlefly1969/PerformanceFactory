@@ -362,8 +362,8 @@ describe("PF5 pre-account experience", () => {
     );
     // Blueprint: nessuna carta, gratis fino alla chiusura della calibrazione.
     expect(offer).toHaveTextContent(/Senza carta/);
-    // La calibrazione si chiude sulla confidence, non a una data (#19, #28).
-    expect(offer).not.toHaveTextContent(/giorni/);
+    // Testo della demo PF10, confermato da Stefano: durata indicativa.
+    expect(offer).toHaveTextContent("al massimo circa 30 giorni");
     expect(offer).not.toHaveTextContent(/Tutto sbloccato/);
     // L'offerta e marketing: non riporta le risposte dell'atleta.
     expect(offer).not.toHaveTextContent("Aumentare la resistenza");

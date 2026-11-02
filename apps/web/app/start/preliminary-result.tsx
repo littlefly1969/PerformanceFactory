@@ -155,9 +155,7 @@ export function PreliminaryResult({
           </span>
           <p>
             Gratis finché non ti conosciamo abbastanza
-            {/* La calibrazione si chiude sulla confidence, non a una data (#19, #28):
-                niente «al massimo circa 30 giorni» della demo. */}
-            <small>Senza carta · finché la calibrazione non è sicura</small>
+            <small>Senza carta · al massimo circa 30 giorni</small>
           </p>
         </aside>
         <p className="pf4-note">
