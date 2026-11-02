@@ -2,7 +2,10 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import "../../start/pf4.css";
 import "./account.css";
+import "./account-dark.css";
 import "./account-pages.css";
+import "./account-reveal.css";
+import "./account-lesson.css";
 
 export type AccountTab = "home" | "coach" | "profile";
 

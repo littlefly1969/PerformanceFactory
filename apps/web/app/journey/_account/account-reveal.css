@@ -1,0 +1,161 @@
+/* S15 · Dove sei adesso e dove puoi arrivare (demo PF10) */
+.pf-acc-reveal-seg {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin: 8px 0 4px;
+}
+.pf-acc-reveal-seg button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--acc-muted);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.pf-acc-reveal-seg button.is-selected {
+  background: #fff;
+  box-shadow:
+    0 1px 0 #eaeae7,
+    inset 0 0 0 1px #eaeae7;
+  color: var(--acc-ink);
+}
+.pf-acc-reveal-spider {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  margin: 18px 0 10px;
+}
+.pf-acc-reveal-spider svg {
+  width: min(220px, 62vw);
+  height: auto;
+}
+.pf-acc-reveal-spider figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 18px;
+  color: var(--acc-muted);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.pf-acc-reveal-spider figcaption span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.pf-acc-reveal-spider .is-real::before {
+  content: "";
+  width: 14px;
+  border-top: 2px solid var(--acc-ink);
+}
+.pf-acc-reveal-spider .is-potential::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--acc-lime);
+}
+.pf-acc-reveal-cells {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 6px 0 16px;
+}
+.pf-acc-reveal-cells div {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 12px 4px;
+  border-radius: 14px;
+}
+.pf-acc-reveal-cells div.is-selected {
+  background: var(--acc-lime);
+}
+.pf-acc-reveal-cells dt {
+  color: var(--acc-muted);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+.pf-acc-reveal-cells .is-selected dt {
+  color: #0b0b0c99;
+}
+.pf-acc-reveal-cells dd {
+  margin: 0;
+  font-family: "PF4 Space Grotesk", "PF4 Public Sans", sans-serif;
+  font-size: 22px;
+  font-weight: 300;
+}
+
+/* S19 · Pagamento riuscito (demo PF10) e attesa della conferma */
+.pf-acc-paid {
+  display: grid;
+  gap: 4px;
+  padding-top: 24px;
+}
+.pf-acc-paid-bar {
+  width: 40px;
+  height: 3px;
+  margin-bottom: 18px;
+  border-radius: 2px;
+  background: var(--acc-lime);
+}
+.pf-acc-paid h1:focus {
+  outline: none;
+}
+.pf-acc-paid-rows {
+  display: grid;
+  margin: 18px 0 12px;
+}
+.pf-acc-paid-rows div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--acc-line);
+}
+.pf-acc-paid-rows dt {
+  color: var(--acc-muted);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.pf-acc-paid-rows dd {
+  margin: 0;
+  font-size: 15px;
+  text-align: right;
+}
+.pf-acc-paid-wait {
+  display: block;
+  height: 3px;
+  margin-top: 24px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--acc-line);
+}
+.pf-acc-paid-wait::after {
+  content: "";
+  display: block;
+  width: 40%;
+  height: 100%;
+  background: var(--acc-lime);
+  animation: pf-acc-wait 1.4s ease-in-out infinite alternate;
+}
+@keyframes pf-acc-wait {
+  from {
+    transform: translateX(-10%);
+  }
+  to {
+    transform: translateX(160%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-acc-paid-wait::after {
+    animation: none;
+    width: 100%;
+  }
+}

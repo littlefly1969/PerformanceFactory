@@ -1,0 +1,129 @@
+/* Tono scuro: esito dell'assessment come nella demo PF10. */
+.pf-acc.is-dark {
+  --acc-line: #ffffff1f;
+  background: var(--acc-ink);
+  color: #fff;
+}
+.pf-acc.is-dark p {
+  color: #ffffffb8;
+}
+.pf-acc.is-dark .pf-acc-kicker {
+  color: #ffffff99;
+}
+.pf-acc.is-dark .pf-acc-title {
+  color: #fff;
+}
+.pf-acc.is-dark .pf-acc-footer {
+  border-top-color: transparent;
+  background: #0b0b0cf2;
+}
+.pf-acc.is-dark .pf-acc-link {
+  color: #ffffffb8;
+}
+.pf-acc.is-dark a:focus-visible,
+.pf-acc.is-dark button:focus-visible {
+  outline-color: var(--acc-lime);
+}
+.pf-acc.is-dark .pf-acc-mini-ring {
+  fill: #ffffff05;
+  stroke: #ffffff26;
+}
+.pf-acc.is-dark .pf-acc-mini-real.is-provisional {
+  fill: #c8f02e1f;
+  stroke: var(--acc-lime);
+}
+.pf-acc.is-dark .pf-acc-badge {
+  background: #ffffff14;
+  color: #ffffffcc;
+}
+.pf-acc-ready-meter {
+  position: relative;
+  margin: 8px 0 34px;
+}
+.pf-acc-ready-value {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0 12px;
+}
+.pf-acc-ready-value strong {
+  font-family: "PF4 Space Grotesk", "PF4 Public Sans", sans-serif;
+  font-size: 52px;
+  font-weight: 300;
+  line-height: 1;
+}
+.pf-acc-ready-bar {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: #ffffff1f;
+}
+.pf-acc-ready-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--acc-lime);
+}
+.pf-acc-ready-bar b {
+  position: absolute;
+  top: -5px;
+  width: 2px;
+  height: 14px;
+  margin-left: -1px;
+  background: #fff;
+}
+.pf-acc-ready-threshold {
+  position: absolute;
+  top: calc(100% + 8px);
+  transform: translateX(-50%);
+  color: #ffffff80;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.pf-acc-calc {
+  min-height: 80dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.pf-acc-calc-hex {
+  width: min(180px, 48vw);
+  margin-bottom: 36px;
+  fill: none;
+  stroke: #ffffff1f;
+  stroke-width: 1;
+}
+.pf-acc-calc-hex .is-inner {
+  stroke-dasharray: 3 4;
+}
+.pf-acc-calc-hex .is-trace {
+  stroke: var(--acc-lime);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-dasharray: 504;
+  animation: pf-acc-hex-trace 2.4s cubic-bezier(0.32, 0.72, 0, 1) infinite;
+}
+@keyframes pf-acc-hex-trace {
+  from {
+    stroke-dashoffset: 504;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-acc-calc-hex .is-trace {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+.pf-acc-calc .pf-acc-link {
+  border: 0;
+  background: none;
+  padding: 8px 0;
+}

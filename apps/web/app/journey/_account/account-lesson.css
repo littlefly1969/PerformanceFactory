@@ -1,0 +1,220 @@
+/* Lezione gratuita su fondo scuro (demo PF10). */
+.pf-acc.is-dark .pf-acc-top {
+  border-bottom-color: transparent;
+}
+.pf-acc.is-dark .pf-acc-top a,
+.pf-acc.is-dark .pf-acc-top span {
+  color: #fff;
+}
+.pf-acc.is-dark .pf-acc-lead,
+.pf-acc.is-dark .pf-acc-muted {
+  color: #ffffffa3 !important;
+}
+.pf-acc.is-dark .pf-acc-kicker.is-lime {
+  color: var(--acc-lime);
+}
+.pf-acc.is-dark .pf-acc-card,
+.pf-acc.is-dark .pf-acc-rules {
+  border-color: #ffffff29;
+  background: #ffffff0f;
+  color: #fff;
+}
+.pf-acc.is-dark .pf-acc-rules input {
+  accent-color: var(--acc-lime);
+}
+.pf-acc.is-dark .pf-acc-rules label {
+  color: #ffffffd6;
+}
+.pf-acc.is-dark .pf-acc-pill.is-dark {
+  background: #fff;
+  color: var(--acc-ink);
+}
+.pf-acc.is-dark .pf-acc-clubs {
+  display: flex;
+  gap: 12px;
+  margin: 22px -22px 22px;
+  padding: 0 22px 6px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.pf-acc.is-dark .pf-acc-clubs::-webkit-scrollbar {
+  display: none;
+}
+.pf-acc.is-dark .pf-acc-club {
+  flex: 0 0 min(260px, 76%);
+  min-height: 168px;
+  align-content: end;
+  scroll-snap-align: center;
+  position: relative;
+  border: 0;
+  border-radius: 24px;
+  background: linear-gradient(180deg, #ffffff0a, #ffffff17);
+  box-shadow: inset 0 0 0 1px #ffffff29;
+  color: #fff;
+}
+.pf-acc.is-dark .pf-acc-club small {
+  color: #ffffff8c;
+}
+.pf-acc.is-dark .pf-acc-club.is-selected {
+  box-shadow: inset 0 0 0 2px var(--acc-lime);
+}
+.pf-acc-club-km {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #0b0b0c99;
+  color: #fff;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.pf-acc-club-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 26px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: #ffffff0f;
+  box-shadow: inset 0 0 0 1px #ffffff1f;
+}
+.pf-acc-club-head span {
+  display: grid;
+  gap: 2px;
+}
+.pf-acc-club-head b {
+  font-size: 15px;
+  font-weight: 400;
+}
+.pf-acc-club-head small {
+  color: #ffffff8c;
+  font-size: 11px;
+}
+.pf-acc-club-head .pf-acc-link {
+  border: 0;
+  background: none;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.pf-acc.is-dark .pf-acc-days {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  overflow: visible;
+}
+.pf-acc.is-dark .pf-acc-days button,
+.pf-acc.is-dark .pf-acc-times button {
+  width: auto;
+  border: 0;
+  border-radius: 16px;
+  background: #ffffff0f;
+  box-shadow: inset 0 0 0 1px #ffffff29;
+  color: #fff;
+}
+.pf-acc.is-dark .pf-acc-days small {
+  color: #ffffff80;
+}
+.pf-acc.is-dark .pf-acc-days b,
+.pf-acc.is-dark .pf-acc-times button {
+  font-family: "PF4 Space Grotesk", "PF4 Public Sans", sans-serif;
+  font-size: 24px;
+  font-weight: 300;
+}
+.pf-acc.is-dark .pf-acc-times {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  overflow: visible;
+}
+.pf-acc.is-dark .pf-acc-times button {
+  min-width: 0;
+  min-height: 56px;
+  font-size: 20px;
+}
+.pf-acc.is-dark .pf-acc-days button.is-selected,
+.pf-acc.is-dark .pf-acc-times button.is-selected {
+  background: var(--acc-lime);
+  box-shadow: none;
+  color: var(--acc-ink);
+}
+.pf-acc.is-dark .pf-acc-days button.is-selected small {
+  color: #0b0b0c99;
+}
+.pf-acc-lesson-meta {
+  color: #ffffff80 !important;
+  font-size: 10px !important;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.pf-acc-lesson-ok {
+  display: grid;
+  gap: 14px;
+  padding-top: 18px;
+}
+.pf-acc-lesson-check {
+  width: 54px;
+  height: 54px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--acc-lime);
+  color: var(--acc-ink);
+  font-size: 24px;
+}
+.pf-acc-lesson-ticket {
+  display: grid;
+  gap: 4px;
+  padding: 20px;
+  border-radius: 24px;
+  background: #ffffff0f;
+  box-shadow: inset 0 0 0 1px #ffffff29;
+}
+.pf-acc-lesson-ticket b {
+  font-size: 17px;
+  font-weight: 400;
+}
+.pf-acc-lesson-ticket small {
+  color: #ffffff8c;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.pf-acc-lesson-ticket dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin: 14px -20px -20px;
+  border-top: 1px solid #ffffff1f;
+}
+.pf-acc-lesson-ticket dl div {
+  padding: 14px 20px;
+}
+.pf-acc-lesson-ticket dl div + div {
+  border-left: 1px solid #ffffff1f;
+}
+.pf-acc-lesson-ticket dt {
+  color: #ffffff80;
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.pf-acc-lesson-ticket dd {
+  margin: 4px 0 0;
+  font-family: "PF4 Space Grotesk", "PF4 Public Sans", sans-serif;
+  font-size: 30px;
+  font-weight: 300;
+}
+.pf-acc-lesson-ticket dd.is-lime {
+  color: var(--acc-lime);
+}
+.pf-acc.is-dark .pf-acc-lesson-ok .pf-acc-link {
+  justify-self: start;
+  border: 0;
+  background: none;
+  padding: 8px 0;
+}
+.pf-acc.is-dark h1:focus {
+  outline: none;
+}
