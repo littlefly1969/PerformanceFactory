@@ -24,15 +24,6 @@ const time = (iso: string) =>
     hour: "2-digit",
     minute: "2-digit",
   });
-const when = (iso: string) =>
-  new Date(iso).toLocaleString("it-IT", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-
 /** Senza distanza si dice perché, invece di mostrare un numero inventato. */
 const NO_DISTANCE = {
   NO_ADDRESS:
@@ -55,10 +46,16 @@ function days(slots: LessonSlot[]) {
   return [...seen.entries()];
 }
 
+const shortDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("it-IT", { day: "numeric", month: "short" });
+
 /**
- * Scelta del circolo per la lezione gratuita: il circolo, e se ci sono
- * lezioni in calendario il giorno e l'orario preferiti. Il gruppo di livello
- * simile lo compone il circolo; il coach vede il livello solo con il consenso.
+ * Lezione gratuita nella veste della demo PF10, su fondo scuro: «Dove
+ * giochi?» (circoli a schede), poi «Quando?» (giorni e orari a schede, regole
+ * e consenso per il coach). La lezione resta una richiesta: il gruppo di
+ * livello simile lo compone il circolo, e «Ci vediamo in campo» compare solo
+ * quando il posto è confermato. Il passo «Dove sei?» della demo non c'è: la
+ * distanza viene dall'indirizzo del profilo.
  */
 export default function ClubPage() {
   useAccountJourney();
@@ -73,9 +70,12 @@ export default function ClubPage() {
   const [share, setShare] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [step, setStep] = useState<"club" | "when">("club");
+  const [editing, setEditing] = useState(false);
   // Esito dell'ultima azione riuscita, con il ritorno al riepilogo.
   const [done, setDone] = useState("");
   const outcome = useRef<HTMLElement>(null);
+  const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     if (done) outcome.current?.focus();
   }, [done]);
@@ -92,6 +92,8 @@ export default function ClubPage() {
         ),
       );
       setDone(success);
+      setEditing(false);
+      setStep("club");
       return true;
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Operazione non riuscita.");
@@ -100,13 +102,18 @@ export default function ClubPage() {
       setBusy(false);
     }
   };
+  const go = (next: "club" | "when") => {
+    setStep(next);
+    setMessage("");
+    window.requestAnimationFrame(() => heading.current?.focus());
+  };
 
   const top = (
     <AccountTopBar title="Lezione gratuita" back="/journey/profilo" />
   );
   if (!view?.enabled || view.phase === "UNAVAILABLE")
     return (
-      <AccountScreen top={top}>
+      <AccountScreen top={top} tone="dark">
         <h1 className="pf-acc-title">Scegli il circolo</h1>
         {error && <p className="pf-acc-error">{error}</p>}
         {view && (
@@ -120,42 +127,66 @@ export default function ClubPage() {
 
   const { phase, clubs, slots, seat } = view;
   const selected = clubId || view.attributedClubId || clubs[0]?.id || "";
+  const club = clubs.find((c) => c.id === selected);
   const clubSlots = slots.filter((s) => s.partnerId === selected);
   const clubDays = days(clubSlots);
   const chosenDay = day && clubDays.some(([k]) => k === day) ? day : "";
   const daySlots = clubSlots.filter((s) => dayKey(s.startsAt) === chosenDay);
+  const chosenSlot = daySlots.find((s) => s.id === slotId);
+  const minutes = chosenSlot?.durationMinutes ?? clubSlots[0]?.durationMinutes;
+  const booked = (phase === "REQUESTED" || phase === "ASSIGNED") && !!seat;
   const canRequest =
-    phase === "ELIGIBLE" || phase === "DECLINED" || phase === "REQUESTED";
-  const footer = canRequest ? (
+    (phase === "ELIGIBLE" || phase === "DECLINED" || phase === "REQUESTED") &&
+    (!booked || editing);
+  const request = () =>
+    void call(
+      "/request",
+      phase === "REQUESTED"
+        ? "Richiesta aggiornata."
+        : "Richiesta inviata: il circolo compone il gruppo.",
+      {
+        partnerId: selected,
+        shareWithCoach: share,
+        ...(chosenSlot ? { lessonId: chosenSlot.id } : {}),
+      },
+    );
+  const footer = !canRequest ? (
+    booked ? (
+      <>
+        <PillLink href={summaryHref("lezione")} tone="lime">
+          Torna al riepilogo
+        </PillLink>
+        {phase === "REQUESTED" && (
+          <button
+            type="button"
+            className="pf-acc-link"
+            disabled={busy}
+            onClick={() => {
+              setEditing(true);
+              go("club");
+            }}
+          >
+            Modifica la richiesta
+          </button>
+        )}
+      </>
+    ) : undefined
+  ) : step === "club" ? (
+    <PillButton tone="lime" disabled={!selected} onClick={() => go("when")}>
+      Gioco qui
+    </PillButton>
+  ) : (
     <PillButton
       tone="lime"
       disabled={busy || !share || !selected}
-      onClick={() =>
-        void call(
-          "/request",
-          phase === "REQUESTED"
-            ? "Richiesta aggiornata."
-            : "Richiesta inviata: il circolo compone il gruppo.",
-          {
-            partnerId: selected,
-            shareWithCoach: share,
-            ...(slotId && daySlots.some((s) => s.id === slotId)
-              ? { lessonId: slotId }
-              : {}),
-          },
-        )
-      }
+      onClick={request}
     >
       {phase === "REQUESTED" ? "Aggiorna la richiesta" : "Richiedi il posto"}
     </PillButton>
-  ) : undefined;
+  );
 
   return (
-    <AccountScreen top={top} footer={footer}>
-      <h1 className="pf-acc-title">Scegli il circolo</h1>
-      <p className="pf-acc-lead">
-        Il gruppo sarà di 4 persone con un livello simile al tuo.
-      </p>
+    <AccountScreen top={top} footer={footer} tone="dark">
       {message && (
         <p className="pf-acc-error" role="alert">
           {message}
@@ -170,11 +201,14 @@ export default function ClubPage() {
           aria-label="Esito"
         >
           <p>{done}</p>
-          <PillLink href={summaryHref("lezione")}>Torna al riepilogo</PillLink>
+          {!booked && (
+            <PillLink href={summaryHref("lezione")}>Torna al riepilogo</PillLink>
+          )}
         </section>
       )}
       {phase === "LOCKED" && (
         <section className="pf-acc-card">
+          <h1 className="pf-acc-title">Scegli il circolo</h1>
           <p>
             La lezione si sblocca quando il tuo profilo è abbastanza
             attendibile: continua con le domande e i micro-test.
@@ -184,17 +218,39 @@ export default function ClubPage() {
           </PillLink>
         </section>
       )}
-      {(phase === "REQUESTED" || phase === "ASSIGNED") && seat && (
-        <section className="pf-acc-card" role="status">
-          <span className="pf-acc-kicker">
-            {phase === "ASSIGNED" ? "Posto confermato" : "Richiesta inviata"}
+      {booked && !editing && (
+        <section className="pf-acc-lesson-ok" aria-labelledby="pf-acc-lesson-ok">
+          <span className="pf-acc-lesson-check" aria-hidden="true">
+            {phase === "ASSIGNED" ? "✓" : "…"}
           </span>
-          <p>
-            {seat.club.name}
-            {seat.club.city ? `, ${seat.club.city}` : ""}
+          <h1 id="pf-acc-lesson-ok" className="pf-acc-title">
+            {phase === "ASSIGNED" ? "Ci vediamo in campo." : "Richiesta inviata."}
+          </h1>
+          <div className="pf-acc-lesson-ticket">
+            <b>{seat.club.name}</b>
+            {seat.club.city && <small>{seat.club.city}</small>}
+            {phase === "ASSIGNED" && seat.lesson ? (
+              <dl>
+                <div>
+                  <dt>{weekday(seat.lesson.startsAt)}</dt>
+                  <dd>{shortDate(seat.lesson.startsAt)}</dd>
+                </div>
+                <div>
+                  <dt>Ore</dt>
+                  <dd className="is-lime">{time(seat.lesson.startsAt)}</dd>
+                </div>
+              </dl>
+            ) : (
+              <p>
+                Il circolo compone il gruppo e ti avvisiamo appena c’è la data.
+              </p>
+            )}
+          </div>
+          <p className="pf-acc-lesson-meta">
+            Gruppo di 4
             {phase === "ASSIGNED" && seat.lesson
-              ? ` · ${when(seat.lesson.startsAt)}, ${seat.lesson.durationMinutes} minuti.`
-              : ". Il circolo compone il gruppo e ti avvisiamo appena c’è la data."}
+              ? ` · ${seat.lesson.durationMinutes} minuti`
+              : ""}
           </p>
           <button
             type="button"
@@ -206,24 +262,34 @@ export default function ClubPage() {
           </button>
         </section>
       )}
-      {canRequest && (
+      {canRequest && step === "club" && (
         <>
+          <span className="pf-acc-kicker is-lime">Lezione gratuita</span>
+          <h1 className="pf-acc-title" tabIndex={-1} ref={heading}>
+            Dove giochi?
+          </h1>
+          <p className="pf-acc-lead">
+            Il gruppo sarà di 4 persone con un livello simile al tuo.
+          </p>
           <div className="pf-acc-clubs" role="radiogroup" aria-label="Circolo">
-            {clubs.map((club) => (
+            {clubs.map((c) => (
               <button
                 type="button"
                 role="radio"
-                key={club.id}
-                aria-checked={club.id === selected}
-                className={`pf-acc-club${club.id === selected ? " is-selected" : ""}`}
+                key={c.id}
+                aria-checked={c.id === selected}
+                className={`pf-acc-club${c.id === selected ? " is-selected" : ""}`}
                 onClick={() => {
-                  setClubId(club.id);
+                  setClubId(c.id);
                   setDay("");
                   setSlotId("");
                 }}
               >
-                <b>{club.name}</b>
-                {clubPlace(club) && <small>{clubPlace(club)}</small>}
+                {c.distanceKm !== null && (
+                  <span className="pf-acc-club-km">{c.distanceKm} km</span>
+                )}
+                <b>{c.name}</b>
+                {clubPlace(c) && <small>{clubPlace(c)}</small>}
               </button>
             ))}
           </div>
@@ -235,7 +301,38 @@ export default function ClubPage() {
               </a>
             </p>
           )}
-          <span className="pf-acc-kicker">Giorno</span>
+          {phase === "ELIGIBLE" && (
+            <button
+              type="button"
+              className="pf-acc-link"
+              disabled={busy}
+              onClick={() =>
+                void call("/decline", "Hai scelto di non fare la lezione.")
+              }
+            >
+              Preferisco non fare la lezione
+            </button>
+          )}
+        </>
+      )}
+      {canRequest && step === "when" && (
+        <>
+          <div className="pf-acc-club-head">
+            <span>
+              <b>{club?.name}</b>
+              {club && clubPlace(club) && <small>{clubPlace(club)}</small>}
+            </span>
+            <button
+              type="button"
+              className="pf-acc-link"
+              onClick={() => go("club")}
+            >
+              Cambia
+            </button>
+          </div>
+          <h1 className="pf-acc-title" tabIndex={-1} ref={heading}>
+            Quando?
+          </h1>
           {clubDays.length ? (
             <div className="pf-acc-days" role="radiogroup" aria-label="Giorno">
               {clubDays.map(([key, iso]) => (
@@ -262,28 +359,24 @@ export default function ClubPage() {
             </p>
           )}
           {chosenDay && (
-            <>
-              <span className="pf-acc-kicker">Orario</span>
-              <div
-                className="pf-acc-times"
-                role="radiogroup"
-                aria-label="Orario"
-              >
-                {daySlots.map((s) => (
-                  <button
-                    type="button"
-                    role="radio"
-                    key={s.id}
-                    aria-checked={s.id === slotId}
-                    className={s.id === slotId ? "is-selected" : undefined}
-                    onClick={() => setSlotId(s.id)}
-                  >
-                    {time(s.startsAt)}
-                  </button>
-                ))}
-              </div>
-            </>
+            <div className="pf-acc-times" role="radiogroup" aria-label="Orario">
+              {daySlots.map((s) => (
+                <button
+                  type="button"
+                  role="radio"
+                  key={s.id}
+                  aria-checked={s.id === slotId}
+                  className={s.id === slotId ? "is-selected" : undefined}
+                  onClick={() => setSlotId(s.id)}
+                >
+                  {time(s.startsAt)}
+                </button>
+              ))}
+            </div>
           )}
+          <p className="pf-acc-lesson-meta">
+            Gruppo di 4{minutes ? ` · ${minutes} minuti` : ""}
+          </p>
           <section className="pf-acc-rules">
             <span className="pf-acc-kicker">Regole</span>
             <p>
@@ -301,18 +394,6 @@ export default function ClubPage() {
               Non riceve email né telefono.
             </label>
           </section>
-          {phase === "ELIGIBLE" && (
-            <button
-              type="button"
-              className="pf-acc-link"
-              disabled={busy}
-              onClick={() =>
-                void call("/decline", "Hai scelto di non fare la lezione.")
-              }
-            >
-              Preferisco non fare la lezione
-            </button>
-          )}
         </>
       )}
       {phase === "ATTENDED" && (
