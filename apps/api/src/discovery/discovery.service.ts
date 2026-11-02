@@ -106,6 +106,7 @@ export class DiscoveryService {
               presentation: metadata.ui.presentation,
               columns: metadata.ui.columns,
               unit: metadata.ui.unit,
+              summaryLabel: metadata.ui.summaryLabel,
             }
           : undefined,
       };

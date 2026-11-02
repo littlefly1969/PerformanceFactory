@@ -13,11 +13,12 @@ export function DiscoveryQuestionRenderer({
 }) {
   if (question.type === "date")
     return (
-      <div className="pf4-number">
-        <label htmlFor={question.id}>{question.title}</label>
+      <div className="pf4-number pf4-date-field">
+        <label htmlFor={question.id}>Data</label>
         <input
           id={question.id}
           type="date"
+          aria-label={question.title}
           value={typeof value === "string" ? value : ""}
           onChange={(e) => onChange(e.target.value)}
         />
@@ -97,17 +98,30 @@ export function DiscoveryQuestionRenderer({
       </div>
     );
   }
+  if (
+    question.type === "single_choice" &&
+    question.ui?.presentation === "stepper"
+  )
+    return (
+      <ChoiceStepper
+        question={question}
+        options={options}
+        value={value}
+        onChange={onChange}
+      />
+    );
   const multiple = question.type === "multi_choice";
+  const cards = question.ui?.presentation === "cards";
   return (
     <div
-      className={`pf4-options ${question.ui?.presentation === "cards" ? "pf4-cards" : ""}`}
+      className={`pf4-options ${cards ? "pf4-cards" : ""}`}
       style={{
         gridTemplateColumns: `repeat(${question.ui?.columns ?? 1}, minmax(0, 1fr))`,
       }}
       role="group"
       aria-label={question.title}
     >
-      {options.map((option) => {
+      {options.map((option, index) => {
         const optionValue =
           question.type === "boolean" ? option.value : option.id;
         const selected = multiple
@@ -137,17 +151,95 @@ export function DiscoveryQuestionRenderer({
               )
             }
           >
-            <span>
-              {option.label}
-              {option.description && <small>{option.description}</small>}
-            </span>
-            <span
-              className={`pf4-dot ${multiple ? "pf4-square" : ""}`}
-              aria-hidden="true"
-            />
+            {cards ? (
+              <>
+                <span className="pf4-card-value">
+                  <strong>{option.label.replace("-", "–")}</strong>
+                  {question.ui?.unit && (
+                    <>
+                      {" "}
+                      <span>{question.ui.unit}</span>
+                    </>
+                  )}
+                </span>
+                {/* Dove cade la scelta fra le opzioni, come nella demo. */}
+                <span className="pf4-card-bar" aria-hidden="true">
+                  <i
+                    style={{
+                      left: `${(index / options.length) * 100}%`,
+                      width: `${100 / options.length}%`,
+                    }}
+                  />
+                </span>
+              </>
+            ) : (
+              <>
+                <span>
+                  {option.label}
+                  {option.description && <small>{option.description}</small>}
+                </span>
+                <span
+                  className={`pf4-dot ${multiple ? "pf4-square" : ""}`}
+                  aria-hidden="true"
+                />
+              </>
+            )}
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * Scelta singola mostrata come selettore − / + (demo PF10): scorre le opzioni
+ * nell'ordine configurato e parte vuoto, così una risposta è sempre una scelta.
+ */
+function ChoiceStepper({
+  question,
+  value,
+  options,
+  onChange,
+}: {
+  question: DiscoveryQuestion;
+  value: unknown;
+  options: DiscoveryOption[];
+  onChange: (value: unknown) => void;
+}) {
+  const index = options.findIndex((option) => option.id === value);
+  const current = index >= 0 ? options[index] : undefined;
+  const pick = (next: number) =>
+    onChange(options[Math.min(options.length - 1, Math.max(0, next))].id);
+  return (
+    <div
+      className="pf4-choice-stepper"
+      role="group"
+      aria-label={question.title}
+    >
+      <output aria-live="polite">
+        {current?.label ?? "Usa − e + per scegliere"}
+      </output>
+      <div>
+        <button
+          type="button"
+          aria-label="Indietro di una risposta"
+          disabled={index <= 0}
+          onClick={() => pick(index - 1)}
+        >
+          −
+        </button>
+        <span aria-hidden="true">
+          {index >= 0 ? `${index + 1}/${options.length}` : "—"}
+        </span>
+        <button
+          type="button"
+          aria-label="Avanti di una risposta"
+          disabled={index >= options.length - 1}
+          onClick={() => pick(index + 1)}
+        >
+          +
+        </button>
+      </div>
     </div>
   );
 }

@@ -92,6 +92,12 @@ nulla.
   descrizione, e si ordinano con **Sposta su/giù**. Gli ID già salvati restano
   fissi, perché risposte storiche e condizioni li usano.
 - **Numero e scala.** Minimo, massimo, incremento e unità (`ui.unit`).
+- **Presentazione del funnel (demo PF10).** Senza campo nel modulo, si
+  impostano nei metadati e il modulo li conserva: `ui.presentation: "stepper"`
+  mostra una scelta singola come selettore − / + sulle sue opzioni (parte vuoto,
+  si conferma con «Continua»), `ui.presentation: "cards"` con `ui.unit` dà le
+  schede dell'età, `ui.summaryLabel` (max 40 caratteri) è l'etichetta breve
+  della tessera nel riepilogo; senza, il riepilogo usa il titolo.
 - **Duplica.** Crea una copia disattivata e senza target, subito dopo
   l'originale. Sport e specializzazione non si duplicano, perché le loro opzioni
   vengono dal catalogo.

@@ -38,9 +38,11 @@ export type DiscoveryQuestion = {
   max?: number;
   step?: number;
   ui?: {
-    presentation?: "cards" | "compact_cards" | "scale";
+    presentation?: "cards" | "compact_cards" | "scale" | "stepper";
     columns?: number;
     unit?: string;
+    /** Etichetta breve nel riepilogo del funnel; senza, il titolo. */
+    summaryLabel?: string;
   };
 };
 export type DiscoveryConfiguration = {

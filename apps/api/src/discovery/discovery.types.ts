@@ -38,8 +38,10 @@ export type DiscoveryQuestion = {
   max?: number;
   step?: number;
   ui?: {
-    presentation?: 'cards' | 'compact_cards' | 'scale';
+    presentation?: 'cards' | 'compact_cards' | 'scale' | 'stepper';
     columns?: number;
+    /** Etichetta breve della domanda nel riepilogo del funnel. */
+    summaryLabel?: string;
     unit?: string;
   };
 };

@@ -1,0 +1,344 @@
+/* Misure, analisi e riepilogo del funnel nella veste della demo PF10. */
+/* Altezza e peso. */
+.pf4-funnel .pf4-measures-grid {
+  grid-template-columns: 136px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.pf4-funnel .pf4-figure-wrap {
+  height: 330px;
+  padding: 14px 10px 10px 18px;
+  border-radius: 30px;
+  background: var(--pf4-paper);
+  overflow: hidden;
+}
+.pf4-funnel .pf4-ruler {
+  left: 0;
+  top: 14px;
+  bottom: 10px;
+}
+.pf4-funnel .pf4-figure ellipse {
+  fill: #0b0b0c14;
+}
+.pf4-funnel .pf4-measure + .pf4-measure {
+  margin-top: 32px;
+}
+.pf4-funnel .pf4-measure:nth-child(2) .pf4-kicker {
+  color: var(--pf4-muted);
+}
+.pf4-funnel .pf4-measure-value input {
+  font-family: var(--pf4-num);
+  font-size: 56px;
+  line-height: 60px;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+}
+.pf4-funnel .pf4-measure-value span {
+  font-size: 14px;
+}
+.pf4-funnel .pf4-measure input[type="range"] {
+  height: 44px;
+  margin-top: 2px;
+}
+.pf4-funnel .pf4-measure input[type="range"]::-webkit-slider-runnable-track {
+  background: linear-gradient(
+    to right,
+    var(--pf4-ink) var(--pf4-fill),
+    #e2e2df var(--pf4-fill)
+  );
+}
+.pf4-funnel .pf4-measure input[type="range"]::-webkit-slider-thumb {
+  width: 28px;
+  height: 28px;
+  margin-top: -13px;
+  border: 0;
+  box-shadow:
+    inset 0 0 0 1.5px var(--pf4-ink),
+    0 2px 8px #0b0b0c1f;
+}
+
+/* Analisi. */
+.pf4-funnel .pf4-analysis {
+  flex: 1;
+}
+.pf4-funnel .pf4-analysis h1 {
+  font-size: 30px;
+  line-height: 34px;
+}
+.pf4-analysis-rows {
+  margin: 34px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.pf4-analysis-rows li {
+  padding: 14px 0;
+}
+.pf4-analysis-rows div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+.pf4-analysis-rows span {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--pf4-ink);
+}
+.pf4-analysis-rows small {
+  font-size: 10px;
+  color: var(--pf4-muted);
+  font-variant-numeric: tabular-nums;
+}
+.pf4-analysis-rows b {
+  display: block;
+  height: 2px;
+  background: var(--pf4-line);
+}
+.pf4-analysis-rows b i {
+  display: block;
+  height: 2px;
+  background: var(--pf4-ink);
+  transition: width 0.15s linear;
+}
+
+/* Riepilogo: tessere scure, obiettivo in lime. */
+.pf4-funnel.pf4-tone-dark .pf4-summary {
+  color: #fff;
+}
+.pf4-funnel .pf4-summary {
+  padding-top: 10px;
+}
+.pf4-funnel .pf4-summary .pf4-kicker {
+  margin: 0;
+  color: var(--pf4-lime);
+  animation: pf4-fade 0.4s ease both;
+}
+.pf4-funnel .pf4-summary h1 {
+  margin-top: 10px;
+  font-size: 34px;
+  line-height: 37px;
+  letter-spacing: -0.05em;
+  color: #fff;
+  text-wrap: pretty;
+  animation: pf4-rise 0.4s var(--pf4-ease) both;
+}
+.pf4-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 22px 0 0;
+}
+.pf4-tile {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  min-height: 78px;
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 22px;
+  background: #ffffff0f;
+  animation: pf4-rise 0.4s var(--pf4-ease) both;
+}
+.pf4-tile dt {
+  font-size: 9px;
+  line-height: 12px;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+  color: #ffffff80;
+}
+.pf4-tile dd {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: #fff;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+.pf4-tile.is-wide {
+  grid-column: span 2;
+}
+.pf4-tile.is-lead {
+  background: var(--pf4-lime);
+}
+.pf4-tile.is-lead dt {
+  color: #0b0b0c99;
+}
+.pf4-tile.is-lead dd {
+  font-size: 22px;
+  color: var(--pf4-ink);
+}
+.pf4-tile-bmi .pf4-tile-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.pf4-tile-bmi .pf4-tile-head span {
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--pf4-lime);
+}
+.pf4-tile-bmi strong {
+  font-family: var(--pf4-num);
+  font-size: 40px;
+  line-height: 42px;
+  font-weight: 300;
+  letter-spacing: -0.035em;
+  color: #fff;
+}
+.pf4-tile-bmi .pf4-bmi-scale {
+  position: relative;
+  height: 4px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: #ffffff1f;
+}
+.pf4-tile-bmi .pf4-bmi-scale i {
+  position: absolute;
+  top: -4px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: var(--pf4-lime);
+  box-shadow: 0 0 0 3px #1a1a1c;
+}
+.pf4-tile-bmi .pf4-bmi-ticks {
+  position: relative;
+  height: 12px;
+  margin-top: 2px;
+  font-size: 9px;
+  color: #ffffff66;
+}
+.pf4-free {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: 18px;
+  box-shadow: inset 0 0 0 1px #c8f02e66;
+  animation: pf4-rise 0.4s var(--pf4-ease) 0.65s both;
+}
+.pf4-free > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--pf4-lime);
+}
+.pf4-funnel .pf4-free p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 19px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+.pf4-funnel .pf4-free small {
+  display: block;
+  margin-top: 2px;
+  font-size: 9px;
+  line-height: 14px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #ffffff8c;
+}
+.pf4-funnel .pf4-summary .pf4-note {
+  margin-top: 14px;
+  font-size: 11px;
+  line-height: 16px;
+  color: #ffffff73;
+}
+
+/* Telefoni stretti o bassi: meno aria, niente tagli. */
+@media (max-width: 359px) {
+  .pf4-funnel {
+    --pf4-gutter: 16px;
+  }
+  .pf4-funnel .pf4-measures-grid {
+    grid-template-columns: 108px minmax(0, 1fr);
+  }
+  .pf4-funnel .pf4-measure-value input {
+    font-size: 44px;
+    line-height: 50px;
+  }
+  .pf4-card-value strong {
+    font-size: 26px;
+  }
+}
+@media (max-height: 700px) {
+  .pf4-funnel .pf4-court {
+    width: min(290px, 100%);
+  }
+  .pf4-funnel .pf4-sheet {
+    margin-top: 10px;
+  }
+  .pf4-funnel .pf4-sheet .pf4-body {
+    padding-top: 22px;
+  }
+  .pf4-funnel .pf4-figure-wrap {
+    height: 270px;
+  }
+  .pf4-funnel .pf4-footer {
+    padding-bottom: max(20px, calc(env(safe-area-inset-bottom) + 10px));
+  }
+}
+
+@media (min-width: 900px) {
+  .pf4-funnel .pf4-court {
+    width: min(420px, 100%);
+  }
+  .pf4-funnel .pf4-footer {
+    padding-bottom: 36px;
+  }
+  .pf4-funnel .pf4-summary,
+  .pf4-funnel .pf4-plain {
+    max-width: 640px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf4-funnel .pf4-court-ball {
+    transform: translate(84px, 60px);
+  }
+  .pf4-funnel .pf4-court-trace {
+    stroke-dashoffset: 0;
+  }
+}
+
+.pf4-funnel.pf4-tone-dark .pf4-sheet button:focus-visible,
+.pf4-funnel.pf4-tone-dark .pf4-sheet a:focus-visible,
+.pf4-funnel.pf4-tone-dark .pf4-sheet input:focus-visible {
+  outline-color: var(--pf4-ink);
+}
+
+.pf4-tile-bmi .pf4-bmi-ticks span {
+  white-space: nowrap;
+}
+.pf4-funnel .pf4-measure-value input {
+  width: var(--pf4-digits, 3ch);
+}
+@media (max-height: 620px) {
+  .pf4-funnel .pf4-court {
+    width: min(220px, 100%);
+  }
+  .pf4-rhythm-bar {
+    margin-top: 6px;
+  }
+  .pf4-funnel .pf4-intro-sheet h1 {
+    font-size: 28px;
+    line-height: 32px;
+  }
+  .pf4-funnel .pf4-intro-sheet .pf4-cta {
+    margin-top: 18px;
+  }
+}

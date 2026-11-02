@@ -1,51 +1,51 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 
 /**
- * Transizione UX fra l'ultima risposta e il riepilogo: non è una valutazione AI
- * e il testo non lo lascia intendere (PF-FS-PREPAYWALL, copy onesto). Con
+ * Transizione UX fra l'ultima risposta e il riepilogo, nella veste della demo
+ * PF10: quattro barre che si riempiono una dopo l'altra. Non è una valutazione
+ * AI: mette in fila le risposte date (PF-FS-PREPAYWALL, copy onesto). Con
  * un'analisi server-side la durata diventerà
  * max(DISCOVERY_ANALYSIS_MIN_DURATION_MS, durata dell'elaborazione).
  */
 export const DISCOVERY_ANALYSIS_MIN_DURATION_MS = 4000;
-const PHASES = [
-  { at: 0, text: "Raccogliamo le tue risposte…" },
-  { at: 1300, text: "Mettiamo in ordine i dati che ci hai dato…" },
-  { at: 2600, text: "Prepariamo il riepilogo del tuo profilo…" },
-];
+const ROWS = ["Chi sei", "Vincoli", "Obiettivo", "Misure"];
+const TICK_MS = 80;
 
 export function AnalysisTransition() {
-  const [phase, setPhase] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
-    const timers = PHASES.slice(1).map(({ at }, index) =>
-      setTimeout(() => setPhase(index + 1), at),
-    );
-    return () => timers.forEach(clearTimeout);
+    const started = Date.now();
+    const timer = setInterval(() => {
+      const now = Math.min(
+        Date.now() - started,
+        DISCOVERY_ANALYSIS_MIN_DURATION_MS,
+      );
+      setElapsed(now);
+      if (now >= DISCOVERY_ANALYSIS_MIN_DURATION_MS) clearInterval(timer);
+    }, TICK_MS);
+    return () => clearInterval(timer);
   }, []);
+  const slice = DISCOVERY_ANALYSIS_MIN_DURATION_MS / ROWS.length;
   return (
-    <section
-      className="pf4-body pf4-analysis"
-      role="status"
-      style={
-        {
-          "--pf4-analysis-ms": `${DISCOVERY_ANALYSIS_MIN_DURATION_MS}ms`,
-        } as CSSProperties
-      }
-    >
-      <h1 key={phase}>{PHASES[phase].text}</h1>
-      <div className="pf4-analysis-bar" aria-hidden="true">
-        <span />
-      </div>
-      <ol className="pf4-analysis-steps" aria-hidden="true">
-        {PHASES.map(({ text }, index) => (
-          <li
-            key={text}
-            className={
-              index < phase ? "is-done" : index === phase ? "is-active" : ""
-            }
-          >
-            {text}
-          </li>
-        ))}
+    <section className="pf4-body pf4-plain pf4-analysis" role="status">
+      <h1>Analizziamo le tue risposte…</h1>
+      <ol className="pf4-analysis-rows">
+        {ROWS.map((label, index) => {
+          const pct = Math.round(
+            Math.min(1, Math.max(0, (elapsed - index * slice) / slice)) * 100,
+          );
+          return (
+            <li key={label}>
+              <div>
+                <span>{label}</span>
+                <small aria-hidden="true">{pct}%</small>
+              </div>
+              <b aria-hidden="true">
+                <i style={{ width: `${pct}%` }} />
+              </b>
+            </li>
+          );
+        })}
       </ol>
     </section>
   );

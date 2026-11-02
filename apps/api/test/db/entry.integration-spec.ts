@@ -137,7 +137,9 @@ describe('Entry slice with PostgreSQL', () => {
           ? q.min
           : q.type === 'date'
             ? '2027-01-01'
-            : q.options[0].id;
+            : q.type === 'multi_choice'
+              ? [q.options[0].id]
+              : q.options[0].id;
 
     const admin = await prisma.user.create({
       data: {
