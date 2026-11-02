@@ -15,6 +15,7 @@ import {
 } from "../_account/account-shell";
 import {
   closedUnconsolidated,
+  definedAreas,
   isClosed,
   isConsolidated,
   microTestOpen,
@@ -125,9 +126,6 @@ export default function CalibrationPage() {
     c?.status === "FREE_LESSON_VALIDATION" ||
     phase === "REQUESTED" ||
     phase === "ASSIGNED";
-  const rule = c?.consolidationRule;
-  const areaRule =
-    rule?.minAreaConfidence ?? rule?.minOverallConfidence ?? null;
   // Il passo scelto dall'AI è un micro-test: si fa nella scheda Coach.
   const toMicroTest = answering && microTestOpen(c);
   useEffect(() => {
@@ -177,7 +175,9 @@ export default function CalibrationPage() {
     if (await action("calibration/finish"))
       window.location.assign(REVEAL_HREF);
   };
+  const rule = c?.consolidationRule;
   const confidence = evaluation?.overallConfidence ?? 0;
+  const defined = definedAreas(c, evaluation?.drivers ?? []);
   const footer = evaluated ? null : waiting ? (
     <PillButton
       tone="lime"
@@ -334,14 +334,12 @@ export default function CalibrationPage() {
           )}
           <ul className="pf-acc-areas">
             {evaluation.drivers.map((d) => {
-              const enough = areaRule !== null && d.confidence >= areaRule;
+              const enough = defined.has(d.id);
               return (
                 <li key={d.id}>
                   <span>{d.name}</span>
                   <small className={enough ? "is-ok" : undefined}>
-                    {(closed && !expiredWeak) || enough
-                      ? "Sufficiente"
-                      : "Provvisoria"}
+                    {enough ? "Sufficiente" : "Provvisoria"}
                   </small>
                 </li>
               );

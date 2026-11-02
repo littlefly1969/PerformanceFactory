@@ -15,6 +15,24 @@ export const isConsolidated = (c: Calibration | null | undefined) =>
 export const closedUnconsolidated = (c: Calibration | null | undefined) =>
   isClosed(c) && c?.completionReason === "DEADLINE_REACHED" && !c.ruleMet;
 
+/**
+ * Aree che conosciamo abbastanza: confidenza dell'area sopra la soglia della
+ * regola di consolidamento; a calibrazione chiusa con R consolidata, tutte.
+ */
+export function definedAreas(
+  c: Calibration | null | undefined,
+  drivers: { id: string; confidence: number }[],
+) {
+  const rule = c?.consolidationRule;
+  const min = rule?.minAreaConfidence ?? rule?.minOverallConfidence ?? null;
+  const all = isClosed(c) && !closedUnconsolidated(c);
+  return new Set(
+    drivers
+      .filter((d) => all || (min !== null && d.confidence >= min))
+      .map((d) => d.id),
+  );
+}
+
 /** C'è un micro-test proposto dall'AI che aspetta l'atleta. */
 export const microTestOpen = (c: Calibration | null | undefined) =>
   c?.round?.action === "PROPOSE_MICRO_TEST" && c.round.status === "OPEN";
