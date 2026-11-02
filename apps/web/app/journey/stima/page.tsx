@@ -4,6 +4,7 @@ import type { ProgramHorizon } from "../journey-types";
 import {
   AccountScreen,
   AccountTopBar,
+  PillButton,
   PillLink,
 } from "../_account/account-shell";
 import {
@@ -25,7 +26,22 @@ const DEFAULT: ProgramHorizon = "PROGRAM_6M";
  * Senza scenari pronti si passa alla pagina degli scenari, che spiega lo stato.
  */
 export default function RevealPage() {
-  const { journey: j } = useAccountJourney();
+  const { journey: j, error, refresh } = useAccountJourney();
+  // Il primo caricamento è fallito (rete o server): niente attesa infinita,
+  // un messaggio e un nuovo tentativo esplicito.
+  const [failed, setFailed] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const retry = async () => {
+    setRetrying(true);
+    try {
+      await refresh();
+      setFailed(false);
+    } catch {
+      setFailed(true);
+    } finally {
+      setRetrying(false);
+    }
+  };
   const s = j?.scenarios?.status === "READY" ? j.scenarios : null;
   const ready = !!s && isClosed(j?.calibration);
   const [shown, setShown] = useState<ProgramHorizon | null>(null);
@@ -33,6 +49,22 @@ export default function RevealPage() {
     if (j && !ready) window.location.replace(SCENARIOS);
   }, [j, ready]);
   const top = <AccountTopBar title="Il tuo scenario" back="/journey/profilo" />;
+  if (!j && (error || failed) && !retrying)
+    return (
+      <AccountScreen
+        top={top}
+        footer={
+          <PillButton tone="lime" onClick={() => void retry()}>
+            Riprova
+          </PillButton>
+        }
+      >
+        <p className="pf-acc-error" role="alert">
+          Non riusciamo a caricare i tuoi scenari. Controlla la connessione e
+          riprova.
+        </p>
+      </AccountScreen>
+    );
   if (!s || !ready)
     return (
       <AccountScreen top={top}>

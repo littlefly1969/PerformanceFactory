@@ -21,7 +21,9 @@ export function ProvisionalReady({
   const value = Math.round(evaluation.overallConfidence);
   const threshold =
     calibration?.consolidationRule?.minOverallConfidence ?? undefined;
-  const reached = threshold !== undefined && value >= threshold;
+  // «Sufficientemente completo» solo con la regola valutata dal server, che
+  // conta anche le soglie per area: l'arrotondamento serve solo a mostrarla.
+  const reached = !!calibration?.ruleMet;
   return (
     <AccountScreen
       tone="dark"

@@ -20,6 +20,7 @@ type Subscription = {
   amountCents: number | null;
   currency: string | null;
   nextChargeAt: string | null;
+  entitlementEndAt?: string | null;
   cancelAtPeriodEnd?: boolean;
 };
 type Status = "CHECKING" | "PENDING" | "CANCELLED" | "PAID";
@@ -45,6 +46,9 @@ const day = (iso: string) =>
 /** Le righe di S19 con i dati dell'abbonamento confermato dal backend. */
 function summary(s: Subscription) {
   const months = s.horizon ? MONTHS[s.horizon] : null;
+  // Disdetto a fine periodo: il backend azzera nextChargeAt, la data che
+  // conta è la fine dell'accesso.
+  const until = s.cancelAtPeriodEnd ? s.entitlementEndAt : s.nextChargeAt;
   return [
     ["Programma", months ? `${months} mesi · P${months}` : "—"],
     ["Pagamento", (s.billingCycle && CYCLES[s.billingCycle]) || "—"],
@@ -56,7 +60,7 @@ function summary(s: Subscription) {
     ],
     [
       s.cancelAtPeriodEnd ? "Attivo fino al" : "Prossimo addebito",
-      s.nextChargeAt ? day(s.nextChargeAt) : "—",
+      until ? day(until) : "—",
     ],
   ];
 }

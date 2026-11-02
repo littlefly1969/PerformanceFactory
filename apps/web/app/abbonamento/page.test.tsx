@@ -99,6 +99,29 @@ describe("return from the hosted checkout", () => {
       await screen.findByRole("heading", { name: "Il tuo piano è pronto." }),
     ).toBeTruthy();
   });
+  it("shows when access ends for a subscription cancelled at period end", async () => {
+    at("?checkout=success");
+    const cancelled = {
+      ...SUB,
+      cancelAtPeriodEnd: true,
+      nextChargeAt: null,
+      entitlementEndAt: "2027-03-15T10:00:00.000Z",
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        url.endsWith("/athlete-journey/program")
+          ? new Response("{}")
+          : new Response(
+              JSON.stringify({ entitled: true, subscription: cancelled }),
+            ),
+      ),
+    );
+    render(<SubscriptionReturnPage />);
+    expect(await screen.findByText("Attivo fino al")).toBeTruthy();
+    expect(screen.queryByText("Prossimo addebito")).toBeNull();
+    expect(screen.getByText("15/03/2027")).toBeTruthy();
+  });
   it("keeps waiting through a network error", async () => {
     at("?checkout=success");
     const answers: Array<() => Promise<Response>> = [
