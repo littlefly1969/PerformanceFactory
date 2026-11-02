@@ -1,0 +1,433 @@
+/*
+ * Funnel pre-account nella veste della demo PF10: campo da padel animato,
+ * foglio chiaro che sale, riepilogo a tessere scure. Tutto sotto .pf4-funnel,
+ * così le altre sezioni che usano PF4Shell non cambiano. Mobile first.
+ */
+@font-face {
+  font-family: "PF4 Space Grotesk";
+  src: url("/fonts/space-grotesk-latin.woff2") format("woff2");
+  font-weight: 300 500;
+  font-display: swap;
+}
+.pf4-funnel {
+  --pf4-ink: #0b0b0c;
+  --pf4-paper: #f5f5f2;
+  --pf4-muted: #8a8a8f;
+  --pf4-sub: #4a4a50;
+  --pf4-line: #ededea;
+  --pf4-lime: #c8f02e;
+  --pf4-num: "PF4 Space Grotesk", "PF4 Public Sans", sans-serif;
+  --pf4-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --pf4-gutter: 24px;
+  -webkit-tap-highlight-color: transparent;
+}
+.pf4-funnel .pf4-device {
+  background: #fff;
+}
+.pf4-funnel .pf4-stage {
+  transition: background 0.3s ease;
+}
+.pf4-funnel .pf4-header {
+  margin-left: var(--pf4-gutter);
+  margin-right: var(--pf4-gutter);
+  grid-template-columns: 56px 1fr 56px;
+  min-height: 44px;
+}
+.pf4-funnel .pf4-header button {
+  min-width: 44px;
+  min-height: 44px;
+  font-size: 18px;
+}
+.pf4-funnel .pf4-counter {
+  font-family: var(--pf4-num);
+  font-size: 12px;
+  letter-spacing: 0.4px;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--pf4-muted);
+}
+.pf4-funnel.pf4-tone-dark .pf4-counter {
+  color: #ffffffb8;
+}
+.pf4-funnel .pf4-progress {
+  margin: 10px var(--pf4-gutter) 0;
+}
+.pf4-funnel .pf4-progress span {
+  transition: background 0.4s ease;
+}
+
+/* Caricamento: lo splash bianco della demo. */
+.pf4-funnel .pf4-splash {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 24px;
+  text-align: center;
+}
+.pf4-funnel .pf4-splash .pf4-kicker {
+  margin: 0;
+  color: var(--pf4-ink);
+  letter-spacing: 3px;
+}
+.pf4-funnel .pf4-splash h1 {
+  font-size: 15px;
+  line-height: 22px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--pf4-muted);
+}
+.pf4-funnel .pf4-splash .pf4-cta {
+  max-width: 320px;
+}
+
+/* Riquadro scuro sopra il foglio. */
+.pf4-funnel .pf4-hero {
+  padding: 14px var(--pf4-gutter) 0;
+}
+.pf4-funnel .pf4-hero-court {
+  padding-top: 18px;
+}
+
+/* Foglio chiaro che sale sopra il campo. */
+.pf4-funnel .pf4-sheet {
+  position: relative;
+  margin-top: 16px;
+  border-radius: 36px 36px 0 0;
+  background: var(--pf4-paper);
+  box-shadow: 0 -20px 40px #0000002e;
+  animation: pf4-sheet-in 0.36s var(--pf4-ease) both;
+}
+.pf4-funnel .pf4-sheet .pf4-body {
+  padding: 30px var(--pf4-gutter) 20px;
+  animation: none;
+}
+.pf4-funnel .pf4-sheet h1 {
+  font-size: 28px;
+  line-height: 32px;
+  font-weight: 300;
+  letter-spacing: -0.04em;
+  text-wrap: pretty;
+}
+.pf4-funnel .pf4-sheet .pf4-body > p {
+  margin-top: 12px;
+  font-size: 14px;
+  line-height: 21px;
+  color: var(--pf4-muted);
+  white-space: pre-line;
+}
+.pf4-funnel .pf4-sheet .pf4-body > p + p {
+  margin-top: 0;
+}
+.pf4-funnel .pf4-sheet .pf4-options {
+  margin-top: 28px;
+  gap: 8px;
+}
+.pf4-funnel .pf4-sheet .pf4-option {
+  min-height: 62px;
+  padding: 12px 18px;
+  border: 0;
+  border-radius: 22px;
+  background: #fff;
+  color: var(--pf4-sub);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  text-align: left;
+  transition:
+    transform 0.2s var(--pf4-ease),
+    opacity 0.2s ease;
+}
+.pf4-funnel .pf4-sheet .pf4-option:hover {
+  background: #fff;
+  opacity: 0.85;
+}
+.pf4-funnel .pf4-sheet .pf4-option:active {
+  transform: scale(0.985);
+}
+.pf4-funnel .pf4-sheet .pf4-option.is-selected {
+  color: var(--pf4-ink);
+  box-shadow: none;
+}
+.pf4-funnel .pf4-sheet .pf4-option small {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--pf4-muted);
+}
+.pf4-funnel .pf4-sheet .pf4-dot {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px #d6d6d2;
+  transition: background 0.15s ease;
+}
+.pf4-funnel .pf4-sheet .pf4-square {
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+}
+.pf4-funnel .pf4-sheet .is-selected .pf4-dot {
+  background: var(--pf4-lime);
+  box-shadow: inset 0 0 0 1.5px var(--pf4-ink);
+}
+.pf4-funnel .pf4-sheet .is-selected .pf4-square {
+  background: var(--pf4-lime)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='m5.5 10.4 2.9 2.9 6.1-6.1' fill='none' stroke='%230b0b0c' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+    center / 100% no-repeat;
+}
+
+/* Schede (età): numero grande, unità e barra della fascia. */
+.pf4-funnel .pf4-sheet .pf4-cards {
+  margin-top: 20px;
+  gap: 10px;
+}
+.pf4-funnel .pf4-sheet .pf4-cards .pf4-option {
+  height: 108px;
+  min-height: 108px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: space-between;
+  padding: 16px 16px 14px;
+  border-radius: 26px;
+  box-shadow: 0 4px 14px #0b0b0c0f;
+  transition:
+    transform 0.2s var(--pf4-ease),
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.pf4-funnel .pf4-sheet .pf4-cards .pf4-option:active {
+  transform: scale(0.97);
+}
+.pf4-funnel .pf4-sheet .pf4-cards .pf4-option.is-selected {
+  background: var(--pf4-lime);
+  box-shadow: 0 12px 34px #c8f02e47;
+  opacity: 1;
+}
+.pf4-card-value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.pf4-card-value strong {
+  font-family: var(--pf4-num);
+  font-size: 32px;
+  line-height: 34px;
+  font-weight: 300;
+  letter-spacing: -0.035em;
+  color: var(--pf4-ink);
+  white-space: nowrap;
+}
+.pf4-card-value span {
+  font-size: 12px;
+  font-weight: 400;
+  color: #0b0b0c8c;
+}
+.pf4-card-bar {
+  position: relative;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--pf4-line);
+}
+.pf4-card-bar i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: var(--pf4-lime);
+}
+.pf4-funnel .pf4-sheet .is-selected .pf4-card-bar {
+  background: #0b0b0c24;
+}
+.pf4-funnel .pf4-sheet .is-selected .pf4-card-bar i {
+  background: var(--pf4-ink);
+}
+
+/* Selettore − / + sulle opzioni di una scelta singola. */
+.pf4-funnel .pf4-question-stepper {
+  text-align: center;
+}
+.pf4-funnel .pf4-choice-stepper {
+  margin-top: 8px;
+}
+.pf4-funnel .pf4-choice-stepper > output {
+  display: block;
+  min-height: 26px;
+  font-size: 17px;
+  line-height: 26px;
+  color: var(--pf4-muted);
+}
+.pf4-funnel .pf4-choice-stepper > div {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 20px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--pf4-ink);
+}
+.pf4-funnel .pf4-choice-stepper button {
+  width: 52px;
+  height: 52px;
+  border: 0;
+  border-radius: 50%;
+  background: #ffffff1f;
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  touch-action: manipulation;
+  transition: transform 0.15s var(--pf4-ease);
+}
+.pf4-funnel .pf4-choice-stepper button:active:not(:disabled) {
+  transform: scale(0.92);
+}
+.pf4-funnel .pf4-choice-stepper button:focus-visible {
+  outline-color: var(--pf4-lime);
+  outline-offset: 2px;
+}
+.pf4-funnel .pf4-choice-stepper span {
+  min-width: 64px;
+  padding: 0 6px;
+  font-family: var(--pf4-num);
+  font-size: 18px;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Data: riga sottolineata. */
+.pf4-funnel .pf4-date-field {
+  margin-top: 34px;
+  padding-bottom: 12px;
+  box-shadow: inset 0 -1px 0 var(--pf4-ink);
+}
+.pf4-funnel .pf4-date-field label {
+  display: block;
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: #a6a6ab;
+}
+.pf4-funnel .pf4-date-field input {
+  width: 100%;
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--pf4-ink);
+  font-size: 20px;
+  font-weight: 500;
+  min-height: 32px;
+}
+.pf4-funnel .pf4-date-field:focus-within {
+  box-shadow: inset 0 -2px 0 var(--pf4-ink);
+}
+
+/* Pagine chiare senza campo (data, misure, analisi). */
+.pf4-funnel .pf4-plain h1 {
+  font-size: 32px;
+  line-height: 36px;
+  font-weight: 300;
+  letter-spacing: -0.045em;
+  text-wrap: pretty;
+}
+.pf4-funnel .pf4-plain > p {
+  margin-top: 10px;
+  font-size: 15px;
+  line-height: 22px;
+  color: var(--pf4-sub);
+}
+
+/* Pulsanti: pillola nera sul chiaro, lime sullo scuro. */
+.pf4-funnel .pf4-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  margin-top: auto;
+  padding: 16px var(--pf4-gutter)
+    max(36px, calc(env(safe-area-inset-bottom) + 16px));
+  background: linear-gradient(to bottom, #fff0, #fff 28%);
+}
+.pf4-funnel .pf4-sheet .pf4-footer {
+  background: linear-gradient(to bottom, #f5f5f200, var(--pf4-paper) 28%);
+}
+.pf4-funnel.pf4-tone-dark .pf4-stage > .pf4-footer {
+  background: linear-gradient(to bottom, #0b0b0c00, var(--pf4-ink) 28%);
+}
+.pf4-funnel .pf4-cta {
+  min-height: 54px;
+  border-radius: 999px;
+  background: var(--pf4-ink);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 1.6px;
+  transition:
+    transform 0.2s var(--pf4-ease),
+    opacity 0.2s ease;
+}
+.pf4-funnel .pf4-cta:active:not(:disabled) {
+  transform: scale(0.975);
+}
+.pf4-funnel .pf4-cta:disabled {
+  opacity: 0.4;
+  background: var(--pf4-ink);
+  color: #fff;
+}
+.pf4-funnel.pf4-tone-dark .pf4-stage > .pf4-footer .pf4-cta {
+  background: var(--pf4-lime);
+  color: var(--pf4-ink);
+}
+
+/* Intro: campo e minigioco sullo scuro, ingresso nel foglio. */
+.pf4-funnel .pf4-intro-sheet .pf4-body {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding-top: 26px;
+}
+.pf4-funnel .pf4-intro-sheet .pf4-kicker {
+  margin: 0;
+}
+.pf4-funnel .pf4-intro-sheet h1 {
+  margin-top: 8px;
+  font-size: 32px;
+  line-height: 36px;
+  letter-spacing: -0.045em;
+}
+.pf4-funnel .pf4-intro-sheet .pf4-cta {
+  margin-top: 26px;
+}
+.pf4-funnel .pf4-intro-sheet .pf4-secondary {
+  margin-top: 10px;
+  border: 1px solid #0b0b0c26;
+  background: transparent;
+  color: var(--pf4-ink);
+}
+.pf4-funnel .pf4-intro-sheet .pf4-note,
+.pf4-funnel .pf4-intro-sheet .pf4-error {
+  margin-top: 12px;
+}
+.pf4-funnel .pf4-intro-sheet .pf4-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  margin-top: 8px;
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--pf4-muted);
+}
+.pf4-funnel .pf4-intro-sheet .pf4-login a {
+  margin-left: 4px;
+  color: var(--pf4-ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--pf4-lime);
+}

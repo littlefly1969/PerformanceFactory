@@ -91,6 +91,32 @@ describe('Discovery registration boundary', () => {
     expect(() =>
       assertDiscoveryMetadata({ type: 'number', min: 5, max: 1 }, true),
     ).toThrow();
+    // Selettore − / + e etichetta breve del riepilogo (demo PF10).
+    const choice = { type: 'single_choice', options: question.options };
+    expect(() =>
+      assertDiscoveryMetadata(
+        {
+          ...choice,
+          ui: { presentation: 'stepper', summaryLabel: 'Esperienza' },
+        },
+        true,
+      ),
+    ).not.toThrow();
+    expect(() =>
+      assertDiscoveryMetadata(
+        { ...choice, type: 'multi_choice', ui: { presentation: 'stepper' } },
+        true,
+      ),
+    ).toThrow();
+    expect(() =>
+      assertDiscoveryMetadata({ ...choice, ui: { summaryLabel: '' } }, true),
+    ).toThrow();
+    expect(() =>
+      assertDiscoveryMetadata(
+        { ...choice, ui: { summaryLabel: 'x'.repeat(41) } },
+        true,
+      ),
+    ).toThrow();
     expect(() =>
       assertDiscoveryMetadata(
         { type: 'single_choice', target: 'sportId' },

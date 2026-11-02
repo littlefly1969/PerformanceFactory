@@ -17,6 +17,63 @@ const question: DiscoveryQuestion = {
 };
 
 describe("PF4 configured controls", () => {
+  it("scrolls the configured options with the − / + stepper, starting empty", async () => {
+    const onChange = vi.fn();
+    const stepper: DiscoveryQuestion = {
+      ...question,
+      ui: { presentation: "stepper" },
+    };
+    const { rerender } = render(
+      <DiscoveryQuestionRenderer
+        question={stepper}
+        options={stepper.options}
+        value={undefined}
+        onChange={onChange}
+      />,
+    );
+    expect(screen.getByText("Usa − e + per scegliere")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Indietro di una risposta" }),
+    ).toBeDisabled();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Avanti di una risposta" }),
+    );
+    // Il valore salvato resta l'id dell'opzione configurata.
+    expect(onChange).toHaveBeenLastCalledWith("a");
+    rerender(
+      <DiscoveryQuestionRenderer
+        question={stepper}
+        options={stepper.options}
+        value="b"
+        onChange={onChange}
+      />,
+    );
+    expect(screen.getByText("Seconda opzione")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Avanti di una risposta" }),
+    ).toBeDisabled();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Indietro di una risposta" }),
+    );
+    expect(onChange).toHaveBeenLastCalledWith("a");
+  });
+  it("shows cards with the configured unit", () => {
+    render(
+      <DiscoveryQuestionRenderer
+        question={{
+          ...question,
+          options: [{ id: "a", label: "18-29", value: "18-29" }],
+          ui: { presentation: "cards", columns: 2, unit: "anni" },
+        }}
+        options={[{ id: "a", label: "18-29", value: "18-29" }]}
+        value={undefined}
+        onChange={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByRole("button", { name: "18–29 anni" }),
+    ).toBeInTheDocument();
+  });
   it("renders backend labels and accessible selected state", async () => {
     const onChange = vi.fn();
     render(

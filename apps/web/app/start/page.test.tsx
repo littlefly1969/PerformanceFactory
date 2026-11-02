@@ -5,7 +5,6 @@ import {
   render,
   screen,
   waitFor,
-  within,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -82,7 +81,7 @@ describe("PF4 configured journey", () => {
     await screen.findByRole("heading", { name: "Altra domanda configurata" });
     await userEvent.click(screen.getByRole("button", { name: "No" }));
     await screen.findByRole("heading", {
-      name: "Raccogliamo le tue risposte…",
+      name: "Analizziamo le tue risposte…",
     });
     await act(() =>
       vi.advanceTimersByTimeAsync(DISCOVERY_ANALYSIS_MIN_DURATION_MS),
@@ -96,6 +95,58 @@ describe("PF4 configured journey", () => {
     expect(
       screen.getByRole("heading", { name: "Crea il tuo account." }),
     ).toBeInTheDocument();
+  });
+  it("confirms a stepper choice with Continua instead of advancing on its own", async () => {
+    mockConfig({
+      version: 11,
+      questions: [
+        { ...config.questions[0], ui: { presentation: "stepper" } },
+        config.questions[1],
+      ],
+    });
+    render(<StartPage />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Inizia il percorso →" }),
+    );
+    const next = screen.getByRole("button", { name: "Continua" });
+    expect(next).toBeDisabled();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Avanti di una risposta" }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(
+      screen.getByRole("heading", { name: "Domanda scelta dal backend" }),
+    ).toBeInTheDocument();
+    await userEvent.click(next);
+    expect(
+      screen.getByRole("heading", { name: "Altra domanda configurata" }),
+    ).toBeInTheDocument();
+    expect(
+      JSON.parse(window.sessionStorage.getItem(DRAFT_KEY)!).answers,
+    ).toEqual({ "backend-first": "option-a" });
+  });
+  it("keeps the rhythm game optional: the journey starts mid-game, nothing is saved", async () => {
+    vi.stubGlobal("requestAnimationFrame", () => 1);
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    mockConfig();
+    render(<StartPage />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Prova il ritmo" }),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Colpisci" }));
+    expect(JSON.parse(window.sessionStorage.getItem(DRAFT_KEY)!)).toMatchObject(
+      { currentStep: "intro", answers: {} },
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: "Inizia il percorso →" }),
+    );
+    expect(
+      screen.getByRole("heading", { name: "Domanda scelta dal backend" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Colpisci" })).toBeNull();
+    expect(JSON.parse(window.sessionStorage.getItem(DRAFT_KEY)!)).toMatchObject(
+      { currentStep: "backend-first", answers: {} },
+    );
   });
   it("derives progress and initial question from changed configuration", async () => {
     mockConfig({ version: 10, questions: [config.questions[1]] });
@@ -197,7 +248,7 @@ it("allows skipping an optional choice without opening its conditional branch", 
   );
   await userEvent.click(screen.getByRole("button", { name: "Continua" }));
   expect(
-    screen.getByRole("heading", { name: "Raccogliamo le tue risposte…" }),
+    screen.getByRole("heading", { name: "Analizziamo le tue risposte…" }),
   ).toBeInTheDocument();
   expect(JSON.parse(sessionStorage.getItem(DRAFT_KEY)!).answers).toEqual({});
 });
@@ -274,20 +325,21 @@ describe("PF5 pre-account experience", () => {
     render(<StartPage />);
   }
 
-  it("keeps the analysis on screen for at least 4 seconds, through three phases", async () => {
+  it("keeps the analysis on screen for at least 4 seconds, filling four bars", async () => {
     vi.useFakeTimers();
     start("processing");
     await act(() => vi.advanceTimersByTimeAsync(0));
-    const phase = () => screen.getByRole("heading", { level: 1 });
-    expect(phase()).toHaveTextContent("Raccogliamo le tue risposte…");
-    await act(() => vi.advanceTimersByTimeAsync(1300));
-    expect(phase()).toHaveTextContent(
-      "Mettiamo in ordine i dati che ci hai dato…",
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(
+      "Analizziamo le tue risposte…",
     );
+    const pct = (label: string) =>
+      screen.getByText(label).nextElementSibling?.textContent;
+    expect(pct("Chi sei")).toBe("0%");
     await act(() => vi.advanceTimersByTimeAsync(1300));
-    expect(phase()).toHaveTextContent(
-      "Prepariamo il riepilogo del tuo profilo…",
-    );
+    expect(pct("Chi sei")).toBe("100%");
+    expect(pct("Misure")).toBe("0%");
+    await act(() => vi.advanceTimersByTimeAsync(1300));
+    expect(pct("Vincoli")).toBe("100%");
     await act(() =>
       vi.advanceTimersByTimeAsync(DISCOVERY_ANALYSIS_MIN_DURATION_MS - 2601),
     );
@@ -305,12 +357,11 @@ describe("PF5 pre-account experience", () => {
     const offer = await screen.findByRole("complementary", {
       name: "Come si parte",
     });
-    expect(within(offer).getByText("Fase gratuita")).toBeInTheDocument();
     expect(offer).toHaveTextContent(
-      "Gratis finché non ti conosciamo abbastanza.",
+      "Gratis finché non ti conosciamo abbastanza",
     );
     // Blueprint: nessuna carta, gratis fino alla chiusura della calibrazione.
-    expect(offer).toHaveTextContent(/senza carta/);
+    expect(offer).toHaveTextContent(/Senza carta/);
     // La calibrazione si chiude sulla confidence, non a una data (#19, #28).
     expect(offer).not.toHaveTextContent(/giorni/);
     expect(offer).not.toHaveTextContent(/Tutto sbloccato/);
@@ -322,7 +373,7 @@ describe("PF5 pre-account experience", () => {
       "Questi sono i tuoi vincoli.",
     );
     expect(
-      screen.getByText(/Ora crea l’account: il tuo profilo parte da qui/),
+      screen.getByText("Il tuo punto di partenza", { selector: "p" }),
     ).toBeInTheDocument();
     // 90 kg / 1,80 m²: BMI derivato dalle misure dichiarate.
     expect(screen.getByText("27.8")).toBeInTheDocument();
@@ -373,7 +424,7 @@ describe("PF5 pre-account experience", () => {
     expect(screen.getByLabelText("Altezza")).toHaveValue(175);
     await userEvent.click(screen.getByRole("button", { name: "Continua" }));
     await screen.findByRole("heading", {
-      name: "Raccogliamo le tue risposte…",
+      name: "Analizziamo le tue risposte…",
     });
     expect(JSON.parse(sessionStorage.getItem(DRAFT_KEY)!).answers).toEqual({
       experience: "mid",

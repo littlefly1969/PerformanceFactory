@@ -22,10 +22,11 @@ import {
   restoreDraft,
   setAnswer,
 } from "./discovery-state";
-import { FunnelQuestion } from "./funnel-question";
+import { FunnelQuestion, isPlainQuestion } from "./funnel-question";
+import { RhythmCourt } from "./padel-court";
 import { BodyMeasures } from "./body-measures";
 import { measurePair, screenIds } from "./funnel-screens";
-import { PF4Shell } from "./pf4-shell";
+import { PF4Shell, PFMark } from "./pf4-shell";
 import { Registration } from "./registration";
 import { pruneHiddenAnswers, visibleQuestions } from "./discovery-branches";
 import { PreliminaryResult } from "./preliminary-result";
@@ -215,7 +216,9 @@ export default function StartPage() {
   if (!config || !draft)
     return (
       <PF4Shell funnel={{ tone: "light" }}>
-        <div className="pf4-body">
+        <div className="pf4-body pf4-splash">
+          <PFMark size={54} />
+          <p className="pf4-kicker">Performance Factory</p>
           <h1>{error || "Prepariamo il tuo percorso…"}</h1>
           {error && (
             <button
@@ -242,14 +245,21 @@ export default function StartPage() {
     timers.current.clear();
     setDraft({ ...draft, currentStep: steps[index + delta] });
   };
+  // Il selettore − / + scorre le risposte: si conferma con «Continua».
   const autoAdvance =
-    question && ["single_choice", "boolean"].includes(question.type);
+    question &&
+    ["single_choice", "boolean"].includes(question.type) &&
+    question.ui?.presentation !== "stepper";
   const onScreen = question || measures;
   const pad = (n: number) => String(n).padStart(2, "0");
   return (
     <PF4Shell
       funnel={{
-        tone: question || draft.currentStep === "intro" ? "dark" : "light",
+        tone:
+          (question && !isPlainQuestion(question)) ||
+          ["intro", "result"].includes(draft.currentStep)
+            ? "dark"
+            : "light",
         counter: onScreen
           ? `${pad(index)} / ${pad(screens.length)}`
           : undefined,
@@ -271,36 +281,44 @@ export default function StartPage() {
         </p>
       )}
       {draft.currentStep === "intro" && (
-        <div className="pf4-intro pf4-body">
-          <p className="pf4-kicker">Performance Factory</p>
-          <h1 ref={heading} tabIndex={-1}>
-            Eleva la tua performance.
-          </h1>
-          <p>
-            Il tuo sport. I tuoi obiettivi.
-            <br />
-            Un primo passo per conoscerti meglio.
-          </p>
-          <button className="pf4-cta" onClick={begin}>
-            Inizia il percorso →
-          </button>
-          {!googlePending && (
-            <GoogleRegistrationButton onError={setGoogleError} />
-          )}
-          {googlePending && (
-            <p className="pf4-note">
-              Account Google riconosciuto. Completa le domande per proseguire.
-            </p>
-          )}
-          {googleError && (
-            <p role="alert" className="pf4-error">
-              {googleError}
-            </p>
-          )}
-          <p className="pf4-login">
-            Hai già un account? <a href="/login">Accedi</a>
-          </p>
-        </div>
+        <>
+          <div className="pf4-hero pf4-hero-court">
+            <RhythmCourt />
+          </div>
+          <div className="pf4-sheet pf4-intro-sheet">
+            <div className="pf4-body pf4-intro">
+              <p className="pf4-kicker">{screens.length} domande · 2 minuti</p>
+              <h1 ref={heading} tabIndex={-1}>
+                Eleva la tua performance.
+              </h1>
+              <p>
+                Il tuo sport. I tuoi obiettivi.
+                <br />
+                Un primo passo per conoscerti meglio.
+              </p>
+              <button className="pf4-cta" onClick={begin}>
+                Inizia il percorso →
+              </button>
+              {!googlePending && (
+                <GoogleRegistrationButton onError={setGoogleError} />
+              )}
+              {googlePending && (
+                <p className="pf4-note">
+                  Account Google riconosciuto. Completa le domande per
+                  proseguire.
+                </p>
+              )}
+              {googleError && (
+                <p role="alert" className="pf4-error">
+                  {googleError}
+                </p>
+              )}
+              <p className="pf4-login">
+                Hai già un account? <a href="/login">Accedi</a>
+              </p>
+            </div>
+          </div>
+        </>
       )}
       {question && (
         <FunnelQuestion

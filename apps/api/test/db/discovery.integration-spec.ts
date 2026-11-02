@@ -208,7 +208,9 @@ describe('PF4 discovery to authenticated journey', () => {
           ? q.min
           : q.type === 'date'
             ? '2027-01-01'
-            : q.options[0].id;
+            : q.type === 'multi_choice'
+              ? [q.options[0].id]
+              : q.options[0].id;
   }, 60000);
 
   afterAll(async () => {
@@ -1733,9 +1735,10 @@ describe('PF4 discovery to authenticated journey', () => {
       'general_height_cm.value',
       130,
     );
+    // Limitazioni a scelta multipla: il profilo riceve le etichette scelte.
     expect(assessment.profileJson).toHaveProperty(
       'general_health_status.value',
-      'Nessuna',
+      'Gomito',
     );
     expect(
       (await post('submit')).json<JourneyResponse>().result.snapshotId,

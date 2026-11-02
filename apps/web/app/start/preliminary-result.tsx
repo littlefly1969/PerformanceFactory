@@ -9,7 +9,7 @@ const BMI_BANDS = [
   { upTo: 18.5, label: "Sottopeso" },
   { upTo: 25, label: "Nella norma" },
   { upTo: 30, label: "Sovrappeso" },
-  { upTo: Infinity, label: "Obesità" },
+  { upTo: Infinity, label: "Oltre la norma" },
 ];
 const MEASURES = [HEIGHT_KEY, WEIGHT_KEY];
 /** Tacche sotto la scala BMI. */
@@ -44,7 +44,7 @@ export function PreliminaryResult({
     );
     return {
       id: q.id,
-      title: q.title,
+      title: q.ui?.summaryLabel ?? q.title,
       target: q.target,
       contextKey: q.contextKey,
       value: selected.length
@@ -91,52 +91,75 @@ export function PreliminaryResult({
         !(bmi !== null && r.contextKey && MEASURES.includes(r.contextKey)),
     ),
   ];
+  // Riepilogo della demo PF10: l'obiettivo in evidenza, poi le altre risposte.
+  const [lead, ...others] = profile;
   return (
     <>
-      <section className="pf4-body pf4-result">
-        {/* Fase gratuita del Blueprint (A3/A4): profilo e calibrazione, il programma si sceglie dopo. */}
-        <aside className="pf4-offer" aria-label="Come si parte">
-          <span className="pf4-kicker">Fase gratuita</span>
-          <p className="pf4-offer-title">
-            Gratis finché non ti conosciamo abbastanza.
-          </p>
-          <p>
-            Profilo, micro-test e coach AI senza carta, finché la calibrazione
-            non è abbastanza sicura del tuo livello.
-          </p>
-        </aside>
+      <section className="pf4-body pf4-result pf4-summary">
+        <p className="pf4-kicker">Il tuo punto di partenza</p>
         <h1>Questi sono i tuoi vincoli.</h1>
-        <p>
-          Ora crea l’account: il tuo profilo parte da qui e si definisce mentre
-          ti alleni.
-        </p>
-        {bmi !== null && band && (
-          <div className="pf4-bmi">
-            <span className="pf4-kicker">Indice di massa corporea</span>
-            <div className="pf4-bmi-value">
-              <strong>{bmi.toFixed(1)}</strong>
-              <span>{band.label}</span>
-            </div>
-            <div className="pf4-bmi-scale" aria-hidden="true">
-              <i style={{ left: `${bmiPosition(bmi)}%` }} />
-            </div>
-            <div className="pf4-bmi-ticks" aria-hidden="true">
-              {BMI_TICKS.map((tick) => (
-                <span key={tick} style={{ left: `${bmiPosition(tick)}%` }}>
-                  {tick}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-        <dl className="pf4-profile">
-          {profile.map((row) => (
-            <div key={row.id}>
+        <dl className="pf4-tiles">
+          {[lead, ...others].filter(Boolean).map((row, index) => (
+            <div
+              key={row.id}
+              className={`pf4-tile${index === 0 ? " is-lead is-wide" : ""}`}
+              style={{ animationDelay: `${(0.15 + index * 0.07).toFixed(2)}s` }}
+            >
               <dt>{row.title}</dt>
               <dd>{row.value}</dd>
             </div>
           ))}
+          {bmi !== null && band && (
+            <div
+              className="pf4-tile pf4-tile-bmi is-wide"
+              style={{
+                animationDelay: `${(0.15 + profile.length * 0.07).toFixed(2)}s`,
+              }}
+            >
+              <dt className="pf4-tile-head">
+                Indice di massa corporea
+                <span>{band.label}</span>
+              </dt>
+              <dd>
+                <strong>{bmi.toFixed(1)}</strong>
+                <div className="pf4-bmi-scale" aria-hidden="true">
+                  <i style={{ left: `${bmiPosition(bmi)}%` }} />
+                </div>
+                <div className="pf4-bmi-ticks" aria-hidden="true">
+                  {BMI_TICKS.map((tick) => (
+                    <span key={tick} style={{ left: `${bmiPosition(tick)}%` }}>
+                      {tick}
+                    </span>
+                  ))}
+                </div>
+              </dd>
+            </div>
+          )}
         </dl>
+        {/* Fase gratuita del Blueprint (A3/A4): profilo e calibrazione, il programma si sceglie dopo. */}
+        <aside className="pf4-free" aria-label="Come si parte">
+          <span aria-hidden="true">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#0B0B0C"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect x="3.5" y="9" width="17" height="11" rx="2" />
+              <path d="M12 9v11M3.5 13h17M12 9c-1.5-3-5-3.5-5-1.2C7 9 12 9 12 9zM12 9c1.5-3 5-3.5 5-1.2C17 9 12 9 12 9z" />
+            </svg>
+          </span>
+          <p>
+            Gratis finché non ti conosciamo abbastanza
+            {/* La calibrazione si chiude sulla confidence, non a una data (#19, #28):
+                niente «al massimo circa 30 giorni» della demo. */}
+            <small>Senza carta · finché la calibrazione non è sicura</small>
+          </p>
+        </aside>
         <p className="pf4-note">
           Riepilogo preliminare delle tue risposte: il BMI viene da peso e
           altezza dichiarati e non è il tuo Performance Index.

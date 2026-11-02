@@ -2,21 +2,15 @@ import type { ReactNode, Ref } from "react";
 import type { DiscoveryOption, DiscoveryQuestion } from "./discovery-types";
 import { DiscoveryQuestionRenderer } from "./question-renderer";
 import { NumberGauge } from "./number-gauge";
+import { PadelCourt } from "./padel-court";
 
-/** Illustrazione vettoriale del riquadro scuro: un campo in prospettiva. */
-export function CourtIllustration() {
-  return (
-    <svg className="pf4-illustration" viewBox="0 0 320 150" aria-hidden="true">
-      <path d="M60 140 110 22h100l50 118Z" />
-      <path d="M85 81h150M160 22v118M98 52h124M72 112h176" />
-      <circle cx="214" cy="60" r="7" className="pf4-ball" />
-    </svg>
-  );
-}
+/** Le domande con una data sono pagine chiare, senza campo (demo PF10). */
+export const isPlainQuestion = (question: DiscoveryQuestion) =>
+  question.type === "date";
 
 /**
- * Domanda del funnel: riquadro scuro in alto (illustrazione o quadrante
- * numerico) e foglio chiaro con titolo, risposte e pulsante.
+ * Domanda del funnel: campo da padel animato (o quadrante numerico) sullo
+ * scuro e foglio chiaro con titolo, risposte e pulsante.
  */
 export function FunnelQuestion({
   question,
@@ -34,9 +28,39 @@ export function FunnelQuestion({
   footer?: ReactNode;
 }) {
   const numeric = question.type === "number" || question.type === "scale";
+  const stepper =
+    question.type === "single_choice" &&
+    question.ui?.presentation === "stepper";
+  const hints = [
+    question.description,
+    question.type === "multi_choice" ? "Puoi scegliere più risposte." : "",
+  ].filter(Boolean);
+  const content = (
+    <>
+      <h1 ref={headingRef} tabIndex={-1}>
+        {question.title}
+      </h1>
+      {hints.length > 0 && <p>{hints.join("\n")}</p>}
+      <DiscoveryQuestionRenderer
+        question={question}
+        options={options}
+        value={value}
+        onChange={onChange}
+      />
+    </>
+  );
+  if (isPlainQuestion(question))
+    return (
+      <>
+        <section className="pf4-body pf4-plain pf4-question">{content}</section>
+        {footer}
+      </>
+    );
   return (
     <>
-      <div className={`pf4-hero${numeric ? " pf4-hero-gauge" : ""}`}>
+      <div
+        className={`pf4-hero${numeric ? " pf4-hero-gauge" : " pf4-hero-court"}`}
+      >
         {numeric ? (
           <NumberGauge
             value={typeof value === "number" ? value : undefined}
@@ -45,28 +69,14 @@ export function FunnelQuestion({
             unit={question.ui?.unit}
           />
         ) : (
-          <div className="pf4-hero-art">
-            <CourtIllustration />
-          </div>
+          <PadelCourt />
         )}
       </div>
       <div className="pf4-sheet">
         <section
-          className={`pf4-body pf4-question${numeric ? " pf4-question-number" : ""}`}
+          className={`pf4-body pf4-question${numeric ? " pf4-question-number" : ""}${stepper ? " pf4-question-stepper" : ""}`}
         >
-          <h1 ref={headingRef} tabIndex={-1}>
-            {question.title}
-          </h1>
-          {question.description && <p>{question.description}</p>}
-          {question.type === "multi_choice" && (
-            <p>Puoi scegliere più risposte.</p>
-          )}
-          <DiscoveryQuestionRenderer
-            question={question}
-            options={options}
-            value={value}
-            onChange={onChange}
-          />
+          {content}
         </section>
         {footer}
       </div>

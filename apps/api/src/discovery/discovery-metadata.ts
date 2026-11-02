@@ -38,7 +38,7 @@ export function assertDiscoveryMetadata(value: unknown, required: boolean) {
     const ui = m.ui as Record<string, unknown>;
     if (
       ui.presentation !== undefined &&
-      !['cards', 'compact_cards', 'scale'].includes(
+      !['cards', 'compact_cards', 'scale', 'stepper'].includes(
         typeof ui.presentation === 'string' ? ui.presentation : '',
       )
     )
@@ -49,6 +49,16 @@ export function assertDiscoveryMetadata(value: unknown, required: boolean) {
       ui.unit !== undefined &&
       (typeof ui.unit !== 'string' || ui.unit.length > 30)
     )
+      return fail();
+    if (
+      ui.summaryLabel !== undefined &&
+      (typeof ui.summaryLabel !== 'string' ||
+        !ui.summaryLabel ||
+        ui.summaryLabel.length > 40)
+    )
+      return fail();
+    // Selettore − / +: scorre le opzioni di una scelta singola, nell'ordine.
+    if (ui.presentation === 'stepper' && m.type !== 'single_choice')
       return fail();
   }
   if (

@@ -1,0 +1,274 @@
+/* Campo da padel animato e minigioco «Trova il ritmo» (demo PF10). */
+/* Campo da padel. */
+.pf4-court {
+  position: relative;
+  width: min(354px, 100%);
+  aspect-ratio: 354 / 164;
+  margin: 0 auto;
+}
+.pf4-court svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.pf4-court-glow {
+  position: absolute;
+  left: 22%;
+  top: -11%;
+  width: 56%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, #c8f02e24 0%, #c8f02e00 66%);
+  filter: blur(46px);
+  pointer-events: none;
+}
+.pf4-court-orb {
+  fill: none;
+  stroke: #ffffff29;
+  stroke-dasharray: 3 5;
+  transform-origin: 177px 82px;
+  animation: pf4-orb 3.2s ease-in-out infinite;
+}
+.pf4-court-floor {
+  fill: #ffffff08;
+  stroke: #ffffff1f;
+}
+.pf4-court-trace {
+  fill: none;
+  stroke: var(--pf4-lime);
+  stroke-width: 2;
+  stroke-dasharray: 1;
+  animation: pf4-trace 1.6s var(--pf4-ease) both;
+}
+.pf4-court-lines {
+  stroke-width: 1.4;
+  opacity: 0.7;
+  animation-duration: 1.4s;
+  animation-delay: 0.5s;
+}
+.pf4-court-walls {
+  fill: none;
+  stroke: #c8f02e59;
+  stroke-width: 5;
+  stroke-linecap: round;
+  animation: pf4-fade 0.6s ease 1.2s both;
+}
+.pf4-court-net line {
+  stroke: #fff;
+  stroke-width: 2;
+  stroke-dasharray: 2 4;
+}
+.pf4-court-net circle {
+  fill: #fff;
+}
+.pf4-court-net {
+  animation: pf4-fade 0.5s ease 0.9s both;
+}
+.pf4-court-players circle {
+  fill: #ffffffd9;
+  animation:
+    pf4-fade 0.4s ease 1.3s both,
+    pf4-bob 2.6s ease-in-out 1.7s infinite;
+}
+.pf4-court-players circle:nth-child(2) {
+  animation-duration: 0.4s, 2.8s;
+  animation-delay: 1.35s, 1.9s;
+}
+.pf4-court-players circle:nth-child(4) {
+  animation-duration: 0.4s, 3s;
+  animation-delay: 1.45s, 2s;
+}
+.pf4-court-ball circle {
+  fill: var(--pf4-lime);
+}
+.pf4-court-ball-halo {
+  opacity: 0.22;
+}
+.pf4-court-ball {
+  transform: translate(84px, 60px);
+  animation: pf4-rally 3.4s ease-in-out 1.6s infinite both;
+}
+.pf4-court.is-manual .pf4-court-ball {
+  animation: none;
+}
+.pf4-court-zone {
+  fill: #c8f02e14;
+  stroke: var(--pf4-lime);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+  transform-origin: 270px 102px;
+  animation: pf4-zone 1.3s ease-in-out infinite;
+}
+.pf4-court-zone.is-hot {
+  fill: #c8f02e40;
+  stroke-dasharray: none;
+  stroke-width: 2.5;
+}
+@keyframes pf4-trace {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes pf4-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes pf4-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+@keyframes pf4-orb {
+  0%,
+  100% {
+    transform: scale(0.86);
+    opacity: 0.35;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+}
+@keyframes pf4-zone {
+  0%,
+  100% {
+    transform: scale(0.92);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+@keyframes pf4-rally {
+  0%,
+  4% {
+    transform: translate(84px, 60px) scale(1);
+  }
+  25% {
+    transform: translate(177px, 52px) scale(1.7);
+  }
+  46%,
+  54% {
+    transform: translate(270px, 102px) scale(1);
+  }
+  75% {
+    transform: translate(177px, 112px) scale(1.7);
+  }
+  96%,
+  100% {
+    transform: translate(84px, 60px) scale(1);
+  }
+}
+@keyframes pf4-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes pf4-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.992);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Minigioco. */
+.pf4-rhythm-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  margin-top: 12px;
+}
+.pf4-funnel .pf4-rhythm-try {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid #ffffff40;
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+}
+.pf4-funnel .pf4-rhythm-hit {
+  min-width: 140px;
+  min-height: 48px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--pf4-lime);
+  color: var(--pf4-ink);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  touch-action: manipulation;
+  transition: transform 0.15s var(--pf4-ease);
+}
+.pf4-funnel .pf4-rhythm-hit:active {
+  transform: scale(0.96);
+}
+.pf4-funnel .pf4-rhythm-close {
+  width: 44px;
+  height: 44px;
+  border: 1px solid #ffffff33;
+  border-radius: 50%;
+  background: transparent;
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+}
+.pf4-rhythm-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.pf4-rhythm-count i {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px #ffffff59;
+  transition: background 0.2s ease;
+}
+.pf4-rhythm-count i.is-on {
+  background: var(--pf4-lime);
+  box-shadow: none;
+}
+.pf4-rhythm-count b {
+  margin-left: 4px;
+  font-family: var(--pf4-num);
+  font-size: 12px;
+  font-weight: 400;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.pf4-funnel .pf4-rhythm-feedback {
+  min-height: 18px;
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+  color: #ffffffb8;
+}

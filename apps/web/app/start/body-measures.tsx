@@ -116,6 +116,11 @@ function Measure({
           max={question.max}
           step={question.step ?? 1}
           value={Number.isFinite(value) ? value : ""}
+          style={
+            {
+              "--pf4-digits": `${Math.max(2, String(Number.isFinite(value) ? value : "").length) + 0.2}ch`,
+            } as CSSProperties
+          }
           onChange={(e) =>
             // Campo svuotato: null, così non torna la proposta mentre si scrive.
             onChange(e.target.value === "" ? null : e.target.valueAsNumber)
@@ -179,7 +184,7 @@ export function BodyMeasures({
     100;
   return (
     <>
-      <section className="pf4-body pf4-measures">
+      <section className="pf4-body pf4-plain pf4-measures">
         <h1 ref={headingRef} tabIndex={-1}>
           Quanto sei alto e quanto pesi?
         </h1>
