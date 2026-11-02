@@ -46,7 +46,8 @@ export default function WelcomeSpiderPage() {
   const estimated = estimate?.estimated ?? true;
   return (
     <WelcomeShell
-      step={2}
+      step={3}
+      back="/benvenuto/classifica"
       skipHref={NEXT}
       footer={
         <Link className="pf-welcome-cta" href={NEXT}>
@@ -55,7 +56,7 @@ export default function WelcomeSpiderPage() {
       }
     >
       <WelcomeIntro
-        step={2}
+        step={3}
         kicker="Il tuo Spider"
         title={
           <>

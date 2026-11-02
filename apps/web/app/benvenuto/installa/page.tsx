@@ -1,5 +1,4 @@
 "use client";
-import Image from "next/image";
 import { useEffect, useState } from "react";
 import { API_BASE, secureFetch } from "../../lib/api";
 import {
@@ -8,6 +7,7 @@ import {
   useInstallPrompt,
   type InstallPlatform,
 } from "../../lib/pwa";
+import { PFMark } from "../../start/pf4-shell";
 import "../../start/pf4.css";
 import "./installa.css";
 
@@ -68,7 +68,11 @@ const GUIDES: Record<InstallPlatform, React.ReactNode[]> = {
   ],
 };
 
-/** 04 · L'app: dopo il regalo l'atleta porta PF sulla Home del telefono. */
+/**
+ * 05 · Sempre con te (demo PF10): dopo il regalo l'atleta porta PF sulla Home
+ * del telefono. PF è una PWA: al posto dei pulsanti degli store c'è
+ * l'installazione dal browser.
+ */
 export default function InstallaPage() {
   const install = useInstallPrompt();
   const [platform, setPlatform] = useState<InstallPlatform>();
@@ -101,25 +105,32 @@ export default function InstallaPage() {
     <main className="pf-welcome">
       <div className="pf-welcome-frame">
         <header className="pf-welcome-top">
+          <a
+            className="pf-welcome-top-back"
+            href="/benvenuto/regalo"
+            aria-label="Indietro"
+          >
+            ←
+          </a>
           <div
             className="pf-welcome-steps"
             role="progressbar"
             aria-label="Benvenuto"
-            aria-valuenow={4}
+            aria-valuenow={5}
             aria-valuemin={1}
-            aria-valuemax={4}
+            aria-valuemax={5}
           >
-            {[1, 2, 3, 4].map((step) => (
-              <span key={step} className={step === 4 ? "is-current" : ""} />
+            {[1, 2, 3, 4, 5].map((step) => (
+              <span key={step} className={step === 5 ? "is-current" : ""} />
             ))}
           </div>
           <button type="button" onClick={() => void proceed()}>
-            Salta
+            Più tardi
           </button>
         </header>
 
         <section className="pf-welcome-body">
-          <span className="pf-welcome-kicker">04 · La tua app</span>
+          <span className="pf-welcome-kicker">05 · Sempre con te</span>
           <h1>
             {done ? (
               <>
@@ -128,11 +139,7 @@ export default function InstallaPage() {
                 PF è sulla tua Home.
               </>
             ) : (
-              <>
-                Portaci
-                <br />
-                in tasca.
-              </>
+              <>Porta Performance Factory in campo.</>
             )}
           </h1>
           <p>
@@ -142,8 +149,10 @@ export default function InstallaPage() {
           </p>
 
           <div className="pf-welcome-app" aria-hidden="true">
-            <Image src="/icons/icon-192.png" alt="" width={96} height={96} />
-            <span>PF</span>
+            <span className="pf-welcome-app-icon">
+              <PFMark size={50} />
+            </span>
+            <span>Performance Factory</span>
           </div>
 
           {guide && (

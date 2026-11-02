@@ -66,8 +66,18 @@
 .pf-gift-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 16px;
   min-height: 44px;
+}
+.pf-gift-back {
+  padding: 8px 4px 8px 0;
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  text-decoration: none;
+}
+.pf-gift-skip {
+  margin-left: auto;
 }
 .pf-gift-steps {
   display: flex;
