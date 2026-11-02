@@ -469,7 +469,7 @@ describe("Prossimo passo uguale in Home e profilo", () => {
         completionReason: "DEADLINE_REACHED",
       }),
       { ...lesson, phase: "CLOSED" },
-      "/journey/scenari",
+      "/journey/stima",
     ],
     [
       "lesson locked",
@@ -499,7 +499,7 @@ describe("Prossimo passo uguale in Home e profilo", () => {
       "calibration closed",
       closedRound,
       { ...lesson, phase: "CLOSED" },
-      "/journey/scenari",
+      "/journey/stima",
     ],
   ])("with %s", async (_case, current, view, href) => {
     const j = journey({ calibration: current });

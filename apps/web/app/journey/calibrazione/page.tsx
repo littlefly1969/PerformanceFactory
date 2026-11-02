@@ -21,7 +21,7 @@ import {
   useAccountJourney,
 } from "../_account/calibration-state";
 import { DarkQuestion, SingleOptions } from "../_account/dark-question";
-import { summaryHref } from "../_account/next-step";
+import { REVEAL_HREF, summaryHref } from "../_account/next-step";
 import { MiniSpider } from "../_account/spiders";
 
 type Round = NonNullable<Calibration["round"]>;
@@ -175,7 +175,7 @@ export default function CalibrationPage() {
   // R consolidata: l'atleta chiude la calibrazione e sceglie lo scenario.
   const finish = async () => {
     if (await action("calibration/finish"))
-      window.location.assign("/journey/scenari");
+      window.location.assign(REVEAL_HREF);
   };
   const confidence = evaluation?.overallConfidence ?? 0;
   const footer = evaluated ? null : waiting ? (
@@ -187,7 +187,7 @@ export default function CalibrationPage() {
       Aggiorna lo stato
     </PillButton>
   ) : closed ? (
-    <PillLink href="/journey/scenari" tone="lime">
+    <PillLink href={REVEAL_HREF} tone="lime">
       Vedi dove puoi arrivare
     </PillLink>
   ) : (

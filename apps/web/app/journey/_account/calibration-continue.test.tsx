@@ -68,7 +68,7 @@ describe("Calibrazione con la lezione in attesa o R consolidata", () => {
       screen.getByRole("button", { name: /Vai ai tuoi scenari/ }),
     );
     await waitFor(() =>
-      expect(assign).toHaveBeenCalledWith("/journey/scenari"),
+      expect(assign).toHaveBeenCalledWith("/journey/stima"),
     );
     expect(calls.some((c) => c.url.endsWith("/calibration/finish"))).toBe(true);
   });
@@ -89,7 +89,7 @@ describe("Calibrazione con la lezione in attesa o R consolidata", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: /Vedi dove puoi arrivare/ }),
-    ).toHaveAttribute("href", "/journey/scenari");
+    ).toHaveAttribute("href", "/journey/stima");
   });
 
   it("shows the lesson as a secondary link on Home while calibrating", async () => {

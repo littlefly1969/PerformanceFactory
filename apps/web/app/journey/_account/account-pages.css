@@ -451,6 +451,10 @@
   font-size: 13px;
   text-align: left;
 }
+.pf-acc-choice > span:last-child {
+  flex: none;
+  white-space: nowrap;
+}
 .pf-acc-choice span:first-child {
   display: grid;
   gap: 2px;
@@ -463,9 +467,13 @@
   font-size: 12px;
   color: var(--acc-muted);
 }
+/* Scelta attiva in lime, come nel checkout della demo PF10. */
 .pf-acc-choice.is-selected {
-  border-color: var(--acc-ink);
-  box-shadow: inset 0 0 0 1px var(--acc-ink);
+  border-color: var(--acc-lime);
+  background: var(--acc-lime);
+}
+.pf-acc-choice.is-selected small {
+  color: #0b0b0c99;
 }
 .pf-acc-methods {
   display: grid;
@@ -494,4 +502,96 @@
 }
 .pf-acc-footer .pf-acc-link {
   margin-top: 10px;
+}
+
+/* S15 · Dove sei adesso e dove puoi arrivare (demo PF10) */
+.pf-acc-reveal-seg {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin: 8px 0 4px;
+}
+.pf-acc-reveal-seg button {
+  min-height: 40px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--acc-muted);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.pf-acc-reveal-seg button.is-selected {
+  background: #fff;
+  box-shadow:
+    0 1px 0 #eaeae7,
+    inset 0 0 0 1px #eaeae7;
+  color: var(--acc-ink);
+}
+.pf-acc-reveal-spider {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  margin: 18px 0 10px;
+}
+.pf-acc-reveal-spider svg {
+  width: min(220px, 62vw);
+  height: auto;
+}
+.pf-acc-reveal-spider figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 18px;
+  color: var(--acc-muted);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.pf-acc-reveal-spider figcaption span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.pf-acc-reveal-spider .is-real::before {
+  content: "";
+  width: 14px;
+  border-top: 2px solid var(--acc-ink);
+}
+.pf-acc-reveal-spider .is-potential::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--acc-lime);
+}
+.pf-acc-reveal-cells {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 6px 0 16px;
+}
+.pf-acc-reveal-cells div {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 12px 4px;
+  border-radius: 14px;
+}
+.pf-acc-reveal-cells div.is-selected {
+  background: var(--acc-lime);
+}
+.pf-acc-reveal-cells dt {
+  color: var(--acc-muted);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+}
+.pf-acc-reveal-cells .is-selected dt {
+  color: #0b0b0c99;
+}
+.pf-acc-reveal-cells dd {
+  margin: 0;
+  font-family: "PF4 Space Grotesk", "PF4 Public Sans", sans-serif;
+  font-size: 22px;
+  font-weight: 300;
 }
