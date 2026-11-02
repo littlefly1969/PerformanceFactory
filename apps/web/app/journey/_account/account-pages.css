@@ -595,3 +595,73 @@
   font-size: 22px;
   font-weight: 300;
 }
+
+/* S19 · Pagamento riuscito (demo PF10) e attesa della conferma */
+.pf-acc-paid {
+  display: grid;
+  gap: 4px;
+  padding-top: 24px;
+}
+.pf-acc-paid-bar {
+  width: 40px;
+  height: 3px;
+  margin-bottom: 18px;
+  border-radius: 2px;
+  background: var(--acc-lime);
+}
+.pf-acc-paid h1:focus {
+  outline: none;
+}
+.pf-acc-paid-rows {
+  display: grid;
+  margin: 18px 0 12px;
+}
+.pf-acc-paid-rows div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 0;
+  border-bottom: 1px solid var(--acc-line);
+}
+.pf-acc-paid-rows dt {
+  color: var(--acc-muted);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.pf-acc-paid-rows dd {
+  margin: 0;
+  font-size: 15px;
+  text-align: right;
+}
+.pf-acc-paid-wait {
+  display: block;
+  height: 3px;
+  margin-top: 24px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--acc-line);
+}
+.pf-acc-paid-wait::after {
+  content: "";
+  display: block;
+  width: 40%;
+  height: 100%;
+  background: var(--acc-lime);
+  animation: pf-acc-wait 1.4s ease-in-out infinite alternate;
+}
+@keyframes pf-acc-wait {
+  from {
+    transform: translateX(-10%);
+  }
+  to {
+    transform: translateX(160%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-acc-paid-wait::after {
+    animation: none;
+    width: 100%;
+  }
+}

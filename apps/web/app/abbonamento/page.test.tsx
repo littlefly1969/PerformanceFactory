@@ -22,22 +22,107 @@ function at(search: string) {
   return replace;
 }
 describe("return from the hosted checkout", () => {
-  it("waits for the provider confirmation, then goes back to the journey", async () => {
-    const replace = at("?checkout=success");
-    const answers = [{ entitled: false }, { entitled: true }];
-    const fetch = vi.fn(
-      async () => new Response(JSON.stringify(answers.shift())),
+  const SUB = {
+    status: "ACTIVE",
+    horizon: "PROGRAM_6M",
+    billingCycle: "QUARTERLY",
+    amountCents: 2850,
+    currency: "eur",
+    nextChargeAt: "2027-02-02T10:00:00.000Z",
+    cancelAtPeriodEnd: false,
+  };
+  it("shows S19 only after the backend confirms, with the real subscription", async () => {
+    at("?checkout=success");
+    const answers = [
+      { entitled: false, subscription: { ...SUB, status: "CHECKOUT_PENDING" } },
+      { entitled: true, subscription: SUB },
+    ];
+    const fetch = vi.fn(async (url: string) =>
+      url.endsWith("/athlete-journey/program")
+        ? new Response(JSON.stringify({ phase: "COMPLETE" }))
+        : new Response(JSON.stringify(answers.shift())),
     );
     vi.stubGlobal("fetch", fetch);
     render(<SubscriptionReturnPage />);
     expect(
       screen.getByRole("heading", { name: "Confermiamo il tuo pagamento…" }),
     ).toBeTruthy();
-    await waitFor(() => expect(replace).toHaveBeenCalledWith("/journey"), {
-      timeout: 4000,
-    });
-    expect(fetch).toHaveBeenCalledWith("/api/payments/subscription", undefined);
-    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(
+      await screen.findByRole(
+        "heading",
+        { name: "Il tuo piano è pronto." },
+        { timeout: 4000 },
+      ),
+    ).toBeTruthy();
+    const rows = screen
+      .getAllByRole("definition")
+      .map((d) => d.textContent?.replace(/\s/g, " "));
+    expect(rows).toEqual([
+      "6 mesi · P6",
+      "Trimestrale",
+      "28,50 €",
+      "02/02/2027",
+    ]);
+    expect(screen.getByRole("link", { name: /Vai al tuo piano/ })).toHaveProperty(
+      "href",
+      expect.stringContaining("/user"),
+    );
+    // Il programma si crea con l'azione esistente, una volta sola.
+    expect(
+      fetch.mock.calls.filter(([url]) => url.endsWith("/athlete-journey/program")),
+    ).toHaveLength(1);
+  });
+  it("keeps the subscription confirmed and lets the athlete retry the plan", async () => {
+    at("?checkout=success");
+    let programCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (!url.endsWith("/athlete-journey/program"))
+          return new Response(JSON.stringify({ entitled: true, subscription: SUB }));
+        programCalls += 1;
+        return programCalls === 1
+          ? new Response(JSON.stringify({ message: "Scenari non pronti" }), {
+              status: 409,
+            })
+          : new Response("{}");
+      }),
+    );
+    render(<SubscriptionReturnPage />);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Scenari non pronti",
+    );
+    expect(screen.getByText("Abbonamento attivo")).toBeTruthy();
+    expect(screen.queryByText("Il tuo piano è pronto.")).toBeNull();
+    screen.getByRole("button", { name: /Prepara il tuo piano/ }).click();
+    expect(
+      await screen.findByRole("heading", { name: "Il tuo piano è pronto." }),
+    ).toBeTruthy();
+  });
+  it("keeps waiting through a network error", async () => {
+    at("?checkout=success");
+    const answers: Array<() => Promise<Response>> = [
+      async () => {
+        throw new TypeError("offline");
+      },
+      async () => new Response(JSON.stringify({ entitled: true, subscription: SUB })),
+    ];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        url.endsWith("/athlete-journey/program")
+          ? new Response("{}")
+          : answers.shift()!(),
+      ),
+    );
+    render(<SubscriptionReturnPage />);
+    expect(
+      await screen.findByRole(
+        "heading",
+        { name: "Il tuo piano è pronto." },
+        { timeout: 4000 },
+      ),
+    ).toBeTruthy();
   });
   it("shows a cancelled checkout without asking the server", async () => {
     at("?checkout=cancel");
@@ -45,8 +130,12 @@ describe("return from the hosted checkout", () => {
     vi.stubGlobal("fetch", fetch);
     render(<SubscriptionReturnPage />);
     expect(
-      await screen.findByRole("heading", { name: "Pagamento annullato." }),
+      await screen.findByRole("heading", { name: "Nessun addebito." }),
     ).toBeTruthy();
+    expect(screen.getByText("Pagamento annullato")).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: /Torna al checkout/ }),
+    ).toHaveProperty("href", expect.stringContaining("/journey/checkout"));
     expect(
       screen.getByRole("link", { name: "Torna al tuo percorso" }),
     ).toHaveProperty("href", expect.stringContaining("/journey"));
