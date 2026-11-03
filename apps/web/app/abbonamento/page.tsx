@@ -12,6 +12,8 @@ import { readError } from "../journey/_account/account-data";
 const POLL_MS = 2000;
 const MAX_ATTEMPTS = 30;
 const PLAN = "/user";
+/** Disponibilità mancante: si compila nel profilo, poi si torna qui. */
+const AVAILABILITY = "/journey/profilo/disponibilita?poi=abbonamento";
 
 type Subscription = {
   status: string;
@@ -70,13 +72,16 @@ function summary(s: Subscription) {
  * quando il webhook del provider ha attivato l'abbonamento: la pagina attende
  * `entitled` da GET /payments/subscription, poi crea il programma con l'azione
  * del percorso (idempotente) e mostra «Il tuo piano è pronto». Il semplice
- * ritorno dal checkout non basta mai.
+ * ritorno dal checkout non basta mai. Se mancano giorni e durata
+ * (`AVAILABILITY_REQUIRED`) chiede la disponibilità nel profilo, che poi
+ * riporta qui.
  */
 export default function SubscriptionReturnPage() {
   const [status, setStatus] = useState<Status>("CHECKING");
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [planReady, setPlanReady] = useState(false);
   const [planError, setPlanError] = useState("");
+  const [needsAvailability, setNeedsAvailability] = useState(false);
   const [busy, setBusy] = useState(false);
   const [round, setRound] = useState(0);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -90,12 +95,27 @@ export default function SubscriptionReturnPage() {
     setBusy(true);
     setPlanError("");
     try {
-      const response = await secureFetch(`${API_BASE}/athlete-journey/program`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: "{}",
-      });
+      const response = await secureFetch(
+        `${API_BASE}/athlete-journey/program`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        },
+      );
+      if (response.status === 409) {
+        const body = (await response
+          .clone()
+          .json()
+          .catch(() => ({}))) as { code?: string };
+        // Il programma chiede giorni e durata: passo obbligatorio nel profilo.
+        if (body.code === "AVAILABILITY_REQUIRED") {
+          setNeedsAvailability(true);
+          return;
+        }
+      }
       if (!response.ok) throw new Error(await readError(response));
+      setNeedsAvailability(false);
       setPlanReady(true);
     } catch (e) {
       setPlanError(
@@ -163,6 +183,10 @@ export default function SubscriptionReturnPage() {
             <PillLink href={PLAN} tone="lime">
               Vai al tuo piano
             </PillLink>
+          ) : needsAvailability ? (
+            <PillLink href={AVAILABILITY} tone="lime">
+              Indica la tua disponibilità
+            </PillLink>
           ) : (
             <PillButton
               tone="lime"
@@ -185,7 +209,9 @@ export default function SubscriptionReturnPage() {
           >
             {planReady
               ? "Il tuo piano è pronto."
-              : "Prepariamo il tuo piano…"}
+              : needsAvailability
+                ? "Ultimo passo: la tua disponibilità."
+                : "Prepariamo il tuo piano…"}
           </h1>
           <dl className="pf-acc-paid-rows">
             {summary(subscription).map(([label, value]) => (
@@ -200,7 +226,13 @@ export default function SubscriptionReturnPage() {
               {planError}
             </p>
           )}
-          {!planReady && !planError && (
+          {needsAvailability && (
+            <p className="pf-acc-muted">
+              Per costruire il programma ci servono i giorni e il tempo che hai
+              per allenarti. Poi torni qui e il piano si prepara.
+            </p>
+          )}
+          {!planReady && !planError && !needsAvailability && (
             <p className="pf-acc-muted" role="status">
               Partiamo dalla tua R consolidata e dall’orizzonte che hai scelto.
             </p>

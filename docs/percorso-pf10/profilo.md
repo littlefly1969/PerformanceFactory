@@ -32,7 +32,11 @@ In calibrazione non c'è il calendario: al suo posto «Analisi delle sei aree» 
   iniziato l'assessment). Le voci salvate dal profilo sono marcate `source:
   "profile"` e alla creazione del programma (e nella validazione dell'obiettivo)
   valgono sulle risposte congelate del funnel e dell'assessment: frequenza, giorni,
-  minuti e giorni preferiti restano quelli scelti nel profilo.
+  minuti e giorni preferiti restano quelli scelti nel profilo. Se dopo
+  l'abbonamento il programma risponde `409 AVAILABILITY_REQUIRED` (giorni e durata
+  non più chiesti nell'assessment), `/abbonamento` mostra «Ultimo passo: la tua
+  disponibilità.» e porta a `/journey/profilo/disponibilita?poi=abbonamento`; dopo
+  il salvataggio si torna a `/abbonamento`, che prepara il piano.
 - **Classifica e Playtomic.** Il livello Playtomic va da 0 a 7 con al massimo due
   decimali; si può scrivere con la virgola o sceglierlo da una delle 7 fasce della
   demo. Cambiarlo fa ricalcolare la R come gli altri campi della classifica.
