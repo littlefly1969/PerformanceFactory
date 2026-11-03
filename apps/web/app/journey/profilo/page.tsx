@@ -39,6 +39,7 @@ import {
 } from "./_profile/profile-cards";
 import { AreaRing, type HexAxis, ProfileHex } from "./_profile/profile-hex";
 import "./_profile/profile.css";
+import "./_profile/profile-body.css";
 
 const GearIcon = () => (
   <svg viewBox="0 0 24 24" aria-hidden="true">
