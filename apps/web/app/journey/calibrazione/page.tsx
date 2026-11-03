@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MultiChoiceStep } from "../choice-options";
 import type { Calibration } from "../journey-types";
 import {
@@ -22,11 +22,15 @@ import {
   useAccountJourney,
 } from "../_account/calibration-state";
 import { DarkQuestion, SingleOptions } from "../_account/dark-question";
-import { REVEAL_HREF, summaryHref } from "../_account/next-step";
+import { REVEAL_HREF } from "../_account/next-step";
 import { MiniSpider } from "../_account/spiders";
+import { HexPrep } from "../_account/assessment-hex";
+import { ProvisionalReady } from "../_account/provisional-ready";
 
 type Round = NonNullable<Calibration["round"]>;
 type Answers = Record<string, string | string[]>;
+/** Fasi del ciclo della demo PF10: esagono, coppia, calcolo, risultato. */
+type Cycle = "prep" | "questions" | "calc" | "result";
 
 /** Round di domande dell'AI, una alla volta nella veste dell'assessment. */
 function RoundQuestions({
@@ -34,6 +38,7 @@ function RoundQuestions({
   areaName,
   busy,
   error,
+  draft,
   onClose,
   onSubmit,
 }: {
@@ -42,11 +47,13 @@ function RoundQuestions({
   busy: boolean;
   /** Invio non riuscito: domanda e scelte restano, si può riprovare. */
   error: string;
+  /** Risposte non inviate: si riparte dall'ultima domanda con le scelte. */
+  draft: Answers | null;
   onClose: () => void;
   onSubmit: (answers: Answers) => void;
 }) {
-  const [answers, setAnswers] = useState<Answers>(round.answers ?? {});
-  const [index, setIndex] = useState(0);
+  const [answers, setAnswers] = useState<Answers>(draft ?? round.answers ?? {});
+  const [index, setIndex] = useState(draft ? round.questions.length - 1 : 0);
   const q = round.questions[index];
   const last = index === round.questions.length - 1;
   const next = (value: string | string[]) => {
@@ -83,7 +90,6 @@ function RoundQuestions({
           onSelect={(value) => next(String(value))}
         />
       )}
-      {busy && <p role="status">Aggiorniamo la tua valutazione…</p>}
       {error && !busy && (
         <>
           <p className="pf-acc-error" role="alert">
@@ -104,14 +110,17 @@ const LESSON_CHOICE = /lezione gratuita/i;
 
 /**
  * Stato della calibrazione: quanto ti conosciamo rispetto alla soglia, area
- * per area, e il prossimo passo scelto dall'AI (domande o micro-test). Si
- * continua anche con R consolidata o la lezione in attesa; la calibrazione
- * si chiude con la lezione svolta, con la scelta degli scenari o alla
- * scadenza.
+ * per area, e il prossimo passo. «Continua la calibrazione» apre il ciclo
+ * della demo PF10: l'esagono mentre l'AI scrive la coppia di domande, le due
+ * risposte, il calcolo e il risultato aggiornato, da cui si continua o si
+ * esce. Il micro-test non fa parte del ciclo. Si continua anche con R
+ * consolidata o la lezione in attesa; la calibrazione si chiude con la
+ * lezione svolta, con la scelta degli scenari o alla scadenza.
  */
 export default function CalibrationPage() {
   const { journey: j, error, busy, action, refresh } = useAccountJourney();
-  const [answering, setAnswering] = useState(false);
+  const [cycle, setCycle] = useState<Cycle | null>(null);
+  const answering = cycle === "questions";
   // Round inviato e accettato dal server: si attende il suo esito.
   const [sent, setSent] = useState<string | null>(null);
   const c = j?.calibration ?? null;
@@ -135,19 +144,62 @@ export default function CalibrationPage() {
   // si aspetta e si rilegge, senza reinviare le risposte.
   const waiting =
     sent !== null && round?.id === sent && round.status === "EVALUATING";
-  const evaluated = sent !== null && !waiting;
-  useEffect(() => {
-    // Valutazione aggiornata: si torna al riepilogo, nessun nuovo round.
-    if (evaluated) window.location.assign(summaryHref("calibrazione"));
-  }, [evaluated]);
+  // Risposte inviate e non accettate: tornano nella domanda per riprovare.
+  const [draft, setDraft] = useState<Answers | null>(null);
+  // L'esagono gira mentre l'AI valuta; poi il risultato aggiornato.
   const send = async (roundId: string, answers: Answers) => {
-    if (!(await action("calibration/answers", { roundId, answers }))) return;
-    setAnswering(false);
-    setSent(roundId);
+    setCycle("calc");
+    const ok = await action("calibration/answers", { roundId, answers });
+    setDraft(ok ? null : answers);
+    if (ok) setSent(roundId);
+    setCycle(ok ? "result" : stalled ? null : "questions");
   };
   const areaName = (id: string) =>
     evaluation?.drivers.find((d) => d.id === id)?.name ?? "Calibrazione";
-
+  // Round rimasto in valutazione (processo interrotto): si rimanda la
+  // valutazione con le risposte già fissate, che il server non cambia.
+  const stalled = round?.status === "EVALUATING" ? round : null;
+  // Nuovo blocco: l'esagono gira finché l'AI non ha scritto la coppia.
+  const next = async () => {
+    if (stalled) return send(stalled.id, stalled.answers ?? {});
+    if (microTestOpen(c)) return window.location.assign("/journey/coach");
+    if (round?.status === "OPEN") return setCycle("questions");
+    setCycle("prep");
+    if (await action("calibration/round")) setCycle("questions");
+  };
+  // R consolidata: l'atleta chiude la calibrazione e sceglie lo scenario.
+  const finish = async () => {
+    if (await action("calibration/finish")) window.location.assign(REVEAL_HREF);
+  };
+  // Dal profilo provvisorio («Continua la calibrazione») si entra nel ciclo.
+  const autostart = useRef(false);
+  useEffect(() => {
+    if (autostart.current || !c) return;
+    autostart.current = true;
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("ciclo")) return;
+    url.searchParams.delete("ciclo");
+    window.history.replaceState(null, "", url.pathname + url.search);
+    if (!isClosed(c)) void next();
+  });
+  if (cycle === "prep")
+    return (
+      <HexPrep
+        title="Preparo le tue domande."
+        sub="Due domande sulle aree che conosciamo meno."
+        areas={evaluation?.drivers.length}
+        error={busy ? undefined : error || undefined}
+        onRetry={busy ? undefined : () => void next()}
+      />
+    );
+  if (cycle === "calc")
+    return (
+      <HexPrep
+        title="Sto calcolando la tua performance."
+        sub="Aggiorno lo Spider con le nuove risposte."
+        areas={evaluation?.drivers.length}
+      />
+    );
   if (answering && round && !microTestOpen(c) && round.status === "OPEN")
     return (
       <RoundQuestions
@@ -156,29 +208,53 @@ export default function CalibrationPage() {
         areaName={areaName}
         busy={busy}
         error={error}
-        onClose={() => setAnswering(false)}
+        draft={draft}
+        onClose={() => setCycle(sent ? "result" : null)}
         onSubmit={(answers) => void send(round.id, answers)}
       />
     );
-
-  // Round rimasto in valutazione (processo interrotto): si rimanda la
-  // valutazione con le risposte già fissate, che il server non cambia.
-  const stalled = round?.status === "EVALUATING" ? round : null;
-  const next = async () => {
-    if (stalled) return send(stalled.id, stalled.answers ?? {});
-    if (microTestOpen(c)) return window.location.assign("/journey/coach");
-    if (round?.status === "OPEN") return setAnswering(true);
-    if (await action("calibration/round")) setAnswering(true);
-  };
-  // R consolidata: l'atleta chiude la calibrazione e sceglie lo scenario.
-  const finish = async () => {
-    if (await action("calibration/finish"))
-      window.location.assign(REVEAL_HREF);
-  };
+  // Risultato del blocco, come nella demo: si continua o si esce salvando.
+  if (cycle === "result" && evaluation && c && !waiting)
+    return (
+      <ProvisionalReady
+        evaluation={evaluation}
+        calibration={c}
+        kicker={
+          c.ruleMet
+            ? "Calibrazione sufficiente"
+            : `Blocco ${c.roundsCompleted} completato`
+        }
+        title={
+          c.ruleMet
+            ? "Ti conosco abbastanza per partire."
+            : "Il tuo profilo prende forma."
+        }
+        onContinue={isClosed(c) || busy ? undefined : () => void next()}
+        extra={
+          isClosed(c) ? (
+            <PillLink href={REVEAL_HREF} tone="lime">
+              Vedi dove puoi arrivare
+            </PillLink>
+          ) : c.canFinish ? (
+            <PillButton
+              tone="outline"
+              disabled={busy}
+              onClick={() => void finish()}
+            >
+              Vai ai tuoi scenari
+            </PillButton>
+          ) : c.ruleMet && phase === "ELIGIBLE" ? (
+            <a className="pf-acc-link" href="/journey/circolo">
+              Scegli il circolo per la lezione gratuita
+            </a>
+          ) : null
+        }
+      />
+    );
   const rule = c?.consolidationRule;
   const confidence = evaluation?.overallConfidence ?? 0;
   const defined = definedAreas(c, evaluation?.drivers ?? []);
-  const footer = evaluated ? null : waiting ? (
+  const footer = waiting ? (
     <PillButton
       tone="lime"
       disabled={busy}
@@ -263,9 +339,6 @@ export default function CalibrationPage() {
           Le tue risposte sono salvate, ma la valutazione si è interrotta.
           Completala: usiamo le risposte che hai già dato.
         </p>
-      )}
-      {evaluated && (
-        <p role="status">Valutazione aggiornata. Ti portiamo al riepilogo…</p>
       )}
       {evaluation && c && (
         <>

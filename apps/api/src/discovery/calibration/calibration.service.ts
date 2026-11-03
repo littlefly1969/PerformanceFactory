@@ -45,7 +45,6 @@ import {
 import {
   generateMicroTest,
   microTestQuestions,
-  microTestBalance,
   microTestsByArea,
   roundEvidence,
   skipMicroTest,
@@ -238,9 +237,6 @@ export class CalibrationService {
       );
       const asked = await this.askedQuestions(userId, rounds);
       const microTests = microTestsByArea(rounds);
-      const { questionsPerMicroTest } = await loadCalibrationSettings(
-        this.prisma,
-      );
       const prompt = await loadActiveAssessmentPrompt(
         this.prisma,
         'CALIBRATION',
@@ -263,9 +259,11 @@ export class CalibrationService {
           microTests: microTests.get(d.areaId) ?? [],
           focus: inFocus.has(d.areaId),
         })),
-        microTestBalance: microTestBalance(rounds, questionsPerMicroTest),
       });
       const sequence = (rounds.at(-1)?.sequence ?? 0) + 1;
+      // Il ciclo propone solo domande, a coppie: il motore non sceglie più il
+      // micro-test, che resta disponibile a parte. Il ramo serve ai passi
+      // salvati prima e al futuro coach AI.
       // Il micro-test lo scrive il generatore dedicato: se l'AI non risponde o
       // il test non supera i controlli, il passo fallisce e si riprova, senza
       // ripiegare sul catalogo (§4.4, AT-13).
