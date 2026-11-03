@@ -261,6 +261,34 @@ describe("riepilogo della demo PF10", () => {
   });
 });
 
+describe("obiettivi a risposta multipla", () => {
+  it("nel riepilogo mostra «Obiettivi» con tutte le scelte", () => {
+    const goal = {
+      ...choice("pf4_goal", "Quali sono i tuoi obiettivi?", [
+        "Migliorare la tecnica",
+        "Aumentare la resistenza",
+      ]),
+      type: "multi_choice" as const,
+      target: "goalId" as const,
+    };
+    render(
+      <PreliminaryResult
+        config={{ version: 1, questions: [goal] }}
+        draft={{
+          version: 1,
+          currentStep: "result",
+          goalId: ["0", "1"],
+          answers: {},
+        }}
+        onContinue={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText("Obiettivi", { selector: "dt" }).nextElementSibling,
+    ).toHaveTextContent("Migliorare la tecnica, Aumentare la resistenza");
+  });
+});
+
 describe("prima domanda del funnel", () => {
   it("ricorda i termini e porta all'accesso", async () => {
     const age = choice("pf4_age", "Quanti anni hai?", ["18-29", "30-39"]);

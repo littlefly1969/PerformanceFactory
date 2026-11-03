@@ -10,6 +10,7 @@ import { ConsentsService } from '../consents/consents.service';
 import { RegisterAthleteDto } from '../auth/dto/register-athlete.dto';
 import { DiscoveryService } from './discovery.service';
 import { validateDiscovery } from './discovery-validation';
+import { discoveryGoalText } from './discovery-goal';
 import { QuizDraftService } from './quiz-draft.service';
 import { PartnersService } from '../partners/partners.service';
 import { AnalyticsService } from '../analytics/analytics.service';
@@ -117,7 +118,7 @@ export class AthleteRegistrationService {
           const goalQuestion = configuration.questions.find(
             (q) => q.target === 'goalId',
           );
-          const goal = goalQuestion?.options.find((o) => o.id === draft.goalId);
+          const goalText = discoveryGoalText(goalQuestion, draft.goalId);
           const created = await tx.user.create({
             data: {
               email,
@@ -154,7 +155,7 @@ export class AthleteRegistrationService {
                   specializationId: draft.specializationId!,
                 },
               },
-              performanceGoal: { create: { goalText: goal!.label } },
+              performanceGoal: { create: { goalText } },
               discovery: {
                 create: {
                   version: BigInt(configuration.version),

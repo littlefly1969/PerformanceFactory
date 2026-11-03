@@ -77,6 +77,33 @@ seed, configurazione persistita, autenticazione, pagamenti o webhook.
   riducono sui telefoni bassi, niente scorrimento inutile; lo Spider non ha più i
   nomi delle aree (restano per i lettori di schermo) e prende lo spazio libero.
 
+## Obiettivi a risposta multipla (decisione di Stefano del 3 novembre 2026)
+
+«Qual è il tuo obiettivo principale?» diventa «Quali sono i tuoi obiettivi?» e si
+possono sceglierne più d'uno (migrazione `20261103230000_funnel_obiettivi_multipli`).
+
+- Resta la stessa domanda obiettivo (`target: goalId`) con le stesse opzioni e
+  gli stessi id; solo la domanda obiettivo può essere a scelta multipla, sport e
+  specializzazione no.
+- La bozza salva `goalId` come lista. Alla registrazione gli obiettivi scelti, nell'ordine
+  configurato, diventano un'unica frase in `UserPerformanceGoal.goalText`
+  («Migliorare la tecnica e aumentare la resistenza»): da lì il resto del percorso
+  (valutazione, prompt, programma) è invariato.
+- Le bozze aperte prima della migrazione restano valide con la versione
+  congelata (obiettivo singolo).
+- Nel riepilogo la voce diventa «Obiettivi» quando sono più d'uno.
+
+**Tornare indietro.** La versione precedente non accetta la domanda obiettivo a
+scelta multipla (`/start` risponderebbe «Configurazione discovery non valida»).
+Prima di tornare alla versione precedente, rimetti la domanda com'era e cancella
+le bozze anonime (utenti e profili registrati restano):
+
+```bash
+DC="docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml"
+$DC exec -T postgres psql -U performancefactory -d performancefactory -c "UPDATE \"OnboardingQuestionTemplate\" SET label = 'Qual è il tuo obiettivo principale?', \"helpText\" = 'Il programma si costruisce intorno a questo.', \"optionsJson\" = jsonb_set(\"optionsJson\", '{type}', '\"single_choice\"'), \"updatedAt\" = CURRENT_TIMESTAMP WHERE key = 'pf4_goal' AND scope = 'DISCOVERY'; DELETE FROM \"QuizDraft\";"
+infra/scripts/update-prod.sh --env-file .env.production sha-<versione precedente>
+```
+
 ## Pagamento completato
 
 `/abbonamento` interroga `GET /payments/subscription` ogni 2 secondi per al massimo
