@@ -29,9 +29,10 @@ In calibrazione non c'è il calendario: al suo posto «Analisi delle sei aree» 
   assegnata: data, circolo, oppure «Richiesta inviata». Senza circoli in zona: «Non
   ancora disponibile nella tua zona.».
 - **Disponibilità.** Si salva già in fase gratuita, prima del programma (basta aver
-  iniziato l'assessment). Alla creazione del programma i giorni preferiti salvati
-  restano; frequenza, giorni e minuti dati nelle risposte dell'onboarding hanno la
-  precedenza.
+  iniziato l'assessment). Le voci salvate dal profilo sono marcate `source:
+  "profile"` e alla creazione del programma (e nella validazione dell'obiettivo)
+  valgono sulle risposte congelate del funnel e dell'assessment: frequenza, giorni,
+  minuti e giorni preferiti restano quelli scelti nel profilo.
 - **Classifica e Playtomic.** Il livello Playtomic va da 0 a 7 con al massimo due
   decimali; si può scrivere con la virgola o sceglierlo da una delle 7 fasce della
   demo. Cambiarlo fa ricalcolare la R come gli altri campi della classifica.

@@ -1,4 +1,6 @@
 import { Prisma } from '@prisma/client';
+import { discoveryContext } from '../../src/discovery/discovery-context';
+import { TrainingAvailabilityService } from '../../src/athlete/training-availability';
 import { validateDiscovery } from '../../src/discovery/discovery-validation';
 import { deleteOnboardingTemplate } from '../../src/admin/admin-onboarding';
 import { deleteAthleteCompletely } from '../../src/admin/admin-athletes';
@@ -1601,22 +1603,22 @@ describe('PF4 discovery to authenticated journey', () => {
         programHorizon: 'PROGRAM_6M',
       });
 
-      // Disponibilità salvata dal profilo nella fase gratuita.
-      const free = await prisma.userOnboardingAssessment.findUnique({
-        where: { userId },
-      });
-      await prisma.userOnboardingAssessment.upsert({
-        where: { userId },
-        update: {
-          profileJson: {
-            ...((free?.profileJson as Prisma.JsonObject | null) ?? {}),
-            preferred_training_days: { value: [2, 4] },
-          },
-        },
-        create: {
-          userId,
-          profileJson: { preferred_training_days: { value: [2, 4] } },
-        },
+      // Disponibilità salvata dal profilo nella fase gratuita, con una
+      // frequenza diversa da quella data nel funnel.
+      const context = (await discoveryContext(prisma, userId))!;
+      const question = context.templates.find(
+        (t) => t.key === 'general_training_frequency',
+      );
+      const funnel = context.answers.find(
+        (a) => a.questionId === question?.id,
+      )?.value;
+      expect(funnel).toBeDefined();
+      expect(funnel).not.toBe('6_PLUS');
+      await new TrainingAvailabilityService(prisma).save(userId, {
+        currentFrequency: '6_PLUS',
+        daysPerWeek: 2,
+        sessionDurationMinutes: 90,
+        preferredDays: [2, 4],
       });
       const response = await post('program');
       expect(response.statusCode).toBe(201);
@@ -1655,11 +1657,14 @@ describe('PF4 discovery to authenticated journey', () => {
         'program_duration_weeks.value',
         26,
       );
-      // Il profilo generale non cancella i giorni scelti nel profilo.
-      expect(completed.profileJson).toHaveProperty(
-        'preferred_training_days.value',
-        [2, 4],
-      );
+      // Le risposte congelate del funnel non cancellano né sostituiscono la
+      // disponibilità aggiornata dal profilo.
+      expect(completed.profileJson).toMatchObject({
+        general_training_frequency: { value: '6_PLUS' },
+        training_days_available: { value: 2 },
+        training_session_duration: { value: 90 },
+        preferred_training_days: { value: [2, 4] },
+      });
       expect(
         (
           await prisma.userPerformanceGoal.findUniqueOrThrow({

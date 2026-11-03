@@ -11,7 +11,10 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { profileValue } from '../ai-orchestrator/training-constraints';
+import {
+  AVAILABILITY_FROM_PROFILE,
+  profileValue,
+} from '../ai-orchestrator/training-constraints';
 import { PROGRAM_WEEKS, horizonForWeeks } from '../discovery/program-horizon';
 
 export class TrainingAvailabilityDto {
@@ -93,20 +96,24 @@ export class TrainingAvailabilityService {
         general_training_frequency: {
           label: 'Frequenza abituale',
           value: input.currentFrequency,
+          source: AVAILABILITY_FROM_PROFILE,
         },
         training_days_available: {
           label: 'Giorni disponibili',
           value: input.daysPerWeek,
+          source: AVAILABILITY_FROM_PROFILE,
         },
         training_session_duration: {
           label: 'Minuti disponibili per sessione',
           value: input.sessionDurationMinutes,
+          source: AVAILABILITY_FROM_PROFILE,
         },
         ...(input.preferredDays
           ? {
               preferred_training_days: {
                 label: 'Giorni preferiti ISO',
                 value: input.preferredDays,
+                source: AVAILABILITY_FROM_PROFILE,
               },
             }
           : {}),
