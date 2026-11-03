@@ -130,3 +130,29 @@ export function serve(routes: Record<string, unknown>) {
   );
   return calls;
 }
+
+/** Micro-test della home (GET /athlete-journey/micro-test). */
+export const homeMicro = (
+  round: unknown = ROUND,
+  status = "READY",
+  extra: Record<string, unknown> = {},
+) => ({
+  status,
+  test: round
+    ? {
+        roundId: (round as { id: string }).id,
+        title: "Il terzo colpo decide il punto.",
+        area: { id: "d0", name: "Tecnico-tattico" },
+        durationMinutes: 2,
+        format: (round as { questions: { microTest?: { format?: string } }[] })
+          .questions[0]?.microTest?.format
+          ? "SITUATIONAL"
+          : "PRACTICAL",
+        points: 10,
+        round,
+      }
+    : null,
+  streak: { days: 3, week: [true, true, true, false, false, false, false] },
+  history: [],
+  ...extra,
+});

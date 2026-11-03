@@ -67,9 +67,7 @@ describe("Calibrazione con la lezione in attesa o R consolidata", () => {
     await userEvent.click(
       screen.getByRole("button", { name: /Vai ai tuoi scenari/ }),
     );
-    await waitFor(() =>
-      expect(assign).toHaveBeenCalledWith("/journey/stima"),
-    );
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("/journey/stima"));
     expect(calls.some((c) => c.url.endsWith("/calibration/finish"))).toBe(true);
   });
 
@@ -92,20 +90,29 @@ describe("Calibrazione con la lezione in attesa o R consolidata", () => {
     ).toHaveAttribute("href", "/journey/stima");
   });
 
-  it("shows the lesson as a secondary link on Home while calibrating", async () => {
+  it("shows the requested lesson on Home while calibrating", async () => {
     const j = journey({
       calibration: calibration(null, "FREE_LESSON_VALIDATION"),
     });
     serve({
       "/auth/journey": j,
-      "/athlete-journey/free-lesson": { ...lesson, phase: "REQUESTED" },
+      "/athlete-journey/free-lesson": {
+        ...lesson,
+        phase: "REQUESTED",
+        seat: {
+          status: "REQUESTED",
+          club: { name: "Padel Club Nord", city: "Milano" },
+          preferredLessonId: null,
+          lesson: null,
+        },
+      },
     });
     render(<AccountHome journey={j as unknown as Journey} />);
     expect(
-      await screen.findByRole("link", { name: /Continua la calibrazione/ }),
-    ).toHaveAttribute("href", "/journey/calibrazione");
-    expect(
-      screen.getByRole("link", { name: "Gestisci la lezione" }),
+      await screen.findByRole("link", { name: /Lezione richiesta/ }),
     ).toHaveAttribute("href", "/journey/circolo");
+    expect(
+      screen.getByRole("link", { name: /Continua il profilo/ }),
+    ).toHaveAttribute("href", "/journey/calibrazione");
   });
 });

@@ -68,7 +68,7 @@ export async function syncCredits(
     }),
     prisma.calibrationRound.findMany({
       where: { userId, status: 'EVALUATED' },
-      select: { id: true },
+      select: { id: true, action: true },
     }),
     prisma.microTestCompletion.findMany({
       where: { userId },
@@ -78,7 +78,12 @@ export async function syncCredits(
   const entries: CreditEntry[] = creditEntries(
     {
       initialEvaluationId: initial?.id ?? null,
-      evaluatedRoundIds: rounds.map((r) => r.id),
+      evaluatedRoundIds: rounds
+        .filter((r) => r.action !== 'PROPOSE_MICRO_TEST')
+        .map((r) => r.id),
+      microTestRoundIds: rounds
+        .filter((r) => r.action === 'PROPOSE_MICRO_TEST')
+        .map((r) => r.id),
       microTestCompletionIds: tests.map((t) => t.id),
     },
     settings,
