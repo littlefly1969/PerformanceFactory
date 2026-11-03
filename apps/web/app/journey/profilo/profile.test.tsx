@@ -268,35 +268,6 @@ describe("La tua disponibilità", () => {
   });
 });
 
-describe("Disponibilità richiesta dal programma", () => {
-  it("goes back to the subscription page after saving", async () => {
-    window.history.replaceState(
-      null,
-      "",
-      "/journey/profilo/disponibilita?poi=abbonamento",
-    );
-    serve({
-      "/athlete/training/availability": {
-        ...NO_AVAILABILITY,
-        daysPerWeek: 3,
-        sessionDurationMinutes: 60,
-        preferredDays: [1, 3, 5],
-      },
-    });
-    render(<AvailabilityPage />);
-    await waitFor(() =>
-      expect(screen.getByRole("link", { name: "Indietro" })).toHaveAttribute(
-        "href",
-        "/abbonamento",
-      ),
-    );
-    const save = screen.getByRole("button", { name: /Salva disponibilità/ });
-    await waitFor(() => expect(save).toBeEnabled());
-    await userEvent.click(save);
-    await waitFor(() => expect(push).toHaveBeenCalledWith("/abbonamento"));
-  });
-});
-
 describe("La tua classifica FITP", () => {
   const view = (ranking: unknown = null) => ({
     "/athlete-journey/fit-ranking": {

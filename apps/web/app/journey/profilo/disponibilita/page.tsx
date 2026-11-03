@@ -1,6 +1,6 @@
 "use client";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   athleteRequest,
   useAthlete,
@@ -52,14 +52,6 @@ export default function AvailabilityPage() {
   const [edited, setEdited] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  // Arrivati dalla creazione del programma (dopo l'abbonamento) si torna lì.
-  const [fromSubscription, setFromSubscription] = useState(false);
-  useEffect(() => {
-    if (
-      new URLSearchParams(window.location.search).get("poi") === "abbonamento"
-    )
-      setFromSubscription(true);
-  }, []);
   const draft = edited ?? fromServer(data);
   const set = (next: Partial<Draft>) => {
     setMessage("");
@@ -91,9 +83,7 @@ export default function AvailabilityPage() {
         sessionDurationMinutes: draft.minutes,
         preferredDays: draft.days.map((d) => d + 1),
       });
-      router.push(
-        fromSubscription ? "/abbonamento" : summaryHref("disponibilita"),
-      );
+      router.push(summaryHref("disponibilita"));
     } catch (e) {
       setMessage(
         (e as Error).message || "Non è stato possibile salvare. Riprova.",
@@ -105,10 +95,7 @@ export default function AvailabilityPage() {
   return (
     <AccountScreen
       top={
-        <AccountTopBar
-          title="La tua disponibilità"
-          back={fromSubscription ? "/abbonamento" : "/journey/profilo"}
-        />
+        <AccountTopBar title="La tua disponibilità" back="/journey/profilo" />
       }
       footer={
         <PillButton

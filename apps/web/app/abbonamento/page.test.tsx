@@ -63,14 +63,13 @@ describe("return from the hosted checkout", () => {
       "28,50 €",
       "02/02/2027",
     ]);
-    expect(
-      screen.getByRole("link", { name: /Vai al tuo piano/ }),
-    ).toHaveProperty("href", expect.stringContaining("/user"));
+    expect(screen.getByRole("link", { name: /Vai al tuo piano/ })).toHaveProperty(
+      "href",
+      expect.stringContaining("/user"),
+    );
     // Il programma si crea con l'azione esistente, una volta sola.
     expect(
-      fetch.mock.calls.filter(([url]) =>
-        url.endsWith("/athlete-journey/program"),
-      ),
+      fetch.mock.calls.filter(([url]) => url.endsWith("/athlete-journey/program")),
     ).toHaveLength(1);
   });
   it("keeps the subscription confirmed and lets the athlete retry the plan", async () => {
@@ -80,9 +79,7 @@ describe("return from the hosted checkout", () => {
       "fetch",
       vi.fn(async (url: string) => {
         if (!url.endsWith("/athlete-journey/program"))
-          return new Response(
-            JSON.stringify({ entitled: true, subscription: SUB }),
-          );
+          return new Response(JSON.stringify({ entitled: true, subscription: SUB }));
         programCalls += 1;
         return programCalls === 1
           ? new Response(JSON.stringify({ message: "Scenari non pronti" }), {
@@ -101,33 +98,6 @@ describe("return from the hosted checkout", () => {
     expect(
       await screen.findByRole("heading", { name: "Il tuo piano è pronto." }),
     ).toBeTruthy();
-  });
-  it("asks for availability in the profile when the program needs it", async () => {
-    at("?checkout=success");
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (url: string) =>
-        url.endsWith("/athlete-journey/program")
-          ? new Response(
-              JSON.stringify({
-                code: "AVAILABILITY_REQUIRED",
-                message: "Prima del programma indica la disponibilità.",
-              }),
-              { status: 409 },
-            )
-          : new Response(JSON.stringify({ entitled: true, subscription: SUB })),
-      ),
-    );
-    render(<SubscriptionReturnPage />);
-    expect(
-      await screen.findByRole("heading", {
-        name: "Ultimo passo: la tua disponibilità.",
-      }),
-    ).toBeTruthy();
-    expect(screen.queryByRole("alert")).toBeNull();
-    expect(
-      screen.getByRole("link", { name: "Indica la tua disponibilità" }),
-    ).toHaveAttribute("href", "/journey/profilo/disponibilita?poi=abbonamento");
   });
   it("shows when access ends for a subscription cancelled at period end", async () => {
     at("?checkout=success");
@@ -158,8 +128,7 @@ describe("return from the hosted checkout", () => {
       async () => {
         throw new TypeError("offline");
       },
-      async () =>
-        new Response(JSON.stringify({ entitled: true, subscription: SUB })),
+      async () => new Response(JSON.stringify({ entitled: true, subscription: SUB })),
     ];
     vi.stubGlobal(
       "fetch",
