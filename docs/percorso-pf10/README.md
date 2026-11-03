@@ -18,7 +18,7 @@ seed, configurazione persistita, autenticazione, pagamenti o webhook.
 | S05 | 04 · Il tuo regalo | `/benvenuto/regalo` | passo 4 di 5, freccia indietro |
 | S06 | 05 · Sempre con te | `/benvenuto/installa` | installazione PWA al posto degli store (D6) |
 | S07 | Home prima dell'assessment | `/journey` | invariata (PR #67) |
-| S08-S09 | Assessment | `/journey` | invariato; conferma «Risposte registrate» resta (D5) |
+| S08-S09 | Assessment | `/journey` | dopo l'ultima risposta la valutazione parte da sola (D5) |
 | S10 | Sto calcolando la tua performance | `/journey` fase `PROCESSING` | veste scura con esagono animato |
 | S11 | Profilo provvisorio pronto | `/journey` fase `EVALUATION` | veste scura, misuratore con la soglia reale |
 | S12 | Home in calibrazione | `/journey` | aggiunto «Completa le sei aree» |
@@ -31,7 +31,7 @@ seed, configurazione persistita, autenticazione, pagamenti o webhook.
 | S19 | Pagamento completato | `/abbonamento` | nuova veste; mostrata solo con `entitled` dal backend |
 | S20 | Abbandono del checkout | — | non realizzata: servirebbe un endpoint (D4) |
 
-## Decisioni aperte (proposte solo frontend)
+## Decisioni (approvate da Stefano il 3 novembre 2026, solo frontend)
 
 - **D1** Accesso con Apple: non esiste nel backend, omesso.
 - **D2** «Accetto i termini di servizio»: non esiste un documento Termini, omesso.
@@ -41,7 +41,8 @@ seed, configurazione persistita, autenticazione, pagamenti o webhook.
 - **D4** Il metodo di pagamento si sceglie sulla pagina ospitata del provider; S20
   (abbandono) non realizzata.
 - **D5** Valutazione automatica dopo l'ultima risposta, senza la conferma «Risposte
-  registrate»: **non applicata**, in attesa di approvazione.
+  registrate»: parte una volta da sola (anche riaprendo la pagina con le risposte
+  complete); se fallisce, «Riprova l'analisi».
 - **D6** Testi e dati reali dell'app al posto dei pulsanti degli store, delle regole
   e dei valori d'esempio della demo.
 
