@@ -3,6 +3,7 @@ import {
   fitRankingContext,
   fitRankingProblems,
   normalizeCardNumber,
+  normalizePlaytomicLevel,
 } from './fit-ranking';
 
 const valid = {
@@ -11,6 +12,7 @@ const valid = {
   tennisCurrent: 'NONE',
   tennisBest: 'NONE',
   cardNumber: null,
+  playtomicLevel: null,
 };
 
 describe('FIT ranking', () => {
@@ -44,6 +46,33 @@ describe('FIT ranking', () => {
     expect(normalizeCardNumber(undefined)).toBeNull();
     expect(normalizeCardNumber('x'.repeat(31))).toBeUndefined();
     expect(normalizeCardNumber(12)).toBeUndefined();
+  });
+
+  it('accepts a Playtomic level from 0 to 7 with at most two decimals', () => {
+    expect(normalizePlaytomicLevel(2.75)).toBe(2.75);
+    expect(normalizePlaytomicLevel('2,5')).toBe(2.5);
+    expect(normalizePlaytomicLevel(0)).toBe(0);
+    expect(normalizePlaytomicLevel(7)).toBe(7);
+    expect(normalizePlaytomicLevel(null)).toBeNull();
+    expect(normalizePlaytomicLevel('')).toBeNull();
+    for (const bad of [7.01, -1, 2.755, '2,755', 'abc', true])
+      expect(normalizePlaytomicLevel(bad)).toBeUndefined();
+    expect(fitRankingProblems({ ...valid, playtomicLevel: 8 })).toEqual([
+      'Il livello Playtomic va da 0 a 7',
+    ]);
+  });
+
+  it('passes the Playtomic level to the AI only when declared', () => {
+    const context = fitRankingContext({
+      ...valid,
+      playtomicLevel: 2.5,
+      createdAt: new Date('2026-10-12T00:00:00Z'),
+    });
+    expect(context?.padel).toEqual({
+      current: '3ª fascia',
+      best: '2ª fascia',
+      playtomic: '2.50',
+    });
   });
 
   it('gives the AI readable labels and never the card number', () => {

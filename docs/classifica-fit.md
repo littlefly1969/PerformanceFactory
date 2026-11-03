@@ -8,7 +8,10 @@ schermata:
 
 1. classifica FIT di padel, attuale e migliore di sempre;
 2. classifica FIT di tennis, attuale e migliore di sempre;
-3. numero di tessera FIT, facoltativo (compare solo se lo si chiede).
+3. numero di tessera FIT, facoltativo (compare solo se lo si chiede);
+4. livello Playtomic di padel, facoltativo, da 0 a 7 con al massimo due
+   decimali: si indica solo dal profilo (`/journey/profilo/classifica`), con le
+   fasce della demo PF10 (Iniziazione … Competizione) come aiuto.
 
 «Non ho classifiche» la dichiara tutta in un tocco. È sempre facoltativa: senza
 dichiarazione i prompt ricevono `fitRanking: null`.
@@ -26,9 +29,9 @@ migliore arriva fino all'attuale, e se l'atleta alza l'attuale la migliore già
 data sale con lei. Le liste sono in `FIT_RANKING_OPTIONS`
 (`apps/api/src/discovery/fit-ranking/fit-ranking.ts`).
 
-Il riquadro (`apps/web/app/components/fit-ranking-editor.tsx`) compare nella
-schermata della foto del benvenuto (`/benvenuto/foto`), nel profilo del percorso
-(`/journey/profilo`) e nel profilo dell'atleta (`/user/profile`). La classifica
+Si compila nel benvenuto (`/benvenuto/classifica`), nella pagina di modifica
+del profilo del percorso (`/journey/profilo/classifica`, schede chiare della demo
+PF10) e nell'account (`/account/fit`, `apps/web/app/components/fit-ranking-editor.tsx`). La classifica
 non dà punteggio e non entra nelle risposte dell'onboarding.
 
 ## Dove si salva
@@ -52,7 +55,8 @@ Ogni prompt dell'assessment riceve `fitRanking`: domande conoscitive iniziali
 dei driver, valutazione della R,
 domande di calibrazione, micro-test e scenari P3/P6/P12. Il coaching la legge dal
 profilo. Ai prompt arrivano solo le etichette leggibili e la data della
-dichiarazione: **mai il numero di tessera**. Una regola fissa
+dichiarazione, più il livello Playtomic come `padel.playtomic` («2.75») quando
+c'è: **mai il numero di tessera**. Una regola fissa
 (`FIT_RANKING_RULE`) si aggiunge ai prompt anche quando l'AI Tuner ha attivato
 un testo che non cita la classifica; i prompt predefiniti la citano anche nel
 testo modificabile.
@@ -60,7 +64,7 @@ testo modificabile.
 ## Correzione e ricalcolo della R
 
 L'atleta corregge la classifica quando vuole, dal profilo del percorso
-(`/journey/profilo`) o dal profilo dell'atleta (`/user/profile`).
+(`/journey/profilo/classifica`) o dall'account (`/account/fit`).
 
 | Endpoint | Cosa fa |
 |---|---|
@@ -78,6 +82,10 @@ classifica nuova:
   provvisoria e la R consolidata precedente rimane quella mostrata. Il programma
   già creato non cambia.
 
+Il livello Playtomic conta come la classifica: se cambia, la R si ricalcola.
+Una richiesta senza il campo `playtomicLevel` (per esempio dal benvenuto) lascia
+il livello già dichiarato; `null` lo toglie. Colonna
+`AthleteFitRanking.playtomicLevel`, migrazione `20261103230000_playtomic_level`.
 Cambiare solo il numero di tessera non ricalcola nulla. Se l'AI non risponde la
 classifica resta salvata con `recalculatedAt` nullo, la pagina lo dice e un
 nuovo salvataggio riprova il ricalcolo.

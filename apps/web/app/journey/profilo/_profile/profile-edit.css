@@ -1,0 +1,364 @@
+/* Pagine di modifica del profilo (demo PF10): disponibilità e classifica. */
+.pf-edit h1 {
+  margin: 2px 0 0;
+  font-size: 30px;
+  font-weight: 300;
+  line-height: 34px;
+  letter-spacing: -0.045em;
+  text-wrap: pretty;
+}
+.pf-acc .pf-edit-lead {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 21px;
+  color: #4a4a50;
+}
+.pf-edit-section {
+  margin-top: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.pf-edit-section > h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+}
+.pf-edit-q {
+  min-width: 0;
+  margin: 22px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 0;
+}
+.pf-edit-q legend {
+  margin-bottom: 10px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 26px;
+  letter-spacing: -0.02em;
+  text-wrap: pretty;
+}
+.pf-edit-grid {
+  display: grid;
+  gap: 8px;
+}
+.pf-edit-grid.is-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.pf-edit-grid.is-five {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.pf-edit-tile {
+  display: flex;
+  border: 0;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #e2e2df;
+  color: var(--acc-ink);
+  text-align: left;
+  transition:
+    transform 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+    background-color 0.2s ease;
+}
+.pf-edit-tile:active {
+  transform: scale(0.97);
+}
+.pf-edit-tile.is-on {
+  background: var(--acc-ink);
+  box-shadow: none;
+  color: #fff;
+}
+.pf-edit-tile span {
+  color: var(--acc-muted);
+}
+.pf-edit-tile.is-on span {
+  color: #ffffff99;
+}
+.pf-edit-tile.is-row {
+  min-height: 64px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+}
+.pf-edit-tile.is-row b {
+  flex: none;
+  font-size: 26px;
+  font-weight: 300;
+  line-height: 28px;
+  letter-spacing: -0.04em;
+}
+.pf-edit-tile.is-row span {
+  font-size: 13px;
+  line-height: 16px;
+}
+.pf-edit-tile.is-col {
+  height: 72px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 0;
+  text-align: center;
+}
+.pf-edit-tile.is-col b {
+  font-family: "PF4 Space Grotesk", sans-serif;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 24px;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+}
+.pf-edit-tile.is-col span {
+  font-size: 8px;
+  letter-spacing: 1.1px;
+  text-transform: uppercase;
+}
+.pf-edit-days {
+  padding: 16px;
+  border-radius: 22px;
+  background: #ffffff9e;
+}
+.pf-acc .pf-edit-days p {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.pf-edit-days p b {
+  font-family: "PF4 Space Grotesk", sans-serif;
+  font-size: 40px;
+  font-weight: 300;
+  line-height: 42px;
+  letter-spacing: -0.035em;
+}
+.pf-edit-days p span {
+  font-size: 14px;
+  color: #4a4a50;
+}
+.pf-edit-week {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+.pf-edit-week button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.pf-edit-week button:active {
+  transform: scale(0.96);
+}
+.pf-edit-week i {
+  width: 100%;
+  height: 56px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #e2e2df;
+}
+.pf-edit-week .is-on i {
+  background: var(--acc-lime);
+  box-shadow: none;
+}
+.pf-edit-week span {
+  font-size: 10px;
+  letter-spacing: 0.6px;
+  color: var(--acc-muted);
+}
+.pf-edit-week .is-on span {
+  color: var(--acc-ink);
+}
+.pf-edit .pf-acc-error {
+  margin-top: 18px;
+}
+
+/* Classifica: le schede FIT su fondo chiaro. */
+.pf-edit .pf-fit-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.pf-edit .pf-fit-group legend {
+  margin-bottom: 10px;
+  padding: 0;
+  color: var(--acc-ink);
+  font-size: 16px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.pf-edit .pf-fit-grid {
+  display: grid;
+  gap: 8px;
+}
+.pf-edit .pf-fit-grid.is-four {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.pf-edit .pf-fit-grid.is-five {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+.pf-edit .pf-fit-grid.is-two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.pf-edit .pf-fit-grid.is-subs {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  padding: 10px;
+  border-radius: 20px;
+  background: #ffffff9e;
+}
+.pf-edit .pf-fit-tile {
+  min-height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #e2e2df;
+  color: var(--acc-ink);
+  font-size: 13px;
+  line-height: 16px;
+  text-align: center;
+  transition:
+    transform 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+    background-color 0.2s ease;
+}
+.pf-edit .pf-fit-grid.is-four .pf-fit-tile {
+  aspect-ratio: 1 / 1;
+  border-radius: 20px;
+}
+.pf-edit .pf-fit-grid.is-five .pf-fit-tile {
+  height: 64px;
+  border-radius: 20px;
+  padding: 0;
+}
+.pf-edit .pf-fit-grid.is-subs .pf-fit-tile {
+  height: 44px;
+  min-height: 44px;
+  border-radius: 10px;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 500;
+}
+.pf-edit .pf-fit-tile b {
+  font-family: "PF4 Public Sans", sans-serif;
+  font-size: 30px;
+  font-weight: 300;
+  line-height: 32px;
+  letter-spacing: -0.04em;
+}
+.pf-edit .pf-fit-grid.is-five .pf-fit-tile b {
+  font-size: 24px;
+  line-height: 26px;
+}
+.pf-edit .pf-fit-tile small {
+  color: var(--acc-muted);
+  font-size: 8px;
+  font-weight: 400;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+.pf-edit .pf-fit-tile.is-open {
+  box-shadow: inset 0 0 0 1.5px var(--acc-ink);
+}
+.pf-edit .pf-fit-tile.is-selected {
+  background: var(--acc-ink);
+  box-shadow: none;
+  color: #fff;
+}
+.pf-edit .pf-fit-tile.is-selected small {
+  color: #ffffff99;
+}
+.pf-edit .pf-fit-tile:disabled {
+  opacity: 0.32;
+}
+.pf-edit .pf-fit-tile:active:not(:disabled) {
+  transform: scale(0.96);
+}
+.pf-edit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 16px;
+}
+.pf-edit-field input {
+  height: 54px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #e2e2df;
+  color: var(--acc-ink);
+  font: inherit;
+  font-size: 16px;
+  outline: none;
+}
+.pf-edit-field input:focus-visible {
+  box-shadow: inset 0 0 0 1.5px var(--acc-ink);
+}
+.pf-edit-bands {
+  margin: 0;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-radius: 20px;
+  background: #ffffff9e;
+  list-style: none;
+}
+.pf-edit-bands button {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--acc-ink);
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+}
+.pf-edit-bands button span {
+  font-size: 10px;
+  letter-spacing: 1.1px;
+  color: var(--acc-muted);
+}
+.pf-edit-bands button.is-on {
+  background: var(--acc-ink);
+  color: #fff;
+}
+.pf-edit-bands button.is-on span {
+  color: #ffffff99;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-edit-tile,
+  .pf-edit-week button,
+  .pf-edit .pf-fit-tile {
+    transition: none;
+  }
+}
+
+/* Margini della demo (24 px) anche nelle pagine di modifica. */
+.pf-acc-frame:has(> .pf-edit) {
+  padding-left: 24px;
+  padding-right: 24px;
+}

@@ -151,6 +151,8 @@ export const OUTCOMES = {
   "micro-test-rimandato":
     "Micro-test rimandato: lo ritrovi quando continui la calibrazione.",
   lezione: "Lezione gratuita aggiornata.",
+  disponibilita: "Disponibilità salvata.",
+  classifica: "Classifica salvata: ricalcoliamo la tua R.",
 } as const;
 
 export type Outcome = keyof typeof OUTCOMES;

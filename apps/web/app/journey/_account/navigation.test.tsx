@@ -557,7 +557,7 @@ describe("Conferma nel riepilogo", () => {
       "/athlete-journey/free-lesson": lesson,
     });
     render(<ProfilePage />);
-    expect(await screen.findByText("Tra 70 e 96")).toBeInTheDocument();
+    expect(await screen.findByText("≈ 83")).toBeInTheDocument();
     expect(screen.queryByRole("status")).toBeNull();
   });
 });

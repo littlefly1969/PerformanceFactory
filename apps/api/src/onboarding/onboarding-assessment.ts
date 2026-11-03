@@ -27,6 +27,29 @@ import {
   validateSportSelection,
 } from './onboarding-sports';
 
+/** Voci scritte da POST /athlete/training/availability, da non perdere. */
+const AVAILABILITY_KEYS = [
+  'general_training_frequency',
+  'training_days_available',
+  'training_session_duration',
+  'preferred_training_days',
+] as const;
+
+function keptAvailability(profileJson: Prisma.JsonValue | undefined) {
+  if (
+    !profileJson ||
+    typeof profileJson !== 'object' ||
+    Array.isArray(profileJson)
+  )
+    return {};
+  return Object.fromEntries(
+    AVAILABILITY_KEYS.filter((key) => profileJson[key] != null).map((key) => [
+      key,
+      profileJson[key],
+    ]),
+  );
+}
+
 export async function getStatus(prisma: PrismaService, actor: Actor) {
   assertAthlete(actor);
   const [assessment, goal, sportSelection] = await Promise.all([
@@ -277,6 +300,17 @@ export async function submit(
     if (existing?.baselineId)
       return { status: 'COMPLETED', snapshot: { id: existing.baselineId } };
 
+    // Le voci della disponibilità salvate dal profilo prima dell'abbonamento
+    // restano se le risposte non le contengono (per esempio i giorni
+    // preferiti); quelle presenti nelle risposte valgono come prima.
+    const saved = await tx.userOnboardingAssessment.findUnique({
+      where: { userId: actor.id },
+      select: { profileJson: true },
+    });
+    const profileJson = {
+      ...keptAvailability(saved?.profileJson),
+      ...profile,
+    } as Prisma.InputJsonValue;
     await tx.userOnboardingAssessment.upsert({
       where: { userId: actor.id },
       update: {
@@ -284,7 +318,7 @@ export async function submit(
         answersJson: normalizedAnswers.map((answer) => ({
           ...serializeAnswer(answer),
         })) as Prisma.InputJsonValue,
-        profileJson: profile as Prisma.InputJsonValue,
+        profileJson,
         completedAt: new Date(),
       },
       create: {
@@ -293,7 +327,7 @@ export async function submit(
         answersJson: normalizedAnswers.map((answer) => ({
           ...serializeAnswer(answer),
         })) as Prisma.InputJsonValue,
-        profileJson: profile as Prisma.InputJsonValue,
+        profileJson,
         completedAt: new Date(),
       },
     });

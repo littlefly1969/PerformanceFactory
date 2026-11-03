@@ -48,7 +48,28 @@ export type FitRankingValues = {
   tennisCurrent: string;
   tennisBest: string;
   cardNumber: string | null;
+  /** Livello Playtomic di padel, facoltativo: da 0 a 7 con due decimali. */
+  playtomicLevel: number | null;
 };
+
+export const PLAYTOMIC_MAX = 7;
+
+/**
+ * Livello Playtomic: null per nessuno, undefined se non valido. Accetta
+ * numeri e testi con la virgola («2,75»), al massimo due decimali.
+ */
+export function normalizePlaytomicLevel(value: unknown) {
+  if (value === null || value === undefined || value === '') return null;
+  const n =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && /^\s*\d+([.,]\d{1,2})?\s*$/.test(value)
+        ? Number(value.replace(',', '.'))
+        : NaN;
+  if (!Number.isFinite(n) || n < 0 || n > PLAYTOMIC_MAX) return undefined;
+  if (Math.round(n * 100) / 100 !== n) return undefined;
+  return n;
+}
 
 /** Le quattro voci obbligatorie, nell'ordine in cui si chiedono. */
 export const FIT_RANKING_FIELDS = [
@@ -105,6 +126,8 @@ export function fitRankingProblems(values: Partial<FitRankingValues>) {
   }
   if (normalizeCardNumber(values.cardNumber) === undefined)
     problems.push('Numero di tessera non valido');
+  if (normalizePlaytomicLevel(values.playtomicLevel) === undefined)
+    problems.push('Il livello Playtomic va da 0 a 7');
   return problems;
 }
 
@@ -118,6 +141,9 @@ export function fitRankingContext(
     padel: {
       current: fitRankingLabel('PADEL', row.padelCurrent),
       best: fitRankingLabel('PADEL', row.padelBest),
+      ...(row.playtomicLevel !== null && row.playtomicLevel !== undefined
+        ? { playtomic: row.playtomicLevel.toFixed(2) }
+        : {}),
     },
     tennis: {
       current: fitRankingLabel('TENNIS', row.tennisCurrent),
@@ -150,7 +176,8 @@ const same = (a: FitRankingValues, b: FitRankingValues) =>
   a.padelBest === b.padelBest &&
   a.tennisCurrent === b.tennisCurrent &&
   a.tennisBest === b.tennisBest &&
-  (a.cardNumber ?? null) === (b.cardNumber ?? null);
+  (a.cardNumber ?? null) === (b.cardNumber ?? null) &&
+  (a.playtomicLevel ?? null) === (b.playtomicLevel ?? null);
 
 /**
  * Registra una dichiarazione nello storico, se diversa dall'ultima, e la
@@ -167,9 +194,11 @@ export async function saveFitRanking(
 ) {
   const latest = await loadFitRanking(tx, userId);
   if (latest && same(latest, values)) return false;
+  // Il livello Playtomic conta come la classifica: cambiato, si ricalcola R.
   const changed =
     !latest ||
-    FIT_RANKING_FIELDS.some(({ field }) => latest[field] !== values[field]);
+    FIT_RANKING_FIELDS.some(({ field }) => latest[field] !== values[field]) ||
+    (latest.playtomicLevel ?? null) !== (values.playtomicLevel ?? null);
   const row = await tx.athleteFitRanking.create({
     data: {
       userId,

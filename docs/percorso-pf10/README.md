@@ -7,6 +7,9 @@ pre-account e il minigioco della PR #67 restano come sono.
 Solo frontend (`apps/web`). Nessuna modifica a API, servizi, schema, migrazioni,
 seed, configurazione persistita, autenticazione, pagamenti o webhook.
 
+Il profilo della fase gratuita (pulsante con l'omino) è descritto in
+[profilo.md](profilo.md).
+
 ## Mappa delle schermate
 
 | Demo | Schermata | App | Stato |

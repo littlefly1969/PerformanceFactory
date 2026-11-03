@@ -1,0 +1,160 @@
+/* Pagine di sola presentazione del profilo: invito e community (demo PF10). */
+.pf-fake h1 {
+  margin: 6px 0 0;
+  font-size: 32px;
+  font-weight: 300;
+  line-height: 36px;
+  letter-spacing: -0.05em;
+  text-wrap: pretty;
+}
+.pf-acc .pf-fake-lead {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 21px;
+  color: #4a4a50;
+  text-wrap: pretty;
+}
+.pf-acc .pf-fake-soon {
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--acc-lime-soft);
+  font-size: 13px;
+}
+.pf-fake button:disabled,
+.pf-acc-footer .pf-acc-pill:disabled {
+  cursor: default;
+}
+.pf-fake-box {
+  margin-top: 22px;
+  padding: 20px;
+  border-radius: 26px;
+  background: #f6f6f3;
+}
+.pf-fake-box .pf-prof-kicker {
+  font-size: 10px;
+  letter-spacing: 1.6px;
+}
+.pf-fake-code {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pf-fake-code b {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-family: "PF4 Space Grotesk", sans-serif;
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+}
+.pf-fake-code button {
+  min-height: 44px;
+  flex: none;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--acc-ink);
+  color: #fff;
+  font-size: 10px;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+  opacity: 0.45;
+}
+.pf-fake-link {
+  width: 100%;
+  min-height: 44px;
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 16px;
+  background: #fff;
+  color: var(--acc-ink);
+  text-align: left;
+}
+.pf-fake-link span {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pf-fake-link small {
+  flex: none;
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--acc-muted);
+}
+.pf-fake-qr {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.pf-fake-qr div {
+  width: 96px;
+  height: 96px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #d6d6d2;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: var(--acc-muted);
+}
+.pf-acc .pf-fake-qr p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 19px;
+  color: #4a4a50;
+}
+.pf-fake-whatsapp {
+  width: 100%;
+  min-height: 50px;
+  margin-top: 12px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--acc-ink);
+  color: var(--acc-ink);
+  font-size: 11px;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+  opacity: 0.45;
+}
+.pf-fake-list {
+  margin-top: 30px;
+}
+.pf-fake-list .pf-prof-kicker {
+  font-size: 10px;
+  letter-spacing: 1.6px;
+}
+.pf-acc .pf-fake-list p {
+  margin: 0;
+  padding: 18px 0;
+  box-shadow: inset 0 -1px 0 #eaeae7;
+  font-size: 15px;
+  color: var(--acc-muted);
+}
+.pf-fake-list small {
+  display: block;
+  margin-top: 14px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--acc-muted);
+}
+
+.pf-acc-frame:has(> .pf-fake) {
+  padding-left: 24px;
+  padding-right: 24px;
+}

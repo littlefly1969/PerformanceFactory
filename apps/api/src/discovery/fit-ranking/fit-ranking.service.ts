@@ -13,6 +13,7 @@ import {
   fitRankingProblems,
   loadFitRanking,
   normalizeCardNumber,
+  normalizePlaytomicLevel,
   saveFitRanking,
 } from './fit-ranking';
 
@@ -37,6 +38,7 @@ export class FitRankingService {
         tennisCurrent: ranking.tennisCurrent,
         tennisBest: ranking.tennisBest,
         cardNumber: ranking.cardNumber,
+        playtomicLevel: ranking.playtomicLevel ?? null,
         updatedAt: ranking.createdAt,
       },
       options: FIT_RANKING_OPTIONS,
@@ -54,12 +56,20 @@ export class FitRankingService {
       tennisCurrent: body.tennisCurrent,
       tennisBest: body.tennisBest,
       cardNumber: body.cardNumber,
+      playtomicLevel: body.playtomicLevel,
     } as Partial<FitRankingValues>;
     const problems = fitRankingProblems(declared);
     if (problems.length) throw new BadRequestException(problems[0]);
+    // Senza il campo (benvenuto, pagine che non lo mostrano) resta il livello
+    // Playtomic già dichiarato; null lo toglie.
+    const kept =
+      body.playtomicLevel === undefined
+        ? ((await loadFitRanking(this.prisma, userId))?.playtomicLevel ?? null)
+        : normalizePlaytomicLevel(body.playtomicLevel)!;
     const values = {
       ...declared,
       cardNumber: normalizeCardNumber(body.cardNumber) ?? null,
+      playtomicLevel: kept,
     } as FitRankingValues;
     await this.prisma.$transaction(async (tx) => {
       // Stesso lock del lease del percorso: mentre l'AI scrive le domande o fa

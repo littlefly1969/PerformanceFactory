@@ -1601,6 +1601,23 @@ describe('PF4 discovery to authenticated journey', () => {
         programHorizon: 'PROGRAM_6M',
       });
 
+      // Disponibilità salvata dal profilo nella fase gratuita.
+      const free = await prisma.userOnboardingAssessment.findUnique({
+        where: { userId },
+      });
+      await prisma.userOnboardingAssessment.upsert({
+        where: { userId },
+        update: {
+          profileJson: {
+            ...((free?.profileJson as Prisma.JsonObject | null) ?? {}),
+            preferred_training_days: { value: [2, 4] },
+          },
+        },
+        create: {
+          userId,
+          profileJson: { preferred_training_days: { value: [2, 4] } },
+        },
+      });
       const response = await post('program');
       expect(response.statusCode).toBe(201);
       // La durata è quella dell'orizzonte pagato: nessun passo DURATION.
@@ -1637,6 +1654,11 @@ describe('PF4 discovery to authenticated journey', () => {
       expect(completed.profileJson).toHaveProperty(
         'program_duration_weeks.value',
         26,
+      );
+      // Il profilo generale non cancella i giorni scelti nel profilo.
+      expect(completed.profileJson).toHaveProperty(
+        'preferred_training_days.value',
+        [2, 4],
       );
       expect(
         (
@@ -1840,6 +1862,34 @@ describe('PF4 discovery to authenticated journey', () => {
         })
       ).profileJson,
     ).toHaveProperty('fit_ranking.value.padel.current', '3ª fascia');
+    // Livello Playtomic dal profilo: conta come la classifica e va all'AI.
+    expect(
+      (await post('fit-ranking', { ...declared, playtomicLevel: 7.5 }))
+        .statusCode,
+    ).toBe(400);
+    const playtomic = await post('fit-ranking', {
+      ...declared,
+      playtomicLevel: 2.75,
+    });
+    expect(playtomic.json()).toMatchObject({
+      ranking: { playtomicLevel: 2.75 },
+      recalculationPending: false,
+    });
+    const withLevel = await evaluations();
+    expect(withLevel).toHaveLength(after.length + 1);
+    expect(
+      (
+        withLevel.at(-1)!.inputJson as {
+          prompt: { user: { fitRanking: unknown } };
+        }
+      ).prompt.user.fitRanking,
+    ).toMatchObject({ padel: { playtomic: '2.75' } });
+    // Senza il campo (per esempio dal benvenuto) il livello resta.
+    await post('fit-ranking', declared);
+    expect((await view()).json()).toMatchObject({
+      ranking: { playtomicLevel: 2.75 },
+    });
+    expect(await evaluations()).toHaveLength(withLevel.length);
   });
 
   it('leaves a FIT ranking saved during the AI call pending for recalculation', async () => {

@@ -6,9 +6,16 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsNumber,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 import { AuthenticatedGuard } from '../../common/guards/authenticated.guard';
-import { CARD_NUMBER_MAX } from './fit-ranking';
+import { CARD_NUMBER_MAX, PLAYTOMIC_MAX } from './fit-ranking';
 import { FitRankingService } from './fit-ranking.service';
 
 class FitRankingDto {
@@ -21,6 +28,18 @@ class FitRankingDto {
   @IsString()
   @MaxLength(CARD_NUMBER_MAX)
   cardNumber?: string;
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    minimum: 0,
+    maximum: PLAYTOMIC_MAX,
+    description: 'Livello Playtomic di padel, due decimali; null lo toglie',
+  })
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(PLAYTOMIC_MAX)
+  playtomicLevel?: number | null;
 }
 
 @ApiTags('athlete-journey')
