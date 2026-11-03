@@ -104,6 +104,7 @@ export default function CoachPage() {
             onPrepare={async () => {
               micro.setData(await postJson<HomeMicroTest>(MICRO_TEST));
             }}
+            onRefresh={micro.reload}
             onAnswered={async (roundId, answers) => {
               setFailure("");
               try {

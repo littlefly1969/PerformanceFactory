@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import CoachPage from "../coach/page";
@@ -177,6 +177,54 @@ describe("Risultato del micro-test", () => {
     expect(
       await screen.findByText(/non serve rifare la prova/),
     ).toBeInTheDocument();
+  });
+
+  it("waits for a micro-test another tab is preparing, then offers a retry", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    // Il tempo finto avanza a scatti finché la condizione è vera: le risposte
+    // di fetch arrivano su tempo reale.
+    const tick = (check: () => unknown) =>
+      waitFor(
+        async () => {
+          await act(() => vi.advanceTimersByTimeAsync(3000));
+          check();
+        },
+        { timeout: 150000, interval: 20 },
+      );
+    try {
+      // GET iniziale e POST: PREPARING (la prepara un'altra scheda); poi pronto.
+      let reads = 0;
+      const calls = serve({
+        "/auth/journey": journey({ calibration: calibration(null) }),
+        "/athlete-journey/micro-test": () =>
+          ++reads <= 3 ? homeMicro(null, "PREPARING") : homeMicro(),
+      });
+      render(<CoachPage />);
+      expect(
+        await screen.findByText("Preparo il tuo micro-test."),
+      ).toBeInTheDocument();
+      await tick(() =>
+        screen.getByRole("button", { name: /Inizia il micro-test/ }),
+      );
+      // Una sola richiesta di preparazione: il resto sono riletture.
+      const micro = calls.filter((c) => c.url.endsWith("/micro-test"));
+      expect(micro.length).toBeGreaterThanOrEqual(4);
+      cleanup();
+
+      // Se non arriva mai, dopo l'attesa compare «Riprova».
+      serve({
+        "/auth/journey": journey({ calibration: calibration(null) }),
+        "/athlete-journey/micro-test": homeMicro(null, "PREPARING"),
+      });
+      render(<CoachPage />);
+      await screen.findByText("Preparo il tuo micro-test.");
+      await tick(() => screen.getByText(/più del solito/));
+      expect(
+        screen.getByRole("button", { name: /Riprova/ }),
+      ).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("prepares the next micro-test when the athlete puts the practical test off", async () => {

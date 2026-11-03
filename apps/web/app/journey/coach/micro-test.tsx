@@ -312,6 +312,10 @@ function Practical({
   );
 }
 
+/** Riletture dello stato mentre un'altra scheda prepara il micro-test. */
+const PREPARE_POLL_MS = 3000;
+const PREPARE_POLLS = 30;
+
 /** Attesa con l'esagono: l'AI prepara il test o valuta le risposte. */
 function Working({
   title,
@@ -490,6 +494,7 @@ export function MicroTestTab({
   resultRound,
   saved,
   onPrepare,
+  onRefresh,
   onAnswered,
   onSkip,
 }: {
@@ -500,6 +505,8 @@ export function MicroTestTab({
   saved: string | null;
   /** Chiede al server di preparare il micro-test se manca. */
   onPrepare: () => Promise<void>;
+  /** Rilegge lo stato del micro-test senza chiederne la preparazione. */
+  onRefresh: () => Promise<void>;
   onAnswered: (
     roundId: string,
     answers: Record<string, string>,
@@ -509,14 +516,22 @@ export function MicroTestTab({
   const [started, setStarted] = useState(false);
   const [sending, setSending] = useState(false);
   const [prepError, setPrepError] = useState("");
+  // Richiesta di preparazione in corso e riletture fatte mentre la prepara
+  // un'altra scheda (il server risponde PREPARING senza aspettarla).
+  const [asking, setAsking] = useState(false);
+  const [polls, setPolls] = useState(0);
   const asked = useRef(false);
   const preparing = home?.status === "PREPARING";
   const prepare = () => {
     asked.current = true;
     setPrepError("");
-    onPrepare().catch((e: unknown) =>
-      setPrepError(e instanceof Error ? e.message : "Riprova."),
-    );
+    setPolls(0);
+    setAsking(true);
+    onPrepare()
+      .catch((e: unknown) =>
+        setPrepError(e instanceof Error ? e.message : "Riprova."),
+      )
+      .finally(() => setAsking(false));
   };
   // Manca il micro-test: lo si chiede una volta, anche mentre si legge il
   // risultato del precedente, così il prossimo è pronto al ritorno.
@@ -528,6 +543,23 @@ export function MicroTestTab({
     if (!asked.current) prepare();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preparing]);
+  // Ancora PREPARING dopo la richiesta: lo sta preparando un'altra scheda.
+  // Si rilegge lo stato a intervalli, poi si offre «Riprova».
+  const waiting = preparing && asked.current && !asking && !prepError;
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = setTimeout(() => {
+      if (polls >= PREPARE_POLLS) {
+        setPrepError("La preparazione sta richiedendo più del solito.");
+        return;
+      }
+      onRefresh()
+        .catch(() => undefined)
+        .finally(() => setPolls((n) => n + 1));
+    }, PREPARE_POLL_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waiting, polls]);
   const test = home?.test ?? null;
   const stalled =
     home?.status === "EVALUATING" && test && !sending ? test.round : null;
