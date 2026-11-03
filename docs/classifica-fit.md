@@ -85,7 +85,7 @@ classifica nuova:
 Il livello Playtomic conta come la classifica: se cambia, la R si ricalcola.
 Una richiesta senza il campo `playtomicLevel` (per esempio dal benvenuto) lascia
 il livello già dichiarato; `null` lo toglie. Colonna
-`AthleteFitRanking.playtomicLevel`, migrazione `20261103230000_playtomic_level`.
+`AthleteFitRanking.playtomicLevel`, migrazione `20261103233000_playtomic_level`.
 Cambiare solo il numero di tessera non ricalcola nulla. Se l'AI non risponde la
 classifica resta salvata con `recalculatedAt` nullo, la pagina lo dice e un
 nuovo salvataggio riprova il ricalcolo.
