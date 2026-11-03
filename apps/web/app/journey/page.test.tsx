@@ -85,7 +85,7 @@ describe("PF4 authenticated journey functions", () => {
     await userEvent.click(screen.getByRole("button", { name: "Esci" }));
     expect(requests).toContain("/api/auth/logout");
   });
-  it("renders server questions and stops after the last answer without submitting", async () => {
+  it("renders server questions and evaluates by itself after the last answer", async () => {
     let state = { ...base };
     const requests: { url: string; body: Record<string, unknown> }[] = [];
     vi.stubGlobal(
@@ -110,13 +110,18 @@ describe("PF4 authenticated journey functions", () => {
       questionId: "configured-question",
       value: "yes",
     });
+    // Decisione D5 (demo PF10): niente conferma, l'analisi parte da sola.
     expect(
-      await screen.findByRole("heading", { name: "Risposte registrate." }),
+      await screen.findByRole("heading", {
+        name: "Sto calcolando la tua performance.",
+      }),
     ).toBeInTheDocument();
-    // Nessun invio automatico: la valutazione parte solo su conferma.
-    expect(
-      screen.queryAllByRole("button", { name: /Scopri|Invia|Continua/ }),
-    ).toHaveLength(0);
+    await waitFor(() =>
+      expect(
+        requests.filter((r) => r.url.endsWith("/evaluate")),
+      ).toHaveLength(1),
+    );
+    expect(screen.queryByText("Risposte registrate.")).toBeNull();
     expect(requests.some((r) => r.url.endsWith("/submit"))).toBe(false);
   });
   it("keeps the existing result and duration steps for already submitted athletes", async () => {
@@ -348,23 +353,48 @@ describe("PF5 assessment intro and questions", () => {
     );
   });
 
-  it("shows the stop state at the last answer without any next action", async () => {
-    const requests = serve({
-      ...base,
-      count: 14,
-      currentQuestion: 14,
-      assessmentComplete: true,
-    });
+  it("resumes completed answers with one evaluation, and an explicit retry if it fails", async () => {
+    const requests: string[] = [];
+    let fail = true;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        requests.push(url);
+        if (url.endsWith("/evaluate") && fail)
+          return new Response(
+            JSON.stringify({ message: "Analisi non disponibile. Riprova." }),
+            { status: 503 },
+          );
+        return new Response(
+          JSON.stringify({
+            ...base,
+            count: 14,
+            currentQuestion: 14,
+            assessmentComplete: true,
+          }),
+        );
+      }),
+    );
     render(<JourneyPage />);
     expect(
-      await screen.findByRole("heading", { name: "Risposte registrate." }),
+      await screen.findByText("Analisi non disponibile. Riprova."),
     ).toBeInTheDocument();
-    expect(screen.getByText("14 / 14 · Assessment completato")).toBeVisible();
     expect(screen.queryByText("Domanda configurata")).not.toBeInTheDocument();
+    // Un solo tentativo automatico: il nuovo è su richiesta.
+    expect(requests.filter((url) => url.endsWith("/evaluate"))).toHaveLength(1);
+    fail = false;
+    await userEvent.click(
+      screen.getByRole("button", { name: "Riprova l’analisi" }),
+    );
+    await waitFor(() =>
+      expect(requests.filter((url) => url.endsWith("/evaluate"))).toHaveLength(
+        2,
+      ),
+    );
     expect(requests.some((url) => url.endsWith("/submit"))).toBe(false);
   });
 
-  it("evaluates the answers on confirmation and shows a provisional spider with confidence", async () => {
+  it("evaluates the completed answers by itself and shows a provisional spider with confidence", async () => {
     let state: Record<string, unknown> = {
       ...base,
       count: 14,
@@ -414,9 +444,6 @@ describe("PF5 assessment intro and questions", () => {
       }),
     );
     render(<JourneyPage />);
-    await userEvent.click(
-      await screen.findByRole("button", { name: "Analizza le mie risposte →" }),
-    );
     // Fine dell'assessment: il profilo provvisorio è pronto, poi il profilo.
     expect(
       await screen.findByRole("heading", {

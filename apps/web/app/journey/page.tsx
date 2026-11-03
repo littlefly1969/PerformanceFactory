@@ -45,6 +45,16 @@ export default function JourneyPage() {
       // Transizione osservata dal server: si mostra una volta.
       setReady(true);
   }, [j?.phase]);
+  // Dopo l'ultima risposta la valutazione parte da sola, come nella demo PF10
+  // (decisione D5): niente conferma intermedia. Una volta sola per visita;
+  // se fallisce, il nuovo tentativo è esplicito.
+  const complete = j?.phase === "ASSESSMENT" && !!j.assessmentComplete;
+  const evaluated = useRef(false);
+  useEffect(() => {
+    if (!complete || busy || evaluated.current) return;
+    evaluated.current = true;
+    void action("evaluate");
+  }, [complete, busy, action]);
   // Prima dell'assessment: la prima volta il benvenuto (foto, Spider, regalo,
   // app), poi la home, che è anche dove riapre l'app installata.
   const intro = j?.phase === "ASSESSMENT_INTRO";
@@ -131,7 +141,8 @@ export default function JourneyPage() {
       </DarkQuestion>
     );
   // Calcolo della valutazione (demo PF10): schermata scura, si aggiorna da sola.
-  if (j?.phase === "PROCESSING")
+  // Vale anche mentre parte l'analisi delle risposte appena completate.
+  if (j?.phase === "PROCESSING" || complete)
     return (
       <AccountScreen tone="dark">
         <section className="pf-acc-calc" role="status">
@@ -153,15 +164,28 @@ export default function JourneyPage() {
               {error}
             </p>
           )}
-          <button
-            type="button"
-            className="pf-acc-link"
-            onClick={() => {
-              void refresh();
-            }}
-          >
-            Aggiorna
-          </button>
+          {complete ? (
+            error &&
+            !busy && (
+              <button
+                type="button"
+                className="pf-acc-link"
+                onClick={() => void action("evaluate")}
+              >
+                Riprova l’analisi
+              </button>
+            )
+          ) : (
+            <button
+              type="button"
+              className="pf-acc-link"
+              onClick={() => {
+                void refresh();
+              }}
+            >
+              Aggiorna
+            </button>
+          )}
         </section>
       </AccountScreen>
     );
@@ -240,29 +264,6 @@ export default function JourneyPage() {
             failed={!!error}
             onPrepare={() => action("questions")}
           />
-        )}
-        {/* Tutte le risposte date: l'atleta conferma e parte la prima valutazione AI. */}
-        {j?.phase === "ASSESSMENT" && j.assessmentComplete && (
-          <section className="pf4-body" role="status">
-            <span className="pf4-kicker">
-              {j.count} / {j.count} · Assessment completato
-            </span>
-            <h1>Risposte registrate.</h1>
-            <p>
-              Hai risposto a tutte le domande. Puoi ancora tornare indietro e
-              modificarle; quando confermi le analizziamo e le risposte non
-              saranno più modificabili.
-            </p>
-            <button
-              className="pf4-cta"
-              disabled={busy}
-              onClick={() => void action("evaluate")}
-            >
-              {busy
-                ? "Analizziamo le tue risposte…"
-                : "Analizza le mie risposte →"}
-            </button>
-          </section>
         )}
         {j?.phase === "SUBSCRIBED" && (
           <section className="pf4-body" aria-labelledby="pf4-subscribed-title">
