@@ -152,6 +152,20 @@ describe("contatore della demo PF10", () => {
     expect(container).toBeTruthy();
   });
 
+  it("con le fasce riordinate da back office torna al selettore delle risposte", () => {
+    const onChange = vi.fn();
+    const [low, mid, high] = frequency.options;
+    render(
+      <Counter
+        question={{ ...frequency, options: [high, low, mid] }}
+        onChange={onChange}
+      />,
+    );
+    // Nessun numero da interpretare: si sceglie l'opzione che si vede.
+    expect(screen.getByText("Usa − e + per scegliere")).toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it("con opzioni diverse dalle fasce torna al selettore delle risposte", () => {
     render(
       <Counter
