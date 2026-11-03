@@ -6,8 +6,27 @@
 .pf4-funnel .pf4-registration > .pf4-kicker {
   margin-top: 8px;
 }
-.pf4-funnel .pf4-registration .pf4-google {
+.pf4-funnel .pf4-registration .pf4-apple {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   margin: 22px 0 0;
+}
+/* Apple non ancora attivo: grigio, sopra Google come nella demo. */
+.pf4-funnel .pf4-registration .pf4-apple:disabled {
+  border: 0;
+  background: #e6e6e2;
+  color: #9d9da2;
+  opacity: 1;
+  cursor: not-allowed;
+}
+.pf4-apple-mark {
+  flex-shrink: 0;
+  margin-top: -3px;
+}
+.pf4-funnel .pf4-registration .pf4-google {
+  margin: 10px 0 0;
 }
 .pf4-google-mark {
   font-size: 15px;
@@ -55,6 +74,28 @@
   color: #0b0b0c;
   cursor: pointer;
 }
+/* «Accetta tutte le obbligatorie»: centrata, sopra le singole voci. */
+.pf4-accept-all {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 26px;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  color: #0b0b0c;
+  cursor: pointer;
+}
+.pf4-accept-all small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+  color: #8e8e93;
+}
+.pf4-accept-all input,
 .pf4-signup-check input {
   flex-shrink: 0;
   width: 22px;
@@ -66,6 +107,7 @@
   background: #fff;
   cursor: pointer;
 }
+.pf4-accept-all input:checked,
 .pf4-signup-check input:checked {
   border-color: #0b0b0c;
   background: #0b0b0c
