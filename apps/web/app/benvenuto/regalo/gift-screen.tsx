@@ -27,13 +27,13 @@ export const areaShort = (name: string) =>
     .toUpperCase();
 
 /** Passo 3 di 4 dell'accoglienza dopo la registrazione. */
-const STEP = 3;
-const STEPS = 4;
+const STEP = 4;
+const STEPS = 5;
 /** Passo successivo dell'accoglienza: invito a installare l'app (PWA). */
 export const NEXT_STEP = "/benvenuto/installa";
 
 /**
- * Schermata 03 · Il tuo regalo: la lezione di prova nei circoli affiliati e
+ * Schermata 04 · Il tuo regalo: la lezione di prova nei circoli affiliati e
  * quanto manca a una Performance completamente Reale.
  */
 export function GiftScreen({
@@ -52,6 +52,9 @@ export function GiftScreen({
     <main className="pf-gift">
       <div className="pf-gift-column">
         <header className="pf-gift-header">
+          <a className="pf-gift-back" href="/benvenuto/spider" aria-label="Indietro">
+            ←
+          </a>
           <ol
             className="pf-gift-steps"
             aria-label={`Passo ${STEP} di ${STEPS}`}
@@ -70,7 +73,7 @@ export function GiftScreen({
           </button>
         </header>
 
-        <p className="pf-gift-kicker">03 · Il tuo regalo</p>
+        <p className="pf-gift-kicker">04 · Il tuo regalo</p>
         {clubs.length > 0 && <ClubCarousel clubs={clubs} />}
 
         <section className="pf-gift-offer" aria-labelledby="pf-gift-title">

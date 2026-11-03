@@ -469,7 +469,7 @@ describe("Prossimo passo uguale in Home e profilo", () => {
         completionReason: "DEADLINE_REACHED",
       }),
       { ...lesson, phase: "CLOSED" },
-      "/journey/scenari",
+      "/journey/stima",
     ],
     [
       "lesson locked",
@@ -499,7 +499,7 @@ describe("Prossimo passo uguale in Home e profilo", () => {
       "calibration closed",
       closedRound,
       { ...lesson, phase: "CLOSED" },
-      "/journey/scenari",
+      "/journey/stima",
     ],
   ])("with %s", async (_case, current, view, href) => {
     const j = journey({ calibration: current });
@@ -584,5 +584,43 @@ describe("Lezione gratuita", () => {
     expect(calls.some((c) => c.url.endsWith("/free-lesson/decline"))).toBe(
       true,
     );
+  });
+});
+
+describe("Home: aree da completare", () => {
+  it("counts the areas known well enough, as on the calibration page", async () => {
+    const j = journey({
+      evaluation: {
+        ...journey().evaluation,
+        drivers: journey().evaluation.drivers.map((d, i) => ({
+          ...d,
+          confidence: [72, 40, 60][i],
+        })),
+      },
+      calibration: calibration(null),
+    });
+    serve({
+      "/athlete-journey/profile": PROFILE,
+      "/athlete-journey/free-lesson": lesson,
+    });
+    render(<AccountHome journey={j as unknown as Journey} />);
+    const areas = screen.getByRole("link", { name: /Completa le 3 aree/ });
+    expect(areas).toHaveAttribute("href", "/journey/calibrazione");
+    expect(areas.textContent).toContain("2 di 3 aree definite");
+    expect(areas.querySelectorAll("i.is-ok")).toHaveLength(2);
+  });
+
+  it("hides the areas once the calibration is closed", async () => {
+    const j = journey({
+      calibration: calibration(null, "CALIBRATION_COMPLETED", {
+        ruleMet: true,
+      }),
+    });
+    serve({
+      "/athlete-journey/profile": PROFILE,
+      "/athlete-journey/free-lesson": lesson,
+    });
+    render(<AccountHome journey={j as unknown as Journey} />);
+    expect(screen.queryByText(/aree definite/)).toBeNull();
   });
 });

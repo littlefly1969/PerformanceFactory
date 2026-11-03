@@ -3,7 +3,12 @@ import { AccountMenu } from "../../components/account-menu";
 import type { Journey } from "../journey-types";
 import { AccountScreen, PillLink } from "./account-shell";
 import { type FreeLessonView, useResource } from "./account-data";
-import { isConsolidated, microTestOpen } from "./calibration-state";
+import {
+  definedAreas,
+  isClosed,
+  isConsolidated,
+  microTestOpen,
+} from "./calibration-state";
 import { nextStep } from "./next-step";
 import { MiniSpider } from "./spiders";
 
@@ -18,6 +23,8 @@ export function AccountHome({ journey: j }: { journey: Journey }) {
   const step = lesson.data === undefined ? null : nextStep(j, lesson.data);
   const consolidated = isConsolidated(j.calibration);
   const name = j.firstName?.trim();
+  const drivers = evaluation.drivers;
+  const defined = definedAreas(j.calibration, drivers);
   return (
     <AccountScreen nav="home" coachDot={microTestOpen(j.calibration)}>
       <div className="pf-acc-row">
@@ -42,6 +49,21 @@ export function AccountHome({ journey: j }: { journey: Journey }) {
             </a>
           )}
         </section>
+      )}
+      {!isClosed(j.calibration) && drivers.length > 0 && (
+        <Link className="pf-acc-home-areas" href="/journey/calibrazione">
+          <span className="pf-acc-home-areas-head">
+            <strong>Completa le {drivers.length === 6 ? "sei" : drivers.length} aree</strong>
+            <small>
+              {defined.size} di {drivers.length} aree definite
+            </small>
+          </span>
+          <span className="pf-acc-home-areas-bar" aria-hidden="true">
+            {drivers.map((d) => (
+              <i key={d.id} className={defined.has(d.id) ? "is-ok" : undefined} />
+            ))}
+          </span>
+        </Link>
       )}
       <Link className="pf-acc-card pf-acc-home-spider" href="/journey/profilo">
         <MiniSpider

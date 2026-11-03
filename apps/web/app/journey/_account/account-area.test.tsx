@@ -133,13 +133,26 @@ describe("Scelta del circolo", () => {
   it("requests the seat with the preferred lesson only after consent", async () => {
     const calls = serve({
       "/auth/journey": journey(),
-      "/free-lesson/request": { ...lesson, phase: "REQUESTED" },
+      "/free-lesson/request": {
+        ...lesson,
+        phase: "REQUESTED",
+        seat: {
+          status: "REQUESTED",
+          club: { name: "Padel Club Nord", city: "Milano" },
+          preferredLessonId: "l1",
+          lesson: null,
+        },
+      },
       "/athlete-journey/free-lesson": lesson,
     });
     render(<ClubPage />);
-    const request = await screen.findByRole("button", {
-      name: /Richiedi il posto/,
-    });
+    // Demo PF10: prima «Dove giochi?», poi «Quando?».
+    expect(
+      await screen.findByRole("heading", { name: "Dove giochi?" }),
+    ).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: /Gioco qui/ }));
+    expect(screen.getByRole("heading", { name: "Quando?" })).toBeTruthy();
+    const request = screen.getByRole("button", { name: /Richiedi il posto/ });
     expect(request).toBeDisabled();
     await userEvent.click(screen.getByRole("radio", { name: /27/ }));
     await userEvent.click(await screen.findByRole("radio", { name: "18:00" }));
@@ -150,6 +163,33 @@ describe("Scelta del circolo", () => {
         calls.find((c) => c.url.endsWith("/free-lesson/request"))?.body,
       ).toEqual({ partnerId: "c1", shareWithCoach: true, lessonId: "l1" }),
     );
+    // Una richiesta non è un posto confermato: niente «Ci vediamo in campo».
+    expect(
+      await screen.findByRole("heading", { name: "Richiesta inviata." }),
+    ).toBeTruthy();
+    expect(screen.queryByText("Ci vediamo in campo.")).toBeNull();
+  });
+
+  it("says «Ci vediamo in campo» only for a seat the club confirmed", async () => {
+    serve({
+      "/auth/journey": journey(),
+      "/athlete-journey/free-lesson": {
+        ...lesson,
+        phase: "ASSIGNED",
+        seat: {
+          status: "ASSIGNED",
+          club: { name: "Padel Club Nord", city: "Milano" },
+          preferredLessonId: "l1",
+          lesson: { startsAt: "2026-10-27T18:00:00", durationMinutes: 60 },
+        },
+      },
+    });
+    render(<ClubPage />);
+    expect(
+      await screen.findByRole("heading", { name: "Ci vediamo in campo." }),
+    ).toBeTruthy();
+    expect(screen.getByText("18:00")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Modifica la richiesta/ })).toBeNull();
   });
 });
 

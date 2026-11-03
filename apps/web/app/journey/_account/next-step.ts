@@ -22,6 +22,12 @@ export type NextStep = {
   secondary?: { href: string; label: string };
 };
 
+/**
+ * «Dove sei adesso e dove puoi arrivare» (S15 della demo PF10): R e P3/P6/P12
+ * prima della scelta dello scenario.
+ */
+export const REVEAL_HREF = "/journey/stima";
+
 /** La calibrazione è il passo proposto: domande, micro-test o valutazione. */
 export const isCalibrationStep = (step: NextStep) =>
   step.kind === "evaluation" ||
@@ -52,14 +58,14 @@ export function nextStep(
           kicker: "Fase gratuita conclusa",
           title:
             "La tua R è una stima poco affidabile: puoi comunque vedere i tuoi scenari.",
-          href: "/journey/scenari",
+          href: REVEAL_HREF,
           cta: "I tuoi scenari",
         }
       : {
           kind: "scenarios",
           kicker: "Calibrazione completata",
           title: "Scopri dove puoi arrivare in 3, 6 e 12 mesi.",
-          href: "/journey/scenari",
+          href: REVEAL_HREF,
           cta: "I tuoi scenari",
         };
   if (c?.round?.status === "EVALUATING")

@@ -1,3 +1,9 @@
+@font-face {
+  font-family: "PF4 Space Grotesk";
+  src: url("/fonts/space-grotesk-latin.woff2") format("woff2");
+  font-weight: 300 500;
+  font-display: swap;
+}
 /* Area atleta della fase gratuita: schermate chiare, mobile first. */
 .pf-acc {
   --acc-ink: #0b0b0c;

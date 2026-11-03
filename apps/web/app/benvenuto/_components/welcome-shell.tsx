@@ -2,23 +2,28 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import "./welcome.css";
 
-/** Sequenza di benvenuto dopo la creazione account: 4 passi su fondo scuro. */
-export const WELCOME_STEPS = 4;
+/**
+ * Sequenza di benvenuto dopo la creazione account, come nella demo PF10:
+ * foto, classifica FIT, Spider, regalo e app, su fondo scuro.
+ */
+export const WELCOME_STEPS = 5;
 
 /**
- * Con `back` la stessa schermata serve fuori dal benvenuto, dall'account:
- * al posto dell'avanzamento c'è la freccia per tornare indietro.
+ * `back` porta al passo precedente (o, fuori dal benvenuto, all'account);
+ * `skipLabel` cambia «Salta», per esempio in «Più tardi» sull'ultimo passo.
  */
 export function WelcomeShell({
   step,
   back,
   skipHref,
+  skipLabel = "Salta",
   children,
   footer,
 }: {
   step?: number;
   back?: string;
   skipHref?: string;
+  skipLabel?: string;
   children: ReactNode;
   footer?: ReactNode;
 }) {
@@ -52,7 +57,7 @@ export function WelcomeShell({
           )}
           {skipHref && (
             <Link className="pf-welcome-skip" href={skipHref}>
-              Salta
+              {skipLabel}
             </Link>
           )}
         </header>

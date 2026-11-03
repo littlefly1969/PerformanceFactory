@@ -34,7 +34,7 @@ export default function ScenariosPage() {
   };
   return (
     <AccountScreen
-      top={<AccountTopBar title="Scelta scenario" back="/journey/profilo" />}
+      top={<AccountTopBar title="Scelta scenario" back="/journey/stima" />}
     >
       <h1 className="pf-acc-title">Scegli il tuo orizzonte.</h1>
       <p className="pf-acc-lead">

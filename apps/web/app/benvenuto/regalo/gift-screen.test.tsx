@@ -67,7 +67,7 @@ describe("GiftScreen", () => {
     expect(
       screen.getByTitle("Preparazione atletica").closest("li"),
     ).toHaveClass("is-real");
-    expect(screen.getByLabelText("Passo 3 di 4")).toBeInTheDocument();
+    expect(screen.getByLabelText("Passo 4 di 5")).toBeInTheDocument();
   });
 
   it("moves on with Continua and Salta", async () => {

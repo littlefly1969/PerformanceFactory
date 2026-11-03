@@ -12,6 +12,7 @@ import { QuestionsPreparing } from "./questions-preparing";
 import { AccountHome } from "./_account/account-home";
 import { DarkQuestion, SingleOptions } from "./_account/dark-question";
 import { ProvisionalReady } from "./_account/provisional-ready";
+import { AccountScreen } from "./_account/account-shell";
 import type { Journey } from "./journey-types";
 import "./journey.css";
 const HORIZON_MONTHS: Record<string, number> = {
@@ -65,6 +66,7 @@ export default function JourneyPage() {
     return ready ? (
       <ProvisionalReady
         evaluation={j.evaluation}
+        calibration={j.calibration}
         onHome={() => setReady(false)}
       />
     ) : (
@@ -128,8 +130,43 @@ export default function JourneyPage() {
         )}
       </DarkQuestion>
     );
+  // Calcolo della valutazione (demo PF10): schermata scura, si aggiorna da sola.
+  if (j?.phase === "PROCESSING")
+    return (
+      <AccountScreen tone="dark">
+        <section className="pf-acc-calc" role="status">
+          <svg className="pf-acc-calc-hex" viewBox="0 0 200 200" aria-hidden="true">
+            <polygon points="100,16 172.7,58 172.7,142 100,184 27.3,142 27.3,58" />
+            <polygon
+              className="is-inner"
+              points="100,58 136.4,79 136.4,121 100,142 63.6,121 63.6,79"
+            />
+            <polygon
+              className="is-trace"
+              points="100,16 172.7,58 172.7,142 100,184 27.3,142 27.3,58"
+            />
+          </svg>
+          <h1 className="pf-acc-title">Sto calcolando la tua performance.</h1>
+          <p>Aggiorno lo Spider con le nuove risposte.</p>
+          {error && (
+            <p className="pf-acc-error" role="alert">
+              {error}
+            </p>
+          )}
+          <button
+            type="button"
+            className="pf-acc-link"
+            onClick={() => {
+              void refresh();
+            }}
+          >
+            Aggiorna
+          </button>
+        </section>
+      </AccountScreen>
+    );
   // L'intro PF5 e chiara, come /start; il questionario resta sullo stage scuro.
-  const assessment = j?.phase === "ASSESSMENT" || j?.phase === "PROCESSING";
+  const assessment = j?.phase === "ASSESSMENT";
   return (
     <div className={assessment ? "pf4-assessment" : undefined}>
       <PF4Shell
@@ -242,23 +279,6 @@ export default function JourneyPage() {
               onClick={() => void action("program")}
             >
               {busy ? "Prepariamo il programma…" : "Crea il mio programma →"}
-            </button>
-          </section>
-        )}
-        {j?.phase === "PROCESSING" && (
-          <section className="pf4-body" role="status">
-            <h1>Analizziamo le tue risposte…</h1>
-            <p>
-              Il percorso riprenderà automaticamente quando l’elaborazione sarà
-              terminata.
-            </p>
-            <button
-              className="pf4-cta"
-              onClick={() => {
-                void refresh();
-              }}
-            >
-              Aggiorna
             </button>
           </section>
         )}
