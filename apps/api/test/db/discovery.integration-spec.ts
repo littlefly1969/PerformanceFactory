@@ -860,7 +860,7 @@ describe('PF4 discovery to authenticated journey', () => {
     });
     // Senza giorni e durata nel profilo il programma non parte.
     await expect(app.get(AthleteJourneyService).submit(userId)).rejects.toThrow(
-      'indica nel profilo quanti giorni',
+      'indica quanti giorni e quanto tempo',
     );
     // La disponibilità si compila nel profilo, fuori dall'assessment.
     const operational = await loadOperationalTemplates(prisma);

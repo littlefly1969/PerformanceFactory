@@ -12,6 +12,12 @@ import { AccountHome } from "./_account/account-home";
 import { DarkQuestion, SingleOptions } from "./_account/dark-question";
 import { HexPrep, HexSide } from "./_account/assessment-hex";
 import { ProvisionalReady } from "./_account/provisional-ready";
+import { useResource } from "./_account/account-data";
+import {
+  AVAILABILITY_PATH,
+  AvailabilityStep,
+  type AvailabilityForm,
+} from "./_account/availability-step";
 import type { Journey } from "./journey-types";
 import "./journey.css";
 /** Durata minima di un giro d'animazione, come nella demo PF10. */
@@ -107,7 +113,23 @@ export default function JourneyPage() {
   useEffect(() => {
     if (welcome) window.location.replace("/benvenuto/foto");
   }, [welcome]);
+  // Già abbonato ma senza giorni e durata: il programma non parte senza.
+  const subscribed = j?.phase === "SUBSCRIBED";
+  const availability = useResource<AvailabilityForm>(
+    subscribed ? AVAILABILITY_PATH : null,
+  );
   if (welcome) return null;
+  if (subscribed && availability.data?.ready === false)
+    return (
+      <AvailabilityStep
+        lead="Ci manca solo questo per preparare il tuo programma."
+        action="Crea il mio programma"
+        onSaved={(form) => {
+          availability.setData(form);
+          void action("program");
+        }}
+      />
+    );
   if (intro)
     return (
       <WelcomeHome
