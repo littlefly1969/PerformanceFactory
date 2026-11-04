@@ -8,7 +8,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import AccountPage from "./page";
-import AccountAddressPage from "./indirizzo/page";
+import { AccountAddressPage } from "./indirizzo/address-page";
 import AccountPhotoPage from "./foto/page";
 import AccountSubscriptionPage from "./abbonamento/page";
 
@@ -73,7 +73,6 @@ describe("Accesso all'account", () => {
     for (const [name, href] of [
       ["Foto", "/account/foto?da=account"],
       ["Tessera e classifiche FIT", "/account/fit?da=account"],
-      ["Indirizzo", "/account/indirizzo?da=account"],
       ["Face ID e impronta", "/account/accesso?da=account"],
       ["Abbonamento", "/account/abbonamento?da=account"],
     ])
@@ -84,6 +83,8 @@ describe("Accesso all'account", () => {
       "href",
       "/user",
     );
+    // L'indirizzo per ora non ha interfaccia: resta solo nel database.
+    expect(screen.queryByRole("link", { name: /Indirizzo/ })).toBeNull();
   });
 
   it.each([
@@ -98,7 +99,7 @@ describe("Accesso all'account", () => {
       serve({ "/auth/journey": { phase, welcomeCompleted: true } });
       render(<AccountPage />);
       expect(
-        await screen.findByRole("link", { name: /Indirizzo/ }),
+        await screen.findByRole("link", { name: /Foto/ }),
       ).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Indietro" })).toHaveAttribute(
         "href",

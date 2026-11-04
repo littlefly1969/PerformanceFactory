@@ -127,10 +127,8 @@ describe("PF4 athlete experience", () => {
     expect(
       screen.getByRole("link", { name: "Tessera e classifiche FIT" }),
     ).toHaveAttribute("href", "/account/fit?da=user");
-    expect(screen.getByRole("link", { name: "Indirizzo" })).toHaveAttribute(
-      "href",
-      "/account/indirizzo?da=user",
-    );
+    // L'indirizzo per ora non ha interfaccia.
+    expect(screen.queryByRole("link", { name: "Indirizzo" })).toBeNull();
     expect(screen.getByRole("link", { name: "Abbonamento" })).toHaveAttribute(
       "href",
       "/account/abbonamento?da=user",

@@ -18,7 +18,10 @@ import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import { CoachLessonService } from './coach-lesson.service';
+import { ClubAreaService } from './club-area';
 import {
+  AreaResolveDto,
+  AreaSuggestionsDto,
   AssignSeatDto,
   CoachFeedbackDto,
   CoachNoShowDto,
@@ -43,7 +46,10 @@ type AuthRequest = { user: { id: string } };
 @UseGuards(AuthenticatedGuard, RolesGuard)
 @Roles(UserRole.USER)
 export class FreeLessonController {
-  constructor(private readonly lessons: FreeLessonService) {}
+  constructor(
+    private readonly lessons: FreeLessonService,
+    private readonly areas: ClubAreaService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Lezione gratuita: crediti e fase' })
@@ -60,15 +66,24 @@ export class FreeLessonController {
     return this.lessons.gift(req.user.id);
   }
 
+  @Post('area/suggestions')
+  @ApiOperation({
+    summary: 'CAP o città per cercare i circoli, senza indirizzo',
+  })
+  areaSuggestions(@Req() req: AuthRequest, @Body() body: AreaSuggestionsDto) {
+    return this.areas.suggestions(req.user.id, body.input, body.sessionToken);
+  }
+
+  @Post('area/resolve')
+  @ApiOperation({ summary: 'Città del CAP o della città scelta' })
+  areaResolve(@Req() req: AuthRequest, @Body() body: AreaResolveDto) {
+    return this.areas.resolve(req.user.id, body.placeId, body.sessionToken);
+  }
+
   @Post('request')
   @ApiOperation({ summary: 'Richiede il posto nella lezione gratuita' })
   request(@Req() req: AuthRequest, @Body() body: RequestFreeLessonDto) {
-    return this.lessons.request(
-      req.user.id,
-      body.partnerId,
-      body.shareWithCoach,
-      body.lessonId,
-    );
+    return this.lessons.request(req.user.id, body.partnerId, body.lessonId);
   }
 
   @Post('withdraw')

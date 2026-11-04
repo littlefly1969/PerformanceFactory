@@ -275,46 +275,56 @@ describe('Free lesson with PostgreSQL', () => {
     await prisma.$disconnect();
   });
 
-  it('dice quanto dista il circolo, e perche non lo sa senza indirizzo', async () => {
+  it('mostra i circoli con citta e posizione, senza usare l indirizzo dell atleta', async () => {
     const id = await athlete([80, 90]);
-    // Senza indirizzo non si inventa un numero: si dice il motivo.
-    expect(await athletes.view(id)).toMatchObject({
-      distance: { available: false, reason: 'NO_ADDRESS' },
-      clubs: [{ distanceKm: null }],
+    const ours = (view: unknown) =>
+      (view as { clubs: Array<{ id: string }> }).clubs.find(
+        (c) => c.id === partnerId,
+      );
+    // Sede senza coordinate: nessuna posizione, la distanza non si inventa.
+    const first = await athletes.view(id);
+    expect(first).not.toHaveProperty('distance');
+    const club = ours(first);
+    expect(club).toMatchObject({
+      id: partnerId,
+      province: null,
+      postalCode: null,
+      location: null,
+      logoUrl: null,
+      photoUrl: null,
     });
+    expect(club).not.toHaveProperty('distanceKm');
 
-    // Indirizzo salvato ma non riconosciuto: nessuna coordinata, nessuna distanza.
-    await prisma.userAddress.create({
-      data: {
-        userId: id,
-        street: 'Via senza nome 1',
-        postalCode: '67100',
-        city: "L'Aquila",
-        province: 'AQ',
-      },
-    });
-    expect(await athletes.view(id)).toMatchObject({
-      distance: { available: false, reason: 'ADDRESS_NOT_LOCATED' },
-      clubs: [{ distanceKm: null }],
-    });
-
-    // Atleta e circolo localizzati: distanza in linea d'aria fra Pescara e L'Aquila.
-    await prisma.userAddress.update({
-      where: { userId: id },
-      data: { latitude: 42.3498, longitude: 13.3995 },
-    });
+    // Sede localizzata: le coordinate servono al browser per i chilometri.
     await prisma.partner.update({
       where: { id: partnerId },
-      data: { latitude: 42.4618, longitude: 14.2161 },
+      data: {
+        latitude: 42.4618,
+        longitude: 14.2161,
+        city: 'Pescara',
+        postalCode: '65121',
+        province: 'PE',
+      },
     });
     const located = await athletes.view(id);
-    expect(located).toMatchObject({
-      distance: { available: true, reason: null },
+    expect(located).not.toHaveProperty('distance');
+    expect(ours(located)).toMatchObject({
+      city: 'Pescara',
+      postalCode: '65121',
+      province: 'PE',
+      location: { latitude: 42.4618, longitude: 14.2161 },
     });
-    const [club] = (located as { clubs: Array<{ distanceKm: number | null }> })
-      .clubs;
-    expect(club.distanceKm).toBeGreaterThan(65);
-    expect(club.distanceKm).toBeLessThan(80);
+    // Gli altri test usano il circolo senza sede.
+    await prisma.partner.update({
+      where: { id: partnerId },
+      data: {
+        latitude: null,
+        longitude: null,
+        city: null,
+        postalCode: null,
+        province: null,
+      },
+    });
   });
 
   it('credits each interaction once, also with parallel requests, and keeps the catalog out of the panel', async () => {
@@ -401,8 +411,8 @@ describe('Free lesson with PostgreSQL', () => {
       }),
     ).toBe(1);
     await Promise.all([
-      athletes.request(id, partnerId, true),
-      athletes.request(id, partnerId, true),
+      athletes.request(id, partnerId),
+      athletes.request(id, partnerId),
     ]);
     const seat = await prisma.freeLessonSeat.findUniqueOrThrow({
       where: { userId: id },
@@ -625,7 +635,7 @@ describe('Free lesson with PostgreSQL', () => {
         .status,
     ).toBe('COMPLETED');
     await expect(
-      athletes.request(roundAthlete, partnerId, true),
+      athletes.request(roundAthlete, partnerId),
     ).rejects.toMatchObject({ response: { phase: 'NO_SHOW' } });
   });
 
@@ -721,15 +731,15 @@ describe('Free lesson with PostgreSQL', () => {
     // La lezione al completo non si propone.
     expect(slots).toContain(open);
     expect(slots).not.toContain(full);
-    await expect(
-      athletes.request(id, partnerId, true, full),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    expect(await athletes.request(id, partnerId, true, open)).toMatchObject({
+    await expect(athletes.request(id, partnerId, full)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(await athletes.request(id, partnerId, open)).toMatchObject({
       phase: 'REQUESTED',
       seat: { status: 'REQUESTED', preferredLessonId: open },
     });
     // La preferenza si cambia finché il posto non è assegnato.
-    expect(await athletes.request(id, partnerId, true)).toMatchObject({
+    expect(await athletes.request(id, partnerId)).toMatchObject({
       seat: { preferredLessonId: null },
     });
   });
@@ -763,7 +773,7 @@ describe('Free lesson with PostgreSQL', () => {
       phase: 'DECLINED',
     });
     expect(await status(undecided)).toBe('FREE_LEVEL_ESTIMATED');
-    expect(await athletes.request(undecided, partnerId, true)).toMatchObject({
+    expect(await athletes.request(undecided, partnerId)).toMatchObject({
       phase: 'REQUESTED',
     });
     expect(
@@ -853,7 +863,7 @@ describe('Free lesson with PostgreSQL', () => {
     expect(JSON.stringify(await calibration.view(id))).not.toMatch(
       /anomal|CONTRADICTIONS|tre mesi/,
     );
-    await expect(athletes.request(id, partnerId, true)).rejects.toThrow();
+    await expect(athletes.request(id, partnerId)).rejects.toThrow();
     expect(await status(id)).toBe('FREE_LEVEL_ESTIMATED');
 
     // Revisione dell'admin, con audit: la lezione torna disponibile.
@@ -903,7 +913,7 @@ describe('Free lesson with PostgreSQL', () => {
     await flags.update('free_lesson', { enabled: false }, adminId);
     expect(await athletes.view(id)).toEqual({ enabled: false });
     expect(await athletes.gift(id)).toEqual({ enabled: false });
-    await expect(athletes.request(id, partnerId, true)).rejects.toBeInstanceOf(
+    await expect(athletes.request(id, partnerId)).rejects.toBeInstanceOf(
       ForbiddenException,
     );
     expect(

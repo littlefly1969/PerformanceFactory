@@ -18,7 +18,8 @@ import {
 } from '../discovery/calibration/lesson-gate';
 import { FeatureFlagsService } from '../features/feature-flags.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { distanceBetween } from '../geo/distance';
+import { coordinatesOf } from '../geo/distance';
+import { clubImagePath } from '../partners/club-image';
 import { loadFreeLessonSettings, syncCredits } from './free-lesson-config';
 import { loadGift } from './free-lesson-gift';
 import { lessonEligibility } from './free-lesson-rules';
@@ -107,38 +108,58 @@ export class FreeLessonService {
       return { enabled: false as const };
     const settings = await loadFreeLessonSettings(this.prisma);
     const credits = await syncCredits(this.prisma, userId, settings);
-    const [attribution, check, slots, address] = await Promise.all([
+    const [attribution, check, slots] = await Promise.all([
       this.prisma.userAttribution.findUnique({
         where: { userId },
         select: { partnerId: true },
       }),
       checkLesson(this.prisma, userId),
       lessonSlots(this.prisma),
-      this.prisma.userAddress.findUnique({
-        where: { userId },
-        select: { latitude: true, longitude: true },
-      }),
     ]);
     const { phase, missing, clubs } = check;
-    // La distanza si calcola solo con l'indirizzo dell'atleta risolto in
-    // coordinate: altrimenti si dice perche non si puo calcolare.
-    const distance = {
-      available: !!address?.latitude && !!address?.longitude,
-      reason: !address
-        ? ('NO_ADDRESS' as const)
-        : address.latitude === null || address.longitude === null
-          ? ('ADDRESS_NOT_LOCATED' as const)
-          : null,
-    };
-    const clubsWithDistance = clubs.map(({ latitude, longitude, ...club }) => ({
-      ...club,
-      distanceKm: distanceBetween(address, { latitude, longitude }),
-    }));
+    // Niente indirizzo dell'atleta: la distanza la calcola il browser con la
+    // posizione, oppure si cercano i circoli della città dal CAP.
+    const details = await this.prisma.partner.findMany({
+      where: { id: { in: clubs.map((club) => club.id) } },
+      select: {
+        id: true,
+        province: true,
+        postalCode: true,
+        logoUpdatedAt: true,
+        photoUpdatedAt: true,
+      },
+    });
+    const detailById = new Map(details.map((d) => [d.id, d]));
+    const clubsForAthlete = clubs.map((club) => {
+      const detail = detailById.get(club.id);
+      return {
+        id: club.id,
+        name: club.name,
+        city: club.city,
+        province: detail?.province ?? null,
+        postalCode: detail?.postalCode ?? null,
+        location: coordinatesOf(club),
+        logoUrl: clubImagePath(club.id, 'logo', detail?.logoUpdatedAt ?? null),
+        photoUrl: clubImagePath(
+          club.id,
+          'photo',
+          detail?.photoUpdatedAt ?? null,
+        ),
+      };
+    });
     const seat = check.seat
       ? await this.prisma.freeLessonSeat.findUniqueOrThrow({
           where: { userId },
           include: {
-            partner: { select: { name: true, city: true } },
+            partner: {
+              select: {
+                id: true,
+                name: true,
+                city: true,
+                logoUpdatedAt: true,
+                photoUpdatedAt: true,
+              },
+            },
             lesson: { select: { startsAt: true, durationMinutes: true } },
           },
         })
@@ -166,15 +187,29 @@ export class FreeLessonService {
         // Un micro-test è un passo della calibrazione e vale come un round.
         calibrationRound: settings.creditsCalibrationRound,
       },
-      clubs: clubsWithDistance,
-      distance,
+      clubs: clubsForAthlete,
       // Giorni e orari in calendario: l'atleta indica il preferito.
       slots,
       attributedClubId: clubId,
       seat: seat
         ? {
             status: seat.status,
-            club: seat.partner,
+            // Con logo e foto anche se il circolo non offre più la lezione.
+            club: {
+              id: seat.partner.id,
+              name: seat.partner.name,
+              city: seat.partner.city,
+              logoUrl: clubImagePath(
+                seat.partner.id,
+                'logo',
+                seat.partner.logoUpdatedAt,
+              ),
+              photoUrl: clubImagePath(
+                seat.partner.id,
+                'photo',
+                seat.partner.photoUpdatedAt,
+              ),
+            },
             preferredLessonId: seat.preferredLessonId,
             lesson:
               seat.lesson && seat.status !== 'WITHDRAWN'
@@ -189,21 +224,12 @@ export class FreeLessonService {
   }
 
   /**
-   * Richiesta del posto: 1 per atleta, presso un circolo che offre la lezione,
-   * con il consenso a mostrare al coach nome, livello e driver. Ripetere la
-   * richiesta non crea un secondo posto.
+   * Richiesta del posto: 1 per atleta, presso un circolo che offre la lezione.
+   * Il coach vede nome, livello e driver per il consenso privacy dato alla
+   * registrazione. Ripetere la richiesta non crea un secondo posto.
    */
-  async request(
-    userId: string,
-    partnerId: string,
-    shareWithCoach: boolean,
-    lessonId?: string,
-  ) {
+  async request(userId: string, partnerId: string, lessonId?: string) {
     await this.requireEnabled(userId);
-    if (!shareWithCoach)
-      throw new BadRequestException(
-        'Per la lezione il coach deve poter vedere il tuo livello',
-      );
     const club = await this.prisma.partner.findFirst({
       where: { id: partnerId, isActive: true, freeLessonsEnabled: true },
       select: { id: true },
@@ -239,6 +265,7 @@ export class FreeLessonService {
         status: 'REQUESTED',
         lessonId: null,
         assignedAt: null,
+        // Coperto dal consenso privacy accettato alla registrazione.
         coachSharingAcceptedAt: new Date(),
         requestedAt: new Date(),
         eligibilityPolicyId: policy.id,
