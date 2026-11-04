@@ -29,6 +29,10 @@ import {
   MicroTestSessionService,
 } from './calibration/micro-test-session';
 import {
+  HomeMicroTestController,
+  HomeMicroTestService,
+} from './calibration/home-micro-test';
+import {
   EstimatedProfileController,
   EstimatedProfileService,
 } from './estimated-profile';
@@ -52,6 +56,7 @@ import {
     FitRankingController,
     EstimatedProfileController,
     MicroTestSessionController,
+    HomeMicroTestController,
     AthleteProfileController,
   ],
   providers: [
@@ -64,6 +69,7 @@ import {
     FitRankingService,
     EstimatedProfileService,
     MicroTestSessionService,
+    HomeMicroTestService,
     AthleteProfileService,
   ],
   exports: [

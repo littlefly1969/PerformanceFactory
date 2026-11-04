@@ -49,6 +49,8 @@ export const MICRO_TEST_LIMITS = {
   option: 100,
   minOptions: 3,
   maxOptions: 5,
+  verdict: 40,
+  takeaway: 220,
 };
 
 export type MicroTestTarget = {
@@ -77,7 +79,19 @@ export type MicroTestInput = {
   videos?: { id: string; title: string; description: string }[];
   /** Parole vietate in vigore, dal back office; senza, la lista iniziale. */
   unsafeTerms?: string[];
+  /**
+   * Micro-test della home: un solo test, sul driver fra quelli ricevuti (i
+   * meno sviluppati) dove una prova ha più senso. Senza, uno per driver.
+   */
+  chooseOne?: boolean;
 };
+
+/**
+ * Esito mostrato all'atleta per ogni livello del risultato, dal più basso al
+ * più alto: frase breve e consiglio. Nelle situazioni il livello è il numero
+ * di risposte corrette (da 0 a tutte), nella prova pratica l'esito scelto.
+ */
+export type MicroTestOutcome = { verdict: string; takeaway: string };
 
 /** Impegno fisico dichiarato dall'AI: mai alto, mai moderato con limitazioni. */
 export const PHYSICAL_LOADS = ['NONE', 'LOW', 'MODERATE'] as const;
@@ -98,7 +112,19 @@ export type GeneratedMicroTest = {
   situations: MicroTestSituation[];
   /** Video da guardare dopo il test, scelto dall'AI. */
   video: VideoChoice | null;
+  /** Frase e consiglio per ogni livello del risultato, scritti dall'AI. */
+  results: MicroTestOutcome[];
 };
+
+/** Livelli del risultato: esiti della prova pratica o corrette da 0 a tutte. */
+export const resultLevels = (test: {
+  format: MicroTestFormat;
+  options: unknown[];
+  situations: unknown[];
+}) =>
+  test.format === 'SITUATIONAL'
+    ? test.situations.length + 1
+    : test.options.length;
 
 export type MicroTestResult = {
   provider: AiProvider;
@@ -115,7 +141,9 @@ function formatRules(input: MicroTestInput) {
   const l = MICRO_TEST_LIMITS;
   return [
     'FORMATO DI RISPOSTA (fisso): rispondi solo con JSON conforme allo schema.',
-    `- tests: esattamente un micro-test per ciascuno dei ${input.targets.length} driver ricevuti, con lo stesso areaId.`,
+    input.chooseOne
+      ? `- tests: esattamente un micro-test, sul driver dove una prova ha più senso fra i ${input.targets.length} ricevuti (i meno sviluppati, dal più basso), con il suo areaId.`
+      : `- tests: esattamente un micro-test per ciascuno dei ${input.targets.length} driver ricevuti, con lo stesso areaId.`,
     `- title: massimo ${l.title} caratteri, diverso dai micro-test già proposti.`,
     `- instructions: massimo ${l.instructions} caratteri; informationGoal: la lacuna che il test chiude, massimo ${l.informationGoal} caratteri.`,
     `- durationMinutes: intero da 1 a ${l.maxDurationMinutes}, oppure null se non stimabile.`,
@@ -125,6 +153,7 @@ function formatRules(input: MicroTestInput) {
     '- l’esito lo riporta l’atleta: descrivi fasce che può contare da solo, senza strumenti di misura.',
     `- options (solo PRACTICAL): da ${l.minOptions} a ${l.maxOptions} esiti in ordine crescente, label di massimo ${l.option} caratteri, score crescenti tra ${input.scale.minScore} e ${input.scale.maxScore}.`,
     situationRules(input),
+    `- results: l'esito da mostrare all'atleta per ogni livello del risultato, dal più basso al più alto: nella prova pratica uno per esito (stesso ordine di options), nelle situazioni uno per numero di risposte corrette da 0 a tutte (quindi situazioni + 1). verdict: frase breve di massimo ${l.verdict} caratteri (per esempio «Ci sei quasi.»); takeaway: consiglio concreto di massimo ${l.takeaway} caratteri.`,
     FIT_RANKING_RULE,
     PADEL_SPORT_RULE,
   ].join('\n');
@@ -152,9 +181,22 @@ const schema = {
           'format',
           'situations',
           'video',
+          'results',
         ],
         properties: {
           ...SITUATIONS_SCHEMA,
+          results: {
+            type: 'array',
+            items: {
+              type: 'object',
+              additionalProperties: false,
+              required: ['verdict', 'takeaway'],
+              properties: {
+                verdict: { type: 'string' },
+                takeaway: { type: 'string' },
+              },
+            },
+          },
           areaId: { type: 'string' },
           title: { type: 'string' },
           instructions: { type: 'string' },
@@ -193,7 +235,9 @@ export function buildMicroTestPrompt(
   return {
     system: `${input.basePrompt.trim()}\n\n${formatRules(input)}`,
     user: {
-      task: 'Un micro-test su misura per ciascun driver ricevuto.',
+      task: input.chooseOne
+        ? 'Un solo micro-test su misura, sul driver fra quelli ricevuti dove ha più senso.'
+        : 'Un micro-test su misura per ciascun driver ricevuto.',
       reason: input.reason ?? null,
       scale: input.scale,
       athleteContext: input.athleteContext,
@@ -270,8 +314,20 @@ export function stubMicroTests(input: MicroTestInput) {
   const step = (maxScore - minScore) / 3;
   const video = input.videos?.[0];
   const situational = input.proposedTitles.length % 2 === 1;
+  const targets = input.chooseOne ? input.targets.slice(0, 1) : input.targets;
+  const results = (levels: number) =>
+    Array.from({ length: levels }, (_, k) => ({
+      verdict: [
+        'Da rivedere.',
+        'Ci sei quasi.',
+        'Buona lettura.',
+        'Da agonista.',
+        'Perfetto.',
+      ][Math.min(4, Math.round((k * 3) / Math.max(1, levels - 1)))],
+      takeaway: 'Riguarda il video e riprova la prossima volta.',
+    }));
   return {
-    tests: input.targets.map((target) =>
+    tests: targets.map((target) =>
       situational
         ? {
             areaId: target.areaId,
@@ -289,6 +345,7 @@ export function stubMicroTests(input: MicroTestInput) {
               videoId: video?.id ?? null,
               title: video?.title ?? `${target.name}: la lezione di un coach`,
             },
+            results: results(stubSituations(input, target.name).length + 1),
           }
         : {
             areaId: target.areaId,
@@ -308,6 +365,7 @@ export function stubMicroTests(input: MicroTestInput) {
               videoId: video?.id ?? null,
               title: video?.title ?? `${target.name}: come si allena`,
             },
+            results: results(4),
           },
     ),
   };
@@ -336,6 +394,8 @@ export function validateMicroTests(
   const titles = new Set(input.proposedTitles.map(normalize));
   const catalog = new Set((input.videos ?? []).map((v) => v.id));
   const tests: GeneratedMicroTest[] = [];
+  if (input.chooseOne && items.length !== 1)
+    problems.push('serve esattamente un micro-test');
   items.forEach((item, index) => {
     const n = index + 1;
     const entry = item as Partial<Record<string, unknown>>;
@@ -426,6 +486,18 @@ export function validateMicroTests(
       problems.push(`esiti duplicati (${n})`);
     if (parsed.some((o, k) => k > 0 && o.score <= parsed[k - 1].score))
       problems.push(`score non crescenti (${n})`);
+    const results = validateOutcomes(
+      entry.results,
+      resultLevels({ format, options: parsed, situations }),
+      problems,
+      n,
+    );
+    const unsafeResult = findUnsafeTerm(
+      results.map((r) => `${r.verdict}. ${r.takeaway}`).join('. '),
+      unsafeTerms(input),
+    );
+    if (unsafeResult)
+      problems.push(`contenuto non sicuro negli esiti: ${unsafeResult} (${n})`);
     tests.push({
       areaId,
       title: title ?? '',
@@ -438,11 +510,35 @@ export function validateMicroTests(
       format,
       situations,
       video,
+      results,
     });
   });
-  for (const areaId of targets)
-    if (!seen.has(areaId)) problems.push(`micro-test mancante per ${areaId}`);
+  if (!input.chooseOne)
+    for (const areaId of targets)
+      if (!seen.has(areaId)) problems.push(`micro-test mancante per ${areaId}`);
   return problems.length ? null : tests;
+}
+
+/** Una frase e un consiglio per ogni livello del risultato, entro i limiti. */
+function validateOutcomes(
+  value: unknown,
+  levels: number,
+  problems: string[],
+  n: number,
+): MicroTestOutcome[] {
+  const items = Array.isArray(value) ? value : [];
+  if (items.length !== levels) {
+    problems.push(`esiti da mostrare: ne servono ${levels} (${n})`);
+    return [];
+  }
+  return items.map((item, k) => {
+    const o = item as Partial<Record<string, unknown>>;
+    const verdict = clean(o?.verdict, MICRO_TEST_LIMITS.verdict);
+    const takeaway = clean(o?.takeaway, MICRO_TEST_LIMITS.takeaway);
+    if (!verdict || !takeaway)
+      problems.push(`esito da mostrare non valido (${n}.${k + 1})`);
+    return { verdict: verdict ?? '', takeaway: takeaway ?? '' };
+  });
 }
 
 const normalize = (text: string) => text.trim().toLowerCase();

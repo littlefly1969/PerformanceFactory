@@ -9,14 +9,8 @@ import { randomUUID } from 'node:crypto';
 import { AiProposalProviderService } from '../../ai-orchestrator/proposal-provider.service';
 import { loadActiveAssessmentPrompt } from '../../ai-orchestrator/assessment-prompts';
 import { CalibrationQuestion } from '../../ai-orchestrator/calibration-questions';
-import { chosenOptions, choiceEvidence } from '../choice-answers';
 import { AnalyticsService } from '../../analytics/analytics.service';
-import { loadOperationalTemplates } from '../assessment-configuration';
-import {
-  buildAssessmentEvaluationInput,
-  requireAiConsent,
-  saveEvaluation,
-} from '../assessment-evaluation';
+import { requireAiConsent, saveEvaluation } from '../assessment-evaluation';
 import { loadSpecialistQuestionRecords } from '../../onboarding/onboarding-questions';
 import { PrismaService } from '../../prisma/prisma.service';
 import { loadCalibrationSettings } from './calibration-config';
@@ -46,12 +40,17 @@ import {
   generateMicroTest,
   microTestQuestions,
   microTestsByArea,
-  roundEvidence,
   skipMicroTest,
   validRoundAnswers,
 } from './micro-test-step';
+import {
+  NOT_MICRO_TEST,
+  prepareHomeMicroTest,
+} from './home-micro-test-prepare';
+import { loadEvaluationInput } from './calibration-evaluation-input';
 
 const LEASE_MS = 10 * 60 * 1000;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Id domanda → valore scelto, o elenco di valori se la domanda è multipla. */
@@ -168,8 +167,13 @@ export class CalibrationService {
     if (!calibration) return null;
     const [rule, open, evaluations] = await Promise.all([
       latestRule(this.prisma, userId),
+      // Il micro-test della home vive fuori dal ciclo: non è il round aperto.
       this.prisma.calibrationRound.findFirst({
-        where: { userId, status: { in: ['OPEN', 'EVALUATING'] } },
+        where: {
+          userId,
+          status: { in: ['OPEN', 'EVALUATING'] },
+          ...NOT_MICRO_TEST,
+        },
         orderBy: { sequence: 'desc' },
       }),
       this.prisma.calibrationRound.count({
@@ -212,8 +216,15 @@ export class CalibrationService {
         where: { userId },
         orderBy: { sequence: 'asc' },
       });
-      // Un round già aperto vale per tutte le richieste concorrenti.
-      if (rounds.some((r) => r.status === 'OPEN' || r.status === 'EVALUATING'))
+      // Un round già aperto vale per tutte le richieste concorrenti; il
+      // micro-test della home no, perché vive fuori dal ciclo.
+      if (
+        rounds.some(
+          (r) =>
+            (r.status === 'OPEN' || r.status === 'EVALUATING') &&
+            r.action !== 'PROPOSE_MICRO_TEST',
+        )
+      )
         return;
       // Il feedback del coach non ancora valutato passa prima di nuove domande.
       if (await this.evaluatePendingFeedback(userId)) return;
@@ -241,7 +252,8 @@ export class CalibrationService {
         this.prisma,
         'CALIBRATION',
       );
-      const input = await this.evaluationInput(
+      const input = await loadEvaluationInput(
+        this.prisma,
         userId,
         rounds.filter((r) => r.status === 'EVALUATED'),
       );
@@ -411,7 +423,8 @@ export class CalibrationService {
       orderBy: { sequence: 'asc' },
     });
     const round = rounds.find((r) => r.id === roundId)!;
-    const input = await this.evaluationInput(
+    const input = await loadEvaluationInput(
+      this.prisma,
       userId,
       rounds.filter((r) => r.status === 'EVALUATED' || r.id === roundId),
     );
@@ -506,7 +519,7 @@ export class CalibrationService {
       where: { userId, status: 'EVALUATED' },
       orderBy: { sequence: 'asc' },
     });
-    const input = await this.evaluationInput(userId, rounds);
+    const input = await loadEvaluationInput(this.prisma, userId, rounds);
     await addLessonEvidence(this.prisma, userId, input);
     return input;
   }
@@ -518,7 +531,7 @@ export class CalibrationService {
     try {
       await requireAiConsent(this.prisma, userId);
       return await reevaluateForRanking(this.prisma, this.ai, userId, (r) =>
-        this.evaluationInput(userId, r),
+        loadEvaluationInput(this.prisma, userId, r),
       );
     } finally {
       await this.release(userId, lease);
@@ -528,64 +541,26 @@ export class CalibrationService {
   /** Va chiamata sotto il lease dell'atleta. */
   private evaluatePendingFeedback(userId: string) {
     return evaluatePendingFeedback(this.prisma, this.ai, userId, (rounds) =>
-      this.evaluationInput(userId, rounds),
+      loadEvaluationInput(this.prisma, userId, rounds),
     );
   }
 
-  /**
-   * Input completo per la rivalutazione: primo set, risposte dei round passati
-   * (valutati più quello in valutazione), stima precedente per driver.
-   */
-  private async evaluationInput(
-    userId: string,
-    rounds: { status: string; questionsJson: unknown; answersJson: unknown }[],
-  ) {
-    const [bank, operational, discovery, latest] = await Promise.all([
-      loadSpecialistQuestionRecords(this.prisma, userId),
-      loadOperationalTemplates(this.prisma),
-      this.prisma.athleteDiscovery.findUniqueOrThrow({ where: { userId } }),
-      this.prisma.assessmentEvaluation.findFirstOrThrow({
-        where: { userId },
-        orderBy: { sequence: 'desc' },
-        include: { areas: { include: { area: { select: { name: true } } } } },
-      }),
-    ]);
-    // I driver sono quelli dell'ultima valutazione, anche senza anamnesi.
-    const input = await buildAssessmentEvaluationInput(
-      this.prisma,
+  /** Micro-test della home: vedi prepareHomeMicroTest. */
+  prepareMicroTest(userId: string, now = new Date()) {
+    return prepareHomeMicroTest(
+      {
+        prisma: this.prisma,
+        ai: this.ai,
+        analytics: this.analytics,
+        expireIfDue: (id, at) => this.expireIfDue(id, at),
+        evaluationInput: (id, rounds) =>
+          loadEvaluationInput(this.prisma, id, rounds),
+        claim: (id) => this.tryClaim(id),
+        release: (id, lease) => this.release(id, lease),
+      },
       userId,
-      [...operational, ...bank],
-      discovery.assessmentAnswers as Record<string, unknown>,
-      latest.areas.map((a) => ({ id: a.areaId, name: a.area.name })),
+      now,
     );
-    for (const driver of input.drivers) {
-      for (const answer of driver.answers) answer.source = 'ASSESSMENT';
-      const previous = latest.areas.find((a) => a.areaId === driver.areaId);
-      if (previous)
-        driver.previous = {
-          score: previous.score,
-          confidence: previous.confidence,
-        };
-    }
-    for (const round of rounds) {
-      const answers = round.answersJson as Answers;
-      for (const q of round.questionsJson as CalibrationQuestion[]) {
-        const driver = input.drivers.find((d) => d.areaId === q.areaId);
-        const chosen = chosenOptions(q.options, answers[q.id], q.multiple);
-        if (!driver || !chosen) continue;
-        const scores = q.options.map((o) => o.score);
-        const { answer, ...evidence } = choiceEvidence(chosen, q.multiple);
-        driver.answers.push({
-          ...roundEvidence(q, { label: answer }),
-          ...evidence,
-          optionScoreRange: {
-            min: Math.min(...scores),
-            max: Math.max(...scores),
-          },
-        });
-      }
-    }
-    return input;
   }
 
   /** «Non posso farlo ora»: chiude il micro-test senza evidenza. */

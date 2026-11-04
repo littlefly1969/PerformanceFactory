@@ -1,85 +1,332 @@
+"use client";
 import Link from "next/link";
 import { AccountMenu } from "../../components/account-menu";
+import { PFMark } from "../../start/pf4-shell";
 import type { Journey } from "../journey-types";
-import { AccountScreen, PillLink } from "./account-shell";
-import { type FreeLessonView, useResource } from "./account-data";
+import { AccountScreen } from "./account-shell";
 import {
-  definedAreas,
+  type FreeLessonView,
+  type HomeMicroTest,
+  useResource,
+} from "./account-data";
+import {
+  closedUnconsolidated,
   isClosed,
   isConsolidated,
-  microTestOpen,
 } from "./calibration-state";
-import { nextStep } from "./next-step";
-import { MiniSpider } from "./spiders";
+import { REVEAL_HREF, nextStep } from "./next-step";
+import "./account-home.css";
+
+const RING = 2 * Math.PI * 20;
+
+// Stati in cui la home mostra il micro-test in «Per te oggi».
+const SHOWN = new Set<HomeMicroTest["status"]>([
+  "READY",
+  "PREPARING",
+  "EVALUATING",
+]);
+
+const when = (iso: string) => {
+  const d = new Date(iso);
+  const day = d.toLocaleDateString("it-IT", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  const time = d.toLocaleTimeString("it-IT", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return `${day} · ${time}`;
+};
+
+/** Esagono che respira: l'AI è al lavoro o è il coach a parlare. */
+export function HexOrb({
+  size = 40,
+  tone = "ink",
+}: {
+  size?: number;
+  tone?: "ink" | "lime";
+}) {
+  return (
+    <svg
+      className={`pf-hm-orb is-${tone}`}
+      viewBox="0 0 200 200"
+      width={size}
+      height={size}
+      aria-hidden="true"
+    >
+      <polygon points="100,8 179.7,54 179.7,146 100,192 20.3,146 20.3,54" />
+      <polygon points="100,46 146.8,73 146.8,127 100,154 53.2,127 53.2,73" />
+    </svg>
+  );
+}
+
+/** Anello di avanzamento della scheda della lezione (S04 della demo). */
+function LessonRing({ value }: { value: number }) {
+  const c = 2 * Math.PI * 27;
+  return (
+    <div className="pf-hm-ring" role="img" aria-label={`Al ${value}%`}>
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <circle cx="32" cy="32" r="27" />
+        <circle
+          cx="32"
+          cy="32"
+          r="27"
+          strokeDasharray={`${((c * value) / 100).toFixed(1)} ${c.toFixed(1)}`}
+        />
+      </svg>
+      <span>{value}%</span>
+    </div>
+  );
+}
 
 /**
- * Home dopo l'assessment: il prossimo passo e lo Spider, che porta al
- * profilo. Prima dell'assessment la home è quella del benvenuto.
+ * La scheda in cima, come nella demo: fase gratuita finita, oppure la lezione
+ * gratuita nei suoi stati. Senza lezione nel territorio non si promette nulla.
+ */
+function Banner({
+  j,
+  lesson,
+}: {
+  j: Journey;
+  lesson: FreeLessonView | null | undefined;
+}) {
+  const c = j.calibration;
+  if (isClosed(c))
+    return (
+      <Link className="pf-hm-done" href={REVEAL_HREF}>
+        <div className="pf-hm-done-head">
+          <HexOrb size={58} tone="lime" />
+          <div>
+            <span className="pf-hm-kicker is-lime">
+              {closedUnconsolidated(c)
+                ? "Fase gratuita conclusa"
+                : "Fase gratuita terminata"}
+            </span>
+            <strong>Scopri dove puoi arrivare in 3, 6 e 12 mesi.</strong>
+          </div>
+        </div>
+        <span className="pf-hm-pill is-lime">
+          <span>I tuoi scenari</span>
+          <span aria-hidden="true">→</span>
+        </span>
+      </Link>
+    );
+  if (!lesson?.enabled) return null;
+  const { phase, seat, credits } = lesson;
+  if (phase === "LOCKED") {
+    const value = credits.toUnlock
+      ? Math.min(100, Math.round((credits.balance / credits.toUnlock) * 100))
+      : 0;
+    return (
+      <section className="pf-hm-lesson is-locked" aria-label="Lezione gratuita">
+        <div className="pf-hm-lesson-head">
+          <LessonRing value={value} />
+          <div>
+            <span className="pf-hm-kicker">Lezione gratuita</span>
+            <strong>Ancora qualche passo per sbloccarla.</strong>
+          </div>
+        </div>
+        <Link className="pf-hm-pill is-ink" href="/journey/calibrazione">
+          <span>Continua la calibrazione</span>
+          <span aria-hidden="true">→</span>
+        </Link>
+      </section>
+    );
+  }
+  if (phase === "ELIGIBLE" || phase === "DECLINED")
+    return (
+      <section className="pf-hm-lesson is-ready" aria-label="Lezione gratuita">
+        <div className="pf-hm-lesson-head">
+          <div className="pf-hm-ring is-done" role="img" aria-label="Sbloccata">
+            <svg viewBox="0 0 64 64" aria-hidden="true">
+              <circle cx="32" cy="32" r="27" />
+            </svg>
+            <span aria-hidden="true">✓</span>
+          </div>
+          <div>
+            <span className="pf-hm-kicker">Lezione gratuita · sbloccata</span>
+            <strong>Una lezione gratuita in un circolo vicino a te.</strong>
+          </div>
+        </div>
+        <Link className="pf-hm-pill is-ink" href="/journey/circolo">
+          <span>Scegli il circolo</span>
+          <span aria-hidden="true">→</span>
+        </Link>
+      </section>
+    );
+  if ((phase === "REQUESTED" || phase === "ASSIGNED") && seat)
+    return (
+      <Link className="pf-hm-booked" href="/journey/circolo">
+        <div>
+          <span className="pf-hm-kicker">
+            {phase === "ASSIGNED" ? "Lezione di prova" : "Lezione richiesta"}
+          </span>
+          <strong>
+            {phase === "ASSIGNED" && seat.lesson
+              ? when(seat.lesson.startsAt)
+              : "Il circolo compone il gruppo"}
+          </strong>
+          <small>
+            {seat.club.name}
+            {seat.club.city ? `, ${seat.club.city}` : ""}
+          </small>
+        </div>
+        <span aria-hidden="true">→</span>
+      </Link>
+    );
+  return null;
+}
+
+/**
+ * Scheda «Per te oggi» del micro-test: anello dei giorni di fila e titolo.
+ * Mentre l'AI prepara il prossimo, l'esagono respira al posto dell'anello.
+ */
+function MicroTestCard({ data }: { data: HomeMicroTest }) {
+  const ready = data.status === "READY" && data.test;
+  const days = data.streak.days;
+  const dash = `${((RING * Math.min(7, days)) / 7).toFixed(1)} ${RING.toFixed(1)}`;
+  const minutes = data.test?.durationMinutes;
+  return (
+    <Link
+      className="pf-hm-mt"
+      href="/journey/coach?tab=micro"
+      aria-label={
+        ready
+          ? `Micro-test: ${data.test!.title}`
+          : "Micro-test: preparo il prossimo"
+      }
+    >
+      <span className="pf-hm-glow" aria-hidden="true" />
+      {ready ? (
+        <span className="pf-hm-mt-ring" aria-hidden="true">
+          <svg viewBox="0 0 48 48">
+            <circle cx="24" cy="24" r="20" />
+            <circle cx="24" cy="24" r="20" strokeDasharray={dash} />
+          </svg>
+          <b>{days}</b>
+        </span>
+      ) : (
+        <HexOrb size={44} tone="lime" />
+      )}
+      <span className="pf-hm-mt-text">
+        <span className="pf-hm-kicker is-lime">
+          Micro-test{minutes ? ` · ${minutes} min` : ""}
+        </span>
+        <strong>
+          {ready
+            ? data.test!.title
+            : data.status === "EVALUATING"
+              ? "Aggiorniamo la tua valutazione…"
+              : "Preparo il prossimo micro-test…"}
+        </strong>
+      </span>
+    </Link>
+  );
+}
+
+/**
+ * Home della fase gratuita, come la S04 della demo PF10: saluto, stato del
+ * profilo, lezione gratuita, «Completa le sei aree» e «Per te oggi» con il
+ * micro-test. Il calendario della demo arriva con gli allenamenti.
  */
 export function AccountHome({ journey: j }: { journey: Journey }) {
   const evaluation = j.evaluation!;
-  // Lo stesso passo del profilo: servono anche la fase della lezione.
   const lesson = useResource<FreeLessonView>("/athlete-journey/free-lesson");
+  const micro = useResource<HomeMicroTest>("/athlete-journey/micro-test");
   const step = lesson.data === undefined ? null : nextStep(j, lesson.data);
   const consolidated = isConsolidated(j.calibration);
+  const closed = isClosed(j.calibration);
   const name = j.firstName?.trim();
   const drivers = evaluation.drivers;
-  const defined = definedAreas(j.calibration, drivers);
+  const rule = j.calibration?.consolidationRule;
+  const min = rule?.minAreaConfidence ?? rule?.minOverallConfidence ?? null;
+  // Ogni area si riempie verso la soglia della regola di consolidamento.
+  const full = closed && !closedUnconsolidated(j.calibration);
+  const segments = drivers.map((d) => {
+    const fill = full ? 1 : min ? Math.min(1, d.confidence / min) : 0;
+    return { id: d.id, fill, ok: fill >= 1 };
+  });
+  const defined = segments.filter((s) => s.ok).length;
+  // Domande in valutazione o R consolidata: passi da non nascondere.
+  const urgent =
+    step && (step.kind === "evaluation" || step.kind === "finish")
+      ? step
+      : null;
+  const microData = micro.data;
   return (
-    <AccountScreen nav="home" coachDot={microTestOpen(j.calibration)}>
-      <div className="pf-acc-row">
-        <h1 className="pf-acc-title">{name ? `Ciao ${name}.` : "Ciao."}</h1>
-        <AccountMenu
-          name={name}
-          from="home"
-          className="pf-acc-avatar is-small"
-        />
-      </div>
-      <span className="pf-acc-badge">
-        {consolidated ? "R consolidata" : "Profilo provvisorio"}
-      </span>
-      {step && (
-        <section className="pf-acc-lesson" aria-label="Prossimo passo">
-          <span className="pf-acc-kicker">{step.kicker}</span>
-          <h2>{step.title}</h2>
-          <PillLink href={step.href}>{step.cta}</PillLink>
-          {step.secondary && (
-            <a className="pf-acc-link" href={step.secondary.href}>
-              {step.secondary.label}
-            </a>
+    <AccountScreen nav="home" coachDot={micro.data?.status === "READY"}>
+      <div className="pf-hm">
+        <header className="pf-hm-bar">
+          <span className="pf-hm-brand">
+            <PFMark size={18} />
+            Performance Factory
+          </span>
+          <AccountMenu name={name} from="home" className="pf-hm-avatar" />
+        </header>
+
+        <h1 className="pf-hm-hello">{name ? `Ciao ${name}.` : "Ciao."}</h1>
+        <span className={`pf-hm-chip${consolidated ? " is-lime" : ""}`}>
+          {consolidated ? "R consolidata" : "Profilo provvisorio"}
+        </span>
+
+        <div className="pf-hm-stack">
+          <Banner j={j} lesson={lesson.data} />
+          {urgent && (
+            <section className="pf-hm-step" aria-label="Prossimo passo">
+              <span className="pf-hm-kicker">
+                <i aria-hidden="true" />
+                {urgent.kicker}
+              </span>
+              <strong>{urgent.title}</strong>
+              <Link className="pf-hm-pill is-lime" href={urgent.href}>
+                <span>{urgent.cta}</span>
+                <span aria-hidden="true">→</span>
+              </Link>
+            </section>
           )}
-        </section>
-      )}
-      {!isClosed(j.calibration) && drivers.length > 0 && (
-        <Link className="pf-acc-home-areas" href="/journey/calibrazione">
-          <span className="pf-acc-home-areas-head">
-            <strong>Completa le {drivers.length === 6 ? "sei" : drivers.length} aree</strong>
-            <small>
-              {defined.size} di {drivers.length} aree definite
-            </small>
-          </span>
-          <span className="pf-acc-home-areas-bar" aria-hidden="true">
-            {drivers.map((d) => (
-              <i key={d.id} className={defined.has(d.id) ? "is-ok" : undefined} />
-            ))}
-          </span>
-        </Link>
-      )}
-      <Link className="pf-acc-card pf-acc-home-spider" href="/journey/profilo">
-        <MiniSpider
-          real={evaluation.drivers.map((d) => d.score)}
-          scale={evaluation.scale}
-          provisional={!consolidated}
-          size={112}
-        />
-        <div>
-          <span className="pf-acc-kicker">Il tuo Spider</span>
-          <strong>Vai al profilo →</strong>
-          <p>
-            Confidenza complessiva {Math.round(evaluation.overallConfidence)}%
-          </p>
+          {!closed && drivers.length > 0 && (
+            <section className="pf-hm-areas" aria-label="Completa le aree">
+              <div className="pf-hm-areas-head">
+                <strong>
+                  Completa le {drivers.length === 6 ? "sei" : drivers.length}{" "}
+                  aree
+                </strong>
+                <small>
+                  {defined} di {drivers.length} aree definite
+                </small>
+              </div>
+              <div className="pf-hm-areas-bar" aria-hidden="true">
+                {segments.map((s) => (
+                  <span key={s.id}>
+                    <i
+                      className={s.ok ? "is-ok" : undefined}
+                      style={{ width: `${Math.round(s.fill * 100)}%` }}
+                    />
+                  </span>
+                ))}
+              </div>
+              <Link
+                className="pf-hm-pill is-lime is-tall"
+                href="/journey/calibrazione"
+              >
+                <span>Continua il profilo</span>
+                <span aria-hidden="true">→</span>
+              </Link>
+            </section>
+          )}
         </div>
-      </Link>
+
+        {microData?.streak && SHOWN.has(microData.status) && (
+          <>
+            <h2 className="pf-hm-section">Per te oggi</h2>
+            <div className="pf-hm-today">
+              <MicroTestCard data={microData} />
+            </div>
+          </>
+        )}
+      </div>
     </AccountScreen>
   );
 }

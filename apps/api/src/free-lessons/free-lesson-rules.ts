@@ -39,6 +39,8 @@ export function creditEntries(
     initialEvaluationId: string | null;
     evaluatedRoundIds: string[];
     microTestCompletionIds: string[];
+    /** Micro-test valutati: valgono i crediti del micro-test, non del round. */
+    microTestRoundIds?: string[];
   },
   settings: FreeLessonSettings,
 ): CreditEntry[] {
@@ -53,6 +55,13 @@ export function creditEntries(
     entries.push({
       action: 'CALIBRATION_ROUND',
       points: settings.creditsCalibrationRound,
+      sourceKey: `round:${id}`,
+    });
+  // Stessa chiave del round: un micro-test già registrato come round resta così.
+  for (const id of sources.microTestRoundIds ?? [])
+    entries.push({
+      action: 'MICRO_TEST',
+      points: settings.creditsMicroTest,
       sourceKey: `round:${id}`,
     });
   for (const id of sources.microTestCompletionIds)

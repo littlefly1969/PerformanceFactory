@@ -193,6 +193,8 @@ export type CalibrationQuestion = {
     format?: MicroTestFormat;
     /** Video da guardare dopo il test, scelto dall'AI. */
     video?: VideoChoice | null;
+    /** Frase e consiglio per livello del risultato; assenti nei test storici. */
+    results?: { verdict: string; takeaway: string }[];
     /** Solo nelle situazioni di gioco: una voce per situazione. */
     situation?: {
       index: number;

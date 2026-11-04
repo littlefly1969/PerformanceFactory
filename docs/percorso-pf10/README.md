@@ -21,7 +21,7 @@ seed, configurazione persistita, autenticazione, pagamenti o webhook.
 | S08-S09 | Assessment | `/journey` | dopo l'ultima risposta la valutazione parte da sola (D5) |
 | S10 | Sto calcolando la tua performance | `/journey` fase `PROCESSING` | veste scura con esagono animato |
 | S11 | Profilo provvisorio pronto | `/journey` fase `EVALUATION` | veste scura, misuratore con la soglia reale |
-| S12 | Home in calibrazione | `/journey` | aggiunto «Completa le sei aree» |
+| S12 | Home in calibrazione | `/journey` | come la demo senza calendario: lezione gratuita, «Completa le sei aree», «Per te oggi» con il micro-test |
 | S13 | Stato di calibrazione | `/journey/calibrazione` | invariato, criterio delle aree condiviso con la home |
 | S14 | Lezione gratuita | `/journey/circolo` | «Dove giochi?», «Quando?», poi il riepilogo (D3) |
 | S15 | Dove sei adesso e dove puoi arrivare | `/journey/stima` (nuova) | nuova, legge gli scenari già calcolati dal server |
