@@ -3,7 +3,12 @@ import { loadActiveAssessmentPrompt } from '../ai-orchestrator/assessment-prompt
 import { loadScaleConfig } from '../ai-orchestrator/performance-scoring';
 import { AiProposalProviderService } from '../ai-orchestrator/proposal-provider.service';
 import { normalizeOptions } from '../onboarding/onboarding-answers';
-import { INITIAL_QUESTIONS_KIND } from '../onboarding/onboarding-questions';
+import {
+  INITIAL_QUESTIONS_KIND,
+  loadSpecialistQuestionRecords,
+} from '../onboarding/onboarding-questions';
+import type { TemplateRecord } from '../onboarding/onboarding-model';
+import { chosenOptions } from './choice-answers';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   assessmentConfigurationError,
@@ -13,37 +18,49 @@ import { discoveryContext } from './discovery-context';
 import { loadFitRankingContext } from './fit-ranking/fit-ranking';
 
 /**
- * Scrive con l'AI le domande conoscitive iniziali di ogni driver, su misura
- * per funnel, disponibilità e classifica FIT, e le salva nella banca per
- * atleta nell'ordine dei driver. Va chiamata sotto il lease del percorso.
- * Se l'AI non risponde l'errore arriva all'atleta, che riprova: nessuna
- * domanda di riserva. Restituisce false se la banca c'era già.
+ * Scrive con l'AI le domande conoscitive del prossimo driver ancora senza
+ * domande, a coppie (`perArea` per driver, back office), nell'ordine dei
+ * driver: lo stesso giro dello Spider. L'AI riceve funnel, classifica FIT e
+ * le risposte già date ai driver precedenti. Va chiamata sotto il lease del
+ * percorso. Se l'AI non risponde l'errore arriva all'atleta, che riprova:
+ * nessuna domanda di riserva. Restituisce false se non c'era niente da
+ * scrivere (driver tutti coperti o domande precedenti senza risposta).
  */
-export async function generateInitialQuestionBank(
+export async function generateNextInitialQuestions(
   prisma: PrismaService,
   ai: AiProposalProviderService,
   userId: string,
 ) {
-  if (await prisma.userOnboardingQuestion.count({ where: { userId } }))
-    return false;
-  const config = await loadAssessmentConfiguration(prisma, userId);
+  const [config, bank, saved] = await Promise.all([
+    loadAssessmentConfiguration(prisma, userId),
+    loadSpecialistQuestionRecords(prisma, userId),
+    prisma.athleteDiscovery.findUniqueOrThrow({ where: { userId } }),
+  ]);
   if (config.problems.length)
     throw assessmentConfigurationError(config.problems);
-  const [saved, prompt, scale, discovery, fitRanking] = await Promise.all([
-    prisma.athleteDiscovery.findUniqueOrThrow({ where: { userId } }),
+  const covered = new Set(bank.map((q) => q.areaId));
+  const next = config.areas.find((a) => !covered.has(a.id));
+  // Le domande già scritte vanno prima risposte: la coppia nuova parte da lì.
+  if (!next || saved.currentQuestion < bank.length) return false;
+  const [prompt, scale, discovery, fitRanking] = await Promise.all([
     loadActiveAssessmentPrompt(prisma, 'INITIAL_QUESTIONS'),
     loadScaleConfig(prisma),
     discoveryContext(prisma, userId),
     loadFitRankingContext(prisma, userId),
   ]);
   const answers = saved.assessmentAnswers as Record<string, unknown>;
-  const availability = config.operational.map((q) => {
-    const value = answers[q.id];
-    const option = (
-      normalizeOptions(q.optionsJson) as { value: unknown; label?: string }[]
-    ).find((o) => String(o.value) === String(value));
-    return { question: q.label, answer: option?.label ?? null };
-  });
+  const label = (q: TemplateRecord) => {
+    const options = normalizeOptions(q.optionsJson) as {
+      value: unknown;
+      label?: string;
+    }[];
+    const picked = chosenOptions(options, answers[q.id], q.multiple) ?? [];
+    return picked.length ? picked.map((o) => o.label).join(', ') : null;
+  };
+  // Disponibilità solo per chi l'aveva già data nel vecchio percorso.
+  const availability = config.operational
+    .map((q) => ({ question: q.label, answer: label(q) }))
+    .filter((a) => a.answer !== null);
   const result = await ai.generateInitialQuestions({
     basePrompt: prompt.basePrompt,
     promptVersionId: prompt.promptVersionId,
@@ -54,14 +71,26 @@ export async function generateInitialQuestionBank(
     })),
     availability,
     fitRanking,
-    drivers: config.areas.map((a) => ({ areaId: a.id, name: a.name })),
+    drivers: [{ areaId: next.id, name: next.name }],
+    previousAnswers: bank.map((q) => ({
+      driver: q.area?.name ?? '',
+      question: q.label,
+      answer: label(q),
+    })),
     questionsPerArea: config.perArea,
   });
   return prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`;
-    if (await tx.userOnboardingQuestion.count({ where: { userId } }))
+    // Una richiesta concorrente ha già scritto le domande di questo driver.
+    if (
+      await tx.userOnboardingQuestion.count({
+        where: { userId, areaId: next.id },
+      })
+    )
       return false;
-    let position = 0;
+    let position = await tx.userOnboardingQuestion.count({
+      where: { userId },
+    });
     for (const question of result.questions)
       await tx.userOnboardingQuestion.create({
         data: {
@@ -92,7 +121,7 @@ export async function generateInitialQuestionBank(
 /**
  * Classifica FIT cambiata dal profilo prima della prima valutazione: le
  * domande dei driver erano su misura per la classifica precedente, quindi si
- * cancellano con le loro risposte e l'AI le riscrive al passo successivo.
+ * cancellano con le loro risposte e l'AI le riscrive, coppia per coppia.
  */
 export async function dropStaleBank(
   tx: Prisma.TransactionClient,
@@ -115,10 +144,8 @@ export async function dropStaleBank(
     where: { userId },
     data: {
       assessmentAnswers: answers as Prisma.InputJsonValue,
-      currentQuestion: Math.min(
-        saved.currentQuestion,
-        Object.keys(answers).length,
-      ),
+      // Le domande dei driver sono tutta la sequenza: si riparte da capo.
+      currentQuestion: 0,
     },
   });
   return true;

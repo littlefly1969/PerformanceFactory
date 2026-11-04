@@ -8,13 +8,22 @@ import { DurationStep, PerformanceResult } from "./performance-result";
 import { useJourney } from "./use-journey";
 import { MultiChoiceStep } from "./choice-options";
 import { NumberChoiceStep, numericOptions } from "./number-choice";
-import { QuestionsPreparing } from "./questions-preparing";
 import { AccountHome } from "./_account/account-home";
 import { DarkQuestion, SingleOptions } from "./_account/dark-question";
+import { HexPrep, HexSide } from "./_account/assessment-hex";
 import { ProvisionalReady } from "./_account/provisional-ready";
-import { AccountScreen } from "./_account/account-shell";
+import { useResource } from "./_account/account-data";
+import {
+  AVAILABILITY_PATH,
+  AvailabilityStep,
+  type AvailabilityForm,
+} from "./_account/availability-step";
 import type { Journey } from "./journey-types";
 import "./journey.css";
+/** Durata minima di un giro d'animazione, come nella demo PF10. */
+const PREP_MS = 2600;
+const SIDE_MS = 2300;
+const LAST_MS = 3000;
 const HORIZON_MONTHS: Record<string, number> = {
   PROGRAM_3M: 3,
   PROGRAM_6M: 6,
@@ -55,6 +64,48 @@ export default function JourneyPage() {
     evaluated.current = true;
     void action("evaluate");
   }, [complete, busy, action]);
+  // Domande a coppie (demo PF10): finita una coppia l'AI scrive la successiva,
+  // da sola e una volta per coppia; un nuovo tentativo è esplicito.
+  const assessing = j?.phase === "ASSESSMENT" || j?.phase === "PROCESSING";
+  const pending = assessing && !!j?.questionsPending;
+  const written = j?.questions?.length ?? 0;
+  const asked = useRef(-1);
+  const [prepHeld, setPrepHeld] = useState(false);
+  useEffect(() => {
+    if (j?.phase !== "ASSESSMENT" || !pending || busy) return;
+    if (asked.current === written) return;
+    asked.current = written;
+    // «Preparo le tue domande» resta almeno un giro anche se l'AI è veloce.
+    if (!written) {
+      setPrepHeld(true);
+      window.setTimeout(() => setPrepHeld(false), PREP_MS);
+    }
+    void action("questions");
+  }, [j?.phase, pending, busy, written, action]);
+  // Passaggio d'area: chiusa una coppia, il lato dell'esagono si disegna per
+  // almeno un giro e ricomincia finché l'AI non ha la coppia successiva (o,
+  // dopo l'ultima area, la valutazione).
+  const names = j?.driverList?.map((d) => d.name) ?? [];
+  const [side, setSide] = useState<{ index: number; held: boolean } | null>(
+    null,
+  );
+  const answer = async (value: unknown) => {
+    if (!j || !q) return;
+    const next = j.questions[j.currentQuestion + 1];
+    const index = (j.driverList ?? []).findIndex((d) => d.id === q.areaId);
+    const closes = index >= 0 && (!next || next.areaId !== q.areaId);
+    if (closes) {
+      setSide({ index, held: true });
+      window.setTimeout(
+        () => setSide((s) => (s?.index === index ? { ...s, held: false } : s)),
+        index === names.length - 1 ? LAST_MS : SIDE_MS,
+      );
+    }
+    if (!(await action("answer", { questionId: q.id, value })) && closes)
+      setSide(null);
+  };
+  const finishing = assessing && !!j?.assessmentComplete;
+  const areasWritten = new Set(j?.questions?.map((x) => x.areaId)).size;
   // Prima dell'assessment: la prima volta il benvenuto (foto, Spider, regalo,
   // app), poi la home, che è anche dove riapre l'app installata.
   const intro = j?.phase === "ASSESSMENT_INTRO";
@@ -62,7 +113,23 @@ export default function JourneyPage() {
   useEffect(() => {
     if (welcome) window.location.replace("/benvenuto/foto");
   }, [welcome]);
+  // Già abbonato ma senza giorni e durata: il programma non parte senza.
+  const subscribed = j?.phase === "SUBSCRIBED";
+  const availability = useResource<AvailabilityForm>(
+    subscribed ? AVAILABILITY_PATH : null,
+  );
   if (welcome) return null;
+  if (subscribed && availability.data?.ready === false)
+    return (
+      <AvailabilityStep
+        lead="Ci manca solo questo per preparare il tuo programma."
+        action="Crea il mio programma"
+        onSaved={(form) => {
+          availability.setData(form);
+          void action("program");
+        }}
+      />
+    );
   if (intro)
     return (
       <WelcomeHome
@@ -70,6 +137,47 @@ export default function JourneyPage() {
         busy={busy}
         error={error}
         onStart={() => void action("start")}
+      />
+    );
+  // Lato dell'area appena chiusa, o l'esagono completo mentre l'AI calcola.
+  if (side && (side.held || pending || finishing))
+    return (
+      <HexSide
+        names={names}
+        index={side.index}
+        error={side.held ? undefined : error || undefined}
+        onRetry={
+          busy
+            ? undefined
+            : () => void action(finishing ? "evaluate" : "questions")
+        }
+        retryLabel={finishing ? "Riprova l’analisi" : "Riprova"}
+      />
+    );
+  // Prima coppia: l'esagono si disegna finché le domande non sono pronte.
+  if ((pending && !written) || (prepHeld && assessing))
+    return (
+      <HexPrep
+        title="Preparo le tue domande."
+        sub="Sei aree, un punto di partenza."
+        areas={names.length || 6}
+        error={prepHeld ? undefined : error || undefined}
+        onRetry={busy ? undefined : () => void action("questions")}
+      />
+    );
+  // Ripresa a metà (ricarica, altra scheda): stessa attesa, senza lato da tenere.
+  if (pending || finishing || j?.phase === "PROCESSING")
+    return (
+      <HexSide
+        names={names}
+        index={pending ? areasWritten - 1 : names.length - 1}
+        error={error || undefined}
+        onRetry={
+          busy
+            ? undefined
+            : () => void action(finishing ? "evaluate" : "questions")
+        }
+        retryLabel={finishing ? "Riprova l’analisi" : "Riprova"}
       />
     );
   if (j?.phase === "EVALUATION" && j.evaluation)
@@ -118,7 +226,7 @@ export default function JourneyPage() {
             options={q.options}
             initial={j.answers[q.id]}
             busy={busy}
-            onSubmit={(value) => action("answer", { questionId: q.id, value })}
+            onSubmit={(value) => answer(value)}
           />
         ) : numericOptions(q) ? (
           <NumberChoiceStep
@@ -126,68 +234,17 @@ export default function JourneyPage() {
             options={q.options}
             selected={j.answers[q.id]}
             busy={busy}
-            onSubmit={(value) => action("answer", { questionId: q.id, value })}
+            onSubmit={(value) => answer(value)}
           />
         ) : (
           <SingleOptions
             options={q.options}
             selected={j.answers[q.id]}
             busy={busy}
-            onSelect={(value) =>
-              void action("answer", { questionId: q.id, value })
-            }
+            onSelect={(value) => void answer(value)}
           />
         )}
       </DarkQuestion>
-    );
-  // Calcolo della valutazione (demo PF10): schermata scura, si aggiorna da sola.
-  // Vale anche mentre parte l'analisi delle risposte appena completate.
-  if (j?.phase === "PROCESSING" || complete)
-    return (
-      <AccountScreen tone="dark">
-        <section className="pf-acc-calc" role="status">
-          <svg className="pf-acc-calc-hex" viewBox="0 0 200 200" aria-hidden="true">
-            <polygon points="100,16 172.7,58 172.7,142 100,184 27.3,142 27.3,58" />
-            <polygon
-              className="is-inner"
-              points="100,58 136.4,79 136.4,121 100,142 63.6,121 63.6,79"
-            />
-            <polygon
-              className="is-trace"
-              points="100,16 172.7,58 172.7,142 100,184 27.3,142 27.3,58"
-            />
-          </svg>
-          <h1 className="pf-acc-title">Sto calcolando la tua performance.</h1>
-          <p>Aggiorno lo Spider con le nuove risposte.</p>
-          {error && (
-            <p className="pf-acc-error" role="alert">
-              {error}
-            </p>
-          )}
-          {complete ? (
-            error &&
-            !busy && (
-              <button
-                type="button"
-                className="pf-acc-link"
-                onClick={() => void action("evaluate")}
-              >
-                Riprova l’analisi
-              </button>
-            )
-          ) : (
-            <button
-              type="button"
-              className="pf-acc-link"
-              onClick={() => {
-                void refresh();
-              }}
-            >
-              Aggiorna
-            </button>
-          )}
-        </section>
-      </AccountScreen>
     );
   // L'intro PF5 e chiara, come /start; il questionario resta sullo stage scuro.
   const assessment = j?.phase === "ASSESSMENT";
@@ -257,13 +314,6 @@ export default function JourneyPage() {
               Aggiorna
             </button>
           </section>
-        )}
-        {j?.phase === "ASSESSMENT" && j.questionsPending && (
-          <QuestionsPreparing
-            busy={busy}
-            failed={!!error}
-            onPrepare={() => action("questions")}
-          />
         )}
         {j?.phase === "SUBSCRIBED" && (
           <section className="pf4-body" aria-labelledby="pf4-subscribed-title">
