@@ -4,6 +4,7 @@ import type { LessonSlot } from "../_account/account-data";
 import { PillButton, PillLink } from "../_account/account-shell";
 import { ClubLogo, ClubPhoto } from "./club-images";
 import { GroupMeta, shortDate, time, weekday } from "./when-step";
+import "./lesson-booked.css";
 
 export type BookedSeat = {
   status: string;
