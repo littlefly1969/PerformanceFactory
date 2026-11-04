@@ -1,7 +1,7 @@
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { GiftScreen, areaShort } from "./gift-screen";
+import { GiftScreen } from "./gift-screen";
 
 vi.mock("@/app/lib/api", () => ({ API_BASE: "/api" }));
 
@@ -60,13 +60,14 @@ describe("GiftScreen", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
       "1Una lezione di prova, gratis.",
     );
+    // Il testo della demo PF10, senza l'elenco delle singole aree.
     expect(
-      screen.getByText(/profilo è abbastanza attendibile/),
+      screen.getByText(
+        "Si sblocca quando la tua Performance sarà completamente Reale: tutte e sei le aree misurate in campo, niente più tratteggio.",
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText("1 di 6 aree reali")).toBeInTheDocument();
-    expect(
-      screen.getByTitle("Preparazione atletica").closest("li"),
-    ).toHaveClass("is-real");
+    expect(document.querySelector(".pf-gift-areas")).toBeNull();
     expect(screen.getByLabelText("Passo 4 di 5")).toBeInTheDocument();
   });
 
@@ -88,11 +89,5 @@ describe("GiftScreen", () => {
     await userEvent.click(screen.getByRole("button", { name: "Salta" }));
     expect(onContinue).toHaveBeenCalledOnce();
     expect(onSkip).toHaveBeenCalledOnce();
-  });
-
-  it("abbreviates area names to five letters", () => {
-    expect(areaShort("Allenamento mentale")).toBe("MENTA");
-    expect(areaShort("Nutrizione")).toBe("NUTRI");
-    expect(areaShort("Équipe")).toBe("EQUIP");
   });
 });

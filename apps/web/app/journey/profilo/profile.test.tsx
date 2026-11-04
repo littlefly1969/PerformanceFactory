@@ -181,7 +181,9 @@ describe("Profilo come la demo PF10", () => {
       true,
       false,
     ]);
-    expect(screen.getByText("≈ 84")).toBeInTheDocument();
+    // Margine come nella demo: si stringe con la confidenza.
+    expect(screen.getByText("84 ±12")).toBeInTheDocument();
+    expect(screen.getByText("86 ±6")).toBeInTheDocument();
   });
 
   it("shows the consolidated profile without the approximation", async () => {
@@ -204,7 +206,7 @@ describe("Profilo come la demo PF10", () => {
     [
       "locked",
       { ...lesson, phase: "LOCKED", credits: { balance: 40, toUnlock: 100 } },
-      "Continua la calibrazione per sbloccarla.",
+      "Rendi Reali tutte e 3 le aree per sbloccarla.",
     ],
     [
       "requested",
@@ -225,6 +227,11 @@ describe("Profilo come la demo PF10", () => {
       { ...lesson, clubs: [] },
       "Non ancora disponibile nella tua zona.",
     ],
+    [
+      "under internal review",
+      { ...lesson, phase: "LOCKED", missing: ["PROFILE"] },
+      "Continuiamo a conoscere il tuo profilo.",
+    ],
   ])("turns calibration into the lesson when %s", async (_c, view, text) => {
     serve({
       "/auth/journey": journey({ calibration: calibration(null) }),
@@ -233,6 +240,33 @@ describe("Profilo come la demo PF10", () => {
     });
     render(<ProfilePage />);
     expect(await screen.findByText(text)).toBeInTheDocument();
+  });
+});
+
+describe("Lezione bloccata finché tutte le aree non sono Reali", () => {
+  it("counts the Real areas, not the credits", async () => {
+    const drivers = evaluation.drivers.map((d, i) => ({
+      ...d,
+      confidence: [72, 64, 40][i],
+    }));
+    serve({
+      "/auth/journey": journey({
+        evaluation: { ...evaluation, drivers },
+        calibration: calibration(null),
+      }),
+      "/athlete-journey/profile": PROFILE,
+      "/athlete-journey/free-lesson": {
+        ...lesson,
+        phase: "LOCKED",
+        credits: { balance: 100, toUnlock: 100 },
+      },
+    });
+    render(<ProfilePage />);
+    const ring = await screen.findByRole("img", { name: "2 di 3 aree Reali" });
+    expect(ring).toHaveTextContent("2/3");
+    expect(
+      screen.getByText("Rendi Reali tutte e 3 le aree per sbloccarla."),
+    ).toBeInTheDocument();
   });
 });
 

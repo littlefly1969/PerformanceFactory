@@ -1,5 +1,8 @@
 import { Prisma } from '@prisma/client';
-import { loadActivePolicy } from '../discovery/calibration/confidence-policy';
+import {
+  loadActivePolicy,
+  realAreaThreshold,
+} from '../discovery/calibration/confidence-policy';
 import { clubImagePath } from '../partners/club-image';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -8,9 +11,9 @@ type Db = PrismaService | Prisma.TransactionClient;
 export type GiftArea = { id: string; name: string; real: boolean };
 
 /**
- * Un'area è Reale quando la sua confidence raggiunge la soglia per area della
- * regola di consolidamento di R (o, senza soglia per area, quella complessiva):
- * è il punto in cui lo Spider smette di essere tratteggiato su quell'area.
+ * Un'area è Reale quando la sua confidence raggiunge `realAreaThreshold`: è
+ * il punto in cui lo Spider smette di essere tratteggiato su quell'area, e la
+ * lezione si sblocca quando lo sono tutte.
  */
 export function giftAreas(
   areas: { id: string; name: string }[],
@@ -99,10 +102,6 @@ export async function loadGift(db: Db, userId: string) {
       }),
     ),
     attributedClubId,
-    areas: giftAreas(
-      areas,
-      latest?.areas ?? [],
-      policy.minAreaConfidence ?? policy.minOverallConfidence,
-    ),
+    areas: giftAreas(areas, latest?.areas ?? [], realAreaThreshold(policy)),
   };
 }

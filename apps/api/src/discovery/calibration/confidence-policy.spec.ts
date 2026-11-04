@@ -2,6 +2,8 @@ import {
   ConfidenceRule,
   INITIAL_CONFIDENCE_RULES,
   checkRule,
+  lessonRuleMet,
+  realAreaThreshold,
   ruleProblems,
 } from './confidence-policy';
 
@@ -70,6 +72,33 @@ describe('confidence policy', () => {
     );
     for (const initial of Object.values(INITIAL_CONFIDENCE_RULES))
       expect(ruleProblems(initial)).toEqual([]);
+  });
+
+  it('unlocks the lesson only with every area Real, on top of the lesson rule', () => {
+    const lesson = rule({ minOverallConfidence: 50 });
+    const consolidation = rule({
+      minOverallConfidence: 70,
+      minAreaConfidence: 60,
+    });
+    const at = (...c: number[]) => ({
+      overallConfidence: 75,
+      drivers: areas(...c),
+    });
+    expect(realAreaThreshold(consolidation)).toBe(60);
+    // Una sola area sotto la soglia delle aree Reali: ancora bloccata.
+    expect(lessonRuleMet(lesson, consolidation, at(90, 80, 59))).toBe(false);
+    expect(lessonRuleMet(lesson, consolidation, at(90, 80, 60))).toBe(true);
+    // La regola di eleggibilità in vigore resta una condizione in più.
+    expect(
+      lessonRuleMet(lesson, consolidation, {
+        overallConfidence: 40,
+        drivers: areas(90, 80, 60),
+      }),
+    ).toBe(false);
+    // Senza soglia per area vale quella complessiva del consolidamento.
+    expect(
+      lessonRuleMet(lesson, rule({ minOverallConfidence: 70 }), at(90, 69)),
+    ).toBe(false);
   });
 
   it('rejects empty or out of range rules', () => {

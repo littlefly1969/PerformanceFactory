@@ -11,22 +11,7 @@ export type GiftView =
       areas: GiftArea[];
     };
 
-/** Sigle di cinque lettere sotto le barre; le aree senza sigla usano l'inizio del nome. */
-const AREA_SHORT: Record<string, string> = {
-  "Allenamento mentale": "MENTA",
-  "Preparazione atletica": "PREPA",
-  "Tecnico-tattica": "TECNI",
-};
-
-export const areaShort = (name: string) =>
-  AREA_SHORT[name] ??
-  name
-    .normalize("NFD")
-    .replace(/[^A-Za-z]/g, "")
-    .slice(0, 5)
-    .toUpperCase();
-
-/** Passo 3 di 4 dell'accoglienza dopo la registrazione. */
+/** Passo 4 di 5 dell'accoglienza dopo la registrazione. */
 const STEP = 4;
 const STEPS = 5;
 /** Passo successivo dell'accoglienza: invito a installare l'app (PWA). */
@@ -84,26 +69,15 @@ export function GiftScreen({
             <span className="pf-gift-sr">Una </span>
             lezione di prova, gratis.
           </h1>
+          {/* Testo della demo PF10 (W4), richiesto così da Stefano. */}
           <p>
-            Si sblocca quando il tuo profilo è abbastanza attendibile: continua
-            con domande e micro-test. In campo, con il coach, la tua Performance
-            diventa Reale area per area.
+            Si sblocca quando la tua Performance sarà completamente Reale:
+            tutte e sei le aree misurate in campo, niente più tratteggio.
           </p>
           {areas.length > 0 && (
-            <>
-              <ul className="pf-gift-areas">
-                {areas.map((area) => (
-                  <li key={area.id} className={area.real ? "is-real" : ""}>
-                    <span aria-hidden />
-                    <abbr title={area.name}>{areaShort(area.name)}</abbr>
-                  </li>
-                ))}
-              </ul>
-              {/* Progresso del profilo, non condizione di sblocco: la lezione segue LESSON_ELIGIBILITY. */}
-              <p className="pf-gift-count">
-                {`${real} di ${areas.length} aree reali`}
-              </p>
-            </>
+            <p className="pf-gift-count">
+              {`${real} di ${areas.length} aree reali`}
+            </p>
           )}
         </section>
 

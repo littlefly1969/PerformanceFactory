@@ -7,7 +7,11 @@ import {
   NO_LESSON,
   isCalibrationClosed,
 } from './calibration-rules';
-import { checkRule, loadActivePolicy } from './confidence-policy';
+import {
+  checkRule,
+  lessonRuleMet,
+  loadActivePolicy,
+} from './confidence-policy';
 import { lessonSuspended } from './assessment-anomalies';
 import { isLessonDone, isLessonPending } from './lesson-evidence';
 
@@ -55,26 +59,28 @@ export async function lessonGate(
   if (await isLessonPending(db, userId)) return { ...NO_LESSON, pending: true };
   if (await isLessonDone(db, userId)) return { ...NO_LESSON, done: true };
   if (!(await freeLessonEnabledFor(db, userId))) return NO_LESSON;
-  const [calibration, seat, clubs, rule, suspended] = await Promise.all([
-    db.athleteCalibration.findUnique({
-      where: { userId },
-      select: { lessonDeclinedAt: true },
-    }),
-    db.freeLessonSeat.findUnique({
-      where: { userId },
-      select: { status: true },
-    }),
-    lessonClubs(db),
-    loadActivePolicy(db, 'LESSON_ELIGIBILITY'),
-    lessonSuspended(db, userId),
-  ]);
+  const [calibration, seat, clubs, rule, consolidation, suspended] =
+    await Promise.all([
+      db.athleteCalibration.findUnique({
+        where: { userId },
+        select: { lessonDeclinedAt: true },
+      }),
+      db.freeLessonSeat.findUnique({
+        where: { userId },
+        select: { status: true },
+      }),
+      lessonClubs(db),
+      loadActivePolicy(db, 'LESSON_ELIGIBILITY'),
+      loadActivePolicy(db, 'R_CONSOLIDATION'),
+      lessonSuspended(db, userId),
+    ]);
   // Una segnalazione HIGH aperta sospende la lezione: R segue la sola regola.
   const available =
     !suspended &&
     !calibration?.lessonDeclinedAt &&
     !seat &&
     clubs.length > 0 &&
-    checkRule(rule, evaluation).met;
+    lessonRuleMet(rule, consolidation, evaluation);
   return { ...NO_LESSON, available };
 }
 

@@ -7,7 +7,7 @@ import {
 import { AnalyticsService } from '../analytics/analytics.service';
 import { Prisma } from '@prisma/client';
 import {
-  checkRule,
+  lessonRuleMet,
   loadActivePolicy,
 } from '../discovery/calibration/confidence-policy';
 import { lessonSuspended } from '../discovery/calibration/assessment-anomalies';
@@ -33,7 +33,7 @@ type Db = PrismaService | Prisma.TransactionClient;
  * anche la versione della regola e la valutazione usate, da registrare.
  */
 async function checkLesson(db: Db, userId: string) {
-  const [calibration, seat, clubs, policy, latest, suspended] =
+  const [calibration, seat, clubs, policy, consolidation, latest, suspended] =
     await Promise.all([
       db.athleteCalibration.findUnique({
         where: { userId },
@@ -42,6 +42,7 @@ async function checkLesson(db: Db, userId: string) {
       db.freeLessonSeat.findUnique({ where: { userId } }),
       lessonClubs(db),
       loadActivePolicy(db, 'LESSON_ELIGIBILITY'),
+      loadActivePolicy(db, 'R_CONSOLIDATION'),
       db.assessmentEvaluation.findFirst({
         where: { userId },
         orderBy: { sequence: 'desc' },
@@ -53,12 +54,13 @@ async function checkLesson(db: Db, userId: string) {
       }),
       lessonSuspended(db, userId),
     ]);
+  // Si sblocca solo con tutte le aree Reali (e la regola in vigore).
   const eligibilityMet =
     !!latest &&
-    checkRule(policy, {
+    lessonRuleMet(policy, consolidation, {
       overallConfidence: latest.overallConfidence,
       drivers: latest.areas,
-    }).met;
+    });
   return {
     seat,
     clubs,

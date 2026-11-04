@@ -11,6 +11,7 @@ import {
   useResource,
 } from "../_account/account-data";
 import { AccountScreen } from "../_account/account-shell";
+import { lessonProgress } from "../_account/lesson-unlock";
 import {
   closedUnconsolidated,
   definedAreas,
@@ -123,6 +124,25 @@ export default function ProfilePage() {
       ? "Continua l’assessment"
       : "Inizia l’assessment";
   const total = evaluation?.drivers.length ?? 0;
+  const availabilityDone =
+    !!availability.data && availabilityComplete(availability.data);
+  // Scheda «Fase gratuita» come la demo: mentre si calibra «Calibrazione in
+  // corso» (o completata) con la pillola corta «Calibrazione». Quando il passo
+  // è la lezione (circolo da scegliere o lezione da gestire) o gli scenari,
+  // destinazione e pulsante restano quelli del prossimo passo.
+  const phase = !step
+    ? null
+    : step.kind === "scenarios" || step.kind === "lesson"
+      ? { title: step.kicker, href: step.href, cta: step.cta, label: step.cta }
+      : {
+          title:
+            step.kind === "finish"
+              ? "Calibrazione completata"
+              : "Calibrazione in corso",
+          href: step.href,
+          cta: "Calibrazione",
+          label: step.cta,
+        };
   return (
     <AccountScreen nav="profile" coachDot={microTestOpen(calibration)}>
       <header className="pf-prof-head">
@@ -261,6 +281,7 @@ export default function ProfilePage() {
         {evaluation && step && (
           <LessonSection
             view={lesson.data}
+            progress={lessonProgress(j!)}
             calibrationHref={step.href}
             calibrationCta={
               step.kind === "lesson" || step.kind === "scenarios"
@@ -269,24 +290,19 @@ export default function ProfilePage() {
             }
           />
         )}
-        {availability.data !== undefined &&
-          (availabilityComplete(availability.data) ? (
-            <AvailabilityCard value={availability.data!} />
-          ) : (
-            <TodoCard
-              href="/journey/profilo/disponibilita"
-              title="Quale è la tua disponibilità?"
-            />
-          ))}
-        {fit.data !== undefined &&
-          (fit.data?.ranking ? (
-            <FitCard view={fit.data} />
-          ) : (
-            <TodoCard
-              href="/journey/profilo/classifica"
-              title="La tua classifica FITP"
-            />
-          ))}
+        {/* Da compilare in alto, come nella demo; compilate scendono in fondo. */}
+        {availability.data !== undefined && !availabilityDone && (
+          <TodoCard
+            href="/journey/profilo/disponibilita"
+            title="Quale è la tua disponibilità?"
+          />
+        )}
+        {fit.data !== undefined && !fit.data?.ranking && (
+          <TodoCard
+            href="/journey/profilo/classifica"
+            title="La tua classifica FITP"
+          />
+        )}
 
         {evaluation && (
           <section className="pf-prof-areas" aria-labelledby="pf-prof-areas">
@@ -314,14 +330,14 @@ export default function ProfilePage() {
           </section>
         )}
 
-        {evaluation && step && (
+        {evaluation && phase && (
           <section className="pf-prof-phase" aria-label="Prossimo passo">
             <div>
               <span className="pf-prof-kicker">Fase gratuita</span>
-              <strong>{step.kicker}</strong>
+              <strong>{phase.title}</strong>
             </div>
-            <Link href={step.href}>
-              <span>{step.cta}</span>
+            <Link href={phase.href} aria-label={phase.label}>
+              <span>{phase.cta}</span>
               <span aria-hidden="true">→</span>
             </Link>
           </section>
@@ -334,6 +350,8 @@ export default function ProfilePage() {
             title="Analisi delle sei aree"
           />
         )}
+        {availabilityDone && <AvailabilityCard value={availability.data!} />}
+        {fit.data?.ranking && <FitCard view={fit.data} />}
         <LinkCard href="/journey/profilo/invita" title="Invita un amico" />
         <LinkCard
           href="/journey/profilo/community"

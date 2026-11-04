@@ -18,9 +18,9 @@ Il profilo della fase gratuita (pulsante con l'omino) è descritto in
 | S02 | 01 · Mettici la faccia | `/benvenuto/foto` | allineata, la classifica FIT ha ora un passo suo |
 | S03 | 02 · Che classifica hai? | `/benvenuto/classifica` (nuova) | nuova, salva con `POST /athlete-journey/fit-ranking` già esistente |
 | S04 | 03 · Questo sei tu. Per ora. | `/benvenuto/spider` | passo 3 di 5 |
-| S05 | 04 · Il tuo regalo | `/benvenuto/regalo` | passo 4 di 5, freccia indietro |
+| S05 | 04 · Il tuo regalo | `/benvenuto/regalo` | passo 4 di 5, freccia indietro, testo della demo («completamente Reale … niente più tratteggio») e solo il conteggio delle aree reali |
 | S06 | 05 · Sempre con te | `/benvenuto/installa` | installazione PWA al posto degli store (D6) |
-| S07 | Home prima dell'assessment | `/journey` | invariata (PR #67) |
+| S07 | Home prima dell'assessment | `/journey` | la stessa home della fase gratuita: «Profilo da iniziare», scheda lime «Completa l'assessment per sbloccarla.» (o «Scopri dove sei oggi.» senza lezione) con «Inizia l'assessment»; la vecchia home è stata eliminata |
 | S08-S09 | Assessment | `/journey` | dopo l'ultima risposta la valutazione parte da sola (D5) |
 | S10 | Sto calcolando la tua performance | `/journey` fase `PROCESSING` | veste scura con esagono animato |
 | S11 | Profilo provvisorio pronto | `/journey` fase `EVALUATION` | veste scura, misuratore con la soglia reale |
