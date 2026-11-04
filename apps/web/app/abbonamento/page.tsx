@@ -6,7 +6,8 @@ import {
   PillButton,
   PillLink,
 } from "../journey/_account/account-shell";
-import { readError } from "../journey/_account/account-data";
+import { apiError, needsAvailability } from "../journey/_account/account-data";
+import { AvailabilityStep } from "../journey/_account/availability-step";
 
 /** Attesa massima della conferma del provider prima di chiedere di riprovare. */
 const POLL_MS = 2000;
@@ -77,6 +78,7 @@ export default function SubscriptionReturnPage() {
   const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [planReady, setPlanReady] = useState(false);
   const [planError, setPlanError] = useState("");
+  const [askAvailability, setAskAvailability] = useState(false);
   const [busy, setBusy] = useState(false);
   const [round, setRound] = useState(0);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -90,19 +92,26 @@ export default function SubscriptionReturnPage() {
     setBusy(true);
     setPlanError("");
     try {
-      const response = await secureFetch(`${API_BASE}/athlete-journey/program`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: "{}",
-      });
-      if (!response.ok) throw new Error(await readError(response));
+      const response = await secureFetch(
+        `${API_BASE}/athlete-journey/program`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        },
+      );
+      if (!response.ok) throw await apiError(response);
       setPlanReady(true);
     } catch (e) {
-      setPlanError(
-        e instanceof Error && e.message
-          ? e.message
-          : "Non siamo riusciti a preparare il piano. Riprova.",
-      );
+      // Già pagato ma senza giorni e durata: li chiediamo e il piano riparte,
+      // senza un nuovo checkout.
+      if (needsAvailability(e)) setAskAvailability(true);
+      else
+        setPlanError(
+          e instanceof Error && e.message
+            ? e.message
+            : "Non siamo riusciti a preparare il piano. Riprova.",
+        );
     } finally {
       setBusy(false);
     }
@@ -155,6 +164,17 @@ export default function SubscriptionReturnPage() {
     heading.current?.focus();
   }, [status, planReady]);
 
+  if (status === "PAID" && subscription && askAvailability)
+    return (
+      <AvailabilityStep
+        lead="Il pagamento è confermato. Ci manca solo questo per preparare il tuo piano."
+        action="Prepara il tuo piano"
+        onSaved={() => {
+          setAskAvailability(false);
+          void preparePlan();
+        }}
+      />
+    );
   if (status === "PAID" && subscription)
     return (
       <AccountScreen
@@ -183,9 +203,7 @@ export default function SubscriptionReturnPage() {
             tabIndex={-1}
             ref={heading}
           >
-            {planReady
-              ? "Il tuo piano è pronto."
-              : "Prepariamo il tuo piano…"}
+            {planReady ? "Il tuo piano è pronto." : "Prepariamo il tuo piano…"}
           </h1>
           <dl className="pf-acc-paid-rows">
             {summary(subscription).map(([label, value]) => (

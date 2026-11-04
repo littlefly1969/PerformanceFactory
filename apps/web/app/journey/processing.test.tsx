@@ -30,12 +30,11 @@ describe("valutazione in corso", () => {
     );
     vi.stubGlobal("fetch", fetch);
     render(<JourneyPage />);
+    // Come nella demo: l'esagono completo mentre l'AI calcola.
     expect(
-      await screen.findByRole("heading", {
-        name: "Sto calcolando la tua performance.",
-      }),
+      await screen.findByRole("heading", { name: "Esagono completo." }),
     ).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Aggiorna" })).toBeTruthy();
+    expect(screen.getByText("Sto calcolando la tua performance.")).toBeTruthy();
     await new Promise((r) => setTimeout(r, 2300));
     expect(fetch.mock.calls.length).toBeGreaterThan(1);
   });
