@@ -157,26 +157,28 @@ describe("Assessment a coppie come la demo PF10", () => {
     ).toBeVisible();
   });
 
-  it("offers a retry when the AI could not write the pair, with no fallback questions", async () => {
-    let fail = true;
-    let state: Record<string, unknown> = {
-      ...base,
-      count: 4,
-      driverList: drivers,
-      currentQuestion: 2,
-      questionsPending: true,
-      questions: [
-        pairQuestion("q1", "tt", "Tecnico-tattico"),
-        pairQuestion("q2", "tt", "Tecnico-tattico"),
-      ],
-    };
+  const pendingPair = () => ({
+    ...base,
+    count: 4,
+    driverList: drivers,
+    currentQuestion: 2,
+    questionsPending: true,
+    questions: [
+      pairQuestion("q1", "tt", "Tecnico-tattico"),
+      pairQuestion("q2", "tt", "Tecnico-tattico"),
+    ],
+  });
+  /** Server che fallisce le prime `failures` richieste di domande con un 502. */
+  const flakyQuestions = (failures: { left: number }) => {
+    let state: Record<string, unknown> = pendingPair();
     const requests: string[] = [];
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string) => {
         requests.push(url);
         if (url.endsWith("/questions")) {
-          if (fail)
+          if (failures.left > 0) {
+            failures.left -= 1;
             return new Response(
               JSON.stringify({
                 message:
@@ -184,6 +186,7 @@ describe("Assessment a coppie come la demo PF10", () => {
               }),
               { status: 502 },
             );
+          }
           state = {
             ...state,
             questionsPending: false,
@@ -197,21 +200,62 @@ describe("Assessment a coppie come la demo PF10", () => {
         return new Response(JSON.stringify(state));
       }),
     );
-    render(<JourneyPage />);
-    expect(
-      await screen.findByText(
-        "Non siamo riusciti a preparare le tue domande. Riprova.",
-      ),
-    ).toBeInTheDocument();
-    // Un solo tentativo automatico: il nuovo è su richiesta.
-    expect(requests.filter((url) => url.endsWith("/questions"))).toHaveLength(
-      1,
-    );
-    fail = false;
-    await userEvent.click(screen.getByRole("button", { name: "Riprova" }));
-    expect(await screen.findByText("Domanda q3")).toBeVisible();
-    expect(requests.filter((url) => url.endsWith("/questions"))).toHaveLength(
-      2,
-    );
+    return () => requests.filter((url) => url.endsWith("/questions")).length;
+  };
+
+  it("retries by itself when the AI could not write the pair, with no retry button", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const asked = flakyQuestions({ left: 2 });
+      render(<JourneyPage />);
+      expect(
+        await screen.findByText(/Problema con i server, stiamo riprovando/),
+      ).toBeInTheDocument();
+      // Né l'errore dell'AI né un pulsante «Riprova»: si riprova da soli.
+      expect(
+        screen.queryByText(
+          "Non siamo riusciti a preparare le tue domande. Riprova.",
+        ),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Riprova/ }),
+      ).not.toBeInTheDocument();
+      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(await screen.findByText("Domanda q3")).toBeVisible();
+      expect(asked()).toBe(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("after three automatic retries asks to try later, with Annulla to go back", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const failures = { left: Infinity };
+      const asked = flakyQuestions(failures);
+      render(<JourneyPage />);
+      await screen.findByText(/Problema con i server, stiamo riprovando/);
+      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(4000);
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(
+        await screen.findByText(/server sono sovraccarichi/),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Annulla/ })).toBeVisible();
+      // Il primo tentativo e tre automatici, poi nessun altro da solo.
+      expect(asked()).toBe(4);
+      await vi.advanceTimersByTimeAsync(10000);
+      expect(asked()).toBe(4);
+      // Chi vuole può riprovare subito.
+      failures.left = 0;
+      await userEvent.click(
+        screen.getByRole("button", { name: "Riprova adesso" }),
+      );
+      expect(await screen.findByText("Domanda q3")).toBeVisible();
+      expect(asked()).toBe(5);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

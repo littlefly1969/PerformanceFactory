@@ -24,7 +24,8 @@ import {
 import { DarkQuestion, SingleOptions } from "../_account/dark-question";
 import { REVEAL_HREF } from "../_account/next-step";
 import { MiniSpider } from "../_account/spiders";
-import { HexPrep } from "../_account/assessment-hex";
+import { type HexFailure, HexPrep } from "../_account/assessment-hex";
+import { useAutoRetry } from "../_account/auto-retry";
 import { ProvisionalReady } from "../_account/provisional-ready";
 
 type Round = NonNullable<Calibration["round"]>;
@@ -45,7 +46,7 @@ function RoundQuestions({
   round: Round;
   areaName: (id: string) => string;
   busy: boolean;
-  /** Invio non riuscito: domanda e scelte restano, si può riprovare. */
+  /** Invio rifiutato: domanda e scelte restano, si può rispondere di nuovo. */
   error: string;
   /** Risposte non inviate: si riparte dall'ultima domanda con le scelte. */
   draft: Answers | null;
@@ -91,16 +92,9 @@ function RoundQuestions({
         />
       )}
       {error && !busy && (
-        <>
-          <p className="pf-acc-error" role="alert">
-            Risposte non inviate: {error} Le tue scelte sono ancora qui.
-          </p>
-          {last && (
-            <PillButton tone="lime" onClick={() => onSubmit(answers)}>
-              Riprova l’invio
-            </PillButton>
-          )}
-        </>
+        <p className="pf-acc-error" role="alert">
+          Risposte non inviate: {error} Le tue scelte sono ancora qui.
+        </p>
       )}
     </DarkQuestion>
   );
@@ -118,7 +112,17 @@ const LESSON_CHOICE = /lezione gratuita/i;
  * lezione svolta, con la scelta degli scenari o alla scadenza.
  */
 export default function CalibrationPage() {
-  const { journey: j, error, busy, action, refresh } = useAccountJourney();
+  const {
+    journey: j,
+    error,
+    busy,
+    action,
+    attempt,
+    clearError,
+    refresh,
+  } = useAccountJourney();
+  // L'AI che prepara le domande o valuta le risposte si ritenta da sola.
+  const { retry, run, reset } = useAutoRetry();
   const [cycle, setCycle] = useState<Cycle | null>(null);
   const answering = cycle === "questions";
   // Round inviato e accettato dal server: si attende il suo esito.
@@ -146,13 +150,19 @@ export default function CalibrationPage() {
     sent !== null && round?.id === sent && round.status === "EVALUATING";
   // Risposte inviate e non accettate: tornano nella domanda per riprovare.
   const [draft, setDraft] = useState<Answers | null>(null);
-  // L'esagono gira mentre l'AI valuta; poi il risultato aggiornato.
+  // L'esagono gira mentre l'AI valuta; poi il risultato aggiornato. Con un
+  // problema del server si ritenta da soli; finiti i tentativi l'esagono
+  // chiede di riprovare più tardi.
   const send = async (roundId: string, answers: Answers) => {
     setCycle("calc");
-    const ok = await action("calibration/answers", { roundId, answers });
+    const result = await run(() =>
+      attempt("calibration/answers", { roundId, answers }),
+    );
+    const ok = result === "ok";
     setDraft(ok ? null : answers);
     if (ok) setSent(roundId);
-    setCycle(ok ? "result" : stalled ? null : "questions");
+    if (result !== "transient")
+      setCycle(ok ? "result" : stalled ? null : "questions");
   };
   const areaName = (id: string) =>
     evaluation?.drivers.find((d) => d.id === id)?.name ?? "Calibrazione";
@@ -165,8 +175,22 @@ export default function CalibrationPage() {
     if (microTestOpen(c)) return window.location.assign("/journey/coach");
     if (round?.status === "OPEN") return setCycle("questions");
     setCycle("prep");
-    if (await action("calibration/round")) setCycle("questions");
+    if ((await run(() => attempt("calibration/round"))) === "ok")
+      setCycle("questions");
   };
+  // Esagono fermo: «Annulla» torna allo stato (o al risultato appena visto).
+  const failure = (retryNow: () => void): HexFailure => ({
+    retry,
+    error: retry.phase !== "idle" || busy ? undefined : error || undefined,
+    onCancel: busy
+      ? undefined
+      : () => {
+          reset();
+          clearError();
+          setCycle(sent ? "result" : null);
+        },
+    onRetry: busy ? undefined : retryNow,
+  });
   // R consolidata: l'atleta chiude la calibrazione e sceglie lo scenario.
   const finish = async () => {
     if (await action("calibration/finish")) window.location.assign(REVEAL_HREF);
@@ -188,8 +212,7 @@ export default function CalibrationPage() {
         title="Preparo le tue domande."
         sub="Due domande sulle aree che conosciamo meno."
         areas={evaluation?.drivers.length}
-        error={busy ? undefined : error || undefined}
-        onRetry={busy ? undefined : () => void next()}
+        failure={failure(() => void next())}
       />
     );
   if (cycle === "calc")
@@ -198,6 +221,10 @@ export default function CalibrationPage() {
         title="Sto calcolando la tua performance."
         sub="Aggiorno lo Spider con le nuove risposte."
         areas={evaluation?.drivers.length}
+        failure={failure(() => {
+          const answers = draft ?? stalled?.answers;
+          if (round && answers) void send(round.id, answers);
+        })}
       />
     );
   if (answering && round && !microTestOpen(c) && round.status === "OPEN")
@@ -237,16 +264,16 @@ export default function CalibrationPage() {
             </PillLink>
           ) : c.canFinish ? (
             <PillButton
-              tone="outline"
+              tone={c.ruleMet ? "lime" : "outline"}
               disabled={busy}
               onClick={() => void finish()}
             >
               Vai ai tuoi scenari
             </PillButton>
           ) : c.ruleMet && phase === "ELIGIBLE" ? (
-            <a className="pf-acc-link" href="/journey/circolo">
+            <PillLink href="/journey/circolo" tone="lime">
               Scegli il circolo per la lezione gratuita
-            </a>
+            </PillLink>
           ) : null
         }
       />
@@ -254,6 +281,10 @@ export default function CalibrationPage() {
   const rule = c?.consolidationRule;
   const confidence = evaluation?.overallConfidence ?? 0;
   const defined = definedAreas(c, evaluation?.drivers ?? []);
+  // Calibrazione sufficiente (regola valutata dal server): niente più
+  // «Continua la calibrazione»; il passo giallo è il circolo, gli scenari o
+  // la home. Una valutazione interrotta va comunque completata.
+  const enough = !!c?.ruleMet && !stalled;
   const footer = waiting ? (
     <PillButton
       tone="lime"
@@ -266,6 +297,31 @@ export default function CalibrationPage() {
     <PillLink href={REVEAL_HREF} tone="lime">
       Vedi dove puoi arrivare
     </PillLink>
+  ) : enough ? (
+    <>
+      {c?.canFinish ? (
+        <PillButton tone="lime" disabled={busy} onClick={() => void finish()}>
+          Vai ai tuoi scenari
+        </PillButton>
+      ) : phase === "ELIGIBLE" ? (
+        <PillLink href="/journey/circolo" tone="lime">
+          Scegli il circolo per la lezione gratuita
+        </PillLink>
+      ) : lessonPending ? (
+        <PillLink href="/journey/circolo" tone="lime">
+          La tua lezione gratuita
+        </PillLink>
+      ) : null}
+      {c?.canFinish || phase === "ELIGIBLE" || lessonPending ? (
+        <a className="pf-acc-link" href="/journey">
+          Salva e vai alla home
+        </a>
+      ) : (
+        <PillLink href="/journey" tone="lime">
+          Salva e vai alla home
+        </PillLink>
+      )}
+    </>
   ) : (
     <>
       <PillButton tone="lime" disabled={busy || !c} onClick={() => void next()}>
@@ -306,7 +362,7 @@ export default function CalibrationPage() {
           : closed
             ? "La tua R è consolidata."
             : consolidated
-              ? "La tua R è consolidata. Puoi continuare a calibrare."
+              ? "La tua R è consolidata."
               : "La calibrazione si chiude quando ti conosciamo abbastanza."}
       </h1>
       {expiredWeak && (
@@ -347,6 +403,7 @@ export default function CalibrationPage() {
               real={evaluation.drivers.map((d) => d.score)}
               scale={evaluation.scale}
               provisional={!consolidated}
+              defined={evaluation.drivers.map((d) => defined.has(d.id))}
               size={120}
             />
             <div>
@@ -394,8 +451,8 @@ export default function CalibrationPage() {
           {lessonPending && (
             <p role="status">
               Hai chiesto la lezione gratuita: la calibrazione si chiude dopo il
-              feedback del coach del circolo. Intanto puoi continuare a
-              rispondere.
+              feedback del coach del circolo.
+              {enough ? "" : " Intanto puoi continuare a rispondere."}
             </p>
           )}
           {!closed && c.ruleMet && phase === "ELIGIBLE" && (

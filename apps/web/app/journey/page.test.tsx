@@ -318,45 +318,53 @@ describe("PF5 assessment intro and questions", () => {
     ).toBeInTheDocument();
   });
 
-  it("resumes completed answers with one evaluation, and an explicit retry if it fails", async () => {
-    const requests: string[] = [];
-    let fail = true;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (url: string) => {
-        requests.push(url);
-        if (url.endsWith("/evaluate") && fail)
+  it("resumes completed answers with one evaluation, retried by itself if the server fails", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const requests: string[] = [];
+      let failures = 1;
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (url: string) => {
+          requests.push(url);
+          if (url.endsWith("/evaluate") && failures > 0) {
+            failures -= 1;
+            return new Response(
+              JSON.stringify({ message: "Analisi non disponibile. Riprova." }),
+              { status: 503 },
+            );
+          }
           return new Response(
-            JSON.stringify({ message: "Analisi non disponibile. Riprova." }),
-            { status: 503 },
+            JSON.stringify({
+              ...base,
+              count: 14,
+              currentQuestion: 14,
+              assessmentComplete: true,
+            }),
           );
-        return new Response(
-          JSON.stringify({
-            ...base,
-            count: 14,
-            currentQuestion: 14,
-            assessmentComplete: true,
-          }),
-        );
-      }),
-    );
-    render(<JourneyPage />);
-    expect(
-      await screen.findByText("Analisi non disponibile. Riprova."),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("Domanda configurata")).not.toBeInTheDocument();
-    // Un solo tentativo automatico: il nuovo è su richiesta.
-    expect(requests.filter((url) => url.endsWith("/evaluate"))).toHaveLength(1);
-    fail = false;
-    await userEvent.click(
-      screen.getByRole("button", { name: "Riprova l’analisi" }),
-    );
-    await waitFor(() =>
-      expect(requests.filter((url) => url.endsWith("/evaluate"))).toHaveLength(
-        2,
-      ),
-    );
-    expect(requests.some((url) => url.endsWith("/submit"))).toBe(false);
+        }),
+      );
+      render(<JourneyPage />);
+      expect(
+        await screen.findByText(/Problema con i server, stiamo riprovando/),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByText("Analisi non disponibile. Riprova."),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Riprova/ }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText("Domanda configurata")).not.toBeInTheDocument();
+      await vi.advanceTimersByTimeAsync(2000);
+      await waitFor(() =>
+        expect(
+          requests.filter((url) => url.endsWith("/evaluate")),
+        ).toHaveLength(2),
+      );
+      expect(requests.some((url) => url.endsWith("/submit"))).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("evaluates the completed answers by itself and shows a provisional spider with confidence", async () => {

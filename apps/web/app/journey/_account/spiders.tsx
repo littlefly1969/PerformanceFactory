@@ -130,18 +130,43 @@ export function ProfileSpider({
   );
 }
 
-/** Esagono piccolo: R in nero, P in lime; tratteggiato se provvisorio. */
+/**
+ * Bracci dello Spider, uno per area: dal punto medio del lato precedente al
+ * vertice dell'area e al punto medio del lato successivo. Insieme
+ * ricompongono il contorno del poligono.
+ */
+const arms = (center: number, radius: number, ratios: number[]) => {
+  const p = ratios.map((ratio, i) =>
+    point(center, radius, i, ratios.length, ratio),
+  );
+  const mid = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    `${((a.x + b.x) / 2).toFixed(1)},${((a.y + b.y) / 2).toFixed(1)}`;
+  return p.map((v, i) => {
+    const prev = p[(i + p.length - 1) % p.length];
+    const next = p[(i + 1) % p.length];
+    return `${mid(prev, v)} ${v.x.toFixed(1)},${v.y.toFixed(1)} ${mid(v, next)}`;
+  });
+};
+
+/**
+ * Esagono piccolo: R in nero, P in lime; tratteggiato se provvisorio. Con
+ * `defined` (durante la calibrazione) il braccio di ogni area definita
+ * diventa continuo, quello delle altre resta tratteggiato.
+ */
 export function MiniSpider({
   real,
   potential,
   scale,
   provisional = false,
+  defined,
   size = 96,
 }: {
   real: number[];
   potential?: number[];
   scale: Scale;
   provisional?: boolean;
+  /** Per area, nell'ordine di `real`: true se l'area è già definita. */
+  defined?: boolean[];
   size?: number;
 }) {
   const count = Math.max(real.length, 6);
@@ -153,6 +178,13 @@ export function MiniSpider({
       r,
       Array.from({ length: count }, () => ratio),
     );
+  const ratios = real.map((v) => ratioOf(v, scale));
+  // Bracci per area solo se lo Spider è provvisorio e sappiamo quali sono
+  // definite: altrimenti il contorno resta uno solo.
+  const byArea =
+    provisional && real.length >= 3 && defined?.length === real.length
+      ? defined
+      : null;
   return (
     <svg
       className="pf-acc-mini"
@@ -180,14 +212,20 @@ export function MiniSpider({
       )}
       {real.length >= 3 && (
         <polygon
-          className={`pf-acc-mini-real${provisional ? " is-provisional" : ""}`}
-          points={polygon(
-            c,
-            r,
-            real.map((v) => ratioOf(v, scale)),
-          )}
+          className={`pf-acc-mini-real${provisional ? " is-provisional" : ""}${
+            byArea ? " has-arms" : ""
+          }`}
+          points={polygon(c, r, ratios)}
         />
       )}
+      {byArea &&
+        arms(c, r, ratios).map((points, i) => (
+          <polyline
+            key={i}
+            className={`pf-acc-mini-arm${byArea[i] ? " is-defined" : ""}`}
+            points={points}
+          />
+        ))}
     </svg>
   );
 }

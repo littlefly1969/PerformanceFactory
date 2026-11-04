@@ -41,9 +41,10 @@ const microTestRound = (j: Journey) =>
 /**
  * Il prossimo passo della fase gratuita, uguale per Home e profilo. Decidono
  * lo stato della calibrazione e la fase della lezione restituiti dal backend,
- * mai punteggio o confidenza. La calibrazione resta aperta anche con R
- * consolidata e con la lezione in attesa: si continua finché la chiudono la
- * lezione svolta, la scelta degli scenari o la scadenza.
+ * mai punteggio o confidenza. Con R consolidata (calibrazione sufficiente)
+ * non si propone più di continuare a calibrare: il passo è il circolo, la
+ * lezione in attesa o gli scenari. La calibrazione si chiude con la lezione
+ * svolta, la scelta degli scenari o la scadenza.
  */
 export function nextStep(
   j: Journey,
@@ -108,18 +109,32 @@ export function nextStep(
       title: "Scegli il circolo per la tua lezione gratuita.",
       href: "/journey/circolo",
       cta: "Scegli il circolo",
-      secondary: {
-        href: "/journey/calibrazione",
-        label: "Continua la calibrazione",
-      },
+      secondary: c?.ruleMet
+        ? undefined
+        : {
+            href: "/journey/calibrazione",
+            label: "Continua la calibrazione",
+          },
     };
   if (c?.canFinish)
     return {
       kind: "finish",
       kicker: "R consolidata",
-      title: "Puoi vedere i tuoi scenari o continuare a calibrare.",
+      title: "Ti conosciamo abbastanza: puoi vedere i tuoi scenari.",
       href: "/journey/calibrazione",
       cta: "Scegli come proseguire",
+    };
+  if (lessonPending && c?.ruleMet)
+    return {
+      kind: "lesson",
+      kicker:
+        phase === "ASSIGNED"
+          ? "Lezione gratuita · confermata"
+          : "Lezione gratuita · richiesta",
+      title:
+        "R consolidata: la calibrazione si chiude dopo il feedback del coach.",
+      href: "/journey/circolo",
+      cta: "Gestisci la lezione",
     };
   if (lessonPending)
     return {
@@ -128,9 +143,7 @@ export function nextStep(
         phase === "ASSIGNED"
           ? "Lezione gratuita · confermata"
           : "Lezione gratuita · richiesta",
-      title: c?.ruleMet
-        ? "R consolidata: si chiude dopo il feedback del coach. Intanto puoi continuare."
-        : "Continua la calibrazione mentre aspetti la lezione.",
+      title: "Continua la calibrazione mentre aspetti la lezione.",
       href: "/journey/calibrazione",
       cta: "Continua la calibrazione",
       secondary: toLesson,

@@ -163,6 +163,32 @@
   background: var(--acc-lime);
   animation: pf-hex-bar var(--pf-hex-loop) linear infinite;
 }
+/* AI ferma: avviso dei nuovi tentativi e, finiti, la scelta di uscire. */
+.pf-hex .pf-hex-retry {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #ffffffb8;
+}
+.pf-hex .pf-hex-overload {
+  margin: 0;
+  color: #ffffffcc;
+}
+.pf-hex-overload strong {
+  display: block;
+  color: #fff;
+}
+.pf-hex-stop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 340px;
+  margin-top: 16px;
+}
+.pf-hex-stop .pf-acc-pill {
+  width: 100%;
+}
 .pf-hex .pf-acc-link {
   margin-top: 12px;
   border: 0;

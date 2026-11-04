@@ -1,5 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
-import { AccountScreen } from "./account-shell";
+import { AccountScreen, PillButton } from "./account-shell";
+import { AUTO_RETRIES, type RetryState } from "./auto-retry";
 import "./assessment-hex.css";
 
 /**
@@ -43,23 +44,85 @@ function Grid({ vertices }: { vertices: { x: number; y: number }[] }) {
   );
 }
 
+/**
+ * Cosa mostrare se l'AI non risponde. Mentre si riprova da soli resta
+ * l'animazione con un avviso, senza pulsanti; finiti i tentativi si chiede
+ * di riprovare più tardi e «Annulla» riporta indietro.
+ */
+export type HexFailure = {
+  /** Nuovi tentativi automatici in corso o finiti. */
+  retry?: RetryState;
+  /** Errore che un nuovo tentativo non risolve: si mostra con «Annulla». */
+  error?: string;
+  /** Torna indietro senza aspettare l'AI. */
+  onCancel?: () => void;
+  /** Finiti i tentativi, chi vuole può riprovare subito. */
+  onRetry?: () => void;
+};
+
+function Failure({ retry, error, onCancel, onRetry }: HexFailure) {
+  if (retry?.phase === "exhausted")
+    return (
+      <div className="pf-hex-stop">
+        <p className="pf-hex-overload" role="alert">
+          <strong>I nostri server sono sovraccarichi in questo momento.</strong>{" "}
+          Vuoi riprovare più tardi?
+        </p>
+        {onCancel && (
+          <PillButton tone="lime" arrow={false} onClick={onCancel}>
+            Annulla
+          </PillButton>
+        )}
+        {onRetry && (
+          <button type="button" className="pf-acc-link" onClick={onRetry}>
+            Riprova adesso
+          </button>
+        )}
+      </div>
+    );
+  if (error)
+    return (
+      <div className="pf-hex-stop">
+        <p className="pf-acc-error" role="alert">
+          {error}
+        </p>
+        {onCancel && (
+          <PillButton tone="lime" arrow={false} onClick={onCancel}>
+            Annulla
+          </PillButton>
+        )}
+      </div>
+    );
+  return (
+    <>
+      <span className="pf-hex-dots" aria-hidden="true">
+        <i />
+        <i />
+        <i />
+      </span>
+      {retry?.phase === "retrying" && (
+        <p className="pf-hex-retry">
+          Problema con i server, stiamo riprovando… ({retry.attempt} di{" "}
+          {AUTO_RETRIES})
+        </p>
+      )}
+    </>
+  );
+}
+
 function Stage({
   children,
   title,
   sub,
   kicker,
-  error,
-  onRetry,
-  retryLabel = "Riprova",
+  failure,
   loop,
 }: {
   children: ReactNode;
   title: string;
   sub: string;
   kicker?: string;
-  error?: string;
-  onRetry?: () => void;
-  retryLabel?: string;
+  failure?: HexFailure;
   /** Durata di un giro dell'animazione, anche della barra in basso. */
   loop: string;
 }) {
@@ -74,24 +137,7 @@ function Stage({
         {kicker && <span className="pf-hex-kicker">{kicker}</span>}
         <h1 className="pf-acc-title">{title}</h1>
         <p>{sub}</p>
-        {error ? (
-          <>
-            <p className="pf-acc-error" role="alert">
-              {error}
-            </p>
-            {onRetry && (
-              <button type="button" className="pf-acc-link" onClick={onRetry}>
-                {retryLabel}
-              </button>
-            )}
-          </>
-        ) : (
-          <span className="pf-hex-dots" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </span>
-        )}
+        <Failure {...failure} />
         <span className="pf-hex-bar" aria-hidden="true">
           <i />
         </span>
@@ -105,14 +151,12 @@ export function HexPrep({
   title,
   sub,
   areas = 6,
-  error,
-  onRetry,
+  failure,
 }: {
   title: string;
   sub: string;
   areas?: number;
-  error?: string;
-  onRetry?: () => void;
+  failure?: HexFailure;
 }) {
   const v = hexVertices(Math.max(3, areas));
   const inner = v.map((p) => ({
@@ -120,7 +164,7 @@ export function HexPrep({
     y: C + (p.y - C) * 0.58,
   }));
   return (
-    <Stage title={title} sub={sub} error={error} onRetry={onRetry} loop="2.6s">
+    <Stage title={title} sub={sub} failure={failure} loop="2.6s">
       <svg viewBox="0 0 200 200" aria-hidden="true">
         <Grid vertices={v} />
         <polygon className="pf-hex-breath" points={points(inner)} />
@@ -148,17 +192,13 @@ export function HexPrep({
 export function HexSide({
   names,
   index,
-  error,
-  onRetry,
-  retryLabel,
+  failure,
 }: {
   /** Aree nell'ordine dello Spider. */
   names: string[];
   /** Area appena completata. */
   index: number;
-  error?: string;
-  onRetry?: () => void;
-  retryLabel?: string;
+  failure?: HexFailure;
 }) {
   const n = Math.max(3, names.length);
   const v = hexVertices(n);
@@ -181,9 +221,7 @@ export function HexSide({
           ? "Sto calcolando la tua performance."
           : `Ora ${next.toLowerCase()}.`
       }
-      error={error}
-      onRetry={onRetry}
-      retryLabel={retryLabel}
+      failure={failure}
       loop={last ? "3s" : "2.3s"}
     >
       <svg viewBox="0 0 200 200" aria-hidden="true">
