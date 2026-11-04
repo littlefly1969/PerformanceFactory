@@ -1,9 +1,8 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional, PickType } from '@nestjs/swagger';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
-  Equals,
   IsBoolean,
   IsDateString,
   IsInt,
@@ -15,18 +14,32 @@ import {
   Max,
   MaxLength,
   Min,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
+import {
+  AddressResolveDto,
+  AddressSuggestionsDto,
+} from '../../athlete/athlete-address';
 
 export class RequestFreeLessonDto {
   @ApiProperty()
   @IsUUID()
   partnerId: string;
 
-  /** Consenso a mostrare al coach nome, livello stimato e driver. */
-  @ApiProperty()
-  @Equals(true, { message: 'Serve il consenso a condividere il livello' })
-  shareWithCoach: boolean;
+  /**
+   * Deprecato e ignorato: il coach della lezione vede nome, livello e driver
+   * per il consenso privacy accettato alla registrazione. Resta accettato per
+   * i client non ancora aggiornati.
+   */
+  @ApiPropertyOptional({
+    deprecated: true,
+    description:
+      'Ignorato: la condivisione con il coach è coperta dal consenso privacy della registrazione',
+  })
+  @IsOptional()
+  @IsBoolean()
+  shareWithCoach?: boolean;
 
   /** Lezione in calendario preferita; il gruppo lo compone comunque l'admin. */
   @ApiPropertyOptional()
@@ -34,6 +47,26 @@ export class RequestFreeLessonDto {
   @IsUUID()
   lessonId?: string;
 }
+
+/**
+ * CAP o città scritti dall'atleta per cercare i circoli: lo stesso token di
+ * sessione dei suggerimenti dell'indirizzo, testo più corto.
+ */
+export class AreaSuggestionsDto extends PickType(AddressSuggestionsDto, [
+  'sessionToken',
+] as const) {
+  @ApiProperty({ description: 'CAP o città, almeno 2 caratteri' })
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsString()
+  @MinLength(2)
+  @MaxLength(80)
+  input!: string;
+}
+
+/** Scelta di un CAP o di una città fra i suggerimenti di Google. */
+export class AreaResolveDto extends AddressResolveDto {}
 
 export class UpdateFreeLessonConfigDto {
   @ApiPropertyOptional({ minimum: 0, maximum: 1000 })

@@ -1,9 +1,12 @@
 import { ServiceUnavailableException } from '@nestjs/common';
 import {
+  AREA_FIELD_MASK,
   AUTOCOMPLETE_FIELD_MASK,
   DETAILS_FIELD_MASK,
   SEARCH_FIELD_MASK,
   PlacesService,
+  areaAutocompleteRequest,
+  readArea,
   readPlace,
   readSuggestions,
 } from './places.service';
@@ -130,6 +133,79 @@ describe('readSuggestions', () => {
   });
 });
 
+describe('areaAutocompleteRequest', () => {
+  it('asks only for postcodes and towns in Italy, with the session token', () => {
+    expect(areaAutocompleteRequest('651', 'token-1234567890ab')).toEqual({
+      input: '651',
+      sessionToken: 'token-1234567890ab',
+      languageCode: 'it',
+      regionCode: 'it',
+      includedRegionCodes: ['it'],
+      includedPrimaryTypes: [
+        'postal_code',
+        'locality',
+        'administrative_area_level_3',
+      ],
+    });
+  });
+});
+
+describe('readArea', () => {
+  const area = (...components: ReturnType<typeof component>[]) => ({
+    addressComponents: components,
+  });
+  const italy = component(['country', 'political'], 'Italia', 'IT');
+  const province = component(
+    ['administrative_area_level_2', 'political'],
+    'Provincia di Pescara',
+    'pe',
+  );
+
+  it('gives the town of a postcode, with postcode and province', () => {
+    expect(
+      readArea(
+        area(
+          component(['postal_code'], '65121'),
+          component(['locality', 'political'], 'Pescara'),
+          province,
+          italy,
+        ),
+      ),
+    ).toEqual({ city: 'Pescara', postalCode: '65121', province: 'PE' });
+  });
+
+  it('falls back to the municipality and drops an invalid postcode or province', () => {
+    expect(
+      readArea(
+        area(
+          component(['administrative_area_level_3'], 'Montesilvano'),
+          component(['postal_code'], '651'),
+          component(['administrative_area_level_2'], 'Pescara', 'Pescara'),
+          italy,
+        ),
+      ),
+    ).toEqual({ city: 'Montesilvano', postalCode: null, province: null });
+    expect(readArea(area(component(['postal_town'], 'Chieti'), italy))).toEqual(
+      { city: 'Chieti', postalCode: null, province: null },
+    );
+  });
+
+  it('is null without a town or outside Italy', () => {
+    expect(readArea(area(component(['postal_code'], '65121'), italy))).toBe(
+      null,
+    );
+    expect(
+      readArea(
+        area(
+          component(['locality'], 'Nice'),
+          component(['country'], 'France', 'FR'),
+        ),
+      ),
+    ).toBeNull();
+    expect(readArea(null)).toBeNull();
+  });
+});
+
 describe('PlacesService', () => {
   const env = { ...process.env };
   const fetchMock = jest.fn();
@@ -186,6 +262,54 @@ describe('PlacesService', () => {
     expect((init.headers as Record<string, string>)['x-goog-fieldmask']).toBe(
       DETAILS_FIELD_MASK,
     );
+  });
+
+  it('looks up postcodes and towns, then reads only the address components', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          suggestions: [
+            {
+              placePrediction: {
+                placeId: 'ChIJ-cap',
+                text: { text: '65121 Pescara PE, Italia' },
+                structuredFormat: {
+                  mainText: { text: '65121' },
+                  secondaryText: { text: 'Pescara PE, Italia' },
+                },
+              },
+            },
+          ],
+        }),
+      ),
+    );
+    expect(
+      await new PlacesService().suggestAreas('65121', 'token-1234567890ab'),
+    ).toEqual([
+      {
+        placeId: 'ChIJ-cap',
+        text: '65121 Pescara PE, Italia',
+        mainText: '65121',
+        secondaryText: 'Pescara PE, Italia',
+      },
+    ]);
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      includedPrimaryTypes: [
+        'postal_code',
+        'locality',
+        'administrative_area_level_3',
+      ],
+    });
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify(PLACE)));
+    expect(
+      await new PlacesService().resolveArea('ChIJ-cap', 'token-1234567890ab'),
+    ).toEqual({ city: 'L’Aquila', postalCode: '67100', province: 'AQ' });
+    const [url, details] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(url).toContain('sessionToken=token-1234567890ab');
+    expect(
+      (details.headers as Record<string, string>)['x-goog-fieldmask'],
+    ).toBe(AREA_FIELD_MASK);
   });
 
   it('turns provider errors and timeouts into an unavailable service', async () => {

@@ -20,6 +20,8 @@ export const AUTOCOMPLETE_FIELD_MASK = [
 export const DETAILS_FIELD_MASK =
   'id,formattedAddress,addressComponents,location';
 export const LOCATION_FIELD_MASK = 'location';
+/** Per CAP e città bastano i componenti: niente coordinate né indirizzo. */
+export const AREA_FIELD_MASK = 'addressComponents';
 /** Solo il Place ID: la Text Search così non ha costo, le coordinate a parte. */
 export const SEARCH_FIELD_MASK = 'places.id';
 
@@ -56,6 +58,13 @@ export type PlaceResolution =
       formattedAddress: string | null;
     };
 
+/** Zona scelta dall'atleta: la città dei circoli, senza la sua posizione. */
+export type ClubArea = {
+  city: string;
+  postalCode: string | null;
+  province: string | null;
+};
+
 type Component = { longText?: string; shortText?: string; types?: string[] };
 
 /** Corpo della richiesta Autocomplete (New): solo indirizzi in Italia. */
@@ -67,6 +76,22 @@ export function autocompleteRequest(input: string, sessionToken: string) {
     regionCode: 'it',
     includedRegionCodes: ['it'],
     includedPrimaryTypes: ['street_address', 'premise', 'subpremise', 'route'],
+  };
+}
+
+/** Corpo della richiesta Autocomplete (New) per un CAP o una città in Italia. */
+export function areaAutocompleteRequest(input: string, sessionToken: string) {
+  return {
+    input,
+    sessionToken,
+    languageCode: 'it',
+    regionCode: 'it',
+    includedRegionCodes: ['it'],
+    includedPrimaryTypes: [
+      'postal_code',
+      'locality',
+      'administrative_area_level_3',
+    ],
   };
 }
 
@@ -166,6 +191,34 @@ export function readPlace(payload: unknown): PlaceResolution {
 }
 
 /**
+ * Città, CAP e provincia da Place Details (New): con un CAP la città è quella
+ * del CAP. Null fuori dall'Italia o senza città; CAP e provincia solo se validi.
+ */
+export function readArea(payload: unknown): ClubArea | null {
+  const place = (payload ?? {}) as { addressComponents?: Component[] };
+  const components = Array.isArray(place.addressComponents)
+    ? place.addressComponents
+    : [];
+  const part = (type: string) =>
+    components.find((c) => c.types?.includes(type));
+  const long = (type: string) => part(type)?.longText?.trim() || '';
+  const short = (type: string) => part(type)?.shortText?.trim() || '';
+  if (short('country').toUpperCase() !== 'IT') return null;
+  const city =
+    long('locality') ||
+    long('administrative_area_level_3') ||
+    long('postal_town');
+  if (!city) return null;
+  const postalCode = long('postal_code');
+  const province = short('administrative_area_level_2').toUpperCase();
+  return {
+    city,
+    postalCode: /^\d{5}$/.test(postalCode) ? postalCode : null,
+    province: /^[A-Z]{2}$/.test(province) ? province : null,
+  };
+}
+
+/**
  * Google Places API (New), chiamata solo dal backend con la chiave
  * GOOGLE_PLACES_API_KEY: Autocomplete per i suggerimenti, Place Details per
  * risolvere la scelta. Senza chiave il servizio è spento e l'indirizzo si
@@ -205,6 +258,33 @@ export class PlacesService {
       DETAILS_FIELD_MASK,
     );
     return readPlace(payload);
+  }
+
+  /** Suggerimenti di CAP e città per cercare i circoli, senza indirizzo. */
+  async suggestAreas(input: string, sessionToken: string) {
+    const payload = await this.call(
+      'places:autocomplete',
+      AUTOCOMPLETE_FIELD_MASK,
+      {
+        method: 'POST',
+        body: JSON.stringify(areaAutocompleteRequest(input, sessionToken)),
+      },
+    );
+    return readSuggestions(payload);
+  }
+
+  /** Città del CAP o della città scelta; lo stesso token chiude la sessione. */
+  async resolveArea(placeId: string, sessionToken: string) {
+    const query = new URLSearchParams({
+      sessionToken,
+      languageCode: 'it',
+      regionCode: 'it',
+    });
+    const payload = await this.call(
+      `places/${encodeURIComponent(placeId)}?${query}`,
+      AREA_FIELD_MASK,
+    );
+    return readArea(payload);
   }
 
   /** Coordinate aggiornate di un luogo già scelto; null se non arrivano. */

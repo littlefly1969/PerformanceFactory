@@ -25,6 +25,23 @@ export type LessonSlot = {
   seatsLeft: number;
 };
 
+/**
+ * Circolo che offre la lezione: la distanza la calcola il browser dalla
+ * posizione dell'atleta, solo se la concede; con CAP o città si filtra per
+ * città.
+ */
+export type LessonClub = {
+  id: string;
+  name: string;
+  city: string | null;
+  province: string | null;
+  postalCode: string | null;
+  location: { latitude: number; longitude: number } | null;
+  /** Percorsi relativi alla base dell'API, versionati dal back office. */
+  logoUrl: string | null;
+  photoUrl: string | null;
+};
+
 export type FreeLessonView =
   | { enabled: false }
   | {
@@ -41,23 +58,18 @@ export type FreeLessonView =
         | "CLOSED";
       missing: Array<"LEVEL" | "CONFIDENCE" | "PROFILE">;
       credits: { balance: number; toUnlock: number };
-      clubs: {
-        id: string;
-        name: string;
-        city: string | null;
-        /** Distanza in linea d'aria, null se non si può calcolare. */
-        distanceKm: number | null;
-      }[];
-      /** Senza distanza il motivo: manca l'indirizzo o non è riconosciuto. */
-      distance: {
-        available: boolean;
-        reason: "NO_ADDRESS" | "ADDRESS_NOT_LOCATED" | null;
-      };
+      clubs: LessonClub[];
       slots: LessonSlot[];
       attributedClubId: string | null;
       seat: {
         status: string;
-        club: { name: string; city: string | null };
+        club: {
+          id: string;
+          name: string;
+          city: string | null;
+          logoUrl: string | null;
+          photoUrl: string | null;
+        };
         preferredLessonId: string | null;
         lesson: { startsAt: string; durationMinutes: number } | null;
       } | null;
