@@ -126,20 +126,22 @@ export default function ProfilePage() {
   const total = evaluation?.drivers.length ?? 0;
   const availabilityDone =
     !!availability.data && availabilityComplete(availability.data);
-  // Scheda «Fase gratuita» come la demo: «Calibrazione in corso» (o
-  // completata) e la pillola corta «Calibrazione»; a fase chiusa gli scenari.
+  // Scheda «Fase gratuita» come la demo: mentre si calibra «Calibrazione in
+  // corso» (o completata) con la pillola corta «Calibrazione». Quando il passo
+  // è la lezione (circolo da scegliere o lezione da gestire) o gli scenari,
+  // destinazione e pulsante restano quelli del prossimo passo.
   const phase = !step
     ? null
-    : step.kind === "scenarios"
+    : step.kind === "scenarios" || step.kind === "lesson"
       ? { title: step.kicker, href: step.href, cta: step.cta, label: step.cta }
       : {
           title:
             step.kind === "finish"
               ? "Calibrazione completata"
               : "Calibrazione in corso",
-          href: step.kind === "lesson" ? "/journey/calibrazione" : step.href,
+          href: step.href,
           cta: "Calibrazione",
-          label: step.kind === "lesson" ? "Continua la calibrazione" : step.cta,
+          label: step.cta,
         };
   return (
     <AccountScreen nav="profile" coachDot={microTestOpen(calibration)}>

@@ -234,8 +234,7 @@ describe("Prossimo passo nel profilo", () => {
       lesson,
       "/journey/calibrazione",
     ],
-    // La lezione sbloccata ha la sua scheda: «Fase gratuita» resta calibrazione.
-    ["lesson unlocked", calibration(null), lesson, "/journey/calibrazione"],
+    ["lesson unlocked", calibration(null), lesson, "/journey/circolo"],
     [
       "lesson requested",
       calibration(null, "FREE_LESSON_VALIDATION"),
