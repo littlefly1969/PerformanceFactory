@@ -109,6 +109,52 @@ describe('Rolling calendar and athlete availability with PostgreSQL', () => {
     });
     expect(response.json<{ daysPerWeek: number }>().daysPerWeek).toBe(4);
   });
+  it('saves availability from the free-phase profile, before the program exists', async () => {
+    const athlete = await f.user('USER', false);
+    const url = '/api/athlete/training/availability';
+    const payload = {
+      currentFrequency: '4_5',
+      daysPerWeek: 2,
+      sessionDurationMinutes: 45,
+      preferredDays: [2, 4],
+    };
+    const save = () =>
+      f.app.inject({ method: 'POST', url, headers: athlete.headers, payload });
+    // Senza percorso avviato e senza profilo completato, nessun salvataggio.
+    expect((await save()).statusCode).toBe(400);
+    await f.prisma.athleteDiscovery.create({
+      data: {
+        userId: athlete.id,
+        version: 1,
+        configuration: { questions: [] },
+        draft: { answers: {} },
+      },
+    });
+    expect((await save()).statusCode).toBe(201);
+    const stored = await f.prisma.userOnboardingAssessment.findUniqueOrThrow({
+      where: { userId: athlete.id },
+    });
+    // Stato invariato: il profilo si completa solo con il programma.
+    expect(stored.status).toBe('PENDING');
+    expect(stored.profileJson).toMatchObject({
+      summary: 'Profilo reale test',
+      general_training_frequency: { value: '4_5' },
+      training_days_available: { value: 2 },
+      training_session_duration: { value: 45 },
+      preferred_training_days: { value: [2, 4] },
+    });
+    const view = await f.app.inject({
+      method: 'GET',
+      url,
+      headers: athlete.headers,
+    });
+    expect(view.json()).toMatchObject({
+      currentFrequency: '4_5',
+      daysPerWeek: 2,
+      sessionDurationMinutes: 45,
+      preferredDays: [2, 4],
+    });
+  });
   it.each([12, 26, 52])(
     'preserves the selected %s-week program in discovery, context and home',
     async (weeks) => {

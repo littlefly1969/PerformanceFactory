@@ -1,6 +1,8 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { AccountMenu } from "../../components/account-menu";
+import type { FitRankingView } from "../../components/fit-ranking-editor";
 import {
   type AthleteProfile,
   type FreeLessonView,
@@ -8,11 +10,10 @@ import {
   shortName,
   useResource,
 } from "../_account/account-data";
-import { AccountScreen, PillLink } from "../_account/account-shell";
-import { AssessmentLessonCard, FreeLessonCard } from "../_account/lesson-card";
-import { ProfileSpider } from "../_account/spiders";
+import { AccountScreen } from "../_account/account-shell";
 import {
   closedUnconsolidated,
+  definedAreas,
   isConsolidated,
   microTestOpen,
   useAccountJourney,
@@ -23,43 +24,41 @@ import {
   nextStep,
   readOutcome,
 } from "../_account/next-step";
+import {
+  AVAILABILITY_PATH,
+  type Availability,
+  availabilityComplete,
+} from "./_profile/availability";
+import {
+  AvailabilityCard,
+  ExternalIcon,
+  FitCard,
+  LessonSection,
+  LinkCard,
+  TodoCard,
+} from "./_profile/profile-cards";
+import { AreaRing, type HexAxis, ProfileHex } from "./_profile/profile-hex";
+import "./_profile/profile.css";
+import "./_profile/profile-body.css";
 
-/** Intestazione: avatar con il menu dell'account, nome, sport ed esperienza. */
-function ProfileHeader({ profile }: { profile: AthleteProfile | null }) {
-  const name = profile?.firstName?.trim() ?? "";
-  const meta = [
-    profile?.sport,
-    profile?.experience &&
-      (/gioc/i.test(profile.experience)
-        ? profile.experience
-        : `${profile.experience} di gioco`),
-  ]
-    .filter(Boolean)
-    .join(" · ");
-  return (
-    <header className="pf-acc-profile-head">
-      <AccountMenu
-        name={name}
-        from="profilo"
-        className="pf-acc-avatar"
-        align="start"
-      />
-      <div>
-        <h1>{name || "Il tuo profilo"}</h1>
-        {meta && <p className="pf-acc-meta">{meta}</p>}
-      </div>
-    </header>
-  );
-}
+const GearIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="12" cy="12" r="3.1" />
+    <path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.1-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1.1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H9a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1Z" />
+  </svg>
+);
 
 /**
- * Profilo dell'atleta nella fase gratuita: lezione gratuita, sintesi globale
- * di R con la sua confidenza, Spider delle sei aree e stato della
- * calibrazione. Prima dell'assessment lo Spider è vuoto.
+ * Profilo dell'atleta nella fase gratuita, come la demo PF10: testata scura
+ * con l'esagono grande (aree definite a linea piena, le altre tratteggiate),
+ * la calibrazione che diventa la lezione, disponibilità e classifica FIT da
+ * compilare o modificare, le sei aree, il prossimo passo, l'analisi delle
+ * aree, l'invito e la community. Il calendario arriva con l'abbonamento.
  */
 export default function ProfilePage() {
   const { journey: j, error, busy, action } = useAccountJourney();
   const [outcome, setOutcome] = useState<Outcome | null>(null);
+  const [info, setInfo] = useState(false);
   const confirmation = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
     // Il vecchio richiamo all'indirizzo nel profilo porta all'account.
@@ -79,155 +78,279 @@ export default function ProfilePage() {
     if (outcome && j) confirmation.current?.focus();
   }, [outcome, j]);
   const profile = useResource<AthleteProfile>("/athlete-journey/profile");
-  const evaluation = j?.evaluation ?? null;
   const lesson = useResource<FreeLessonView>("/athlete-journey/free-lesson");
-  // Prima dell'assessment la fase è UNAVAILABLE: decidono flag e circoli.
-  const offered =
-    !!lesson.data?.enabled && (lesson.data.clubs?.length ?? 0) > 0;
+  const availability = useResource<Availability>(AVAILABILITY_PATH);
+  const fit = useResource<FitRankingView>("/athlete-journey/fit-ranking");
+  const evaluation = j?.evaluation ?? null;
   const calibration = j?.calibration ?? null;
-  // R consolidata anche a calibrazione aperta: si può continuare a rispondere.
   const closed = isConsolidated(calibration);
   const expiredWeak = closedUnconsolidated(calibration);
   const rule = calibration?.consolidationRule.minOverallConfidence ?? null;
   const global = profile.data?.global ?? null;
-  const axes = evaluation
+  const defined = evaluation
+    ? definedAreas(calibration, evaluation.drivers)
+    : new Set<string>();
+  const axes: HexAxis[] = evaluation
     ? evaluation.drivers.map((d) => ({
         id: d.id,
         label: shortName(d.name),
-        value: d.score,
+        score: d.score,
         confidence: d.confidence,
+        defined: defined.has(d.id),
       }))
     : (j?.driverList ?? []).map((d) => ({
         id: d.id,
         label: shortName(d.name),
-        value: null,
+        score: null,
+        confidence: 0,
+        defined: false,
       }));
-  const completeness = evaluation
-    ? Math.min(
-        100,
-        Math.round((evaluation.overallConfidence / (rule || 100)) * 100),
-      )
-    : 0;
+  const hexAxes = axes.length >= 3 ? axes : placeholderAxes;
+  // Prima dell'assessment la fase è UNAVAILABLE: decidono flag e circoli.
+  const offered =
+    !!lesson.data?.enabled && (lesson.data.clubs?.length ?? 0) > 0;
   const started = j?.phase === "ASSESSMENT" || j?.phase === "PROCESSING";
+  const answered = j ? Math.min(j.currentQuestion, j.count) : 0;
   const step = j && lesson.data !== undefined ? nextStep(j, lesson.data) : null;
+  const firstName = (profile.data?.firstName ?? j?.firstName ?? "").trim();
+  const startAssessment = () => {
+    if (started) return window.location.assign("/journey");
+    void action("start").then((ok) => ok && window.location.assign("/journey"));
+  };
+  const assessCta = busy
+    ? "Prepariamo le domande…"
+    : started || answered > 0
+      ? "Continua l’assessment"
+      : "Inizia l’assessment";
+  const total = evaluation?.drivers.length ?? 0;
   return (
     <AccountScreen nav="profile" coachDot={microTestOpen(calibration)}>
-      <ProfileHeader profile={profile.data ?? null} />
-      {outcome && j && (
-        <p
-          className="pf-acc-confirm"
-          role="status"
-          tabIndex={-1}
-          ref={confirmation}
-        >
-          {OUTCOMES[outcome]} Qui trovi R, affidabilità e il prossimo passo.
-        </p>
-      )}
-      {error && (
-        <p className="pf-acc-error" role="alert">
-          {error}
-        </p>
-      )}
-      {j && !evaluation && (
-        <AssessmentLessonCard
-          answered={Math.min(j.currentQuestion, j.count)}
-          count={j.count}
-          started={started}
-          busy={busy}
-          offered={offered}
-          onStart={() => {
-            if (started) return window.location.assign("/journey");
-            void action("start").then(
-              (ok) => ok && window.location.assign("/journey"),
-            );
-          }}
-        />
-      )}
-      {evaluation && lesson.data && <FreeLessonCard view={lesson.data} />}
-
-      {evaluation && global && (
-        <section className="pf-acc-global" aria-labelledby="pf-acc-global">
-          <div className="pf-acc-row">
-            <span className="pf-acc-kicker" id="pf-acc-global">
-              Sintesi globale · R
-            </span>
-            <span className="pf-acc-badge">
-              {closed ? "R consolidata" : "Profilo provvisorio"}
-            </span>
-          </div>
-          <div className="pf-acc-row is-big">
-            <strong>
-              {closed ? "" : "≈ "}
-              {global.value}
-            </strong>
-            <div>
-              <b>
-                Tra {global.low} e {global.high}
-              </b>
-              <small>Confidenza complessiva {percent(global.confidence)}</small>
-            </div>
-          </div>
-          {expiredWeak ? (
-            <p className="pf-acc-warning" role="status">
-              <strong>Attenzione: stima poco affidabile.</strong> La fase
-              gratuita è scaduta prima che ti conoscessimo abbastanza: R e i
-              tuoi scenari partono da dati ancora parziali.
-            </p>
-          ) : (
-            <p>
-              {closed
-                ? "La stima è consolidata: le tue risposte bastano per un valore affidabile."
-                : "La stima si basa su dati ancora parziali. L’intervallo si stringe man mano che completi le aree."}
-            </p>
-          )}
-          <p className="pf-acc-muted">
-            R non è la media dei sei punteggi: ogni area pesa per quanto la
-            conosciamo. P3, P6 e P12 si mostrano quando la calibrazione è
-            chiusa.
-          </p>
-          <small className="pf-acc-note">
-            Soglia di completezza{" "}
-            {rule === null ? "da definire" : percent(rule)}
-          </small>
-          {step && (
-            <div className="pf-acc-phase" aria-label="Prossimo passo">
-              <div>
-                <span className="pf-acc-kicker">Fase gratuita</span>
-                <strong>{step.kicker}</strong>
-              </div>
-              <PillLink href={step.href}>{step.cta}</PillLink>
-            </div>
-          )}
-        </section>
-      )}
-
-      <section className="pf-acc-spider-wrap" aria-label="Il tuo Spider">
-        <ProfileSpider
-          axes={axes}
-          scale={evaluation?.scale ?? { min: 0, max: 100 }}
-          provisional={!closed}
-        />
-      </section>
-
-      <section className="pf-acc-card" aria-labelledby="pf-acc-completion">
-        <span className="pf-acc-kicker" id="pf-acc-completion">
-          Completamento profilo · sei aree
-        </span>
-        <div
-          className="pf-acc-bar"
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={completeness}
-        >
-          <span style={{ width: `${completeness}%` }} />
+      <header className="pf-prof-head">
+        <div className="pf-prof-glow" aria-hidden="true" />
+        <div className="pf-prof-top">
+          <AccountMenu
+            name={firstName}
+            from="profilo"
+            className="pf-prof-avatar"
+            align="start"
+          />
+          <Link
+            href="/account?da=profilo"
+            className="pf-prof-gear"
+            aria-label="Impostazioni"
+          >
+            <GearIcon />
+          </Link>
         </div>
-        <p>
-          {evaluation
-            ? "Ogni risposta e ogni micro-test rendono più nitida l’area che conosciamo meno."
-            : "Rispondi all’assessment: lo Spider nasce provvisorio e si definisce mentre ti alleni."}
-        </p>
-      </section>
+        {j && !evaluation && (
+          <div className="pf-prof-hello">
+            <h1>Ciao{firstName ? ` ${firstName}` : ""}.</h1>
+            {offered ? (
+              <p>
+                {answered > 0
+                  ? "Ti mancano poche domande per sbloccare la tua "
+                  : "Pochi minuti di domande e sblocchi la tua "}
+                <span>lezione di prova gratuita</span>
+                {answered > 0 ? "." : " con un coach."}
+              </p>
+            ) : (
+              // La lezione si promette solo se il server la offre.
+              <p>
+                {answered > 0
+                  ? "Ti mancano poche domande per il tuo primo Spider."
+                  : "Pochi minuti di domande e scopri dove sei oggi."}
+              </p>
+            )}
+          </div>
+        )}
+        {evaluation && <h1 className="pf-sr-only">Il tuo profilo</h1>}
+        <ProfileHex
+          axes={hexAxes}
+          overallConfidence={evaluation ? evaluation.overallConfidence : null}
+          scale={evaluation?.scale ?? { min: 0, max: 100 }}
+        >
+          {j && !evaluation && (
+            <div className="pf-prof-hex-cta">
+              <button type="button" disabled={busy} onClick={startAssessment}>
+                <span>{assessCta}</span>
+                <span aria-hidden="true">→</span>
+              </button>
+            </div>
+          )}
+        </ProfileHex>
+        {evaluation && global && (
+          <>
+            <div className="pf-prof-r">
+              <p>
+                <span>R</span>
+                <b>
+                  {closed ? "" : "≈ "}
+                  {global.value}
+                </b>
+              </p>
+              <div>
+                <span className={`pf-prof-chip${closed ? " is-done" : ""}`}>
+                  {closed ? "Sufficientemente completo" : "Profilo provvisorio"}
+                </span>
+                <button
+                  type="button"
+                  className="pf-prof-info-btn"
+                  aria-expanded={info}
+                  aria-controls="pf-prof-info"
+                  aria-label={
+                    info ? "Chiudi le informazioni su R" : "Informazioni su R"
+                  }
+                  onClick={() => setInfo(!info)}
+                >
+                  {info ? "×" : "i"}
+                </button>
+              </div>
+            </div>
+            {expiredWeak && (
+              <p className="pf-prof-warning" role="status">
+                <strong>Attenzione: stima poco affidabile.</strong> La fase
+                gratuita è scaduta prima che ti conoscessimo abbastanza: R e i
+                tuoi scenari partono da dati ancora parziali.
+              </p>
+            )}
+            {info && (
+              <div className="pf-prof-info" id="pf-prof-info">
+                <div>
+                  <b>
+                    Tra {global.low} e {global.high}
+                  </b>
+                  <span>
+                    Confidenza complessiva {percent(global.confidence)}
+                  </span>
+                </div>
+                <p>
+                  {closed
+                    ? "La stima è consolidata: le tue risposte bastano per un valore affidabile."
+                    : "La stima si basa su dati ancora parziali. L’intervallo si stringe man mano che completi le aree."}
+                </p>
+                <p className="is-muted">
+                  R non è la media dei sei punteggi. P3, P6 e P12 si mostrano
+                  quando la calibrazione è chiusa.
+                </p>
+                <span className="pf-prof-info-note">
+                  Soglia di completezza{" "}
+                  {rule === null ? "da definire" : percent(rule)}
+                </span>
+              </div>
+            )}
+          </>
+        )}
+      </header>
+
+      <div className="pf-prof-body">
+        {outcome && j && (
+          <p
+            className="pf-prof-confirm"
+            role="status"
+            tabIndex={-1}
+            ref={confirmation}
+          >
+            {OUTCOMES[outcome]}
+          </p>
+        )}
+        {error && (
+          <p className="pf-acc-error" role="alert">
+            {error}
+          </p>
+        )}
+        {evaluation && step && (
+          <LessonSection
+            view={lesson.data}
+            calibrationHref={step.href}
+            calibrationCta={
+              step.kind === "lesson" || step.kind === "scenarios"
+                ? "Continua la calibrazione"
+                : step.cta
+            }
+          />
+        )}
+        {availability.data !== undefined &&
+          (availabilityComplete(availability.data) ? (
+            <AvailabilityCard value={availability.data!} />
+          ) : (
+            <TodoCard
+              href="/journey/profilo/disponibilita"
+              title="Quale è la tua disponibilità?"
+            />
+          ))}
+        {fit.data !== undefined &&
+          (fit.data?.ranking ? (
+            <FitCard view={fit.data} />
+          ) : (
+            <TodoCard
+              href="/journey/profilo/classifica"
+              title="La tua classifica FITP"
+            />
+          ))}
+
+        {evaluation && (
+          <section className="pf-prof-areas" aria-labelledby="pf-prof-areas">
+            <div className="pf-prof-section-head">
+              <h2 id="pf-prof-areas">Le sei aree</h2>
+              <span>
+                {defined.size} di {total} aree definite
+              </span>
+            </div>
+            <ul>
+              {evaluation.drivers.map((d) => (
+                <li key={d.id}>
+                  <Link href="/journey/calibrazione">
+                    <AreaRing
+                      confidence={d.confidence}
+                      defined={defined.has(d.id)}
+                    >
+                      {Math.round(d.score)}
+                    </AreaRing>
+                    <span>{d.name}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {evaluation && step && (
+          <section className="pf-prof-phase" aria-label="Prossimo passo">
+            <div>
+              <span className="pf-prof-kicker">Fase gratuita</span>
+              <strong>{step.kicker}</strong>
+            </div>
+            <Link href={step.href}>
+              <span>{step.cta}</span>
+              <span aria-hidden="true">→</span>
+            </Link>
+          </section>
+        )}
+
+        {evaluation && (
+          <LinkCard
+            href="/journey/calibrazione"
+            kicker={`${total}/${total} stimate · ${defined.size}/${total} definite`}
+            title="Analisi delle sei aree"
+          />
+        )}
+        <LinkCard href="/journey/profilo/invita" title="Invita un amico" />
+        <LinkCard
+          href="/journey/profilo/community"
+          title="Unisciti alla community"
+          tone="outline"
+          icon={<ExternalIcon />}
+        />
+      </div>
     </AccountScreen>
   );
 }
+
+/** Esagono vuoto finché il percorso non ha ancora l'elenco delle aree. */
+const placeholderAxes: HexAxis[] = Array.from({ length: 6 }, (_, i) => ({
+  id: `area-${i}`,
+  label: "",
+  score: null,
+  confidence: 0,
+  defined: false,
+}));

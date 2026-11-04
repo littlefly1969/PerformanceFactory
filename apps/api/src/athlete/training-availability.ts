@@ -11,7 +11,10 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { profileValue } from '../ai-orchestrator/training-constraints';
+import {
+  AVAILABILITY_FROM_PROFILE,
+  profileValue,
+} from '../ai-orchestrator/training-constraints';
 import { PROGRAM_WEEKS, horizonForWeeks } from '../discovery/program-horizon';
 
 export class TrainingAvailabilityDto {
@@ -72,35 +75,45 @@ export class TrainingAvailabilityService {
   async save(userId: string, input: TrainingAvailabilityDto) {
     await this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`training-profile:${userId}`}))`;
-      const assessment = await tx.userOnboardingAssessment.findUnique({
-        where: { userId },
-      });
-      if (assessment?.status !== 'COMPLETED')
+      const [assessment, discovery] = await Promise.all([
+        tx.userOnboardingAssessment.findUnique({ where: { userId } }),
+        tx.athleteDiscovery.findUnique({
+          where: { userId },
+          select: { userId: true },
+        }),
+      ]);
+      // Nella fase gratuita (percorso PF10) la disponibilità si compila dal
+      // profilo prima dell'abbonamento: basta il percorso avviato. Il programma
+      // la legge dalle stesse voci quando viene creato.
+      if (assessment?.status !== 'COMPLETED' && !discovery)
         throw new BadRequestException('Completa prima il tuo profilo iniziale');
+      const stored = assessment?.profileJson;
       const profile =
-        assessment.profileJson &&
-        typeof assessment.profileJson === 'object' &&
-        !Array.isArray(assessment.profileJson)
-          ? assessment.profileJson
+        stored && typeof stored === 'object' && !Array.isArray(stored)
+          ? stored
           : {};
       const values = {
         general_training_frequency: {
           label: 'Frequenza abituale',
           value: input.currentFrequency,
+          source: AVAILABILITY_FROM_PROFILE,
         },
         training_days_available: {
           label: 'Giorni disponibili',
           value: input.daysPerWeek,
+          source: AVAILABILITY_FROM_PROFILE,
         },
         training_session_duration: {
           label: 'Minuti disponibili per sessione',
           value: input.sessionDurationMinutes,
+          source: AVAILABILITY_FROM_PROFILE,
         },
         ...(input.preferredDays
           ? {
               preferred_training_days: {
                 label: 'Giorni preferiti ISO',
                 value: input.preferredDays,
+                source: AVAILABILITY_FROM_PROFILE,
               },
             }
           : {}),
@@ -113,11 +126,11 @@ export class TrainingAvailabilityService {
             }
           : {}),
       };
-      await tx.userOnboardingAssessment.update({
+      const profileJson = { ...profile, ...values } as Prisma.InputJsonObject;
+      await tx.userOnboardingAssessment.upsert({
         where: { userId },
-        data: {
-          profileJson: { ...profile, ...values } as Prisma.InputJsonObject,
-        },
+        update: { profileJson },
+        create: { userId, profileJson },
       });
       if (input.programDurationWeeks)
         await tx.athleteDiscovery.updateMany({

@@ -4,6 +4,12 @@ import { isProgramWeeks } from '../discovery/program-horizon';
 import { LifecycleError } from '../training-lifecycle/training-lifecycle.policy';
 import { TrainingConstraints } from './proposal-provider-model';
 
+/**
+ * Origine delle voci di disponibilità salvate dall'atleta (profilo o pagina
+ * disponibilità): sono le più recenti e valgono sulle risposte congelate.
+ */
+export const AVAILABILITY_FROM_PROFILE = 'profile';
+
 export function profileValue(profile: unknown, key: string): unknown {
   if (!profile || typeof profile !== 'object' || Array.isArray(profile))
     return undefined;

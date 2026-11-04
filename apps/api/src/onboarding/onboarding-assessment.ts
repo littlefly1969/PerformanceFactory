@@ -1,6 +1,7 @@
 import { BadRequestException } from '@nestjs/common';
 import { OnboardingQuestionScope, Prisma } from '@prisma/client';
 import { AiProposalProviderService } from '../ai-orchestrator/proposal-provider.service';
+import { AVAILABILITY_FROM_PROFILE } from '../ai-orchestrator/training-constraints';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   assertAthlete,
@@ -26,6 +27,55 @@ import {
   requireSportContext,
   validateSportSelection,
 } from './onboarding-sports';
+
+/** Voci scritte da POST /athlete/training/availability, da non perdere. */
+const AVAILABILITY_KEYS = [
+  'general_training_frequency',
+  'training_days_available',
+  'training_session_duration',
+  'preferred_training_days',
+] as const;
+
+function savedAvailability(
+  profileJson: Prisma.JsonValue | undefined,
+  fromProfileOnly: boolean,
+) {
+  if (
+    !profileJson ||
+    typeof profileJson !== 'object' ||
+    Array.isArray(profileJson)
+  )
+    return {};
+  return Object.fromEntries(
+    AVAILABILITY_KEYS.filter((key) => {
+      const entry = profileJson[key];
+      if (entry == null) return false;
+      return (
+        !fromProfileOnly ||
+        (typeof entry === 'object' &&
+          !Array.isArray(entry) &&
+          entry.source === AVAILABILITY_FROM_PROFILE)
+      );
+    }).map((key) => [key, profileJson[key]]),
+  );
+}
+
+/**
+ * Profilo generale con la disponibilità già salvata. La disponibilità scritta
+ * dall'atleta nel profilo (fase gratuita o dopo) è la più recente e vale sulle
+ * risposte congelate del funnel e dell'assessment; le altre voci salvate
+ * restano solo se le risposte non le contengono.
+ */
+export function withSavedAvailability(
+  profile: Record<string, unknown>,
+  saved: Prisma.JsonValue | undefined,
+) {
+  return {
+    ...savedAvailability(saved, false),
+    ...profile,
+    ...savedAvailability(saved, true),
+  };
+}
 
 export async function getStatus(prisma: PrismaService, actor: Actor) {
   assertAthlete(actor);
@@ -277,6 +327,16 @@ export async function submit(
     if (existing?.baselineId)
       return { status: 'COMPLETED', snapshot: { id: existing.baselineId } };
 
+    // Riletta sotto il lock: una disponibilità salvata dal profilo nel
+    // frattempo vale comunque sulle risposte congelate.
+    const saved = await tx.userOnboardingAssessment.findUnique({
+      where: { userId: actor.id },
+      select: { profileJson: true },
+    });
+    const profileJson = withSavedAvailability(
+      profile,
+      saved?.profileJson,
+    ) as Prisma.InputJsonValue;
     await tx.userOnboardingAssessment.upsert({
       where: { userId: actor.id },
       update: {
@@ -284,7 +344,7 @@ export async function submit(
         answersJson: normalizedAnswers.map((answer) => ({
           ...serializeAnswer(answer),
         })) as Prisma.InputJsonValue,
-        profileJson: profile as Prisma.InputJsonValue,
+        profileJson,
         completedAt: new Date(),
       },
       create: {
@@ -293,7 +353,7 @@ export async function submit(
         answersJson: normalizedAnswers.map((answer) => ({
           ...serializeAnswer(answer),
         })) as Prisma.InputJsonValue,
-        profileJson: profile as Prisma.InputJsonValue,
+        profileJson,
         completedAt: new Date(),
       },
     });
@@ -383,7 +443,15 @@ export async function prepareCompletedOnboarding(
   }
   const templates = await loadQuestionnaireQuestions(prisma, actor.id);
   const normalizedAnswers = normalizeAnswersForQuestions(templates, answers);
-  const profile = buildGeneralProfile(normalizedAnswers);
+  // Anche la validazione dell'obiettivo legge la disponibilità aggiornata.
+  const saved = await prisma.userOnboardingAssessment.findUnique({
+    where: { userId: actor.id },
+    select: { profileJson: true },
+  });
+  const profile = withSavedAvailability(
+    buildGeneralProfile(normalizedAnswers),
+    saved?.profileJson,
+  );
 
   const areaScores = new Map<
     string,

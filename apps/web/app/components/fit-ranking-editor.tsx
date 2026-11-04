@@ -13,7 +13,13 @@ type Values = {
   cardNumber: string;
 };
 export type FitRankingView = {
-  ranking: (Omit<Values, "cardNumber"> & { cardNumber: string | null }) | null;
+  ranking:
+    | (Omit<Values, "cardNumber"> & {
+        cardNumber: string | null;
+        /** Livello Playtomic di padel, da 0 a 7; null se non indicato. */
+        playtomicLevel?: number | null;
+      })
+    | null;
   options: Record<Sport, Option[]>;
   recalculationPending: boolean;
 };

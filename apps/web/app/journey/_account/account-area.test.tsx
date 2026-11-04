@@ -51,8 +51,15 @@ describe("Profilo dell'atleta", () => {
       },
     });
     render(<ProfilePage />);
-    expect(await screen.findByText("Tra 70 e 96")).toBeInTheDocument();
-    expect(screen.getByText(/83/)).toBeInTheDocument();
+    // R provvisoria in testata; l'intervallo è nel pannello della «i».
+    expect(await screen.findByText("≈ 83")).toBeInTheDocument();
+    expect(screen.getByText("Profilo provvisorio")).toBeInTheDocument();
+    expect(screen.queryByText("Tra 70 e 96")).toBeNull();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Informazioni su R" }),
+    );
+    expect(screen.getByText("Tra 70 e 96")).toBeVisible();
+    expect(screen.getByText("Soglia di completezza 70%")).toBeVisible();
     expect(
       await screen.findByRole("link", { name: /Scegli il circolo/ }),
     ).toHaveAttribute("href", "/journey/circolo");
@@ -60,9 +67,13 @@ describe("Profilo dell'atleta", () => {
     expect(
       screen.getByRole("link", { name: /Fai il micro-test/ }),
     ).toHaveAttribute("href", "/journey/coach");
+    // Nessuna area abbastanza conosciuta: valori stimati e lati tratteggiati.
     expect(
-      screen.getByRole("img", { name: /Il tuo Spider provvisorio/ }),
+      screen.getByRole("img", {
+        name: "Il tuo Spider: Tecnico-tattico 86 provvisorio, Preparazione 78 provvisorio, Mental 84 provvisorio",
+      }),
     ).toBeInTheDocument();
+    expect(screen.getByText("0 di 3 aree definite")).toBeInTheDocument();
   });
 });
 

@@ -54,25 +54,39 @@ describe("Lezione gratuita prima dell'assessment", () => {
       "/athlete-journey/free-lesson": { enabled: false },
     });
     render(<ProfilePage />);
-    expect(await screen.findByText("Scopri dove sei oggi.")).toBeVisible();
-    expect(screen.queryByText(/Lezione gratuita/)).toBeNull();
+    expect(
+      await screen.findByText(
+        "Pochi minuti di domande e scopri dove sei oggi.",
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "Ciao Stefano." }),
+    ).toBeVisible();
+    expect(screen.queryByText(/lezione/i)).toBeNull();
   });
 
-  it("presents the assessment as the first step when clubs offer it", async () => {
+  it("greets with the free lesson as the prize and starts the assessment", async () => {
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
     serve({
       "/auth/journey": intro,
       "/athlete-journey/profile": PROFILE,
       "/athlete-journey/free-lesson": { ...lesson, phase: "UNAVAILABLE" },
+      "/athlete-journey/start": intro,
     });
     render(<ProfilePage />);
+    expect(await screen.findByText("lezione di prova gratuita")).toBeVisible();
+    // Prima dell'assessment niente lezione, aree, R o prossimo passo.
+    expect(screen.queryByLabelText("Lezione gratuita")).toBeNull();
+    expect(screen.queryByText("Le sei aree")).toBeNull();
+    expect(screen.queryByLabelText("Prossimo passo")).toBeNull();
     expect(
-      await screen.findByText(
-        "Completa l’assessment: è il primo passo per sbloccarla.",
-      ),
-    ).toBeVisible();
-    expect(
-      screen.getByText(/fino a sbloccare la lezione di prova/),
-    ).toBeVisible();
+      screen.getByRole("img", { name: "Il tuo Spider, ancora vuoto" }),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Inizia l’assessment/ }),
+    );
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("/journey"));
   });
 });
 

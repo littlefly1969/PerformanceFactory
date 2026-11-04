@@ -1,4 +1,6 @@
 import { Prisma } from '@prisma/client';
+import { discoveryContext } from '../../src/discovery/discovery-context';
+import { TrainingAvailabilityService } from '../../src/athlete/training-availability';
 import { validateDiscovery } from '../../src/discovery/discovery-validation';
 import { deleteOnboardingTemplate } from '../../src/admin/admin-onboarding';
 import { deleteAthleteCompletely } from '../../src/admin/admin-athletes';
@@ -1655,6 +1657,23 @@ describe('PF4 discovery to authenticated journey', () => {
         programHorizon: 'PROGRAM_6M',
       });
 
+      // Disponibilità salvata dal profilo nella fase gratuita, con una
+      // frequenza diversa da quella data nel funnel.
+      const context = (await discoveryContext(prisma, userId))!;
+      const question = context.templates.find(
+        (t) => t.key === 'general_training_frequency',
+      );
+      const funnel = context.answers.find(
+        (a) => a.questionId === question?.id,
+      )?.value;
+      expect(funnel).toBeDefined();
+      expect(funnel).not.toBe('6_PLUS');
+      await new TrainingAvailabilityService(prisma).save(userId, {
+        currentFrequency: '6_PLUS',
+        daysPerWeek: 2,
+        sessionDurationMinutes: 90,
+        preferredDays: [2, 4],
+      });
       const response = await post('program');
       expect(response.statusCode).toBe(201);
       // La durata è quella dell'orizzonte pagato: nessun passo DURATION.
@@ -1692,6 +1711,14 @@ describe('PF4 discovery to authenticated journey', () => {
         'program_duration_weeks.value',
         26,
       );
+      // Le risposte congelate del funnel non cancellano né sostituiscono la
+      // disponibilità aggiornata dal profilo.
+      expect(completed.profileJson).toMatchObject({
+        general_training_frequency: { value: '6_PLUS' },
+        training_days_available: { value: 2 },
+        training_session_duration: { value: 90 },
+        preferred_training_days: { value: [2, 4] },
+      });
       expect(
         (
           await prisma.userPerformanceGoal.findUniqueOrThrow({
@@ -1894,6 +1921,34 @@ describe('PF4 discovery to authenticated journey', () => {
         })
       ).profileJson,
     ).toHaveProperty('fit_ranking.value.padel.current', '3ª fascia');
+    // Livello Playtomic dal profilo: conta come la classifica e va all'AI.
+    expect(
+      (await post('fit-ranking', { ...declared, playtomicLevel: 7.5 }))
+        .statusCode,
+    ).toBe(400);
+    const playtomic = await post('fit-ranking', {
+      ...declared,
+      playtomicLevel: 2.75,
+    });
+    expect(playtomic.json()).toMatchObject({
+      ranking: { playtomicLevel: 2.75 },
+      recalculationPending: false,
+    });
+    const withLevel = await evaluations();
+    expect(withLevel).toHaveLength(after.length + 1);
+    expect(
+      (
+        withLevel.at(-1)!.inputJson as {
+          prompt: { user: { fitRanking: unknown } };
+        }
+      ).prompt.user.fitRanking,
+    ).toMatchObject({ padel: { playtomic: '2.75' } });
+    // Senza il campo (per esempio dal benvenuto) il livello resta.
+    await post('fit-ranking', declared);
+    expect((await view()).json()).toMatchObject({
+      ranking: { playtomicLevel: 2.75 },
+    });
+    expect(await evaluations()).toHaveLength(withLevel.length);
   });
 
   it('leaves a FIT ranking saved during the AI call pending for recalculation', async () => {

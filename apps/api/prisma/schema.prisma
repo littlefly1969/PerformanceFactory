@@ -1761,6 +1761,8 @@ model AthleteFitRanking {
   tennisCurrent  String
   tennisBest     String
   cardNumber     String?
+  /// Livello Playtomic di padel dichiarato dal profilo, da 0 a 7 (due decimali).
+  playtomicLevel Float?
   /// JOURNEY durante il percorso, PROFILE da una correzione dell'atleta.
   source         String
   /// Correzione dal profilo: quando la R è stata ricalcolata. Null finché il
