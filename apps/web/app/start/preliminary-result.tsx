@@ -93,6 +93,10 @@ export function PreliminaryResult({
       : ["sportId", "specializationId"].map(
           (target) => rows.find((r) => r.target === target)?.value,
         );
+  const goalTitle =
+    Array.isArray(draft.goalId) && draft.goalId.length > 1
+      ? "Obiettivi"
+      : "Obiettivo";
   const byCode = (code: string) => rows.find((r) => r.code === code);
   const eventDate = byCode(EVENT_DATE)?.value;
   // Riepilogo della demo PF10 (note di Stefano del 3 novembre): obiettivo,
@@ -100,7 +104,7 @@ export function PreliminaryResult({
   const demo =
     byCode(GOAL) && SUMMARY.every((code) => byCode(code))
       ? [
-          { ...byCode(GOAL)!, title: "Obiettivo" },
+          { ...byCode(GOAL)!, title: goalTitle },
           ...SUMMARY.map((code) => {
             const row = byCode(code)!;
             return code === EVENT && eventDate && ISO_DATE.test(eventDate)
@@ -112,7 +116,7 @@ export function PreliminaryResult({
   const profile = demo ?? [
     ...rows
       .filter((r) => r.target === "goalId")
-      .map((r) => ({ ...r, title: "Obiettivo" })),
+      .map((r) => ({ ...r, title: goalTitle })),
     ...(sport.some(Boolean)
       ? [
           {

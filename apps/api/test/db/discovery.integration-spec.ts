@@ -204,8 +204,11 @@ describe('PF4 discovery to authenticated journey', () => {
       version: config.version,
       currentStep: 'registration',
       // Neither sport nor specialization is supplied by the client.
-      goalId: config.questions.find((q) => q.target === 'goalId')!.options[0]
-        .id,
+      // Obiettivi a risposta multipla dalla migrazione del 3 novembre 2026.
+      goalId: config.questions
+        .find((q) => q.target === 'goalId')!
+        .options.slice(0, 2)
+        .map((o) => o.id),
       answers: {},
     };
     for (const q of config.questions.filter((q) => !q.target))
@@ -417,6 +420,17 @@ describe('PF4 discovery to authenticated journey', () => {
     expect(
       await prisma.userSportSelection.findUnique({ where: { userId } }),
     ).toMatchObject({ sportId });
+    // Il programma parte dagli obiettivi scelti, uniti in una frase.
+    const goal = config.questions.find((q) => q.code === 'pf4_goal')!;
+    expect(goal).toMatchObject({
+      type: 'multi_choice',
+      title: 'Quali sono i tuoi obiettivi?',
+    });
+    expect(
+      await prisma.userPerformanceGoal.findUnique({ where: { userId } }),
+    ).toMatchObject({
+      goalText: 'Migliorare la tecnica e aumentare la resistenza',
+    });
   });
 
   it('continues using only the cookie, with no second login or consent bypass', async () => {

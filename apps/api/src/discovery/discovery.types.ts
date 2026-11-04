@@ -61,6 +61,7 @@ export type DiscoveryDraft = {
   currentStep: string;
   sportId?: string;
   specializationId?: string;
-  goalId?: string;
+  /** Uno o, con la domanda a scelta multipla, più obiettivi. */
+  goalId?: string | string[];
   answers: Record<string, unknown>;
 };
