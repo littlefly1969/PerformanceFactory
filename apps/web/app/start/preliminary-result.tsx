@@ -2,6 +2,25 @@ import { visibleQuestions } from "./discovery-branches";
 import type { DiscoveryConfiguration, DiscoveryDraft } from "./discovery-types";
 import { optionsFor, questionValue } from "./discovery-state";
 import { HEIGHT_KEY, WEIGHT_KEY } from "./funnel-screens";
+import { oneLine } from "./funnel-question";
+import { counterLabel } from "./choice-counter";
+
+const TITLE = "Questi sono i tuoi vincoli.";
+const GOAL = "pf4_goal";
+const EVENT = "pf4_event";
+const EVENT_DATE = "pf4_event_date";
+/** Le coppie del riepilogo, da sinistra a destra. */
+const SUMMARY = ["pf4_experience", "pf4_frequency", "pf4_limitations", EVENT];
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+/** «2026-12-12» → «12 dic 2026», senza spostamenti di fuso orario. */
+const italianDate = (iso: string) => {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("it-IT", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
 
 /** Fasce OMS del BMI; la scala visiva copre l'intervallo 15-40. */
 const BMI_SCALE = { min: 15, max: 40 };
@@ -47,8 +66,11 @@ export function PreliminaryResult({
       title: q.ui?.summaryLabel ?? q.title,
       target: q.target,
       contextKey: q.contextKey,
+      code: q.code,
       value: selected.length
-        ? selected.map((o) => o.label).join(", ")
+        ? selected
+            .map((o) => counterLabel(q, optionsFor(q, draft), o.id) ?? o.label)
+            .join(", ")
         : value !== undefined
           ? String(value)
           : "Non indicato",
@@ -71,7 +93,23 @@ export function PreliminaryResult({
       : ["sportId", "specializationId"].map(
           (target) => rows.find((r) => r.target === target)?.value,
         );
-  const profile = [
+  const byCode = (code: string) => rows.find((r) => r.code === code);
+  const eventDate = byCode(EVENT_DATE)?.value;
+  // Riepilogo della demo PF10 (note di Stefano del 3 novembre): obiettivo,
+  // esperienza | frequenza, limitazioni | evento, poi l'indice di massa corporea.
+  const demo =
+    byCode(GOAL) && SUMMARY.every((code) => byCode(code))
+      ? [
+          { ...byCode(GOAL)!, title: "Obiettivo" },
+          ...SUMMARY.map((code) => {
+            const row = byCode(code)!;
+            return code === EVENT && eventDate && ISO_DATE.test(eventDate)
+              ? { ...row, value: `${row.value} · ${italianDate(eventDate)}` }
+              : row;
+          }),
+        ]
+      : undefined;
+  const profile = demo ?? [
     ...rows
       .filter((r) => r.target === "goalId")
       .map((r) => ({ ...r, title: "Obiettivo" })),
@@ -97,7 +135,7 @@ export function PreliminaryResult({
     <>
       <section className="pf4-body pf4-result pf4-summary">
         <p className="pf4-kicker">Il tuo punto di partenza</p>
-        <h1>Questi sono i tuoi vincoli.</h1>
+        <h1 {...oneLine(TITLE)}>{TITLE}</h1>
         <dl className="pf4-tiles">
           {[lead, ...others].filter(Boolean).map((row, index) => (
             <div
@@ -158,10 +196,6 @@ export function PreliminaryResult({
             <small>Senza carta · al massimo circa 30 giorni</small>
           </p>
         </aside>
-        <p className="pf4-note">
-          Riepilogo preliminare delle tue risposte: il BMI viene da peso e
-          altezza dichiarati e non è il tuo Performance Index.
-        </p>
       </section>
       <footer className="pf4-footer">
         <button className="pf4-cta" onClick={onContinue}>

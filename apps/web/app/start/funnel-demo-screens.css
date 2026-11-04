@@ -114,6 +114,7 @@
   animation: pf4-fade 0.4s ease both;
 }
 .pf4-funnel .pf4-summary h1 {
+  --pf4-title-size: 34px;
   margin-top: 10px;
   font-size: 34px;
   line-height: 37px;

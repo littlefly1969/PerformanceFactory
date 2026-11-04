@@ -13,10 +13,9 @@ export const CALIBRATION_PROMPT_TYPE = 'CALIBRATION_QUESTIONS';
 
 export const DEFAULT_CALIBRATION_PROMPT = [
   'Sei il motore di calibrazione di Performance Factory, la piattaforma di allenamento al padel. Lo sport è il padel: ogni domanda, situazione di gioco e termine tecnico è di padel, mai di tennis o di altri sport di racchetta. Dopo la prima valutazione di un atleta amatoriale maggiorenne ricevi tutti i driver con score R provvisorio, confidenza, lacune di evidenza e domande già fatte; i driver ancora sotto la regola di consolidamento sono marcati come focus.',
-  'A ogni passo decidi tu la prossima azione: una sola domanda quando la risposta cambierà la domanda successiva, un gruppo di domande indipendenti quando si possono rispondere insieme, un chiarimento neutro quando due risposte si contraddicono. Non c’è un numero fisso di domande per driver: chiedi solo ciò che riduce davvero una lacuna, e non coprire un driver le cui evidenze bastano già.',
+  'La calibrazione procede a blocchi: di norma ogni passo è una coppia di domande indipendenti, anche su due driver diversi. Una sola domanda solo quando la risposta cambierà la domanda successiva o resta un solo aspetto da chiarire; un chiarimento neutro quando due risposte si contraddicono. Non c’è un numero fisso di domande per driver: chiedi solo ciò che riduce davvero una lacuna, e non coprire un driver le cui evidenze bastano già.',
   'Tieni conto della classifica FIT dichiarata (padel e tennis, attuale e migliore di sempre): tara difficoltà, situazioni di gioco e lessico sul livello che indica, e chiedi conferma quando le risposte non tornano con la classifica. Una classifica di tennis dice da dove viene l’atleta, non di che sport parlare: le domande restano di padel.',
   'Domande su comportamenti concreti, frequenze, situazioni di gioco, risultati misurabili: di norma a scelta singola, a scelta multipla solo quando l’atleta può riconoscersi in più opzioni insieme. Evita domande già fatte o equivalenti.',
-  'Puoi proporre un micro-test quando una prova pratica breve darebbe su un driver un’evidenza diversa e più affidabile delle dichiarazioni: lo scrive il preparatore, tu indichi solo il driver e il perché. Ricevi quanti micro-test l’atleta ha già svolto e saltato e a quante domande ha risposto, e un’indicazione di quante domande vorremmo, in media, per ogni micro-test. Tienila in considerazione per bilanciare prove pratiche e domande, ma decidi tu passo per passo e puoi discostartene quando la situazione dell’atleta lo giustifica. Se l’indicazione è 0 non c’è indicazione: scegli liberamente. Non riproporre micro-test già fatti o saltati.',
   'Ogni opzione ha uno score di riferimento sulla scala ricevuta: deve ancorare la risposta al livello reale, non premiare la risposta più lunga. Nelle domande a scelta singola le opzioni coprono tutta la scala e sono mutuamente esclusive.',
   'Scrivi in italiano, con il tu, frasi brevi. Niente diagnosi mediche, niente dati personali, niente promesse di risultato. Un chiarimento non accusa e non rivela sospetti.',
 ].join('\n');
@@ -34,6 +33,20 @@ export const CALIBRATION_ACTIONS = [
   'PROPOSE_MICRO_TEST',
 ] as const;
 export type CalibrationAction = (typeof CALIBRATION_ACTIONS)[number];
+
+/**
+ * Azioni che il motore può scegliere nel ciclo di calibrazione: coppie di
+ * domande (ASK_GROUP), una domanda o un chiarimento. Il micro-test non fa
+ * parte del ciclo; PROPOSE_MICRO_TEST resta solo per i round già salvati.
+ */
+export const CALIBRATION_STEP_ACTIONS = [
+  'ASK_GROUP',
+  'ASK_SINGLE',
+  'REQUEST_CLARIFICATION',
+] as const satisfies readonly CalibrationAction[];
+
+/** Un blocco di calibrazione: la coppia di domande, come nella demo PF10. */
+export const PAIR = 2;
 
 /**
  * Vincoli di formato, UX e sicurezza: non sono un numero di domande per area.
@@ -218,14 +231,12 @@ function formatRules() {
   const l = CALIBRATION_LIMITS;
   return [
     'FORMATO DI RISPOSTA (fisso): rispondi solo con JSON conforme allo schema.',
-    '- action: ASK_SINGLE (esattamente 1 domanda), ASK_GROUP (da 2 a ' +
-      `${l.maxQuestions} domande indipendenti), REQUEST_CLARIFICATION (esattamente 1 domanda neutra su una contraddizione) oppure PROPOSE_MICRO_TEST (nessuna domanda, microTestAreaId del driver).`,
+    `- action: ASK_GROUP (la coppia, esattamente ${PAIR} domande indipendenti: è la scelta di norma), ASK_SINGLE (esattamente 1 domanda) oppure REQUEST_CLARIFICATION (esattamente 1 domanda neutra su una contraddizione).`,
     '- questions: solo sui driver con focus true, con il loro areaId; non serve coprirli tutti.',
-    '- microTestAreaId: l’areaId di un driver con focus true solo con PROPOSE_MICRO_TEST, altrimenti null.',
-    '- microTestBalance: micro-test svolti e saltati e domande risposte finora; questionsPerMicroTest è un’indicazione (in media un micro-test ogni N domande, 0 = nessuna indicazione), non un vincolo.',
+    '- microTestAreaId: sempre null.',
     `- rationale: perché questo passo, in una frase di massimo ${l.rationale} caratteri, senza dati personali.`,
     `- text: massimo ${l.question} caratteri.`,
-    '- le domande sono solo su comportamenti, frequenze e situazioni di gioco già vissute: niente micro-test, esercizi o prove da svolgere dentro una domanda; una prova pratica si propone solo con PROPOSE_MICRO_TEST. Questa regola prevale sulle istruzioni sopra.',
+    '- le domande sono solo su comportamenti, frequenze e situazioni di gioco già vissute: niente micro-test, esercizi o prove da svolgere dentro una domanda. Questa regola prevale sulle istruzioni sopra.',
     `- options: da ${l.minOptions} a ${l.maxOptions}, label di massimo ${l.option} caratteri, score tra la scala minima e massima ricevute.`,
     MULTIPLE_CHOICE_RULE,
     '- un chiarimento (REQUEST_CLARIFICATION) è sempre a scelta singola.',
@@ -239,7 +250,7 @@ const schema = {
   additionalProperties: false,
   required: ['action', 'rationale', 'microTestAreaId', 'questions'],
   properties: {
-    action: { type: 'string', enum: [...CALIBRATION_ACTIONS] },
+    action: { type: 'string', enum: [...CALIBRATION_STEP_ACTIONS] },
     rationale: { type: 'string' },
     microTestAreaId: { type: ['string', 'null'] },
     questions: {
@@ -263,14 +274,11 @@ export function buildCalibrationPrompt(input: CalibrationQuestionsInput) {
   return {
     system: `${input.basePrompt.trim()}\n\n${formatRules()}`,
     user: {
-      task: 'Decidi il prossimo passo sui driver con focus: una domanda, un gruppo, un chiarimento o un micro-test.',
+      task: 'Decidi il prossimo blocco sui driver con focus: di norma una coppia di domande, altrimenti una domanda o un chiarimento.',
       scale: input.scale,
       athleteContext: input.athleteContext,
       fitRanking: input.fitRanking ?? null,
       drivers: input.targets,
-      ...(input.microTestBalance && {
-        microTestBalance: input.microTestBalance,
-      }),
     },
   };
 }
@@ -313,15 +321,6 @@ export async function generateCalibrationQuestions(
       message: 'Non siamo riusciti a preparare le nuove domande. Riprova.',
     });
   }
-  const ignored = (raw as { questions?: unknown }).questions;
-  if (
-    step.action === 'PROPOSE_MICRO_TEST' &&
-    Array.isArray(ignored) &&
-    ignored.length
-  )
-    logger.warn(
-      `MICRO_TEST_STEP_QUESTIONS_IGNORED ${provider}/${model}: ${ignored.length}`,
-    );
   return {
     provider,
     model,
@@ -332,22 +331,26 @@ export async function generateCalibrationQuestions(
 }
 
 /**
- * Stub deterministico per sviluppo e test: una domanda se il focus è un solo
- * driver, altrimenti un gruppo con una domanda per driver in focus.
+ * Stub deterministico per sviluppo e test: una coppia di domande sui primi
+ * driver in focus (due sullo stesso driver se in focus ce n'è uno solo).
  */
 export function stubCalibrationQuestions(input: CalibrationQuestionsInput) {
   const { minScore, maxScore } = input.scale;
   const step = (maxScore - minScore) / 3;
-  const focus = input.targets
-    .filter((t) => t.focus)
-    .slice(0, CALIBRATION_LIMITS.maxQuestions);
+  const focus = input.targets.filter((t) => t.focus);
+  const pair = focus.length
+    ? Array.from({ length: PAIR }, (_, k) => ({
+        target: focus[k % focus.length],
+        n: Math.floor(k / focus.length),
+      }))
+    : [];
   return {
-    action: focus.length === 1 ? 'ASK_SINGLE' : 'ASK_GROUP',
+    action: 'ASK_GROUP',
     rationale: 'Domande sui driver ancora sotto la regola di consolidamento.',
     microTestAreaId: null,
-    questions: focus.map((target) => ({
+    questions: pair.map(({ target, n }) => ({
       areaId: target.areaId,
-      text: `${target.name}: quanto spesso ti capita la situazione ${target.askedQuestions.length + 1}?`,
+      text: `${target.name}: quanto spesso ti capita la situazione ${target.askedQuestions.length + 1 + n}?`,
       options: ['Mai', 'A volte', 'Spesso', 'Sempre'].map((label, k) => ({
         label,
         score: Math.round(minScore + step * k),
@@ -358,7 +361,7 @@ export function stubCalibrationQuestions(input: CalibrationQuestionsInput) {
 
 const QUESTION_COUNT: Record<CalibrationAction, [number, number]> = {
   ASK_SINGLE: [1, 1],
-  ASK_GROUP: [2, CALIBRATION_LIMITS.maxQuestions],
+  ASK_GROUP: [PAIR, PAIR],
   REQUEST_CLARIFICATION: [1, 1],
   PROPOSE_MICRO_TEST: [0, 0],
 };
@@ -368,10 +371,8 @@ const normalized = (text: string) => text.toLowerCase().replace(/\s+/g, ' ');
 /**
  * Contratto del passo: azione ammessa, numero di domande coerente con
  * l'azione (mai per area), solo driver in focus, opzioni nella scala, nessuna
- * domanda già fatta. Le aree del passo si ricavano dalle domande. Con
- * PROPOSE_MICRO_TEST il test lo scrive il generatore dedicato: le domande che
- * il motore scrive comunque (spesso il test stesso) si ignorano, non scartano
- * il passo.
+ * domanda già fatta. Le aree del passo si ricavano dalle domande. Un
+ * micro-test proposto dal motore scarta il passo: non fa parte del ciclo.
  */
 export function validateCalibrationStep(
   raw: unknown,
@@ -384,11 +385,12 @@ export function validateCalibrationStep(
     microTestAreaId?: unknown;
     questions?: unknown;
   } | null;
-  const action = CALIBRATION_ACTIONS.find((a) => a === body?.action);
+  // Un micro-test proposto dal motore non è più un passo valido del ciclo.
+  const action = CALIBRATION_STEP_ACTIONS.find((a) => a === body?.action);
   if (!action) problems.push(`azione non ammessa: ${String(body?.action)}`);
   const rationale = clean(body?.rationale, CALIBRATION_LIMITS.rationale);
   if (!rationale) problems.push('motivo del passo mancante');
-  const items = action === 'PROPOSE_MICRO_TEST' ? [] : body?.questions;
+  const items = body?.questions;
   if (!Array.isArray(items)) {
     problems.push('questions mancanti');
     return null;
@@ -403,12 +405,8 @@ export function validateCalibrationStep(
   const focus = new Map(
     input.targets.filter((t) => t.focus).map((t) => [t.areaId, t]),
   );
-  const microTestAreaId =
-    typeof body?.microTestAreaId === 'string' ? body.microTestAreaId : null;
-  if (action === 'PROPOSE_MICRO_TEST' && !focus.has(microTestAreaId ?? ''))
-    problems.push(`micro-test su un driver non in focus: ${microTestAreaId}`);
-  if (action !== 'PROPOSE_MICRO_TEST' && microTestAreaId)
-    problems.push('microTestAreaId solo con PROPOSE_MICRO_TEST');
+  if (typeof body?.microTestAreaId === 'string' && body.microTestAreaId)
+    problems.push('micro-test fuori dal ciclo di calibrazione');
   const questions: CalibrationQuestion[] = [];
   const seen = new Set<string>();
   items.forEach((item, index) => {
@@ -452,10 +450,7 @@ export function validateCalibrationStep(
   return {
     action,
     rationale,
-    targetAreas:
-      action === 'PROPOSE_MICRO_TEST'
-        ? [microTestAreaId!]
-        : [...new Set(questions.map((q) => q.areaId))],
+    targetAreas: [...new Set(questions.map((q) => q.areaId))],
     questions,
   };
 }

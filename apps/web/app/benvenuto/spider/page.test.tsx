@@ -31,6 +31,9 @@ describe("benvenuto 02 · primo Spider", () => {
       "Spider stimato: Tecnica 50",
     );
     expect(container.querySelector(".pf-spider-shape.is-estimated")).toBeTruthy();
+    // Senza nomi delle aree nel grafico: restano solo nell'etichetta accessibile.
+    expect(container.querySelector(".pf-spider-label")).toBeNull();
+    expect(container.querySelector(".pf-spider.is-bare")).toBeTruthy();
     expect(
       screen.getByRole("link", { name: "Continua" }).getAttribute("href"),
     ).toBe("/benvenuto/regalo");

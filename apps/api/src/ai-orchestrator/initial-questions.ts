@@ -19,9 +19,9 @@ import { PADEL_SPORT_RULE } from './padel-context';
 export const INITIAL_QUESTIONS_PROMPT_TYPE = 'INITIAL_QUESTIONS';
 
 export const DEFAULT_INITIAL_QUESTIONS_PROMPT = [
-  'Sei il motore delle domande conoscitive iniziali di Performance Factory, la piattaforma di allenamento al padel. Lo sport è il padel: ogni domanda, situazione di gioco e termine tecnico è di padel, mai di tennis o di altri sport di racchetta. Un atleta amatoriale maggiorenne si è appena registrato: ricevi le sue risposte al funnel (obiettivo, esperienza, frequenza di gioco, salute), la disponibilità all’allenamento, la classifica FIT dichiarata di padel e di tennis (attuale e migliore di sempre) e i driver della performance da conoscere.',
-  'Scrivi le prime domande per ogni driver: servono alla prima stima della Performance Reale (R), quindi devono far emergere il livello reale dell’atleta su quel driver, non le sue opinioni.',
-  'Su misura: parti dalla classifica e dal funnel. Chi ha o ha avuto una classifica alta riceve situazioni di gioco e soglie da agonista; chi non è mai stato classificato riceve situazioni da amatore. La classifica di tennis dice solo da dove viene l’atleta e quanto è allenabile: non trasformarla in domande di tennis. Tieni conto dell’obiettivo e di eventuali limitazioni dichiarate. Non chiedere di nuovo ciò che il funnel o la classifica dicono già.',
+  'Sei il motore delle domande conoscitive iniziali di Performance Factory, la piattaforma di allenamento al padel. Lo sport è il padel: ogni domanda, situazione di gioco e termine tecnico è di padel, mai di tennis o di altri sport di racchetta. Un atleta amatoriale maggiorenne si è appena registrato: ricevi le sue risposte al funnel (obiettivo, esperienza, frequenza di gioco, salute), la classifica FIT dichiarata di padel e di tennis (attuale e migliore di sempre), il driver della performance da conoscere adesso e le risposte che ha già dato sui driver precedenti.',
+  'Le domande arrivano a coppie, un driver alla volta, nel giro dello Spider. Scrivi le prime domande del driver ricevuto: servono alla prima stima della Performance Reale (R), quindi devono far emergere il livello reale dell’atleta su quel driver, non le sue opinioni.',
+  'Su misura: parti dalla classifica e dal funnel. Chi ha o ha avuto una classifica alta riceve situazioni di gioco e soglie da agonista; chi non è mai stato classificato riceve situazioni da amatore. La classifica di tennis dice solo da dove viene l’atleta e quanto è allenabile: non trasformarla in domande di tennis. Tieni conto dell’obiettivo e di eventuali limitazioni dichiarate. Non chiedere di nuovo ciò che il funnel, la classifica o le risposte precedenti dicono già; usa le risposte precedenti per tarare situazioni e soglie.',
   'Le domande di uno stesso driver guardano aspetti diversi del driver e non si sovrappongono. Domande su comportamenti concreti, frequenze, situazioni di gioco, risultati misurabili: di norma a scelta singola, a scelta multipla solo quando l’atleta può riconoscersi in più opzioni insieme (per esempio dove sente fastidio o quali routine segue).',
   'Ogni opzione ha uno score di riferimento sulla scala ricevuta: deve ancorare la risposta al livello reale, non premiare la risposta più lunga. Nelle domande a scelta singola le opzioni coprono tutta la scala e sono mutuamente esclusive.',
   'Scrivi in italiano, con il tu, frasi brevi. Niente diagnosi mediche, niente dati personali, niente promesse di risultato.',
@@ -38,10 +38,19 @@ export type InitialQuestionsInput = {
   promptVersionId: string | null;
   scale: { minScore: number; maxScore: number };
   athleteContext: AssessmentEvaluationAnswer[];
+  /** Solo per chi l'aveva data nel vecchio percorso: oggi sta nel profilo. */
   availability: AssessmentEvaluationAnswer[];
   fitRanking: FitRankingContext;
   drivers: { areaId: string; name: string }[];
+  /** Risposte già date sui driver precedenti, nell'ordine del giro. */
+  previousAnswers?: InitialPreviousAnswer[];
   questionsPerArea: number;
+};
+
+export type InitialPreviousAnswer = {
+  driver: string;
+  question: string;
+  answer: string | null;
 };
 
 export type InitialQuestion = {
@@ -66,7 +75,7 @@ function formatRules(input: InitialQuestionsInput) {
   return [
     'FORMATO DI RISPOSTA (fisso): rispondi solo con JSON conforme allo schema.',
     `- questions: esattamente ${input.questionsPerArea} per ciascuno dei ${input.drivers.length} driver ricevuti (${input.questionsPerArea * input.drivers.length} in tutto), con il loro areaId, raggruppate per driver nell’ordine ricevuto.`,
-    `- text: massimo ${l.question} caratteri, mai uguale a un’altra domanda.`,
+    `- text: massimo ${l.question} caratteri, mai uguale a un’altra domanda né a una di previousAnswers.`,
     '- le domande sono solo su comportamenti, frequenze e situazioni di gioco già vissute: niente esercizi o prove da svolgere.',
     `- options: da ${l.minOptions} a ${l.maxOptions}, label di massimo ${l.option} caratteri e diverse fra loro. Con multiple false: score tutti diversi, in ordine crescente o decrescente, con la prima o l’ultima opzione a ${input.scale.minScore} e l’altra a ${input.scale.maxScore}.`,
     MULTIPLE_CHOICE_RULE,
@@ -103,19 +112,24 @@ export function buildInitialQuestionsPrompt(input: InitialQuestionsInput) {
   return {
     system: `${input.basePrompt.trim()}\n\n${formatRules(input)}`,
     user: {
-      task: `Le prime ${input.questionsPerArea} domande conoscitive per ogni driver.`,
+      task:
+        input.drivers.length === 1
+          ? `Le prime ${input.questionsPerArea} domande conoscitive sul driver ${input.drivers[0].name}.`
+          : `Le prime ${input.questionsPerArea} domande conoscitive per ogni driver.`,
       scale: input.scale,
       athleteContext: input.athleteContext,
-      availability: input.availability,
+      ...(input.availability.length && { availability: input.availability }),
       fitRanking: input.fitRanking,
       drivers: input.drivers,
+      previousAnswers: input.previousAnswers ?? [],
       questionsPerArea: input.questionsPerArea,
     },
   };
 }
 
 /**
- * Un solo lotto con tutte le domande dei driver. Un output non valido o un
+ * Un lotto con le domande dei driver ricevuti (nel percorso uno alla volta,
+ * a coppie). Un output non valido o un
  * errore del provider si riprova in automatico; poi l'atleta vede un errore
  * da riprovare. Nessuna domanda di riserva.
  */
@@ -239,7 +253,10 @@ export function validateInitialQuestions(
   }
   const l = CALIBRATION_LIMITS;
   const drivers = new Set(input.drivers.map((d) => d.areaId));
-  const seen = new Set<string>();
+  // Anche le domande dei driver precedenti contano come già fatte.
+  const seen = new Set<string>(
+    (input.previousAnswers ?? []).map((a) => normalized(a.question)),
+  );
   const questions: InitialQuestion[] = [];
   items.forEach((item, index) => {
     const entry = item as Partial<Record<string, unknown>> | null;

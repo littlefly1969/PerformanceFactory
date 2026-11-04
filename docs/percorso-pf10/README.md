@@ -46,6 +46,37 @@ seed, configurazione persistita, autenticazione, pagamenti o webhook.
 - **D6** Testi e dati reali dell'app al posto dei pulsanti degli store, delle regole
   e dei valori d'esempio della demo.
 
+## Rifiniture del funnel (note di Stefano del 3 novembre 2026, sera)
+
+- **Età** (prima domanda): in fondo «Continuando accetti i Termini di servizio e la
+  Politica sulla privacy.» e «Hai già un account? Accedi», anche per chi arriva da
+  una campagna senza l'intro.
+- **Esperienza e frequenza**: contatore − / + con solo il numero nel pulsante e la
+  fascia in grigio sopra. Esperienza parte da 3 («1-3 anni»), scende fino a «<1»
+  («Meno di un anno») e sale fino a «10+»; 4-5 «4-5 anni», da 6 «Più di 5 anni».
+  Frequenza da 1 a 7, parte da 3 («3-4 volte»); 1-2 «1-2 volte», da 5 «5 o più
+  volte». Si salva sempre la fascia configurata (valori invariati, li legge
+  `training-constraints`); il numero resta solo nella scheda del browser.
+- **Titoli su una riga**: «Hai dolori o limitazioni fisiche?» e «Questi sono i tuoi
+  vincoli.»; il corpo del carattere si adatta alla larghezza.
+- **Evento**: niente testo grigio sotto la domanda (migrazione
+  `20261103190000_funnel_evento_senza_sottotitolo`, solo `helpText`).
+- **Riepilogo**: obiettivo, poi esperienza | frequenza, limitazioni | evento (con la
+  data, se c'è), indice di massa corporea, banner del gratis e «Crea il tuo
+  account»; tolto il testo grigio sotto il banner. Età, motivazione e sport non
+  sono più nel riepilogo (restano salvati).
+- **Crea il tuo account**: «Continua con Apple» in grigio e non attivo sopra
+  Google (D1 resta: niente accesso Apple nel backend); «Accetta tutte le
+  obbligatorie» centrata sotto le password, con «Le 4 voci qui sotto, le novità
+  restano a parte.»; «Accetto i termini del servizio» obbligatoria sotto i 18 anni,
+  senza «Leggi». Il documento Termini non esiste ancora (D2): la spunta blocca il
+  pulsante ma non si registra nel backend.
+- **Omino** di altezza e peso: sagoma stilizzata nera con spalle, vita, arti
+  affusolati; cresce e si allarga come prima.
+- **Mettici la faccia** e **Questo sei tu**: spazi verticali e foto che si
+  riducono sui telefoni bassi, niente scorrimento inutile; lo Spider non ha più i
+  nomi delle aree (restano per i lettori di schermo) e prende lo spazio libero.
+
 ## Pagamento completato
 
 `/abbonamento` interroga `GET /payments/subscription` ogni 2 secondi per al massimo

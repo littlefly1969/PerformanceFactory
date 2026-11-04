@@ -148,6 +148,9 @@ describe("Ingresso: attribuzione, eventi e 18+", () => {
       "password1",
     );
     await userEvent.click(adult);
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /termini del servizio/ }),
+    );
     await userEvent.click(screen.getByRole("button", { name: "Crea account" }));
     const registration = await waitFor(() => {
       const call = calls.find((c) => c.url.endsWith("/auth/register-athlete"));
@@ -194,6 +197,9 @@ describe("Ingresso: attribuzione, eventi e 18+", () => {
     await userEvent.click(
       screen.getByRole("checkbox", { name: /almeno 18 anni/ }),
     );
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /termini del servizio/ }),
+    );
     await userEvent.click(screen.getByRole("button", { name: "Crea account" }));
     await waitFor(() => expect(assign).toHaveBeenCalled());
     // Una seconda persona sullo stesso browser non eredita id, circolo o referral.
@@ -229,6 +235,9 @@ describe("Ingresso: attribuzione, eventi e 18+", () => {
     await userEvent.click(
       screen.getByRole("checkbox", { name: /almeno 18 anni/ }),
     );
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /termini del servizio/ }),
+    );
     const submit = screen.getByRole("button", { name: "Crea account" });
     // Privacy e AI sono obbligatori: senza, il pulsante resta spento.
     expect(submit).toBeDisabled();
@@ -260,6 +269,60 @@ describe("Ingresso: attribuzione, eventi e 18+", () => {
     });
   });
 
+  it("accepts every required item with one tick, leaving the news apart", async () => {
+    sessionStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({
+        version: 3,
+        currentStep: "registration",
+        answers: { only: "a" },
+      }),
+    );
+    serve("fails", true);
+    render(<StartPage />);
+    await screen.findByRole("checkbox", { name: /Informativa privacy/ });
+    // Apple non è ancora attivo: resta in grigio sopra Google.
+    expect(
+      screen.getByRole("button", { name: /Continua con Apple/ }),
+    ).toBeDisabled();
+    const terms = screen.getByRole("checkbox", {
+      name: /termini del servizio/,
+    });
+    expect(terms).toBeRequired();
+    // Termini senza documento: niente «Leggi», solo privacy e AI lo hanno.
+    expect(screen.getAllByRole("button", { name: "Leggi ↓" })).toHaveLength(2);
+    expect(
+      screen.getByText("Le 4 voci qui sotto, le novità restano a parte."),
+    ).toBeInTheDocument();
+    const all = screen.getByRole("checkbox", {
+      name: /Accetta tutte le obbligatorie/,
+    });
+    await userEvent.click(all);
+    for (const name of [
+      /almeno 18 anni/,
+      /termini del servizio/,
+      /Informativa privacy/,
+      /assistente AI/,
+    ])
+      expect(screen.getByRole("checkbox", { name })).toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: /Voglio ricevere novità/ }),
+    ).not.toBeChecked();
+    // Togliendo una voce si spegne anche «Accetta tutte».
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /assistente AI/ }),
+    );
+    expect(all).not.toBeChecked();
+    await userEvent.click(all);
+    expect(
+      screen.getByRole("checkbox", { name: /assistente AI/ }),
+    ).toBeChecked();
+    await userEvent.click(all);
+    expect(
+      screen.getByRole("checkbox", { name: /almeno 18 anni/ }),
+    ).not.toBeChecked();
+  });
+
   it("asks for a surname before sending the registration", async () => {
     sessionStorage.setItem(
       DRAFT_KEY,
@@ -283,6 +346,9 @@ describe("Ingresso: attribuzione, eventi e 18+", () => {
     );
     await userEvent.click(
       screen.getByRole("checkbox", { name: /almeno 18 anni/ }),
+    );
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /termini del servizio/ }),
     );
     await userEvent.click(screen.getByRole("button", { name: "Crea account" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(

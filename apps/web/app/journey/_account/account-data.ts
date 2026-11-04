@@ -119,13 +119,35 @@ export type SituationFeedback = {
 
 /** Messaggio leggibile di una risposta di errore dell'API. */
 export async function readError(response: Response) {
+  return (await apiError(response)).message;
+}
+
+/** Errore dell'API con il suo codice, per i casi che la pagina recupera. */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+}
+
+export async function apiError(response: Response) {
   const data = (await response.json().catch(() => ({}))) as {
     message?: string | string[];
+    code?: string;
   };
-  return Array.isArray(data.message)
-    ? data.message.join(". ")
-    : (data.message ?? "Operazione non riuscita. Riprova.");
+  return new ApiError(
+    Array.isArray(data.message)
+      ? data.message.join(". ")
+      : (data.message ?? "Operazione non riuscita. Riprova."),
+    data.code,
+  );
 }
+
+/** Giorni e durata mancano: il checkout o il programma chiedono il passo. */
+export const needsAvailability = (e: unknown) =>
+  e instanceof ApiError && e.code === "AVAILABILITY_REQUIRED";
 
 /** POST JSON all'API: restituisce il corpo o lancia con il messaggio. */
 export async function postJson<T>(path: string, body: unknown = {}) {

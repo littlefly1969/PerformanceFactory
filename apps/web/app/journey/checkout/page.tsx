@@ -2,13 +2,22 @@
 import { useEffect, useState } from "react";
 import { API_BASE, secureFetch } from "../../lib/api";
 import type { ProgramHorizon } from "../journey-types";
-import { readError } from "../_account/account-data";
+import {
+  apiError,
+  needsAvailability,
+  useResource,
+} from "../_account/account-data";
 import {
   AccountScreen,
   AccountTopBar,
   PillButton,
   PillLink,
 } from "../_account/account-shell";
+import {
+  AVAILABILITY_PATH,
+  AvailabilityStep,
+  type AvailabilityForm,
+} from "../_account/availability-step";
 import { useAccountJourney } from "../_account/calibration-state";
 import { HORIZON_MONTHS } from "../_account/scenario-values";
 
@@ -80,6 +89,9 @@ export default function CheckoutPage() {
   const [cycle, setCycle] = useState("");
   const [paying, setPaying] = useState(false);
   const [message, setMessage] = useState("");
+  // Giorni e durata servono al programma che parte subito dopo il pagamento.
+  const availability = useResource<AvailabilityForm>(AVAILABILITY_PATH);
+  const [askAvailability, setAskAvailability] = useState(false);
   useEffect(() => {
     let alive = true;
     void fetch(`${API_BASE}/payments/offers`)
@@ -115,13 +127,17 @@ export default function CheckoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ horizon, billingCycle: chosen }),
       });
-      if (!response.ok) throw new Error(await readError(response));
+      if (!response.ok) throw await apiError(response);
       const body = (await response.json()) as { checkoutUrl?: string };
       if (!body.checkoutUrl)
         throw new Error("Pagamento non disponibile, riprova.");
       window.location.assign(body.checkoutUrl);
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Pagamento non disponibile.");
+      if (needsAvailability(e)) setAskAvailability(true);
+      else
+        setMessage(
+          e instanceof Error ? e.message : "Pagamento non disponibile.",
+        );
       setPaying(false);
     }
   };
@@ -132,6 +148,18 @@ export default function CheckoutPage() {
         <h1 className="pf-acc-title">Scegli prima il tuo orizzonte.</h1>
         <PillLink href="/journey/scenari">Vai agli scenari</PillLink>
       </AccountScreen>
+    );
+  if (askAvailability || availability.data?.ready === false)
+    return (
+      <AvailabilityStep
+        top={top}
+        lead="Prima di attivare il piano: il programma parte da qui, subito dopo il pagamento."
+        action="Salva e continua"
+        onSaved={(form) => {
+          setAskAvailability(false);
+          availability.setData(form);
+        }}
+      />
     );
   return (
     <AccountScreen

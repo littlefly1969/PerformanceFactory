@@ -43,7 +43,14 @@ export function Registration({
   // Con i documenti caricati i consensi si danno qui; altrimenti dopo l'account.
   const consentsReady =
     !!documents && documents.every((d) => checks[d.documentHash]);
-  const ready = !!checks.adultConfirmed && (!documents || consentsReady);
+  // «Termini del servizio»: obbligatoria in pagina, il documento non esiste
+  // ancora nel backend e non si registra (niente «Leggi»).
+  const required = [
+    "adultConfirmed",
+    "termsAccepted",
+    ...(documents ?? []).map((d) => d.documentHash),
+  ];
+  const ready = required.every((name) => checks[name]);
   return (
     <form
       className="pf4-body pf4-registration"
@@ -126,6 +133,30 @@ export function Registration({
     >
       <h1>Crea il tuo account.</h1>
       <p className="pf4-kicker">Salviamo programma e progressi</p>
+      {/* Accesso con Apple non ancora disponibile nel backend: in grigio. */}
+      <button
+        type="button"
+        className="pf4-cta pf4-secondary pf4-apple"
+        disabled
+        aria-describedby="pf4-apple-soon"
+      >
+        <svg
+          className="pf4-apple-mark"
+          viewBox="0 0 24 24"
+          width="15"
+          height="15"
+          aria-hidden="true"
+        >
+          <path
+            fill="currentColor"
+            d="M16.6 12.7c0-2.5 2-3.7 2.1-3.8-1.2-1.7-3-1.9-3.6-2-1.5-.2-3 .9-3.8.9-.8 0-2-.9-3.3-.9-1.7 0-3.3 1-4.2 2.5-1.8 3.1-.5 7.7 1.3 10.2.9 1.2 1.9 2.6 3.2 2.6 1.3-.1 1.8-.8 3.3-.8 1.6 0 2 .8 3.4.8 1.4 0 2.3-1.3 3.1-2.5 1-1.4 1.4-2.8 1.4-2.9 0 0-2.8-1.1-2.9-4.1zM14.1 5.2c.7-.8 1.2-2 1-3.2-1 .1-2.2.7-3 1.5-.6.7-1.2 1.9-1 3.1 1.1.1 2.3-.6 3-1.4z"
+          />
+        </svg>
+        Continua con Apple
+      </button>
+      <span id="pf4-apple-soon" className="pf4-sr">
+        Non ancora disponibile
+      </span>
       <GoogleRegistrationButton
         draft={draft}
         pending={googlePending}
@@ -180,9 +211,32 @@ export function Registration({
           />
         </label>
       </div>
+      <label className="pf4-accept-all">
+        <input
+          type="checkbox"
+          checked={ready}
+          onChange={(e) =>
+            setChecks({
+              ...checks,
+              ...Object.fromEntries(
+                required.map((name) => [name, e.target.checked]),
+              ),
+            })
+          }
+        />
+        <span>
+          Accetta tutte le obbligatorie
+          <small>
+            {`Le ${required.length} voci qui sotto${documents ? ", le novità restano a parte" : ""}.`}
+          </small>
+        </span>
+      </label>
       <div className="pf4-signup-checks">
         <SignupCheck {...check("adultConfirmed")} required>
           Ho almeno 18 anni
+        </SignupCheck>
+        <SignupCheck {...check("termsAccepted")} required>
+          Accetto i termini del servizio
         </SignupCheck>
         {documents?.map((document) => (
           <SignupCheck

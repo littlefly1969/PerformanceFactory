@@ -13,6 +13,10 @@ import {
 } from '../../src/discovery/assessment-evaluation';
 import { assessmentFormatRules } from '../../src/ai-orchestrator/assessment-evaluation-model';
 import { loadSpecialistQuestionRecords } from '../../src/onboarding/onboarding-questions';
+import {
+  loadOperationalTemplates,
+  saveOperationalAnswer,
+} from '../../src/discovery/assessment-configuration';
 import { testAssessmentPrompt } from '../../src/ai-tuning/assessment-prompt-test';
 import { SYNTHETIC_ASSESSMENT_CASE } from '../../src/ai-tuning/assessment-synthetic-case';
 type JourneyResponse = {
@@ -41,8 +45,10 @@ type JourneyResponse = {
     id: string;
     kind: string;
     areaId: string;
-    options: Array<{ value: string }>;
+    title: string;
+    options: Array<{ value: string; label: string }>;
   }>;
+  driverList: Array<{ id: string; name: string; count: number }>;
   result: {
     snapshotId: string;
     current: number;
@@ -578,16 +584,15 @@ describe('PF4 discovery to authenticated journey', () => {
     }
   });
 
-  it('starts with availability alone, the driver questions come later', async () => {
+  it('starts with no fixed question: the AI writes the driver questions in pairs', async () => {
     expect((await post('duration', { weeks: 12 })).statusCode).toBe(409);
     const intro = await state();
     expect(intro).toMatchObject({
       phase: 'ASSESSMENT_INTRO',
-      // Solo le due operative: la classifica FIT è un dato del profilo.
-      fixedQuestionCount: 2,
+      // La disponibilità si compila nel profilo, la classifica FIT pure.
+      fixedQuestionCount: 0,
       areaQuestionCount: 12,
-      count: 14,
-      estimatedMinutes: 5,
+      count: 12,
       trial: { days: 7, daysLeft: 7 },
     });
     // Giorni e durata non sono piu domande della discovery.
@@ -601,68 +606,25 @@ describe('PF4 discovery to authenticated journey', () => {
     const start = await post('start');
     expect(start.statusCode).toBe(201);
     const started = start.json<JourneyResponse>();
-    expect(started.count).toBe(14);
-    // Le domande dei driver non esistono finché l'AI non le scrive.
-    expect(started.questions).toHaveLength(2);
-    expect(started.questionsPending).toBe(false);
+    expect(started.count).toBe(12);
+    // Le domande dei driver non esistono finché l'AI non scrive la prima coppia.
+    expect(started.questions).toEqual([]);
+    expect(started.questionsPending).toBe(true);
     expect(
       await prisma.userOnboardingQuestion.count({ where: { userId } }),
     ).toBe(0);
-    expect(started.questions.map((q) => q.kind)).toEqual([
-      'OPERATIONAL',
-      'OPERATIONAL',
-    ]);
-    expect((await post('start')).json<JourneyResponse>().questions).toEqual(
-      start.json<JourneyResponse>().questions,
-    );
+    expect((await post('start')).json<JourneyResponse>().questions).toEqual([]);
     expect((await post('submit')).statusCode).toBe(400);
     expect(
       (await post('answer', { questionId: 'foreign', value: 1 })).statusCode,
     ).toBe(400);
   });
 
-  it('persists each answer and cursor, rejects invalid answers, and resumes after refresh', async () => {
-    const before = await state();
-    const q = before.questions[0];
-    expect(
-      (await post('answer', { questionId: q.id, value: 'forged' })).statusCode,
-    ).toBe(400);
-    expect(
-      (await post('answer', { questionId: q.id, value: q.options[0].value }))
-        .statusCode,
-    ).toBe(201);
-    expect((await state()).currentQuestion).toBe(1);
-    // La risposta operativa entra subito nel profilo letto dal training.
-    expect(
-      (
-        await prisma.userOnboardingAssessment.findUniqueOrThrow({
-          where: { userId },
-        })
-      ).profileJson,
-    ).toHaveProperty('training_days_available.value', 1);
-    expect(
-      (await post('answer', { questionId: q.id, value: q.options[0].value }))
-        .statusCode,
-    ).toBe(409);
-    await post('back');
-    expect((await state()).currentQuestion).toBe(0);
-    for (const question of before.questions) {
-      const response = await post('answer', {
-        questionId: question.id,
-        value: question.options[1].value,
-      });
-      expect(response.statusCode).toBe(201);
-    }
-    // Disponibilità data: l'AI scrive le domande dei driver.
-    const pending = await state();
-    expect(pending).toMatchObject({
-      currentQuestion: 2,
-      questionsPending: true,
-      assessmentComplete: false,
-    });
+  it('writes one pair per driver after the previous answers, persists each answer and resumes', async () => {
     // Se l'AI non risponde l'atleta riprova: nessuna domanda di riserva.
+    const ai = app.get(AiProposalProviderService);
     const failing = jest
-      .spyOn(app.get(AiProposalProviderService), 'generateInitialQuestions')
+      .spyOn(ai, 'generateInitialQuestions')
       .mockRejectedValueOnce(
         new BadGatewayException({ code: 'INITIAL_QUESTIONS_UNAVAILABLE' }),
       );
@@ -672,26 +634,78 @@ describe('PF4 discovery to authenticated journey', () => {
       await prisma.userOnboardingQuestion.count({ where: { userId } }),
     ).toBe(0);
     expect((await state()).questionsPending).toBe(true);
-    const prepared = (await post('questions')).json<JourneyResponse>();
-    expect(prepared.questionsPending).toBe(false);
-    expect(prepared.questions).toHaveLength(14);
-    const bank = prepared.questions.slice(2);
-    expect(bank.every((q) => q.kind === 'AREA')).toBe(true);
-    // Due per driver, raggruppate nell'ordine dei driver.
-    expect(new Set(bank.map((q) => q.areaId)).size).toBe(6);
-    for (let i = 0; i < bank.length; i += 2)
-      expect(bank[i].areaId).toBe(bank[i + 1].areaId);
+    const first = (await post('questions')).json<JourneyResponse>();
+    expect(first).toMatchObject({
+      questionsPending: false,
+      currentQuestion: 0,
+      count: 12,
+    });
+    expect(first.questions).toHaveLength(2);
+    expect(first.questions.every((q) => q.kind === 'AREA')).toBe(true);
+    expect(first.questions[0].areaId).toBe(first.questions[1].areaId);
+    // Il primo driver è il primo del giro dello Spider.
+    expect(first.driverList[0].id).toBe(first.questions[0].areaId);
     const stored = await prisma.userOnboardingQuestion.findMany({
       where: { userId },
     });
     expect(stored.every((q) => q.provider === 'stub')).toBe(true);
     expect(stored[0].inputJson).toMatchObject({ kind: 'INITIAL_QUESTIONS' });
-    // Una seconda richiesta non riscrive le domande.
+    // Finché la coppia non ha risposta l'AI non scrive la successiva.
     expect((await post('questions')).json<JourneyResponse>().questions).toEqual(
-      prepared.questions,
+      first.questions,
     );
+
+    const q = first.questions[0];
+    expect(
+      (await post('answer', { questionId: q.id, value: 'forged' })).statusCode,
+    ).toBe(400);
+    expect(
+      (await post('answer', { questionId: q.id, value: q.options[0].value }))
+        .statusCode,
+    ).toBe(201);
+    expect((await state()).currentQuestion).toBe(1);
+    expect(
+      (await post('answer', { questionId: q.id, value: q.options[0].value }))
+        .statusCode,
+    ).toBe(409);
+    await post('back');
+    expect((await state()).currentQuestion).toBe(0);
+    for (const question of first.questions)
+      expect(
+        (
+          await post('answer', {
+            questionId: question.id,
+            value: question.options[1].value,
+          })
+        ).statusCode,
+      ).toBe(201);
+    expect(await state()).toMatchObject({
+      currentQuestion: 2,
+      questionsPending: true,
+      assessmentComplete: false,
+    });
+    // La coppia successiva tiene conto delle risposte già date.
+    const generate = jest.spyOn(ai, 'generateInitialQuestions');
+    const second = (await post('questions')).json<JourneyResponse>();
+    expect(generate).toHaveBeenCalledTimes(1);
+    const sent = generate.mock.calls[0][0];
+    generate.mockRestore();
+    expect(sent.drivers).toHaveLength(1);
+    expect(sent.drivers[0].areaId).toBe(first.driverList[1].id);
+    expect(sent.previousAnswers).toEqual(
+      first.questions.map((question) => ({
+        driver: expect.any(String) as unknown,
+        question: question.title,
+        answer: question.options[1].label,
+      })),
+    );
+    expect(second.questions).toHaveLength(4);
+    expect(second.questions.slice(0, 2)).toEqual(first.questions);
+    expect(second.questions[2].areaId).toBe(second.questions[3].areaId);
+    expect(second.questions[2].areaId).not.toBe(first.questions[0].areaId);
+
     // Classifica dichiarata dal profilo dopo: le domande erano su misura per
-    // la classifica precedente, quindi l'AI le riscrive.
+    // la classifica precedente, quindi l'AI le riscrive da capo.
     expect(
       (
         await post('fit-ranking', {
@@ -706,11 +720,13 @@ describe('PF4 discovery to authenticated journey', () => {
     expect(
       await prisma.userOnboardingQuestion.count({ where: { userId } }),
     ).toBe(0);
-    expect((await state()).questionsPending).toBe(true);
+    expect(await state()).toMatchObject({
+      currentQuestion: 0,
+      questionsPending: true,
+    });
     const regenerated = (await post('questions')).json<JourneyResponse>();
-    expect(regenerated.questions).toHaveLength(14);
-    expect(regenerated.questions[2].id).not.toBe(bank[0].id);
-    bank.splice(0, bank.length, ...regenerated.questions.slice(2));
+    expect(regenerated.questions).toHaveLength(2);
+    expect(regenerated.questions[0].id).not.toBe(first.questions[0].id);
     // Con l'AI al lavoro sulla classifica di prima (lease attivo, nessuna
     // valutazione ancora) la classifica non cambia e la banca resta.
     await prisma.athleteDiscovery.update({
@@ -729,7 +745,7 @@ describe('PF4 discovery to authenticated journey', () => {
     ).toBe(409);
     expect(
       await prisma.userOnboardingQuestion.count({ where: { userId } }),
-    ).toBe(12);
+    ).toBe(2);
     await prisma.athleteDiscovery.update({
       where: { userId },
       data: { operationAt: null },
@@ -737,7 +753,7 @@ describe('PF4 discovery to authenticated journey', () => {
     // L'AI può marcare una domanda come multipla: la risposta è un elenco e
     // un'opzione esclusiva resta da sola.
     const multi = await prisma.userOnboardingQuestion.findUniqueOrThrow({
-      where: { id: bank[0].id },
+      where: { id: regenerated.questions[0].id },
     });
     const choices = multi.optionsJson as { value: string }[];
     await prisma.userOnboardingQuestion.update({
@@ -749,7 +765,7 @@ describe('PF4 discovery to authenticated journey', () => {
         ),
       },
     });
-    expect((await state()).questions[2]).toMatchObject({ multiple: true });
+    expect((await state()).questions[0]).toMatchObject({ multiple: true });
     for (const value of [
       choices[1].value,
       [choices[0].value, choices[1].value],
@@ -766,15 +782,31 @@ describe('PF4 discovery to authenticated journey', () => {
         })
       ).statusCode,
     ).toBe(201);
-    for (const question of bank.slice(1)) {
-      const response = await post('answer', {
-        questionId: question.id,
-        value: question.options[1].value,
-      });
-      expect(response.statusCode).toBe(201);
+    // Il resto del giro: una coppia per driver, dopo le risposte alla precedente.
+    for (;;) {
+      const current = await state();
+      if (current.questionsPending) {
+        expect((await post('questions')).statusCode).toBe(201);
+        continue;
+      }
+      const next = current.questions[current.currentQuestion];
+      if (!next) break;
+      expect(
+        (
+          await post('answer', {
+            questionId: next.id,
+            value: next.options[1].value,
+          })
+        ).statusCode,
+      ).toBe(201);
     }
     const complete = await state();
-    expect(complete.currentQuestion).toBe(14);
+    expect(complete.currentQuestion).toBe(12);
+    expect(complete.questions).toHaveLength(12);
+    // Due per driver, nell'ordine dei driver.
+    expect(complete.questions.map((q) => q.areaId)).toEqual(
+      complete.driverList.flatMap((d) => [d.id, d.id]),
+    );
     // La classifica dichiarata entra nello storico e nel profilo, senza tessera verso l'AI.
     const declared = await prisma.athleteFitRanking.findMany({
       where: { userId },
@@ -801,16 +833,7 @@ describe('PF4 discovery to authenticated journey', () => {
     expect(complete).toMatchObject({
       phase: 'ASSESSMENT',
       assessmentComplete: true,
-    });
-    expect(
-      (
-        await prisma.userOnboardingAssessment.findUniqueOrThrow({
-          where: { userId },
-        })
-      ).profileJson,
-    ).toMatchObject({
-      training_days_available: { value: 2 },
-      training_session_duration: { value: 45 },
+      questionsPending: false,
     });
   });
 
@@ -835,7 +858,23 @@ describe('PF4 discovery to authenticated journey', () => {
     const before = await prisma.athleteDiscovery.findUniqueOrThrow({
       where: { userId },
     });
-    const question = (await state()).questions[0];
+    // Senza giorni e durata nel profilo il programma non parte.
+    await expect(app.get(AthleteJourneyService).submit(userId)).rejects.toThrow(
+      'indica quanti giorni e quanto tempo',
+    );
+    // La disponibilità si compila nel profilo, fuori dall'assessment.
+    const operational = await loadOperationalTemplates(prisma);
+    await prisma.$transaction(async (tx) => {
+      for (const q of operational)
+        await saveOperationalAnswer(
+          tx,
+          userId,
+          q,
+          q.key === 'training_days_available' ? 1 : 45,
+        );
+    });
+    // La prima domanda è diventata multipla: si usa la seconda.
+    const question = (await state()).questions[1];
     const value = question.options[0].value;
     await prisma.athleteDiscovery.update({
       where: { userId },
@@ -955,7 +994,8 @@ describe('PF4 discovery to authenticated journey', () => {
       padel: { current: '2ª fascia' },
       tennis: { current: '2.1' },
     });
-    expect(prompt.user.availability).toHaveLength(2);
+    // La disponibilità non è più nell'assessment: si compila nel profilo.
+    expect(prompt.user.availability).toEqual([]);
     expect(prompt.system).toContain('fitRanking');
     // La risposta multipla arriva con ogni opzione scelta e il suo score.
     const multiAnswer = (
@@ -998,7 +1038,7 @@ describe('PF4 discovery to authenticated journey', () => {
       1,
     );
     expect((await post('back')).statusCode).toBe(409);
-    const q = before.questions[0];
+    const q = before.questions[1];
     expect(
       (await post('answer', { questionId: q.id, value: q.options[0].value }))
         .statusCode,

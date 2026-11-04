@@ -6,11 +6,19 @@ import {
   ApiPropertyOptional,
 } from '@nestjs/swagger';
 import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
-import { IsInt, IsOptional, IsString, MaxLength, Allow } from 'class-validator';
+import {
+  IsInt,
+  IsObject,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Allow,
+} from 'class-validator';
 import { AuthenticatedGuard } from '../common/guards/authenticated.guard';
 import { AthleteJourneyService } from './athlete-journey.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { markWelcomeCompleted } from './welcome';
+import { availabilityForm, saveAvailability } from './program-availability';
 import { SelectHorizonDto } from './scenarios/select-horizon.dto';
 import {
   CalibrationAnswersDto,
@@ -34,6 +42,14 @@ class SubmitDto {
   @IsString()
   @MaxLength(2000)
   goal?: string;
+}
+class AvailabilityDto {
+  @ApiProperty({
+    description: 'Valori per chiave operativa',
+    example: { training_days_available: 3, training_session_duration: 60 },
+  })
+  @IsObject()
+  answers!: Record<string, unknown>;
 }
 class DurationDto {
   @ApiPropertyOptional() @IsOptional() @IsInt() weeks?: number;
@@ -72,6 +88,19 @@ export class AthleteJourneyController {
   @Post('questions')
   prepareQuestions(@Req() req: { user: { id: string } }) {
     return this.journey.prepareQuestions(req.user.id);
+  }
+  @ApiOperation({ summary: 'Giorni e durata per il programma' })
+  @Get('availability')
+  availability(@Req() req: { user: { id: string } }) {
+    return availabilityForm(this.prisma, req.user.id);
+  }
+  @ApiOperation({ summary: 'Salva giorni e durata nel profilo' })
+  @Post('availability')
+  saveAvailability(
+    @Req() req: { user: { id: string } },
+    @Body() body: AvailabilityDto,
+  ) {
+    return saveAvailability(this.prisma, req.user.id, body.answers);
   }
   @ApiOperation({ summary: 'Salva risposta e avanzamento' })
   @Post('answer')

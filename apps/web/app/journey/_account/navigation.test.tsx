@@ -74,7 +74,7 @@ async function answerBoth() {
 }
 
 describe("Round di domande completato", () => {
-  it("returns to the summary once evaluated, without opening another round", async () => {
+  it("shows the updated result once evaluated, without opening another round", async () => {
     const { assign } = navigation();
     let answered = false;
     const calls = queue({
@@ -87,11 +87,17 @@ describe("Round di domande completato", () => {
     });
     render(<CalibrationPage />);
     await answerBoth();
-    await waitFor(() =>
-      expect(assign).toHaveBeenCalledWith(
-        "/journey/profilo?esito=calibrazione",
-      ),
-    );
+    // Come nella demo: il risultato aggiornato, da cui si continua o si esce.
+    expect(
+      await screen.findByRole("heading", {
+        name: "Il tuo profilo prende forma.",
+      }),
+    ).toBeVisible();
+    expect(screen.getByText("Blocco 2 completato")).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: "Salva i progressi ed esci" }),
+    ).toHaveAttribute("href", "/journey");
+    expect(assign).not.toHaveBeenCalled();
     expect(
       calls.find((c) => c.url.endsWith("/calibration/answers"))?.body,
     ).toEqual({ roundId: ROUND.id, answers: { q1: "o1", q2: "o2" } });
@@ -134,11 +140,11 @@ describe("Round di domande completato", () => {
       await userEvent.click(
         screen.getByRole("button", { name: /Riprova l’invio/ }),
       );
-      await waitFor(() =>
-        expect(assign).toHaveBeenCalledWith(
-          "/journey/profilo?esito=calibrazione",
-        ),
-      );
+      expect(
+        await screen.findByRole("heading", {
+          name: "Il tuo profilo prende forma.",
+        }),
+      ).toBeVisible();
       const sent = calls.filter((c) => c.url.endsWith("/calibration/answers"));
       expect(sent.map((c) => c.body)).toEqual([
         { roundId: ROUND.id, answers: { q1: "o1", q2: "o2" } },
@@ -155,7 +161,7 @@ describe("Round rimasto in valutazione", () => {
     answers: { q1: "o1", q2: "o2" },
   };
 
-  it("tells saved answers apart and returns to the summary once evaluated", async () => {
+  it("tells saved answers apart and shows the result once evaluated", async () => {
     const { assign } = navigation();
     serve({
       "/auth/journey": journey({ calibration: calibration(stalled) }),
@@ -170,11 +176,12 @@ describe("Round rimasto in valutazione", () => {
     await userEvent.click(
       screen.getByRole("button", { name: /Completa la valutazione/ }),
     );
-    await waitFor(() =>
-      expect(assign).toHaveBeenCalledWith(
-        "/journey/profilo?esito=calibrazione",
-      ),
-    );
+    expect(
+      await screen.findByRole("heading", {
+        name: "Il tuo profilo prende forma.",
+      }),
+    ).toBeVisible();
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it("waits and re-reads while another request evaluates, without resending", async () => {
@@ -199,11 +206,12 @@ describe("Round rimasto in valutazione", () => {
     await userEvent.click(
       await screen.findByRole("button", { name: /Aggiorna lo stato/ }),
     );
-    await waitFor(() =>
-      expect(assign).toHaveBeenCalledWith(
-        "/journey/profilo?esito=calibrazione",
-      ),
-    );
+    expect(
+      await screen.findByRole("heading", {
+        name: "Il tuo profilo prende forma.",
+      }),
+    ).toBeVisible();
+    expect(assign).not.toHaveBeenCalled();
     expect(
       calls.filter((c) => c.url.endsWith("/calibration/answers")),
     ).toHaveLength(1);
