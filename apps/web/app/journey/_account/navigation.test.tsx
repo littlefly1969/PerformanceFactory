@@ -113,9 +113,56 @@ describe("Round di domande completato", () => {
     ],
     ["a network error", new TypeError("Failed to fetch")],
   ])(
-    "keeps question, position and local answers after %s",
+    "resends the same answers by itself after %s, with no retry button",
     async (_case, failure) => {
-      const { assign } = navigation();
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      try {
+        const { assign } = navigation();
+        const calls = queue(
+          {
+            "/auth/journey": () =>
+              journey({ calibration: calibration(QUESTIONS) }),
+            "/calibration/answers": () =>
+              journey({ calibration: calibration(null) }),
+          },
+          [failure],
+        );
+        render(<CalibrationPage />);
+        await answerBoth();
+        expect(
+          await screen.findByText(/Problema con i server, stiamo riprovando/),
+        ).toBeVisible();
+        expect(
+          screen.queryByRole("button", { name: /Riprova/ }),
+        ).not.toBeInTheDocument();
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(
+          await screen.findByRole("heading", {
+            name: "Il tuo profilo prende forma.",
+          }),
+        ).toBeVisible();
+        expect(assign).not.toHaveBeenCalled();
+        const sent = calls.filter((c) =>
+          c.url.endsWith("/calibration/answers"),
+        );
+        expect(sent.map((c) => c.body)).toEqual([
+          { roundId: ROUND.id, answers: { q1: "o1", q2: "o2" } },
+          { roundId: ROUND.id, answers: { q1: "o1", q2: "o2" } },
+        ]);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it("after three automatic retries asks to try later; Annulla keeps the answers", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      navigation();
+      const overloaded = () =>
+        new Response(JSON.stringify({ message: "Valutazione non riuscita." }), {
+          status: 502,
+        });
       const calls = queue(
         {
           "/auth/journey": () =>
@@ -123,35 +170,77 @@ describe("Round di domande completato", () => {
           "/calibration/answers": () =>
             journey({ calibration: calibration(null) }),
         },
-        [failure],
+        [overloaded(), overloaded(), overloaded(), overloaded()],
       );
       render(<CalibrationPage />);
       await answerBoth();
-      expect(await screen.findByRole("alert")).toHaveTextContent(
-        /Risposte non inviate.*Le tue scelte sono ancora qui/,
+      await screen.findByText(/Problema con i server, stiamo riprovando/);
+      await vi.advanceTimersByTimeAsync(2000);
+      await vi.advanceTimersByTimeAsync(4000);
+      await vi.advanceTimersByTimeAsync(6000);
+      expect(
+        await screen.findByText(/server sono sovraccarichi/),
+      ).toBeVisible();
+      const sent = () =>
+        calls.filter((c) => c.url.endsWith("/calibration/answers")).length;
+      expect(sent()).toBe(4);
+      await userEvent.click(screen.getByRole("button", { name: /Annulla/ }));
+      // Si torna allo stato della calibrazione, senza l'errore dell'AI.
+      expect(
+        await screen.findByRole("heading", {
+          name: /La calibrazione si chiude quando ti conosciamo abbastanza/,
+        }),
+      ).toBeVisible();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      // Si riprende dall'ultima domanda con le scelte già fatte.
+      await userEvent.click(
+        screen.getByRole("button", { name: /Continua la calibrazione/ }),
       );
-      // Stessa domanda, stessa scelta: nessuna transizione di successo.
-      expect(screen.getByText("Seconda?")).toBeVisible();
+      expect(await screen.findByText("Seconda?")).toBeVisible();
       expect(screen.getByRole("button", { name: /Raramente/ })).toHaveAttribute(
         "aria-pressed",
         "true",
       );
-      expect(assign).not.toHaveBeenCalled();
-      await userEvent.click(
-        screen.getByRole("button", { name: /Riprova l’invio/ }),
-      );
-      expect(
-        await screen.findByRole("heading", {
-          name: "Il tuo profilo prende forma.",
-        }),
-      ).toBeVisible();
-      const sent = calls.filter((c) => c.url.endsWith("/calibration/answers"));
-      expect(sent.map((c) => c.body)).toEqual([
-        { roundId: ROUND.id, answers: { q1: "o1", q2: "o2" } },
-        { roundId: ROUND.id, answers: { q1: "o1", q2: "o2" } },
-      ]);
-    },
-  );
+      expect(sent()).toBe(4);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps question, position and local answers when the answers are refused", async () => {
+    const { assign } = navigation();
+    const calls = queue(
+      {
+        "/auth/journey": () => journey({ calibration: calibration(QUESTIONS) }),
+        "/calibration/answers": () =>
+          journey({ calibration: calibration(null) }),
+      },
+      [
+        new Response(
+          JSON.stringify({ message: "Rispondi a tutte le domande del round" }),
+          { status: 400 },
+        ),
+      ],
+    );
+    render(<CalibrationPage />);
+    await answerBoth();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /Risposte non inviate.*Le tue scelte sono ancora qui/,
+    );
+    // Stessa domanda, stessa scelta, nessun nuovo invio automatico.
+    expect(screen.getByText("Seconda?")).toBeVisible();
+    expect(screen.getByRole("button", { name: /Raramente/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(
+      screen.queryByRole("button", { name: /Riprova/ }),
+    ).not.toBeInTheDocument();
+    expect(assign).not.toHaveBeenCalled();
+    expect(
+      calls.filter((c) => c.url.endsWith("/calibration/answers")),
+    ).toHaveLength(1);
+  });
 });
 
 describe("Round rimasto in valutazione", () => {
@@ -245,7 +334,8 @@ describe("Prossimo passo nel profilo", () => {
       "lesson confirmed and R consolidated",
       calibration(null, "FREE_LESSON_VALIDATION", { ruleMet: true }),
       { ...lesson, phase: "ASSIGNED" },
-      "/journey/calibrazione",
+      // Calibrazione sufficiente: il passo è la lezione, non altre domande.
+      "/journey/circolo",
     ],
     [
       "R consolidated without a lesson",

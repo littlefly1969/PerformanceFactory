@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { Calibration, Evaluation } from "../journey-types";
 import { AccountScreen, PillButton, PillLink } from "./account-shell";
+import { definedAreas } from "./calibration-state";
 import { MiniSpider } from "./spiders";
 
 /**
@@ -27,7 +28,10 @@ export function ProvisionalReady({
   title?: string;
   /** Prossimo blocco nella stessa pagina; senza, si apre la calibrazione. */
   onContinue?: () => void;
-  /** Passo in più sotto «Continua» (scenari, circolo). */
+  /**
+   * Passo in più sotto «Continua» (scenari, circolo). A calibrazione
+   * sufficiente è il passo principale: va passato in giallo.
+   */
   extra?: ReactNode;
 }) {
   const value = Math.round(evaluation.overallConfidence);
@@ -36,12 +40,17 @@ export function ProvisionalReady({
   // «Sufficientemente completo» solo con la regola valutata dal server, che
   // conta anche le soglie per area: l'arrotondamento serve solo a mostrarla.
   const reached = !!calibration?.ruleMet;
+  // Aree già definite: il loro braccio dello Spider è continuo.
+  const defined = definedAreas(calibration, evaluation.drivers);
+  // Calibrazione sufficiente: niente «Continua la calibrazione». Il passo
+  // giallo è quello in più (circolo, scenari) o, senza, il ritorno alla home.
+  const home = reached && !extra;
   return (
     <AccountScreen
       tone="dark"
       footer={
         <>
-          {onContinue ? (
+          {reached ? null : onContinue ? (
             <PillButton tone="lime" onClick={onContinue}>
               Continua la calibrazione
             </PillButton>
@@ -51,17 +60,27 @@ export function ProvisionalReady({
             </PillLink>
           )}
           {extra}
-          <Link
-            href="/journey"
-            className="pf-acc-link"
-            onClick={(event) => {
-              if (!onHome) return;
-              event.preventDefault();
-              onHome();
-            }}
-          >
-            Salva i progressi ed esci
-          </Link>
+          {home && onHome ? (
+            <PillButton tone="lime" onClick={onHome}>
+              Salva e vai alla home
+            </PillButton>
+          ) : home ? (
+            <PillLink href="/journey" tone="lime">
+              Salva e vai alla home
+            </PillLink>
+          ) : (
+            <Link
+              href="/journey"
+              className="pf-acc-link"
+              onClick={(event) => {
+                if (!onHome) return;
+                event.preventDefault();
+                onHome();
+              }}
+            >
+              Salva i progressi ed esci
+            </Link>
+          )}
         </>
       }
     >
@@ -75,6 +94,7 @@ export function ProvisionalReady({
             real={evaluation.drivers.map((d) => d.score)}
             scale={evaluation.scale}
             provisional
+            defined={evaluation.drivers.map((d) => defined.has(d.id))}
             size={190}
           />
         </div>

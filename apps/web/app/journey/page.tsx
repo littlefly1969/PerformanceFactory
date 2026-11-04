@@ -10,7 +10,8 @@ import { MultiChoiceStep } from "./choice-options";
 import { NumberChoiceStep, numericOptions } from "./number-choice";
 import { AccountHome } from "./_account/account-home";
 import { DarkQuestion, SingleOptions } from "./_account/dark-question";
-import { HexPrep, HexSide } from "./_account/assessment-hex";
+import { type HexFailure, HexPrep, HexSide } from "./_account/assessment-hex";
+import { useAutoRetry } from "./_account/auto-retry";
 import { ProvisionalReady } from "./_account/provisional-ready";
 import { useResource } from "./_account/account-data";
 import {
@@ -37,9 +38,12 @@ export default function JourneyPage() {
     google,
     documents,
     action,
+    attempt,
     accept,
     refresh,
   } = useJourney();
+  // L'AI che scrive le domande o valuta le risposte si ritenta da sola.
+  const { retry, run } = useAutoRetry();
   const q = j?.questions?.[j.currentQuestion];
   // Profilo provvisorio pronto (immagine 9): solo appena finito l'assessment.
   const [ready, setReady] = useState(false);
@@ -56,16 +60,16 @@ export default function JourneyPage() {
   }, [j?.phase]);
   // Dopo l'ultima risposta la valutazione parte da sola, come nella demo PF10
   // (decisione D5): niente conferma intermedia. Una volta sola per visita;
-  // se fallisce, il nuovo tentativo è esplicito.
+  // se il server ha un problema si ritenta da soli, poi si esce con «Annulla».
   const complete = j?.phase === "ASSESSMENT" && !!j.assessmentComplete;
   const evaluated = useRef(false);
   useEffect(() => {
     if (!complete || busy || evaluated.current) return;
     evaluated.current = true;
-    void action("evaluate");
-  }, [complete, busy, action]);
+    void run(() => attempt("evaluate"));
+  }, [complete, busy, attempt, run]);
   // Domande a coppie (demo PF10): finita una coppia l'AI scrive la successiva,
-  // da sola e una volta per coppia; un nuovo tentativo è esplicito.
+  // da sola e una volta per coppia, con i nuovi tentativi automatici.
   const assessing = j?.phase === "ASSESSMENT" || j?.phase === "PROCESSING";
   const pending = assessing && !!j?.questionsPending;
   const written = j?.questions?.length ?? 0;
@@ -80,8 +84,8 @@ export default function JourneyPage() {
       setPrepHeld(true);
       window.setTimeout(() => setPrepHeld(false), PREP_MS);
     }
-    void action("questions");
-  }, [j?.phase, pending, busy, written, action]);
+    void run(() => attempt("questions"));
+  }, [j?.phase, pending, busy, written, attempt, run]);
   // Passaggio d'area: chiusa una coppia, il lato dell'esagono si disegna per
   // almeno un giro e ricomincia finché l'AI non ha la coppia successiva (o,
   // dopo l'ultima area, la valutazione).
@@ -105,6 +109,19 @@ export default function JourneyPage() {
       setSide(null);
   };
   const finishing = assessing && !!j?.assessmentComplete;
+  // AI ferma: si ritenta da soli; finiti i tentativi, o con un errore che un
+  // tentativo non risolve, «Annulla» riporta al profilo.
+  const failure = (held = false): HexFailure => ({
+    retry,
+    error:
+      held || retry.phase !== "idle" || busy ? undefined : error || undefined,
+    onCancel: busy
+      ? undefined
+      : () => window.location.assign("/journey/profilo"),
+    onRetry: busy
+      ? undefined
+      : () => void run(() => attempt(finishing ? "evaluate" : "questions")),
+  });
   const areasWritten = new Set(j?.questions?.map((x) => x.areaId)).size;
   // Prima dell'assessment: la prima volta il benvenuto (foto, Spider, regalo,
   // app), poi la home, che è anche dove riapre l'app installata.
@@ -142,17 +159,7 @@ export default function JourneyPage() {
   // Lato dell'area appena chiusa, o l'esagono completo mentre l'AI calcola.
   if (side && (side.held || pending || finishing))
     return (
-      <HexSide
-        names={names}
-        index={side.index}
-        error={side.held ? undefined : error || undefined}
-        onRetry={
-          busy
-            ? undefined
-            : () => void action(finishing ? "evaluate" : "questions")
-        }
-        retryLabel={finishing ? "Riprova l’analisi" : "Riprova"}
-      />
+      <HexSide names={names} index={side.index} failure={failure(side.held)} />
     );
   // Prima coppia: l'esagono si disegna finché le domande non sono pronte.
   if ((pending && !written) || (prepHeld && assessing))
@@ -161,8 +168,7 @@ export default function JourneyPage() {
         title="Preparo le tue domande."
         sub="Sei aree, un punto di partenza."
         areas={names.length || 6}
-        error={prepHeld ? undefined : error || undefined}
-        onRetry={busy ? undefined : () => void action("questions")}
+        failure={failure(prepHeld)}
       />
     );
   // Ripresa a metà (ricarica, altra scheda): stessa attesa, senza lato da tenere.
@@ -171,13 +177,7 @@ export default function JourneyPage() {
       <HexSide
         names={names}
         index={pending ? areasWritten - 1 : names.length - 1}
-        error={error || undefined}
-        onRetry={
-          busy
-            ? undefined
-            : () => void action(finishing ? "evaluate" : "questions")
-        }
-        retryLabel={finishing ? "Riprova l’analisi" : "Riprova"}
+        failure={failure()}
       />
     );
   if (j?.phase === "EVALUATION" && j.evaluation)

@@ -45,7 +45,8 @@ Il profilo della fase gratuita (pulsante con l'omino) è descritto in
   (abbandono) non realizzata.
 - **D5** Valutazione automatica dopo l'ultima risposta, senza la conferma «Risposte
   registrate»: parte una volta da sola (anche riaprendo la pagina con le risposte
-  complete); se fallisce, «Riprova l'analisi».
+  complete); con un problema del server si ritenta da sola fino a tre volte, poi
+  «Annulla» riporta al profilo (vedi «AI che non risponde» in `calibrazione.md`).
 - **D6** Testi e dati reali dell'app al posto dei pulsanti degli store, delle regole
   e dei valori d'esempio della demo.
 

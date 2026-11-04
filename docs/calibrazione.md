@@ -7,8 +7,11 @@ nella fase gratuita. Niente programma: solo round di domande scritte dall'AI sui
 driver con la confidence più bassa. Ogni round rivaluta R e confidence con il prompt
 di valutazione, salvando una nuova valutazione versionata. Quando la **regola di
 consolidamento** in vigore è soddisfatta R è consolidata, ma la calibrazione resta
-aperta e l'atleta può continuare a rispondere (decisione di Stefano, 28 ottobre
-2026). Nessuna attesa fra i round (specifica PF-FS-PREPAYWALL §4.3).
+aperta (decisione di Stefano, 28 ottobre 2026). Con R consolidata («calibrazione
+sufficiente», `ruleMet`) l'app non propone più «Continua la calibrazione»: il
+passo in giallo è la scelta del circolo, la lezione in attesa, gli scenari o
+«Salva e vai alla home» (decisione di Stefano, 4 novembre 2026). Nessuna attesa
+fra i round (specifica PF-FS-PREPAYWALL §4.3).
 
 La calibrazione si chiude solo in tre modi:
 
@@ -282,8 +285,22 @@ La conferma riceve il focus, non promette aumenti di affidabilità e sparisce
 dall'indirizzo, così ricarica e indietro non la ripetono.
 
 - **Round di domande**: dopo `calibration/answers` accettato e valutato si va al
-  riepilogo, senza aprire un nuovo round. Se l'invio fallisce (errore HTTP o di
-  rete) domanda, posizione e scelte restano e si può riprovare. Un round
+  riepilogo, senza aprire un nuovo round. Se l'invio è rifiutato (errore 4xx)
+  domanda, posizione e scelte restano e si può rispondere di nuovo.
+- **Spider durante la calibrazione** (`MiniSpider` con `defined`): il contorno
+  è diviso in bracci, uno per area (dal punto medio del lato precedente al
+  vertice e al punto medio del successivo). Il braccio di un'area definita
+  (`definedAreas`, stessa soglia di home e profilo) è continuo, gli altri restano
+  tratteggiati.
+- **AI che non risponde** (`_account/auto-retry.ts`): preparazione delle domande
+  (`calibration/round`) e valutazione delle risposte (`calibration/answers`), come
+  domande e analisi dell'assessment, con un errore del server (5xx, 408, 429) o di
+  rete si ritentano da sole fino a tre volte (dopo 2, 4 e 6 secondi). L'esagono
+  resta in movimento con «Problema con i server, stiamo riprovando…», senza
+  pulsante «Riprova». Finiti i tentativi l'atleta legge che i server sono
+  sovraccarichi e se vuole riprovare più tardi: «Annulla» torna allo stato della
+  calibrazione (le scelte non inviate restano per il blocco successivo),
+  «Riprova adesso» riparte da capo. Un round
   `EVALUATING` si completa con le risposte salvate; se un'altra richiesta lo
   sta valutando, la pagina aspetta e rilegge lo stato senza reinviarle.
 - **Micro-test**: feedback, risultato e video restano; l'azione principale è

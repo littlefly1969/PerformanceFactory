@@ -5,6 +5,22 @@ import { API_BASE, secureFetch } from "../lib/api";
 import { DRAFT_KEY } from "../start/discovery-state";
 import { clearQuizToken, resumeQuiz, withQuizToken } from "../start/quiz-draft";
 import type { Journey, ConsentDocument } from "./journey-types";
+/**
+ * Esito di un'azione del percorso: accettata, non riuscita per un problema
+ * passeggero del server (si può ritentare da soli) o rifiutata.
+ */
+export type AttemptResult = "ok" | "transient" | "failed";
+/** Errori del server o della rete che un nuovo tentativo può risolvere. */
+const transientStatus = (status: number) =>
+  status >= 500 || status === 408 || status === 429;
+class JourneyError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
 export function useJourney() {
   const [journey, setJourney] = useState<Journey>();
   const [error, setError] = useState("");
@@ -14,13 +30,17 @@ export function useJourney() {
   const [goalReview, setGoalReview] = useState(false);
   const lock = useRef(false);
   const read = async (response: Response) => {
-    const data = await response.json();
+    // Un 502 o 504 del proxy può non avere un corpo JSON: conta lo stato.
+    const data = response.ok
+      ? await response.json()
+      : await response.json().catch(() => ({}));
     if (!response.ok) {
       if (data.code === "GOAL_RISK_ACK_REQUIRED") setGoalReview(true);
-      throw new Error(
+      throw new JourneyError(
         Array.isArray(data.message)
           ? data.message.join(". ")
           : data.message || "Operazione non riuscita. Riprova.",
+        response.status,
       );
     }
     return data;
@@ -89,9 +109,15 @@ export function useJourney() {
     }, 2000);
     return () => clearInterval(timer);
   }, [journey?.phase, busy, refresh]);
-  /** Azione del percorso; restituisce true se il server l'ha accettata. */
-  async function action(path: string, input: unknown = {}) {
-    if (lock.current) return false;
+  /**
+   * Azione del percorso con il suo esito: «transient» se il server o la rete
+   * hanno avuto un problema passeggero, che un nuovo tentativo può risolvere.
+   */
+  async function attempt(
+    path: string,
+    input: unknown = {},
+  ): Promise<AttemptResult> {
+    if (lock.current) return "failed";
     lock.current = true;
     setBusy(true);
     setError("");
@@ -105,15 +131,22 @@ export function useJourney() {
       );
       setJourney(data);
       setGoalReview(false);
-      return true;
+      return "ok";
     } catch (e) {
       setError(e instanceof Error ? e.message : "Connessione non disponibile");
-      return false;
+      return e instanceof JourneyError && !transientStatus(e.status)
+        ? "failed"
+        : "transient";
     } finally {
       lock.current = false;
       setBusy(false);
     }
   }
+  /** Azione del percorso; restituisce true se il server l'ha accettata. */
+  async function action(path: string, input: unknown = {}) {
+    return (await attempt(path, input)) === "ok";
+  }
+  const clearError = useCallback(() => setError(""), []);
   async function accept(input: unknown) {
     if (lock.current) return;
     lock.current = true;
@@ -171,6 +204,8 @@ export function useJourney() {
     documents,
     goalReview,
     action,
+    attempt,
+    clearError,
     accept,
     refresh,
   };

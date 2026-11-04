@@ -1,0 +1,27 @@
+/* Spider piccolo durante la calibrazione: bracci per area. */
+.pf-acc-mini-real.has-arms {
+  stroke: none;
+}
+.pf-acc-mini-arm {
+  fill: none;
+  stroke: #6d6d70;
+  stroke-width: 1.4;
+  stroke-dasharray: 3 2;
+  stroke-linejoin: round;
+}
+/* Area definita: braccio continuo, a dire che quella parte è finita. */
+.pf-acc-mini-arm.is-defined {
+  stroke: var(--acc-ink);
+  stroke-width: 1.6;
+  stroke-dasharray: none;
+}
+.pf-acc.is-dark .pf-acc-mini-real.has-arms {
+  stroke: none;
+}
+.pf-acc.is-dark .pf-acc-mini-arm {
+  stroke: var(--acc-lime);
+  opacity: 0.7;
+}
+.pf-acc.is-dark .pf-acc-mini-arm.is-defined {
+  opacity: 1;
+}

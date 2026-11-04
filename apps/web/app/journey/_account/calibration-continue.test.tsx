@@ -30,9 +30,7 @@ describe("Calibrazione con la lezione in attesa o R consolidata", () => {
     navigation();
     const calls = serve({
       "/auth/journey": journey({
-        calibration: calibration(null, "FREE_LESSON_VALIDATION", {
-          ruleMet: true,
-        }),
+        calibration: calibration(null, "FREE_LESSON_VALIDATION"),
       }),
       "/athlete-journey/free-lesson": { ...lesson, phase: "ASSIGNED" },
     });
@@ -49,7 +47,28 @@ describe("Calibrazione con la lezione in attesa o R consolidata", () => {
     ).toBeNull();
   });
 
-  it("lets the athlete with R consolidated choose the scenarios", async () => {
+  it("with R consolidated and the lesson pending, the lesson is the yellow step", async () => {
+    navigation();
+    serve({
+      "/auth/journey": journey({
+        calibration: calibration(null, "FREE_LESSON_VALIDATION", {
+          ruleMet: true,
+        }),
+      }),
+      "/athlete-journey/free-lesson": { ...lesson, phase: "ASSIGNED" },
+    });
+    render(<CalibrationPage />);
+    const lessonLink = await screen.findByRole("link", {
+      name: /La tua lezione gratuita/,
+    });
+    expect(lessonLink).toHaveAttribute("href", "/journey/circolo");
+    expect(lessonLink).toHaveClass("pf-acc-pill", "is-lime");
+    expect(
+      screen.queryByRole("button", { name: /Continua la calibrazione/ }),
+    ).toBeNull();
+  });
+
+  it("lets the athlete with R consolidated choose the scenarios, without more calibration", async () => {
     const { assign } = navigation();
     const calls = serve({
       "/auth/journey": journey({
@@ -61,14 +80,40 @@ describe("Calibrazione con la lezione in attesa o R consolidata", () => {
       "/athlete-journey/free-lesson": { ...lesson, phase: "DECLINED" },
     });
     render(<CalibrationPage />);
+    const scenarios = await screen.findByRole("button", {
+      name: /Vai ai tuoi scenari/,
+    });
+    expect(scenarios).toHaveClass("is-lime");
     expect(
-      await screen.findByRole("button", { name: /Continua la calibrazione/ }),
-    ).toBeEnabled();
-    await userEvent.click(
-      screen.getByRole("button", { name: /Vai ai tuoi scenari/ }),
-    );
+      screen.queryByRole("button", { name: /Continua la calibrazione/ }),
+    ).toBeNull();
+    expect(
+      screen.getByRole("link", { name: "Salva e vai alla home" }),
+    ).toHaveAttribute("href", "/journey");
+    await userEvent.click(scenarios);
     await waitFor(() => expect(assign).toHaveBeenCalledWith("/journey/stima"));
     expect(calls.some((c) => c.url.endsWith("/calibration/finish"))).toBe(true);
+  });
+
+  it("with R consolidated and the lesson unlocked, Scegli il circolo is the yellow step", async () => {
+    navigation();
+    serve({
+      "/auth/journey": journey({
+        calibration: calibration(null, "FREE_LEVEL_ESTIMATED", {
+          ruleMet: true,
+        }),
+      }),
+      "/athlete-journey/free-lesson": { ...lesson, phase: "ELIGIBLE" },
+    });
+    render(<CalibrationPage />);
+    const club = await screen.findByRole("link", {
+      name: /Scegli il circolo per la lezione gratuita/,
+    });
+    expect(club).toHaveAttribute("href", "/journey/circolo");
+    expect(club).toHaveClass("pf-acc-pill", "is-lime");
+    expect(
+      screen.queryByRole("button", { name: /Continua la calibrazione/ }),
+    ).toBeNull();
   });
 
   it("warns clearly when the deadline closed an R not consolidated", async () => {
