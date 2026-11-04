@@ -106,6 +106,17 @@
 .pf-hm-pill span:last-child {
   font-size: 15px;
 }
+/* «Inizia l'assessment» è un pulsante: stessa pillola dei link. */
+button.pf-hm-pill {
+  width: 100%;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+button.pf-hm-pill:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
 .pf-hm-pill.is-tall {
   min-height: 54px;
   padding: 0 20px;
@@ -120,7 +131,8 @@
   background: var(--acc-ink);
   color: #fff;
 }
-.pf-hm a:active {
+.pf-hm a:active,
+.pf-hm button.pf-hm-pill:not(:disabled):active {
   transform: scale(0.985);
 }
 

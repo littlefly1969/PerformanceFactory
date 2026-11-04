@@ -277,20 +277,27 @@ describe("PF5 assessment intro and questions", () => {
 
   it("lands on the home after the welcome, with the backend count", async () => {
     const requests = serve(journey({ count: 12 }));
-    render(<JourneyPage />);
+    const { container } = render(<JourneyPage />);
     expect(
       await screen.findByRole("heading", { name: "Ciao Stefano." }),
     ).toBeInTheDocument();
+    // La home della fase gratuita (S04 della demo), non la vecchia home.
+    expect(container.querySelector(".pf-hm")).not.toBeNull();
+    expect(container.querySelector(".pf-home")).toBeNull();
     expect(screen.getByText("Profilo da iniziare")).toBeInTheDocument();
     expect(
-      screen.getByRole("img", { name: "Assessment al 0%" }),
+      await screen.findByRole("img", { name: "Al 0%" }),
     ).toBeInTheDocument();
-    // Senza lezione disponibile nessuna promessa: card generica.
-    expect(
-      screen.getByText(/0 di 12 domande · da qui nasce/),
-    ).toBeInTheDocument();
+    // Senza lezione disponibile nessuna promessa: card dell'assessment.
+    expect(screen.getByText("Scopri dove sei oggi.")).toBeInTheDocument();
     expect(screen.queryByText("Lezione gratuita")).not.toBeInTheDocument();
-    expect(screen.getByText("R —")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Inizia l’assessment/ }),
+    ).toBeEnabled();
+    expect(screen.getByRole("link", { name: "Home" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
     // La foto del benvenuto, se c'è, va nell'avatar.
     await waitFor(() =>
       expect(requests).toContain("/api/athlete/profile/photo"),
@@ -306,7 +313,7 @@ describe("PF5 assessment intro and questions", () => {
             JSON.stringify(
               url.endsWith("/free-lesson")
                 ? { enabled: true, phase: "UNAVAILABLE", clubs: [{ id: "c" }] }
-                : journey({ count: 12 }),
+                : journey({ count: 12, currentQuestion: 3 }),
             ),
           ),
       ),
@@ -314,7 +321,11 @@ describe("PF5 assessment intro and questions", () => {
     render(<JourneyPage />);
     expect(await screen.findByText("Lezione gratuita")).toBeInTheDocument();
     expect(
-      screen.getByText(/0 di 12 domande · poi continui/),
+      screen.getByText("Completa l’assessment per sbloccarla."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Al 25%" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Continua l’assessment/ }),
     ).toBeInTheDocument();
   });
 

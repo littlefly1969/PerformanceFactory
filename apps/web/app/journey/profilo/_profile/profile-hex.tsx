@@ -1,4 +1,4 @@
-import { type ReactNode, useId } from "react";
+import type { ReactNode } from "react";
 
 /** Una punta dell'esagono del profilo: valore e confidenza in 0-100. */
 export type HexAxis = {
@@ -20,6 +20,22 @@ const vertex = (k: number, n: number, radius: number) => {
   const a = -Math.PI / 2 + (k / n) * Math.PI * 2;
   return [C + radius * Math.cos(a), C + radius * Math.sin(a)] as const;
 };
+
+/**
+ * Margine di un'area come nella demo PF10 («70 ±8»): metà intervallo che si
+ * stringe con la confidenza, con la stessa ampiezza della R globale (20% della
+ * scala a confidenza zero). Sotto i 3 punti si mostra solo il valore.
+ */
+export function areaValue(
+  score: number,
+  confidence: number,
+  scale: { min: number; max: number },
+) {
+  const c = Math.max(0, Math.min(100, confidence));
+  const half = Math.round(((100 - c) / 100) * (scale.max - scale.min) * 0.2);
+  const value = Math.round(score);
+  return half <= 3 ? `${value}` : `${value} ±${half}`;
+}
 
 const f = (p: readonly [number, number]) =>
   `${p[0].toFixed(1)},${p[1].toFixed(1)}`;
@@ -174,10 +190,7 @@ export function ProfileHex({
               aria-hidden="true"
             >
               <span>{a.label}</span>
-              <b>
-                {a.defined ? "" : "≈ "}
-                {Math.round(a.score ?? 0)}
-              </b>
+              <b>{areaValue(a.score ?? 0, a.confidence, scale)}</b>
             </div>
           );
         })}
@@ -187,8 +200,8 @@ export function ProfileHex({
 }
 
 /**
- * Anello di un'area: arco pari alla confidenza, lime e pieno se l'area è
- * definita, grigio e tratteggiato se no.
+ * Anello di un'area, come la demo: arco pieno lungo quanto la confidenza,
+ * lime se l'area è definita, grigio se non lo è ancora.
  */
 export function AreaRing({
   confidence,
@@ -199,44 +212,19 @@ export function AreaRing({
   defined: boolean;
   children: ReactNode;
 }) {
-  const mask = `pf-ring-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const circ = 2 * Math.PI * 19;
   const arc = (circ * Math.max(0, Math.min(100, confidence))) / 100;
   return (
     <div className={`pf-prof-ring${defined ? " is-defined" : ""}`}>
       <svg viewBox="0 0 48 48" aria-hidden="true">
         <circle className="pf-prof-ring-track" cx="24" cy="24" r="19" />
-        {defined ? (
-          <circle
-            className="pf-prof-ring-arc"
-            cx="24"
-            cy="24"
-            r="19"
-            strokeDasharray={`${arc.toFixed(1)} ${circ.toFixed(1)}`}
-          />
-        ) : (
-          // Tratteggio lungo quanto l'arco: una maschera ritaglia l'arco.
-          <>
-            <mask id={mask}>
-              <circle
-                cx="24"
-                cy="24"
-                r="19"
-                fill="none"
-                stroke="#fff"
-                strokeWidth="6"
-                strokeDasharray={`${arc.toFixed(1)} ${circ.toFixed(1)}`}
-              />
-            </mask>
-            <circle
-              className="pf-prof-ring-arc is-dashed"
-              cx="24"
-              cy="24"
-              r="19"
-              mask={`url(#${mask})`}
-            />
-          </>
-        )}
+        <circle
+          className={`pf-prof-ring-arc${defined ? "" : " is-open"}`}
+          cx="24"
+          cy="24"
+          r="19"
+          strokeDasharray={`${arc.toFixed(1)} ${circ.toFixed(1)}`}
+        />
       </svg>
       <span>{children}</span>
     </div>

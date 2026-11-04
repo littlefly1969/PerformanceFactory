@@ -171,6 +171,8 @@ function LessonRing({ value }: { value: number }) {
           cy="32"
           r="27"
           strokeDasharray={`${((circ * value) / 100).toFixed(1)} ${circ.toFixed(1)}`}
+          // A zero niente puntino: l'arco compare con la prima risposta.
+          strokeOpacity={value > 0 ? 1 : 0}
         />
       </svg>
       <span>{value}%</span>

@@ -74,6 +74,8 @@ function LessonRing({ value }: { value: number }) {
           cy="32"
           r="27"
           strokeDasharray={`${((c * value) / 100).toFixed(1)} ${c.toFixed(1)}`}
+          // A zero niente puntino: l'arco compare con la prima risposta.
+          strokeOpacity={value > 0 ? 1 : 0}
         />
       </svg>
       <span>{value}%</span>
@@ -227,19 +229,92 @@ function MicroTestCard({ data }: { data: HomeMicroTest }) {
 }
 
 /**
+ * Scheda lime prima dell'assessment (S04 della demo, «Profilo da iniziare»):
+ * l'assessment è il primo passo verso la lezione. La lezione si promette solo
+ * se il server la offre: funzione attiva e almeno un circolo.
+ */
+function IntroBanner({
+  j,
+  lesson,
+  busy,
+  onStart,
+}: {
+  j: Journey;
+  lesson: FreeLessonView | null | undefined;
+  busy: boolean;
+  onStart: () => void;
+}) {
+  const offered = !!lesson?.enabled && (lesson.clubs?.length ?? 0) > 0;
+  const answered = Math.min(j.currentQuestion, j.count);
+  const value = j.count ? Math.round((answered / j.count) * 100) : 0;
+  const started = answered > 0 || j.phase === "ASSESSMENT";
+  return (
+    <section
+      className="pf-hm-lesson is-locked"
+      aria-label={offered ? "Lezione gratuita" : "Il tuo assessment"}
+    >
+      <div className="pf-hm-lesson-head">
+        <LessonRing value={value} />
+        <div>
+          <span className="pf-hm-kicker">
+            {offered ? "Lezione gratuita" : "Il tuo assessment"}
+          </span>
+          <strong>
+            {offered
+              ? "Completa l’assessment per sbloccarla."
+              : "Scopri dove sei oggi."}
+          </strong>
+        </div>
+      </div>
+      <button
+        type="button"
+        className="pf-hm-pill is-ink"
+        disabled={busy}
+        onClick={onStart}
+      >
+        <span>
+          {busy
+            ? "Prepariamo le domande…"
+            : started
+              ? "Continua l’assessment"
+              : "Inizia l’assessment"}
+        </span>
+        <span aria-hidden="true">→</span>
+      </button>
+    </section>
+  );
+}
+
+/**
  * Home della fase gratuita, come la S04 della demo PF10: saluto, stato del
  * profilo, lezione gratuita, «Completa le sei aree» e «Per te oggi» con il
- * micro-test. Il calendario della demo arriva con gli allenamenti.
+ * micro-test. Prima dell'assessment («Profilo da iniziare») la scheda lime
+ * porta all'assessment; è anche dove si atterra dopo il benvenuto e aprendo
+ * l'app installata. Il calendario della demo arriva con gli allenamenti.
  */
-export function AccountHome({ journey: j }: { journey: Journey }) {
-  const evaluation = j.evaluation!;
+export function AccountHome({
+  journey: j,
+  busy = false,
+  error,
+  onStart,
+}: {
+  journey: Journey;
+  busy?: boolean;
+  error?: string;
+  /** Prima dell'assessment: avvia (o riprende) le domande. */
+  onStart?: () => void;
+}) {
+  const evaluation = j.evaluation;
   const lesson = useResource<FreeLessonView>("/athlete-journey/free-lesson");
-  const micro = useResource<HomeMicroTest>("/athlete-journey/micro-test");
-  const step = lesson.data === undefined ? null : nextStep(j, lesson.data);
+  const micro = useResource<HomeMicroTest>(
+    evaluation ? "/athlete-journey/micro-test" : null,
+  );
+  const step =
+    !evaluation || lesson.data === undefined ? null : nextStep(j, lesson.data);
   const consolidated = isConsolidated(j.calibration);
   const closed = isClosed(j.calibration);
   const name = j.firstName?.trim();
-  const drivers = evaluation.drivers;
+  const drivers = evaluation?.drivers ?? [];
   const rule = j.calibration?.consolidationRule;
   const min = rule?.minAreaConfidence ?? rule?.minOverallConfidence ?? null;
   // Ogni area si riempie verso la soglia della regola di consolidamento.
@@ -268,11 +343,33 @@ export function AccountHome({ journey: j }: { journey: Journey }) {
 
         <h1 className="pf-hm-hello">{name ? `Ciao ${name}.` : "Ciao."}</h1>
         <span className={`pf-hm-chip${consolidated ? " is-lime" : ""}`}>
-          {consolidated ? "R consolidata" : "Profilo provvisorio"}
+          {!evaluation
+            ? "Profilo da iniziare"
+            : consolidated
+              ? "R consolidata"
+              : "Profilo provvisorio"}
         </span>
 
+        {error && (
+          <p className="pf-acc-error" role="alert">
+            {error}
+          </p>
+        )}
+
         <div className="pf-hm-stack">
-          <Banner j={j} lesson={lesson.data} />
+          {evaluation ? (
+            <Banner j={j} lesson={lesson.data} />
+          ) : (
+            lesson.data !== undefined &&
+            onStart && (
+              <IntroBanner
+                j={j}
+                lesson={lesson.data}
+                busy={busy}
+                onStart={onStart}
+              />
+            )
+          )}
           {urgent && (
             <section className="pf-hm-step" aria-label="Prossimo passo">
               <span className="pf-hm-kicker">

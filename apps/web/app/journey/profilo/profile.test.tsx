@@ -181,7 +181,9 @@ describe("Profilo come la demo PF10", () => {
       true,
       false,
     ]);
-    expect(screen.getByText("≈ 84")).toBeInTheDocument();
+    // Margine come nella demo: si stringe con la confidenza.
+    expect(screen.getByText("84 ±12")).toBeInTheDocument();
+    expect(screen.getByText("86 ±6")).toBeInTheDocument();
   });
 
   it("shows the consolidated profile without the approximation", async () => {

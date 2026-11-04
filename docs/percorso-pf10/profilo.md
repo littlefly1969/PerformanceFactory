@@ -8,7 +8,7 @@ raggiunta dal pulsante flottante con l'omino. Nell'app è `/journey/profilo`.
 | Demo | App | Note |
 | --- | --- | --- |
 | Profilo prima dell'assessment | `/journey/profilo` | esagono vuoto con «Inizia/Continua l'assessment» |
-| Profilo in calibrazione | `/journey/profilo` | R, chip «Profilo provvisorio», pannello «i», lezione, disponibilità, classifica, sei aree, prossimo passo |
+| Profilo in calibrazione | `/journey/profilo` | R, chip «Profilo provvisorio», pannello «i», lezione, disponibilità e classifica da compilare, sei aree, «Fase gratuita · Calibrazione», analisi, disponibilità e classifica compilate, invito, community (l'ordine della demo) |
 | La tua disponibilità | `/journey/profilo/disponibilita` (nuova) | frequenza, giorni della settimana, durata della sessione |
 | La tua classifica FITP | `/journey/profilo/classifica` (nuova) | padel, livello Playtomic, tennis, tessera |
 | Invita un amico | `/journey/profilo/invita` (nuova, finta) | attiva solo la freccia indietro |
@@ -22,8 +22,15 @@ In calibrazione non c'è il calendario: al suo posto «Analisi delle sei aree» 
 - **Linea piena o tratteggiata.** Un'area è definita quando la sua confidenza
   raggiunge la soglia minima delle aree (lo stesso criterio di home e calibrazione).
   Nell'esagono un lato è pieno solo se entrambe le aree agli estremi sono definite;
-  gli anelli delle sei aree sono lime e pieni se definite, grigi e tratteggiati se no.
-  Il valore di un'area non definita è preceduto da «≈».
+  gli anelli delle sei aree hanno l'arco pieno lungo quanto la confidenza, lime se
+  definite e grigio se no, come nella demo. Le etichette dell'esagono mostrano il
+  margine della demo («70 ±8»): metà intervallo pari al 20% della scala a confidenza
+  zero, che si stringe con la confidenza (la stessa ampiezza della R globale); sotto
+  i 3 punti resta solo il valore.
+- **Fase gratuita.** La scheda nera mostra «Calibrazione in corso» (o «Calibrazione
+  completata» con R consolidata) e la pillola corta «Calibrazione»; a fase chiusa
+  porta agli scenari. Con la lezione sbloccata la scheda resta sulla calibrazione:
+  al circolo porta la scheda lime della lezione.
 - **Lezione gratuita.** Bloccata: anello con i crediti raccolti e «Continua la
   calibrazione per sbloccarla.». Sbloccata: «Scegli il circolo». Richiesta o
   assegnata: data, circolo, oppure «Richiesta inviata». Senza circoli in zona: «Non
@@ -44,8 +51,8 @@ In calibrazione non c'è il calendario: al suo posto «Analisi delle sei aree» 
 - Durate della sessione: i 5 valori che il server accetta (30, 45, 60, 90, 120+),
   non gli intervalli della demo.
 - La lezione si sblocca con la regola reale dei crediti, non con «70 di calibrazione».
-- Le etichette dell'esagono non mostrano gli intervalli «±» della demo (l'API non li
-  dà per area): «≈» indica un valore non ancora definito.
+- Il margine «±» di ogni area è calcolato nel browser dalla confidenza dell'area
+  (l'API non lo dà per area), con la stessa regola dell'intervallo di R globale.
 - Invito e community non hanno persone o codici veri: il codice d'esempio deriva dal
   nome e tutti i pulsanti sono disattivati.
 

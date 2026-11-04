@@ -2,7 +2,6 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { PF4Shell } from "../start/pf4-shell";
-import { WelcomeHome } from "./welcome-home";
 import { ConsentStep } from "./consent-step";
 import { DurationStep, PerformanceResult } from "./performance-result";
 import { useJourney } from "./use-journey";
@@ -130,12 +129,14 @@ export default function JourneyPage() {
         }}
       />
     );
+  // Dopo il benvenuto la home è la stessa della fase gratuita (S04 della
+  // demo PF10), con «Profilo da iniziare» e la scheda dell'assessment.
   if (intro)
     return (
-      <WelcomeHome
+      <AccountHome
         journey={j}
         busy={busy}
-        error={error}
+        error={error || undefined}
         onStart={() => void action("start")}
       />
     );

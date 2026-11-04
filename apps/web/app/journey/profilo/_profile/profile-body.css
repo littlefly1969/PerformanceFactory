@@ -481,10 +481,8 @@
   stroke: var(--acc-lime);
   stroke-linecap: round;
 }
-.pf-prof-ring-arc.is-dashed {
+.pf-prof-ring-arc.is-open {
   stroke: #b4b4b8;
-  stroke-dasharray: 3 3;
-  stroke-linecap: butt;
 }
 .pf-prof-ring > span {
   position: absolute;
