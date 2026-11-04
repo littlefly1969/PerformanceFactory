@@ -15,6 +15,7 @@ import { PrismaService } from '../../src/prisma/prisma.service';
 import { DiscoveryModule } from '../../src/discovery/discovery.module';
 import { CalibrationService } from '../../src/discovery/calibration/calibration.service';
 import { MicroTestSessionService } from '../../src/discovery/calibration/micro-test-session';
+import { HomeMicroTestService } from '../../src/discovery/calibration/home-micro-test';
 import { FeatureFlagsService } from '../../src/features/feature-flags.service';
 import { AiProposalProviderService } from '../../src/ai-orchestrator/proposal-provider.service';
 import { CalibrationQuestionsInput } from '../../src/ai-orchestrator/calibration-questions';
@@ -35,6 +36,7 @@ describe('Micro-test engine step with PostgreSQL', () => {
   let prisma: PrismaService;
   let calibration: CalibrationService;
   let session: MicroTestSessionService;
+  let home: HomeMicroTestService;
   let flags: FeatureFlagsService;
   let ai: AiProposalProviderService;
   let stepSpy: jest.SpiedFunction<
@@ -152,6 +154,9 @@ describe('Micro-test engine step with PostgreSQL', () => {
       });
     });
 
+  /** Il micro-test come lo vede l'atleta: vive nella home, fuori dal ciclo. */
+  const shown = async (userId: string) => (await home.view(userId)).test!.round;
+
   const openRound = (userId: string) =>
     prisma.calibrationRound.findFirstOrThrow({
       where: { userId, status: 'OPEN' },
@@ -180,6 +185,7 @@ describe('Micro-test engine step with PostgreSQL', () => {
     prisma = module.get(PrismaService);
     calibration = module.get(CalibrationService);
     session = module.get(MicroTestSessionService);
+    home = module.get(HomeMicroTestService);
     flags = module.get(FeatureFlagsService);
     ai = module.get(AiProposalProviderService);
     const step = ai.generateCalibrationQuestions.bind(ai);
@@ -222,13 +228,9 @@ describe('Micro-test engine step with PostgreSQL', () => {
     const id = await athlete();
     proposeMicroTest();
     await calibration.openRound(id);
-    // L'AI decide; riceve i conteggi e l'indicazione del back office (0).
-    expect(steps.at(-1)!.microTestBalance).toEqual({
-      questionsPerMicroTest: 0,
-      microTestsDone: 0,
-      microTestsSkipped: 0,
-      questionsAnswered: 0,
-    });
+    // Il ciclo di calibrazione non bilancia più domande e micro-test: il
+    // passo micro-test qui è forzato per provare il generatore, che resta.
+    expect(steps.at(-1)).not.toHaveProperty('microTestBalance');
 
     const round = await openRound(id);
     expect(round).toMatchObject({
@@ -259,16 +261,18 @@ describe('Micro-test engine step with PostgreSQL', () => {
     expect(JSON.stringify(input)).not.toMatch(/example\.test|Riservato/);
 
     // L'atleta vede istruzioni e sicurezza, non punteggi né provenienza.
-    const view = await calibration.view(id);
-    expect(view!.round).toMatchObject({ action: 'PROPOSE_MICRO_TEST' });
-    const shown = view!.round!.questions[0];
-    expect(shown.microTest).toEqual({
+    const view = await shown(id);
+    expect(view).toMatchObject({ action: 'PROPOSE_MICRO_TEST' });
+    // Fuori dal ciclo: la calibrazione non lo mostra come round aperto.
+    expect((await calibration.view(id))!.round).toBeNull();
+    const visible = view.questions[0];
+    expect(visible.microTest).toEqual({
       title: question.text,
       instructions: expect.any(String) as string,
       durationMinutes: 10,
       safetyNotes: expect.any(String) as string,
     });
-    expect(JSON.stringify(shown)).not.toMatch(/score|promptHash|provider/);
+    expect(JSON.stringify(visible)).not.toMatch(/score|promptHash|provider/);
 
     await calibration.answerRound(id, round.id, {
       [question.id]: question.options[2].value,
@@ -338,10 +342,6 @@ describe('Micro-test engine step with PostgreSQL', () => {
     expect(next.action).toBe('ASK_GROUP');
     const target = steps.at(-1)!.targets.find((t) => t.areaId === AREAS[0])!;
     expect(target.microTests).toEqual([`${text} (saltato)`]);
-    expect(steps.at(-1)!.microTestBalance).toMatchObject({
-      microTestsDone: 0,
-      microTestsSkipped: 1,
-    });
     // Solo un micro-test si salta; un round di un altro atleta non si trova.
     await expect(calibration.skipMicroTest(id, next.id)).rejects.toBeInstanceOf(
       BadRequestException,
@@ -371,12 +371,12 @@ describe('Micro-test engine step with PostgreSQL', () => {
     expect(questions.map((q) => q.id)).toEqual(['t1', 't2', 't3']);
 
     // Prima della risposta l'atleta non vede la corretta.
-    const view = await calibration.view(id);
-    expect(view!.round!.questions[0].microTest).toMatchObject({
+    const view = await shown(id);
+    expect(view.questions[0].microTest).toMatchObject({
       format: 'SITUATIONAL',
       situation: { index: 0, total: 3, label: 'Uscita dal fondo' },
     });
-    expect(JSON.stringify(view!.round)).not.toMatch(/correct|feedback/);
+    expect(JSON.stringify(view)).not.toMatch(/correct|feedback/);
 
     await expect(
       session.answerSituation(id, round.id, 't1', 'o1'),
@@ -391,9 +391,9 @@ describe('Micro-test engine step with PostgreSQL', () => {
     await expect(
       session.answerSituation(await athlete(), round.id, 't1', 'o1'),
     ).rejects.toBeInstanceOf(NotFoundException);
-    expect(
-      (await calibration.view(id))!.round!.questions[0].microTest,
-    ).toMatchObject({ feedback: { value: 'o1', correctValue: 'o2' } });
+    expect((await shown(id)).questions[0].microTest).toMatchObject({
+      feedback: { value: 'o1', correctValue: 'o2' },
+    });
     await expect(
       calibration.answerRound(id, round.id, { t1: 'o2', t2: 'o2', t3: 'o2' }),
     ).rejects.toBeInstanceOf(BadRequestException);
@@ -425,5 +425,80 @@ describe('Micro-test engine step with PostgreSQL', () => {
       // La situazione sbagliata porta il suo video; l'archivio non lo ha ancora.
       video: { title: 'Uscita dal fondo: come lo gioca un coach', url: null },
     });
+  });
+  it('prepares the home micro-test on the weakest driver, scores it and readies the next one', async () => {
+    const id = await athlete();
+    // Il secondo driver è il meno sviluppato: l'AI parte da lì.
+    await prisma.assessmentEvaluationArea.updateMany({
+      where: { evaluation: { userId: id }, areaId: AREAS[1] },
+      data: { score: 40 },
+    });
+    expect(await home.view(id)).toMatchObject({
+      status: 'PREPARING',
+      test: null,
+      history: [],
+      streak: { days: 1 },
+    });
+
+    const ready = await home.prepare(id);
+    expect(tests.at(-1)).toMatchObject({ chooseOne: true });
+    expect(tests.at(-1)!.targets.map((t) => t.areaId)).toEqual([
+      AREAS[1],
+      AREAS[0],
+    ]);
+    expect(ready).toMatchObject({
+      status: 'READY',
+      test: { area: { id: AREAS[1] }, format: 'PRACTICAL', points: 10 },
+    });
+    // Una seconda richiesta non ne prepara un altro.
+    const calls = testSpy.mock.calls.length;
+    await home.prepare(id);
+    expect(testSpy.mock.calls.length).toBe(calls);
+
+    // Il ciclo di calibrazione va avanti per conto suo.
+    await calibration.openRound(id);
+    expect(
+      await prisma.calibrationRound.count({
+        where: { userId: id, status: 'OPEN' },
+      }),
+    ).toBe(2);
+    expect((await calibration.view(id))!.round).toMatchObject({
+      action: 'ASK_GROUP',
+    });
+
+    const round = await prisma.calibrationRound.findUniqueOrThrow({
+      where: { id: ready.test!.roundId },
+    });
+    const [question] = round.questionsJson as {
+      id: string;
+      options: { value: string }[];
+    }[];
+    await calibration.answerRound(id, round.id, {
+      [question.id]: question.options[2].value,
+    });
+    expect(await session.result(id, round.id)).toMatchObject({
+      status: 'EVALUATED',
+      verdict: 'Buona lettura.',
+      takeaway: 'Riguarda il video e riprova la prossima volta.',
+    });
+
+    // Il prossimo va su un'altra area, e il fatto entra nello storico.
+    const next = await home.prepare(id);
+    expect(next).toMatchObject({
+      status: 'READY',
+      test: { area: { id: AREAS[0] } },
+      history: [{ roundId: round.id, points: 10 }],
+    });
+
+    // A fase gratuita chiusa il micro-test non c'è più.
+    await prisma.athleteCalibration.update({
+      where: { userId: id },
+      data: { status: 'CALIBRATION_COMPLETED' },
+    });
+    expect(await home.view(id)).toMatchObject({
+      status: 'UNAVAILABLE',
+      test: null,
+    });
+    await expect(calibration.prepareMicroTest(id)).resolves.toBe(false);
   });
 });

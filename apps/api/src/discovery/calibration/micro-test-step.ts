@@ -92,14 +92,30 @@ export function microTestBalance(
  * Se l'AI non risponde o il test non supera i controlli, lancia: il passo
  * fallisce e si riprova, senza ripiegare sul catalogo (AT-13).
  */
-export async function generateMicroTest(
+export function generateMicroTest(
   prisma: PrismaService,
   ai: AiProposalProviderService,
   userId: string,
   input: AssessmentEvaluationInput,
-  step: CalibrationQuestionsResult,
+  step: Pick<CalibrationQuestionsResult, 'targetAreas' | 'rationale'>,
 ) {
-  const areaId = step.targetAreas[0];
+  return generateTailoredMicroTest(prisma, ai, userId, input, {
+    areaIds: step.targetAreas.slice(0, 1),
+    reason: step.rationale,
+  });
+}
+
+/**
+ * Un micro-test su uno dei driver indicati: con più driver (la home) l'AI
+ * sceglie quello dove una prova ha più senso; il backend valida tutto.
+ */
+export async function generateTailoredMicroTest(
+  prisma: PrismaService,
+  ai: AiProposalProviderService,
+  userId: string,
+  input: AssessmentEvaluationInput,
+  { areaIds, reason }: { areaIds: string[]; reason: string },
+) {
   const [prompt, proposed, latest, videos, settings] = await Promise.all([
     loadActiveAssessmentPrompt(prisma, 'MICRO_TEST'),
     prisma.microTest.findMany({
@@ -111,13 +127,12 @@ export async function generateMicroTest(
     prisma.assessmentEvaluation.findFirstOrThrow({
       where: { userId },
       orderBy: { sequence: 'desc' },
-      select: { areas: { where: { areaId } } },
+      select: { areas: { where: { areaId: { in: areaIds } } } },
     }),
-    videoCatalog(prisma, areaId),
+    Promise.all(areaIds.map((areaId) => videoCatalog(prisma, areaId))),
     loadCalibrationSettings(prisma),
   ]);
-  const driver = input.drivers.find((d) => d.areaId === areaId)!;
-  const area = latest.areas[0];
+  const catalog = [...new Map(videos.flat().map((v) => [v.id, v])).values()];
   const result = await ai.generateMicroTests({
     basePrompt: prompt.basePrompt,
     promptVersionId: prompt.promptVersionId,
@@ -125,26 +140,32 @@ export async function generateMicroTest(
     athleteContext: input.athleteContext,
     fitRanking: input.fitRanking,
     declaredLimitations: input.athleteContext.filter(isDeclaredLimitation),
-    reason: step.rationale,
-    targets: [
-      {
-        areaId,
-        name: driver.name,
-        score: area.score,
-        confidence: area.confidence,
-        evidenceGaps: area.evidenceGaps as string[],
-        evidence: driver.answers
-          .slice(-MICRO_TEST_EVIDENCE)
-          .map(({ question, answer, source }) => ({
-            source: source ?? 'ASSESSMENT',
-            question,
-            answer,
-          })),
-      },
-    ],
+    reason,
+    targets: areaIds.flatMap((areaId) => {
+      const driver = input.drivers.find((d) => d.areaId === areaId);
+      const area = latest.areas.find((a) => a.areaId === areaId);
+      if (!driver || !area) return [];
+      return [
+        {
+          areaId,
+          name: driver.name,
+          score: area.score,
+          confidence: area.confidence,
+          evidenceGaps: area.evidenceGaps as string[],
+          evidence: driver.answers
+            .slice(-MICRO_TEST_EVIDENCE)
+            .map(({ question, answer, source }) => ({
+              source: source ?? 'ASSESSMENT',
+              question,
+              answer,
+            })),
+        },
+      ];
+    }),
     proposedTitles: proposed.map((p) => p.title),
-    videos,
+    videos: catalog,
     unsafeTerms: settings.unsafeMicroTestTerms,
+    ...(areaIds.length > 1 ? { chooseOne: true } : {}),
   });
   return {
     ...result.tests[0],
@@ -193,6 +214,7 @@ export async function microTestQuestions(
     title: test.title,
     format: test.format,
     video: test.video,
+    results: test.results,
   };
   if (!situational)
     return [

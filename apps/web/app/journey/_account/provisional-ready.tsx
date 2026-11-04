@@ -1,22 +1,34 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import type { Calibration, Evaluation } from "../journey-types";
-import { AccountScreen, PillLink } from "./account-shell";
+import { AccountScreen, PillButton, PillLink } from "./account-shell";
 import { MiniSpider } from "./spiders";
 
 /**
  * Esito dell'assessment nella veste della demo PF10: fondo scuro, Spider
  * provvisorio e barra della calibrazione con la soglia della regola di
  * consolidamento restituita dal server. È una prima stima, che si affina con
- * le domande di calibrazione e i micro-test.
+ * i blocchi di calibrazione; la stessa schermata chiude ogni blocco.
  */
 export function ProvisionalReady({
   evaluation,
   calibration,
   onHome,
+  kicker = "Prime domande completate",
+  title = "Il tuo profilo provvisorio è pronto.",
+  onContinue,
+  extra,
 }: {
   evaluation: Evaluation;
   calibration?: Calibration | null;
-  onHome: () => void;
+  /** Uscita senza ricaricare; senza, «Salva i progressi ed esci» porta alla home. */
+  onHome?: () => void;
+  kicker?: string;
+  title?: string;
+  /** Prossimo blocco nella stessa pagina; senza, si apre la calibrazione. */
+  onContinue?: () => void;
+  /** Passo in più sotto «Continua» (scenari, circolo). */
+  extra?: ReactNode;
 }) {
   const value = Math.round(evaluation.overallConfidence);
   const threshold =
@@ -29,26 +41,34 @@ export function ProvisionalReady({
       tone="dark"
       footer={
         <>
-          <PillLink href="/journey/calibrazione" tone="lime">
-            Continua la calibrazione
-          </PillLink>
+          {onContinue ? (
+            <PillButton tone="lime" onClick={onContinue}>
+              Continua la calibrazione
+            </PillButton>
+          ) : (
+            <PillLink href="/journey/calibrazione?ciclo=1" tone="lime">
+              Continua la calibrazione
+            </PillLink>
+          )}
+          {extra}
           <Link
             href="/journey"
             className="pf-acc-link"
             onClick={(event) => {
+              if (!onHome) return;
               event.preventDefault();
               onHome();
             }}
           >
-            Torna alla home
+            Salva i progressi ed esci
           </Link>
         </>
       }
     >
       <section className="pf-acc-ready" aria-labelledby="pf-acc-ready">
-        <span className="pf-acc-kicker">Prime domande completate</span>
+        <span className="pf-acc-kicker">{kicker}</span>
         <h1 id="pf-acc-ready" className="pf-acc-title">
-          Il tuo profilo provvisorio è pronto.
+          {title}
         </h1>
         <div className="pf-acc-ready-spider">
           <MiniSpider
@@ -89,8 +109,9 @@ export function ProvisionalReady({
           )}
         </div>
         <p>
-          È una prima stima. Si affina con le domande di calibrazione e i
-          micro-test; dove sappiamo meno, il tratto è più tenue.
+          Ogni blocco sono due domande sulle aree che conosciamo meno. Alla
+          soglia lo Spider è abbastanza preciso per costruire il programma; dove
+          sappiamo meno, il tratto è più tenue.
         </p>
       </section>
     </AccountScreen>

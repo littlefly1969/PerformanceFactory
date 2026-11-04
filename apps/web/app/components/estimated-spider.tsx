@@ -8,11 +8,14 @@ export function EstimatedSpider({
   scale,
   estimated,
   size = 260,
+  labels = true,
 }: {
   drivers: SpiderDriver[];
   scale: { min: number; max: number };
   estimated: boolean;
   size?: number;
+  /** Senza nomi delle aree il grafico occupa tutta la larghezza. */
+  labels?: boolean;
 }) {
   const center = 150;
   const radius = 92;
@@ -32,10 +35,10 @@ export function EstimatedSpider({
   const ratio = (i: number) => (drivers[i].score - scale.min) / span;
   if (drivers.length < 3) return null;
   return (
-    <figure className="pf-spider">
+    <figure className={`pf-spider${labels ? "" : " is-bare"}`}>
       <svg
-        viewBox="-60 0 420 300"
-        width={(size * 420) / 300}
+        viewBox={labels ? "-60 0 420 300" : "48 48 204 204"}
+        width={labels ? (size * 420) / 300 : size}
         height={size}
         role="img"
         aria-label={`Spider ${estimated ? "stimato" : "attuale"}: ${drivers
@@ -78,27 +81,28 @@ export function EstimatedSpider({
             />
           );
         })}
-        {drivers.map((d, i) => {
-          const p = point(i, 1.27);
-          return (
-            <text
-              key={d.id}
-              className="pf-spider-label"
-              x={p.x}
-              y={p.y}
-              textAnchor={
-                Math.abs(p.x - center) < 8
-                  ? "middle"
-                  : p.x < center
-                    ? "end"
-                    : "start"
-              }
-              dominantBaseline="middle"
-            >
-              {d.name}
-            </text>
-          );
-        })}
+        {labels &&
+          drivers.map((d, i) => {
+            const p = point(i, 1.27);
+            return (
+              <text
+                key={d.id}
+                className="pf-spider-label"
+                x={p.x}
+                y={p.y}
+                textAnchor={
+                  Math.abs(p.x - center) < 8
+                    ? "middle"
+                    : p.x < center
+                      ? "end"
+                      : "start"
+                }
+                dominantBaseline="middle"
+              >
+                {d.name}
+              </text>
+            );
+          })}
       </svg>
     </figure>
   );

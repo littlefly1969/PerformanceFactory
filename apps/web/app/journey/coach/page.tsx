@@ -1,16 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
 import {
-  type FreeLessonView,
+  type HomeMicroTest,
   postJson,
   useResource,
 } from "../_account/account-data";
 import { AccountScreen, PillLink } from "../_account/account-shell";
-import {
-  microTestOpen,
-  useAccountJourney,
-} from "../_account/calibration-state";
-import { nextStep, summaryHref } from "../_account/next-step";
+import { useAccountJourney } from "../_account/calibration-state";
 import { MicroTestTab } from "./micro-test";
 
 type Tab = "ai" | "pro" | "micro";
@@ -21,13 +17,16 @@ const TABS: { tab: Tab; label: string }[] = [
   { tab: "micro", label: "Micro-test" },
 ];
 
+const MICRO_TEST = "/athlete-journey/micro-test";
+
 /**
  * Coach: l'AI Coach e il Coach Pro arrivano con il piano; nella fase
- * gratuita qui vivono i micro-test proposti dall'AI.
+ * gratuita qui vive il micro-test della home, a tutto schermo scuro come
+ * nella demo PF10.
  */
 export default function CoachPage() {
   const { journey: j, error, refresh } = useAccountJourney();
-  const lesson = useResource<FreeLessonView>("/athlete-journey/free-lesson");
+  const micro = useResource<HomeMicroTest>(MICRO_TEST);
   const [tab, setTab] = useState<Tab>("micro");
   const [resultRound, setResultRound] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
@@ -40,15 +39,19 @@ export default function CoachPage() {
     if (round) setResultRound(round);
     if (requested === "ai" || requested === "pro") setTab(requested);
   }, []);
-  const calibration = j?.calibration ?? null;
-  const dot = microTestOpen(calibration);
+  const dot = micro.data?.status === "READY";
+  const dark = tab === "micro";
   return (
-    <AccountScreen nav="coach" coachDot={dot}>
-      <header className="pf-acc-coach-head">
+    <AccountScreen nav="coach" coachDot={dot} tone={dark ? "dark" : "light"}>
+      <header className={`pf-acc-coach-head${dark ? " is-dark" : ""}`}>
         <span className="pf-acc-kicker">Coach</span>
-        <h1>Non ti fermi mai da solo.</h1>
+        {!dark && <h1>Non ti fermi mai da solo.</h1>}
       </header>
-      <div className="pf-acc-tabs" role="tablist" aria-label="Coach">
+      <div
+        className={`pf-acc-tabs${dark ? " is-dark" : ""}`}
+        role="tablist"
+        aria-label="Coach"
+      >
         {TABS.map((t) => (
           <button
             key={t.tab}
@@ -94,11 +97,14 @@ export default function CoachPage() {
         )}
         {tab === "micro" && j && (
           <MicroTestTab
-            calibration={calibration}
-            evaluation={j.evaluation ?? null}
+            home={micro.data}
+            hasEvaluation={!!j.evaluation}
             resultRound={resultRound}
             saved={saved}
-            next={lesson.data === undefined ? null : nextStep(j, lesson.data)}
+            onPrepare={async () => {
+              micro.setData(await postJson<HomeMicroTest>(MICRO_TEST));
+            }}
+            onRefresh={micro.reload}
             onAnswered={async (roundId, answers) => {
               setFailure("");
               try {
@@ -121,10 +127,11 @@ export default function CoachPage() {
               );
               setSaved(roundId);
               setResultRound(roundId);
-              // Valutazione e lezione cambiano con l'esito: si rileggono.
+              // Valutazione e micro-test cambiano con l'esito: il prossimo
+              // si prepara mentre l'atleta legge il risultato.
               await Promise.all([
                 refresh().catch(() => undefined),
-                lesson.reload(),
+                micro.reload(),
               ]);
             }}
             onSkip={async (roundId) => {
@@ -133,7 +140,7 @@ export default function CoachPage() {
                 await postJson("/athlete-journey/calibration/skip", {
                   roundId,
                 });
-                window.location.assign(summaryHref("micro-test-rimandato"));
+                await micro.reload();
               } catch (e) {
                 setFailure(e instanceof Error ? e.message : "Riprova.");
               }

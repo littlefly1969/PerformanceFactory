@@ -1,4 +1,4 @@
-import type { ReactNode, Ref } from "react";
+import type { CSSProperties, ReactNode, Ref } from "react";
 import type { DiscoveryOption, DiscoveryQuestion } from "./discovery-types";
 import { DiscoveryQuestionRenderer } from "./question-renderer";
 import { NumberGauge } from "./number-gauge";
@@ -7,6 +7,15 @@ import { PadelCourt } from "./padel-court";
 /** Le domande con una data sono pagine chiare, senza campo (demo PF10). */
 export const isPlainQuestion = (question: DiscoveryQuestion) =>
   question.type === "date";
+
+/** Titoli che restano su una riga: il carattere si adatta alla larghezza. */
+const ONE_LINE_TITLES = new Set(["pf4_limitations"]);
+
+/** Proprietà per un titolo su una sola riga lungo `text`. */
+export const oneLine = (text: string) => ({
+  className: "pf4-one-line",
+  style: { "--pf4-chars": text.length } as CSSProperties,
+});
 
 /**
  * Domanda del funnel: campo da padel animato (o quadrante numerico) sullo
@@ -37,7 +46,11 @@ export function FunnelQuestion({
   ].filter(Boolean);
   const content = (
     <>
-      <h1 ref={headingRef} tabIndex={-1}>
+      <h1
+        ref={headingRef}
+        tabIndex={-1}
+        {...(ONE_LINE_TITLES.has(question.code) ? oneLine(question.title) : {})}
+      >
         {question.title}
       </h1>
       {hints.length > 0 && <p>{hints.join("\n")}</p>}

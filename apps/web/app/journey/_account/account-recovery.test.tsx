@@ -4,7 +4,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import ProfilePage from "../profilo/page";
 import CoachPage from "../coach/page";
 import CalibrationPage from "../calibrazione/page";
-import { calibration, journey, lesson, ROUND, serve } from "./account-fixtures";
+import {
+  calibration,
+  homeMicro,
+  journey,
+  lesson,
+  ROUND,
+  serve,
+} from "./account-fixtures";
 vi.mock("../../lib/api", () => ({
   API_BASE: "/api",
   secureFetch: (input: RequestInfo, init?: RequestInit) => fetch(input, init),
@@ -160,7 +167,8 @@ describe("Round rimasto in valutazione", () => {
       answers: { t1: "o1", t2: "o2" },
     };
     const calls = serve({
-      "/auth/journey": journey({ calibration: calibration(stalled) }),
+      "/auth/journey": journey({ calibration: calibration(null) }),
+      "/athlete-journey/micro-test": homeMicro(stalled, "EVALUATING"),
       "/calibration/answers": journey({ calibration: calibration(null) }),
     });
     render(<CoachPage />);

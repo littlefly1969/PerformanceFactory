@@ -24,7 +24,7 @@ Il profilo della fase gratuita (pulsante con l'omino) è descritto in
 | S08-S09 | Assessment | `/journey` | dopo l'ultima risposta la valutazione parte da sola (D5) |
 | S10 | Sto calcolando la tua performance | `/journey` fase `PROCESSING` | veste scura con esagono animato |
 | S11 | Profilo provvisorio pronto | `/journey` fase `EVALUATION` | veste scura, misuratore con la soglia reale |
-| S12 | Home in calibrazione | `/journey` | aggiunto «Completa le sei aree» |
+| S12 | Home in calibrazione | `/journey` | come la demo senza calendario: lezione gratuita, «Completa le sei aree», «Per te oggi» con il micro-test |
 | S13 | Stato di calibrazione | `/journey/calibrazione` | invariato, criterio delle aree condiviso con la home |
 | S14 | Lezione gratuita | `/journey/circolo` | «Dove giochi?», «Quando?», poi il riepilogo (D3) |
 | S15 | Dove sei adesso e dove puoi arrivare | `/journey/stima` (nuova) | nuova, legge gli scenari già calcolati dal server |
@@ -48,6 +48,64 @@ Il profilo della fase gratuita (pulsante con l'omino) è descritto in
   complete); se fallisce, «Riprova l'analisi».
 - **D6** Testi e dati reali dell'app al posto dei pulsanti degli store, delle regole
   e dei valori d'esempio della demo.
+
+## Rifiniture del funnel (note di Stefano del 3 novembre 2026, sera)
+
+- **Età** (prima domanda): in fondo «Continuando accetti i Termini di servizio e la
+  Politica sulla privacy.» e «Hai già un account? Accedi», anche per chi arriva da
+  una campagna senza l'intro.
+- **Esperienza e frequenza**: contatore − / + con solo il numero nel pulsante e la
+  fascia in grigio sopra. Esperienza parte da 3 («1-3 anni»), scende fino a «<1»
+  («Meno di un anno») e sale fino a «10+»; 4-5 «4-5 anni», da 6 «Più di 5 anni».
+  Frequenza da 1 a 7, parte da 3 («3-4 volte»); 1-2 «1-2 volte», da 5 «5 o più
+  volte». Si salva sempre la fascia configurata (valori invariati, li legge
+  `training-constraints`); il numero resta solo nella scheda del browser.
+- **Titoli su una riga**: «Hai dolori o limitazioni fisiche?» e «Questi sono i tuoi
+  vincoli.»; il corpo del carattere si adatta alla larghezza.
+- **Evento**: niente testo grigio sotto la domanda (migrazione
+  `20261103190000_funnel_evento_senza_sottotitolo`, solo `helpText`).
+- **Riepilogo**: obiettivo, poi esperienza | frequenza, limitazioni | evento (con la
+  data, se c'è), indice di massa corporea, banner del gratis e «Crea il tuo
+  account»; tolto il testo grigio sotto il banner. Età, motivazione e sport non
+  sono più nel riepilogo (restano salvati).
+- **Crea il tuo account**: «Continua con Apple» in grigio e non attivo sopra
+  Google (D1 resta: niente accesso Apple nel backend); «Accetta tutte le
+  obbligatorie» centrata sotto le password, con «Le 4 voci qui sotto, le novità
+  restano a parte.»; «Accetto i termini del servizio» obbligatoria sotto i 18 anni,
+  senza «Leggi». Il documento Termini non esiste ancora (D2): la spunta blocca il
+  pulsante ma non si registra nel backend.
+- **Omino** di altezza e peso: sagoma stilizzata nera con spalle, vita, arti
+  affusolati; cresce e si allarga come prima.
+- **Mettici la faccia** e **Questo sei tu**: spazi verticali e foto che si
+  riducono sui telefoni bassi, niente scorrimento inutile; lo Spider non ha più i
+  nomi delle aree (restano per i lettori di schermo) e prende lo spazio libero.
+
+## Obiettivi a risposta multipla (decisione di Stefano del 3 novembre 2026)
+
+«Qual è il tuo obiettivo principale?» diventa «Quali sono i tuoi obiettivi?» e si
+possono sceglierne più d'uno (migrazione `20261104120000_funnel_obiettivi_multipli`).
+
+- Resta la stessa domanda obiettivo (`target: goalId`) con le stesse opzioni e
+  gli stessi id; solo la domanda obiettivo può essere a scelta multipla, sport e
+  specializzazione no.
+- La bozza salva `goalId` come lista. Alla registrazione gli obiettivi scelti, nell'ordine
+  configurato, diventano un'unica frase in `UserPerformanceGoal.goalText`
+  («Migliorare la tecnica e aumentare la resistenza»): da lì il resto del percorso
+  (valutazione, prompt, programma) è invariato.
+- Le bozze aperte prima della migrazione restano valide con la versione
+  congelata (obiettivo singolo).
+- Nel riepilogo la voce diventa «Obiettivi» quando sono più d'uno.
+
+**Tornare indietro.** La versione precedente non accetta la domanda obiettivo a
+scelta multipla (`/start` risponderebbe «Configurazione discovery non valida»).
+Prima di tornare alla versione precedente, rimetti la domanda com'era e cancella
+le bozze anonime (utenti e profili registrati restano):
+
+```bash
+DC="docker compose --env-file .env.production -f infra/docker-compose.prod.example.yml"
+$DC exec -T postgres psql -U performancefactory -d performancefactory -c "UPDATE \"OnboardingQuestionTemplate\" SET label = 'Qual è il tuo obiettivo principale?', \"helpText\" = 'Il programma si costruisce intorno a questo.', \"optionsJson\" = jsonb_set(\"optionsJson\", '{type}', '\"single_choice\"'), \"updatedAt\" = CURRENT_TIMESTAMP WHERE key = 'pf4_goal' AND scope = 'DISCOVERY'; DELETE FROM \"QuizDraft\";"
+infra/scripts/update-prod.sh --env-file .env.production sha-<versione precedente>
+```
 
 ## Pagamento completato
 

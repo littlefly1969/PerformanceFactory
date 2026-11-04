@@ -10,6 +10,7 @@ import {
   calibration,
   drivers,
   journey,
+  homeMicro,
   lesson,
   ROUND,
   serve,
@@ -84,6 +85,8 @@ describe("Micro-test nel Coach", () => {
       answered ? journey({ calibration: calibration(null) }) : journey();
     const calls = serve({
       "/auth/journey": current,
+      "/athlete-journey/micro-test": () =>
+        answered ? homeMicro(null, "PREPARING") : homeMicro(),
       "/calibration/situation": {
         value: "o1",
         correct: false,
@@ -102,7 +105,10 @@ describe("Micro-test nel Coach", () => {
         confidence: { before: 22, after: 40 },
         correct: 1,
         total: 2,
-        summary: "Ci sei quasi.",
+        summary: "Commento dell'area.",
+        points: 10,
+        verdict: "Ci sei quasi.",
+        takeaway: "Aspetta il vetro prima di colpire.",
         video: { title: "L'uscita dal vetro spiegata dal coach", url: null },
       },
     });
@@ -135,8 +141,27 @@ describe("Micro-test nel Coach", () => {
       (await screen.findAllByText("L'uscita dal vetro spiegata dal coach"))
         .length,
     ).toBeGreaterThan(0);
-    expect(screen.getByText("Video in arrivo")).toBeInTheDocument();
+    expect(
+      screen.getByText("Approfondisci · video in arrivo"),
+    ).toBeInTheDocument();
     expect(screen.getByText("22% → 40%")).toBeInTheDocument();
+    // Punti dal back office, frase e consiglio scritti dall'AI.
+    expect(screen.getByText("+10 pt")).toBeInTheDocument();
+    expect(screen.getByText("Ci sei quasi.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Aspetta il vetro prima di colpire."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Torna alla Home" }),
+    ).toHaveAttribute("href", "/journey");
+    // Il prossimo micro-test si prepara mentre si legge il risultato.
+    // (lettura iniziale, rilettura dopo le risposte, richiesta di preparazione).
+    await waitFor(() =>
+      expect(
+        calls.filter((c) => c.url.endsWith("/athlete-journey/micro-test"))
+          .length,
+      ).toBeGreaterThanOrEqual(3),
+    );
   });
 });
 

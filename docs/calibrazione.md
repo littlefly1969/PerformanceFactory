@@ -227,6 +227,52 @@ e ore fra round da `CalibrationConfig`, riapertura delle chiusure a tempo deboli
 `20261013090000_calibration_next_step` (decisione del passo sul round, via driver e
 domande per round).
 
+## Micro-test della home
+
+Nella fase gratuita il micro-test vive nella Home («Per te oggi») e nella scheda
+Micro-test del Coach, fuori dal ciclo di calibrazione: c'è sempre un micro-test
+pronto e il prossimo lo prepara l'AI alla fine di quello svolto.
+
+- **Scelta**: il server passa al generatore (`micro-test-generation.ts`, prompt
+  `MICRO_TEST`) le tre aree meno sviluppate dell'ultima valutazione (score più
+  basso, poi confidenza), senza quella dell'ultimo micro-test se ce ne sono
+  altre; con `chooseOne` l'AI scrive un solo test sull'area dove una prova ha
+  più senso. Il formato lo sceglie l'AI: situazioni di gioco con risposta
+  corretta e spiegazione, oppure prova pratica (fisica, tecnica) con esito
+  riportato dall'atleta. Valgono le stesse regole di sicurezza del passo del
+  motore.
+- **Esiti**: per ogni livello del risultato (risposte corrette da 0 a tutte,
+  oppure ogni esito della prova pratica) il generatore scrive `results`:
+  `verdict` (frase breve, max 40 caratteri) e `takeaway` (consiglio, max 220).
+  Il risultato mostra punti, frase, consiglio, confidenza dell'area prima e dopo
+  e il video scelto dall'AI fra quelli dell'archivio; se l'archivio non ha il
+  video giusto, la scheda ne mostra il titolo («video in arrivo»).
+- **Valutazione**: l'esito passa da `calibration/answers` come gli altri round
+  (`action = PROPOSE_MICRO_TEST`) e produce una nuova valutazione: aggiorna il
+  profilo provvisorio. Il round aperto del ciclo e i controlli «round già
+  aperto» ignorano il micro-test della home.
+- **Punti**: `FreeLessonConfig.creditsMicroTest` (back office, default 10), nel
+  registro dei crediti con chiave `round:<id>`.
+- **Giorni di fila**: giorni consecutivi (ora di Roma) con l'assessment
+  iniziale o un round valutato, micro-test o domande; la settimana va da lunedì
+  a domenica.
+- **Quando c'è**: solo a calibrazione aperta. A fase gratuita chiusa il server
+  risponde `UNAVAILABLE`, non ne prepara altri e la scheda sparisce, finché non
+  arriva il coach AI.
+- **Preparazione**: l'AI lavora senza il lease dell'atleta, che si prende solo
+  per salvare (attesa massima 30 secondi), così le domande di calibrazione non
+  aspettano; una sola preparazione per atleta alla volta. La pagina la chiede
+  quando lo stato è `PREPARING`.
+
+| Metodo e percorso | Effetto |
+|---|---|
+| `GET /athlete-journey/micro-test` | `status` (`READY`, `PREPARING`, `EVALUATING`, `UNAVAILABLE`), test pronto con il round da svolgere, giorni di fila e ultimi cinque fatti con i punti |
+| `POST /athlete-journey/micro-test` | prepara il micro-test se manca (l'AI lavora), poi la stessa vista |
+
+Nessuna migrazione: si usano `CalibrationRound`, `MicroTest` e il registro dei
+crediti esistenti. Il prompt salvato nell'AI Tuner non va modificato: le regole
+su `results` e `chooseOne` sono nelle regole di formato fisse.
+
 ## Navigazione e riepilogo
 
 `/journey/profilo` è il riepilogo della fase gratuita: ogni attività conclusa
@@ -293,7 +339,8 @@ round. Test (casi di accettazione della specifica: AT-10, AT-11, AT-12, AT-13, A
 AT-25, AT-27): `calibration-rules.spec.ts`, `confidence-policy.spec.ts`, `calibration-questions.spec.ts`,
 `micro-test-generation.spec.ts`, `test/db/discovery.integration-spec.ts`,
 `test/db/micro-test-step.integration-spec.ts`, `app/journey/calibration-panel.test.tsx`,
-`app/journey/_account/navigation.test.tsx`,
+`app/journey/_account/navigation.test.tsx`, `home-micro-test.spec.ts`,
+`app/journey/_account/home-micro-test.test.tsx`,
 `app/admin/calibration/page.test.tsx`, `app/ai-tuner/prompts/calibrazione/page.test.tsx`.
 
 ## Aperto

@@ -37,6 +37,11 @@ const input: MicroTestInput = {
   ],
   proposedTitles: ['Bandeja su 10'],
 };
+const outcomes = [
+  { verdict: 'Da rivedere.', takeaway: 'Tieni la pala alta prima del colpo.' },
+  { verdict: 'Ci sei quasi.', takeaway: 'Accorcia il movimento.' },
+  { verdict: 'Buona mano.', takeaway: 'Ora prova a cambiare direzione.' },
+];
 const test = (extra: object = {}) => ({
   areaId: 'tecnica',
   title: 'Volée a muro',
@@ -51,6 +56,7 @@ const test = (extra: object = {}) => ({
     { label: '4-7 su 10', score: 50 },
     { label: '8-10 su 10', score: 80 },
   ],
+  results: outcomes,
   ...extra,
 });
 
@@ -91,8 +97,60 @@ describe('micro-test generation', () => {
         format: 'PRACTICAL',
         situations: [],
         video: null,
+        results: outcomes,
       },
     ]);
+  });
+
+  it('needs one verdict and takeaway per result level', () => {
+    const problems: string[] = [];
+    expect(
+      validateMicroTests(
+        { tests: [test({ results: outcomes.slice(0, 2) })] },
+        input,
+        problems,
+      ),
+    ).toBeNull();
+    expect(problems).toEqual(['esiti da mostrare: ne servono 3 (1)']);
+    expect(
+      validateMicroTests(
+        {
+          tests: [
+            test({
+              results: [
+                ...outcomes.slice(0, 2),
+                { verdict: '', takeaway: 'x' },
+              ],
+            }),
+          ],
+        },
+        input,
+      ),
+    ).toBeNull();
+  });
+
+  it('writes a single test on one of the weakest drivers for the home', () => {
+    const home: MicroTestInput = {
+      ...input,
+      chooseOne: true,
+      targets: [
+        input.targets[0],
+        { ...input.targets[0], areaId: 'mental', name: 'Mental' },
+      ],
+    };
+    expect(buildMicroTestPrompt(home).system).toContain(
+      'esattamente un micro-test, sul driver dove una prova ha più senso fra i 2 ricevuti',
+    );
+    expect(
+      validateMicroTests({ tests: [test({ areaId: 'mental' })] }, home),
+    ).toHaveLength(1);
+    expect(
+      validateMicroTests(
+        { tests: [test(), test({ areaId: 'mental', title: 'Altro' })] },
+        home,
+      ),
+    ).toBeNull();
+    expect(stubMicroTests(home).tests).toHaveLength(1);
   });
 
   it.each([

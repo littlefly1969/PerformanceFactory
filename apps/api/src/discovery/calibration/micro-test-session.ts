@@ -17,6 +17,10 @@ import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import { CalibrationQuestion } from '../../ai-orchestrator/calibration-questions';
 import { resolveVideo } from '../../coaching-videos/coaching-videos';
+import {
+  loadFreeLessonSettings,
+  syncCredits,
+} from '../../free-lessons/free-lesson-config';
 import { AuthenticatedGuard } from '../../common/guards/authenticated.guard';
 import { performanceDriverName as driverName } from '../../performance/performance-display';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -117,6 +121,23 @@ export class MicroTestSessionService {
       (q) => q.microTest?.situation && answers[q.id] !== correctValue(q),
     );
     const situations = questions.filter((q) => q.microTest?.situation).length;
+    // Livello del risultato: corrette nelle situazioni, esito nella prova pratica.
+    const level = situations
+      ? situations - missed.length
+      : questions[0].options.findIndex(
+          (o) => o.value === answers[questions[0].id],
+        );
+    const outcome = test.results?.[level];
+    // I punti sono i crediti del micro-test del back office, registrati una volta.
+    await syncCredits(
+      this.prisma,
+      userId,
+      await loadFreeLessonSettings(this.prisma),
+    );
+    const credit = await this.prisma.interactionCreditEntry.findUnique({
+      where: { userId_sourceKey: { userId, sourceKey: `round:${round.id}` } },
+      select: { points: true },
+    });
     // Il video della prima situazione sbagliata, altrimenti quello del test.
     const choice =
       missed.find((q) => q.microTest?.situation?.video)?.microTest?.situation
@@ -131,6 +152,10 @@ export class MicroTestSessionService {
         ? { correct: situations - missed.length, total: situations }
         : {}),
       summary: after.areas[0]?.rationale ?? '',
+      points: credit?.points ?? 0,
+      ...(outcome
+        ? { verdict: outcome.verdict, takeaway: outcome.takeaway }
+        : {}),
       video: await resolveVideo(this.prisma, choice ?? undefined),
     };
   }

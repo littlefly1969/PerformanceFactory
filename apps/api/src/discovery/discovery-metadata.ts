@@ -25,7 +25,12 @@ export function assertDiscoveryMetadata(value: unknown, required: boolean) {
     (!['sportId', 'specializationId', 'goalId'].includes(
       typeof m.target === 'string' ? m.target : '',
     ) ||
-      m.type !== 'single_choice' ||
+      // Gli obiettivi possono essere più d'uno (demo PF10, 3 novembre 2026):
+      // il programma parte dalla loro unione. Sport e specializzazione no.
+      !(
+        m.type === 'single_choice' ||
+        (m.type === 'multi_choice' && m.target === 'goalId')
+      ) ||
       !required)
   )
     return fail();

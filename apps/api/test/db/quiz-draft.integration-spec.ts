@@ -127,8 +127,10 @@ describe('Quiz draft on PostgreSQL', () => {
     draft = {
       version: config.version,
       currentStep: 'registration',
-      goalId: config.questions.find((q) => q.target === 'goalId')!.options[0]
-        .id,
+      // Obiettivi a risposta multipla dalla migrazione del 3 novembre 2026.
+      goalId: [
+        config.questions.find((q) => q.target === 'goalId')!.options[0].id,
+      ],
       answers: {},
     };
     for (const q of config.questions.filter((q) => !q.target))

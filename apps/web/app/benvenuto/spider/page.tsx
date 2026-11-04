@@ -76,6 +76,7 @@ export default function WelcomeSpiderPage() {
             drivers={estimate.drivers}
             scale={estimate.scale}
             estimated={estimated}
+            labels={false}
           />
         )}
         {!estimate && !error && (

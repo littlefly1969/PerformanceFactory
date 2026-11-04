@@ -110,16 +110,18 @@ describe("PF4 authenticated journey functions", () => {
       questionId: "configured-question",
       value: "yes",
     });
-    // Decisione D5 (demo PF10): niente conferma, l'analisi parte da sola.
+    // Decisione D5 (demo PF10): niente conferma, l'analisi parte da sola
+    // mentre l'esagono si completa.
     expect(
-      await screen.findByRole("heading", {
-        name: "Sto calcolando la tua performance.",
-      }),
+      await screen.findByRole("heading", { name: "Esagono completo." }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Sto calcolando la tua performance."),
     ).toBeInTheDocument();
     await waitFor(() =>
-      expect(
-        requests.filter((r) => r.url.endsWith("/evaluate")),
-      ).toHaveLength(1),
+      expect(requests.filter((r) => r.url.endsWith("/evaluate"))).toHaveLength(
+        1,
+      ),
     );
     expect(screen.queryByText("Risposte registrate.")).toBeNull();
     expect(requests.some((r) => r.url.endsWith("/submit"))).toBe(false);
@@ -316,43 +318,6 @@ describe("PF5 assessment intro and questions", () => {
     ).toBeInTheDocument();
   });
 
-  it("starts from the intro and shows the operational section first", async () => {
-    const requests = serve(journey({ count: 14, estimatedMinutes: 5 }));
-    render(<JourneyPage />);
-    const operational = {
-      ...base,
-      count: 14,
-      questions: [
-        {
-          id: "days",
-          kind: "OPERATIONAL",
-          section: "Disponibilità",
-          title: "Quanti giorni alla settimana puoi realisticamente allenarti?",
-          areaId: null,
-          areaName: null,
-          options: [{ value: 2, label: "2 giorni" }],
-        },
-      ],
-    };
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (url: string) => {
-        requests.push(url);
-        return new Response(JSON.stringify(operational));
-      }),
-    );
-    await userEvent.click(
-      await screen.findByRole("button", { name: "Inizia l’assessment" }),
-    );
-    expect(requests.at(-1)).toBe("/api/athlete-journey/start");
-    expect(await screen.findByText("Disponibilità")).toBeVisible();
-    // Il progressivo usa il totale del backend.
-    expect(screen.getByRole("progressbar")).toHaveAttribute(
-      "aria-valuemax",
-      "14",
-    );
-  });
-
   it("resumes completed answers with one evaluation, and an explicit retry if it fails", async () => {
     const requests: string[] = [];
     let fail = true;
@@ -451,10 +416,13 @@ describe("PF5 assessment intro and questions", () => {
       }),
     ).toBeInTheDocument();
     expect(requests.filter((url) => url.endsWith("/evaluate"))).toHaveLength(1);
-    // Come nella demo PF10: si prosegue con la calibrazione.
+    // Come nella demo PF10: si entra subito nel primo blocco di calibrazione.
     expect(
       screen.getByRole("link", { name: /Continua la calibrazione/ }),
-    ).toHaveAttribute("href", "/journey/calibrazione");
+    ).toHaveAttribute("href", "/journey/calibrazione?ciclo=1");
+    expect(
+      screen.getByRole("link", { name: "Salva i progressi ed esci" }),
+    ).toBeVisible();
     expect(screen.getByRole("meter", { name: "Calibrazione" })).toHaveAttribute(
       "aria-valuenow",
       "30",

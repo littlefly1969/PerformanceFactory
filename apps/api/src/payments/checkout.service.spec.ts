@@ -64,6 +64,9 @@ describe('checkout creation concurrent with a horizon change', () => {
         athleteDiscovery: {
           findUnique: () => Promise.resolve({ programHorizon: 'PROGRAM_3M' }),
         },
+        // Disponibilità: nessuna domanda operativa attiva da compilare.
+        onboardingQuestionTemplate: { findMany: () => Promise.resolve([]) },
+        userOnboardingAssessment: { findUnique: () => Promise.resolve(null) },
       };
       const database = {
         ...tx,

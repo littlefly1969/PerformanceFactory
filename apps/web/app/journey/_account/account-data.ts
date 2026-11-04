@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
 import { API_BASE, secureFetch } from "../../lib/api";
+import type { Calibration } from "../journey-types";
 
 /** Intestazione del profilo e sintesi globale di R, calcolata dal backend. */
 export type AthleteProfile = {
@@ -75,6 +76,38 @@ export type MicroTestResult = {
   total?: number;
   summary?: string;
   video?: ChosenVideo | null;
+  /** Crediti del micro-test dal back office, mostrati come punti. */
+  points?: number;
+  /** Frase e consiglio scritti dall'AI per il livello raggiunto. */
+  verdict?: string;
+  takeaway?: string;
+};
+
+/**
+ * Micro-test della home, fuori dal ciclo di calibrazione: ce n'è sempre uno
+ * pronto (o in preparazione) finché la fase gratuita è aperta.
+ */
+export type HomeMicroTest = {
+  status: "READY" | "PREPARING" | "EVALUATING" | "FAILED" | "UNAVAILABLE";
+  test: {
+    roundId: string;
+    title: string;
+    area: { id: string; name: string };
+    durationMinutes: number | null;
+    format: "PRACTICAL" | "SITUATIONAL";
+    /** Punti che vale, dalla configurazione del back office. */
+    points: number;
+    round: NonNullable<Calibration["round"]>;
+  } | null;
+  /** Giorni di fila con almeno un micro-test e la settimana da lunedì. */
+  streak: { days: number; week: boolean[] };
+  /** Micro-test già fatti, dal più recente. */
+  history: {
+    roundId: string;
+    completedAt: string;
+    title: string;
+    points: number;
+  }[];
 };
 
 export type SituationFeedback = {
@@ -86,13 +119,35 @@ export type SituationFeedback = {
 
 /** Messaggio leggibile di una risposta di errore dell'API. */
 export async function readError(response: Response) {
+  return (await apiError(response)).message;
+}
+
+/** Errore dell'API con il suo codice, per i casi che la pagina recupera. */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+}
+
+export async function apiError(response: Response) {
   const data = (await response.json().catch(() => ({}))) as {
     message?: string | string[];
+    code?: string;
   };
-  return Array.isArray(data.message)
-    ? data.message.join(". ")
-    : (data.message ?? "Operazione non riuscita. Riprova.");
+  return new ApiError(
+    Array.isArray(data.message)
+      ? data.message.join(". ")
+      : (data.message ?? "Operazione non riuscita. Riprova."),
+    data.code,
+  );
 }
+
+/** Giorni e durata mancano: il checkout o il programma chiedono il passo. */
+export const needsAvailability = (e: unknown) =>
+  e instanceof ApiError && e.code === "AVAILABILITY_REQUIRED";
 
 /** POST JSON all'API: restituisce il corpo o lancia con il messaggio. */
 export async function postJson<T>(path: string, body: unknown = {}) {

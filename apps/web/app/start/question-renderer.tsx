@@ -1,4 +1,11 @@
+import { useEffect, useState } from "react";
 import type { DiscoveryOption, DiscoveryQuestion } from "./discovery-types";
+import {
+  bandIndex,
+  counterFor,
+  numberForBand,
+  type ChoiceCounter,
+} from "./choice-counter";
 
 export function DiscoveryQuestionRenderer({
   question,
@@ -98,6 +105,17 @@ export function DiscoveryQuestionRenderer({
       </div>
     );
   }
+  const counter = counterFor(question, options);
+  if (counter)
+    return (
+      <CounterStepper
+        question={question}
+        counter={counter}
+        options={options}
+        value={value}
+        onChange={onChange}
+      />
+    );
   if (
     question.type === "single_choice" &&
     question.ui?.presentation === "stepper"
@@ -236,6 +254,93 @@ function ChoiceStepper({
           aria-label="Avanti di una risposta"
           disabled={index >= options.length - 1}
           onClick={() => pick(index + 1)}
+        >
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const counterKey = (question: DiscoveryQuestion) =>
+  `pf4.counter.${question.id}`;
+
+/** Il numero scelto l'ultima volta, se cade ancora nella fascia salvata. */
+function initialNumber(
+  question: DiscoveryQuestion,
+  counter: ChoiceCounter,
+  index: number,
+) {
+  if (index < 0) return counter.start;
+  try {
+    const raw = sessionStorage.getItem(counterKey(question));
+    const saved = raw === null ? NaN : Number(raw);
+    if (Number.isInteger(saved) && bandIndex(counter, saved) === index)
+      return saved;
+  } catch {
+    /* Senza storage si riparte dal primo numero della fascia. */
+  }
+  return numberForBand(counter, index);
+}
+
+/**
+ * Contatore della demo PF10: nel pulsante solo il numero, sopra in grigio la
+ * fascia. Parte dal valore iniziale già scelto, così «Continua» è attivo.
+ */
+function CounterStepper({
+  question,
+  counter,
+  value,
+  options,
+  onChange,
+}: {
+  question: DiscoveryQuestion;
+  counter: ChoiceCounter;
+  value: unknown;
+  options: DiscoveryOption[];
+  onChange: (value: unknown) => void;
+}) {
+  const selected = options.findIndex((option) => option.id === value);
+  const [n, setN] = useState(() => initialNumber(question, counter, selected));
+  const band = bandIndex(counter, n);
+  useEffect(() => {
+    // Il valore iniziale è una risposta: si salva la fascia in cui cade.
+    if (selected !== band) onChange(options[band].id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const pick = (next: number) => {
+    const clamped = Math.min(counter.max, Math.max(counter.min, next));
+    setN(clamped);
+    try {
+      sessionStorage.setItem(counterKey(question), String(clamped));
+    } catch {
+      /* Il numero è solo di cortesia: la risposta è la fascia. */
+    }
+    const index = bandIndex(counter, clamped);
+    if (options[index].id !== value) onChange(options[index].id);
+  };
+  return (
+    <div
+      className="pf4-choice-stepper pf4-counter"
+      role="group"
+      aria-label={question.title}
+    >
+      <output aria-live="polite">{counter.bands[band].label}</output>
+      <div>
+        <button
+          type="button"
+          aria-label="Diminuisci"
+          disabled={n <= counter.min}
+          onClick={() => pick(n - 1)}
+        >
+          −
+        </button>
+        <span aria-hidden="true">{counter.display(n)}</span>
+        <button
+          type="button"
+          aria-label="Aumenta"
+          disabled={n >= counter.max}
+          onClick={() => pick(n + 1)}
         >
           +
         </button>
