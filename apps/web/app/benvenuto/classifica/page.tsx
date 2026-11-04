@@ -8,6 +8,8 @@ import {
 } from "../../user/_components/use-athlete";
 import type { FitRankingView } from "../../components/fit-ranking-editor";
 import { FitTiles, type FitValues, bestOptions } from "./fit-tiles";
+import { PlaytomicField } from "./playtomic-field";
+import { parsePlaytomic } from "../../journey/profilo/_profile/playtomic";
 
 const NEXT = "/benvenuto/spider";
 type Sport = "PADEL" | "TENNIS";
@@ -32,11 +34,20 @@ const initialValues = (view: FitRankingView | undefined): FitValues =>
       }
     : EMPTY;
 
+/** Livello già dichiarato, scritto con la virgola («2,75»). */
+const initialPlaytomic = (view: FitRankingView | undefined) => {
+  const level = view?.ranking?.playtomicLevel;
+  return level === null || level === undefined
+    ? ""
+    : String(level).replace(".", ",");
+};
+
 /**
  * 02 · La tua classifica (demo PF10): padel e tennis a schede, attuale e
- * migliore di sempre, tessera facoltativa. Stesso salvataggio della pagina
- * dell'account; il servizio vuole le quattro voci, quindi si salva solo a
- * classifica completa («Nessuna classifica» vale come risposta).
+ * migliore di sempre, livello Playtomic e tessera facoltativi, come nel
+ * profilo. Stesso salvataggio della pagina del profilo; il servizio vuole le
+ * quattro voci, quindi si salva solo a classifica completa («Nessuna
+ * classifica» vale come risposta).
  */
 export default function WelcomeRankingPage() {
   const router = useRouter();
@@ -45,17 +56,21 @@ export default function WelcomeRankingPage() {
   );
   const [edited, setEdited] = useState<FitValues | null>(null);
   const [card, setCard] = useState<string | null>(null);
+  const [playtomic, setPlaytomic] = useState<string | null>(null);
   const [tab, setTab] = useState<Sport>("PADEL");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const values = edited ?? initialValues(view);
   const cardNumber = card ?? view?.ranking?.cardNumber ?? "";
-  const touched = edited !== null || card !== null;
+  const playtomicText = playtomic ?? initialPlaytomic(view);
+  const level = parsePlaytomic(playtomicText);
+  const touched = edited !== null || card !== null || playtomic !== null;
   const filled = SPORTS.filter(
     ({ prefix }) => values[`${prefix}Current`] && values[`${prefix}Best`],
   );
   const complete = filled.length === SPORTS.length;
-  const any = Object.values(values).some(Boolean) || !!cardNumber;
+  const any =
+    Object.values(values).some(Boolean) || !!cardNumber || !!playtomicText;
 
   const set = (next: Partial<FitValues>) => {
     setMessage("");
@@ -77,6 +92,13 @@ export default function WelcomeRankingPage() {
 
   const proceed = async () => {
     if (!touched || !any) return router.push(NEXT);
+    if (level === undefined) {
+      setTab("PADEL");
+      setMessage(
+        "Il livello Playtomic va da 0 a 7, con al massimo due decimali.",
+      );
+      return;
+    }
     if (!complete) {
       const missing = SPORTS.find(
         ({ prefix }) => !values[`${prefix}Current`] || !values[`${prefix}Best`],
@@ -92,7 +114,7 @@ export default function WelcomeRankingPage() {
     try {
       const saved = await athleteRequest<FitRankingView>(
         "/athlete-journey/fit-ranking",
-        { ...values, cardNumber },
+        { ...values, cardNumber, playtomicLevel: level },
       );
       if (saved.recalculationPending) {
         setMessage(
@@ -128,8 +150,9 @@ export default function WelcomeRankingPage() {
       }
     >
       <WelcomeIntro step={2} kicker="La tua classifica" title="Che classifica hai?">
-        Le classifiche FITP di padel e tennis ci dicono da dove parti. Se non ne
-        hai, scegli «Nessuna classifica».
+        Le classifiche FITP di padel e tennis, e il livello Playtomic se ce
+        l’hai, ci dicono da dove parti. Se non hai classifiche, scegli
+        «Nessuna classifica».
       </WelcomeIntro>
       <div className="pf-fit-step">
         {view && (
@@ -185,6 +208,15 @@ export default function WelcomeRankingPage() {
                         }
                       />
                     )}
+                  {sport === "PADEL" && (
+                    <PlaytomicField
+                      value={playtomicText}
+                      onChange={(value) => {
+                        setMessage("");
+                        setPlaytomic(value);
+                      }}
+                    />
+                  )}
                 </div>
               ),
             )}

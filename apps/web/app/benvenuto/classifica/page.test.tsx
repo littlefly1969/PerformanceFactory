@@ -114,6 +114,7 @@ describe("benvenuto 02 · classifica FIT", () => {
         tennisCurrent: "2.2",
         tennisBest: "1",
         cardNumber: "77",
+        playtomicLevel: null,
       },
     ]);
   });
@@ -147,6 +148,7 @@ describe("benvenuto 02 · classifica FIT", () => {
         tennisCurrent: "NONE",
         tennisBest: "NONE",
         cardNumber: "",
+        playtomicLevel: null,
       },
     ]);
   });
@@ -163,6 +165,74 @@ describe("benvenuto 02 · classifica FIT", () => {
     ).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("chiede il livello Playtomic come il profilo, da una fascia o scritto", async () => {
+    const posts = serve();
+    render(<WelcomeRankingPage />);
+    const field = await screen.findByLabelText(/Livello Playtomic di padel/);
+    // Una fascia propone il valore centrale.
+    await userEvent.click(screen.getByRole("button", { name: /Intermedio\s*2,5/ }));
+    expect(field).toHaveValue("3");
+    expect(
+      screen.getByRole("button", { name: /Intermedio\s*2,5/, pressed: true }),
+    ).toBeTruthy();
+    // Fuori scala non si salva.
+    await userEvent.clear(field);
+    await userEvent.type(field, "8");
+    expect(field).toHaveAttribute("aria-invalid", "true");
+    await userEvent.click(screen.getByRole("button", { name: "Continua" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Il livello Playtomic va da 0 a 7",
+    );
+    await userEvent.clear(field);
+    await userEvent.type(field, "2,75");
+    expect(
+      screen.getByRole("button", { name: /Intermedio\s*2,5/, pressed: true }),
+    ).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Nessuna classifica" }));
+    const padelBest = screen.getByRole("group", { name: "Migliore di sempre" });
+    await userEvent.click(
+      Array.from(padelBest.querySelectorAll("button")).find(
+        (b) => b.textContent === "Nessuna classifica",
+      )!,
+    );
+    await userEvent.click(screen.getByRole("tab", { name: "Tennis" }));
+    // Il campo è del padel: nella scheda del tennis non c'è.
+    expect(screen.queryByLabelText(/Livello Playtomic/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /—\s*nessuna/ }));
+    const tennisBest = screen.getByRole("group", { name: "Migliore di sempre" });
+    await userEvent.click(
+      Array.from(tennisBest.querySelectorAll("button")).find(
+        (b) => b.textContent === "—nessuna",
+      )!,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Continua" }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/benvenuto/spider"));
+    expect(posts).toEqual([
+      {
+        padelCurrent: "NONE",
+        padelBest: "NONE",
+        tennisCurrent: "NONE",
+        tennisBest: "NONE",
+        cardNumber: "",
+        playtomicLevel: 2.75,
+      },
+    ]);
+  });
+
+  it("solo il livello Playtomic, senza classifiche: chiede di completarle", async () => {
+    const posts = serve();
+    render(<WelcomeRankingPage />);
+    await userEvent.type(
+      await screen.findByLabelText(/Livello Playtomic di padel/),
+      "4",
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Continua" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Completa anche la classifica di padel",
+    );
+    expect(posts).toEqual([]);
+  });
+
   it("riparte dalla classifica già salvata", async () => {
     serve({
       padelCurrent: "2",
@@ -170,11 +240,15 @@ describe("benvenuto 02 · classifica FIT", () => {
       tennisCurrent: "NONE",
       tennisBest: "NONE",
       cardNumber: null,
+      playtomicLevel: 3.5,
     });
     render(<WelcomeRankingPage />);
     expect(
       await screen.findByRole("button", { name: /2ª\s*fascia/, pressed: true }),
     ).toBeTruthy();
+    expect(screen.getByLabelText(/Livello Playtomic di padel/)).toHaveValue(
+      "3,5",
+    );
     expect(screen.getByRole("button", { name: "Continua" })).toBeTruthy();
   });
 });

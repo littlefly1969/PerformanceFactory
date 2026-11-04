@@ -253,8 +253,17 @@
 .pf4-funnel .pf4-question-stepper {
   text-align: center;
 }
+/*
+ * Centrato da sé, come nella demo: fascia in grigio e pillola sull'asse del
+ * titolo. Il contatore non usa .pf4-counter, che è il «03 / 08» allineato a
+ * destra dell'intestazione.
+ */
 .pf4-funnel .pf4-choice-stepper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   margin-top: 8px;
+  text-align: center;
 }
 .pf4-funnel .pf4-choice-stepper > output {
   display: block;

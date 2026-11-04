@@ -463,8 +463,58 @@
 .pf-fit-card-field input::placeholder {
   color: #ffffff59;
 }
+.pf-fit-card-field input[aria-invalid="true"] {
+  box-shadow: inset 0 0 0 1.5px #ff6b6b;
+}
+/* Livello Playtomic: le fasce del profilo, sul fondo scuro. */
+.pf-fit-playtomic {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+.pf-fit-bands {
+  margin: 0;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-radius: 20px;
+  background: #ffffff0f;
+  list-style: none;
+}
+.pf-fit-bands button {
+  width: 100%;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #fff;
+  font-size: 14px;
+  text-align: left;
+  transition: background-color 0.2s ease;
+}
+.pf-fit-bands button span {
+  flex-shrink: 0;
+  color: #ffffff80;
+  font-size: 10px;
+  letter-spacing: 1.1px;
+}
+.pf-fit-bands button.is-on {
+  background: var(--pf-lime);
+  color: var(--pf-ink);
+}
+.pf-fit-bands button.is-on span {
+  color: #0b0b0c99;
+}
 @media (prefers-reduced-motion: reduce) {
-  .pf-fit-tile {
+  .pf-fit-tile,
+  .pf-fit-bands button {
     transition: none;
   }
   .pf-fit-tile:active:not(:disabled) {

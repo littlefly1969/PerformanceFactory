@@ -321,7 +321,7 @@ function CounterStepper({
   };
   return (
     <div
-      className="pf4-choice-stepper pf4-counter"
+      className="pf4-choice-stepper pf4-choice-counter"
       role="group"
       aria-label={question.title}
     >
