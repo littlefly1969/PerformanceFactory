@@ -374,10 +374,20 @@ describe('Free lesson with PostgreSQL', () => {
     const after = await athletes.view(id);
     expect(after.enabled && after.credits.balance).toBe(90);
 
-    // Profilo più attendibile: la regola di eleggibilità in vigore è soddisfatta.
+    // La regola di eleggibilità in vigore da sola non basta: la lezione si
+    // sblocca solo con tutte le aree Reali.
     await prisma.assessmentEvaluation.updateMany({
       where: { userId: id },
       data: { overallConfidence: 60 },
+    });
+    expect(await athletes.view(id)).toMatchObject({
+      phase: 'LOCKED',
+      missing: ['CONFIDENCE'],
+    });
+    // Tutte le aree Reali (soglia per area del consolidamento): si sblocca.
+    await prisma.assessmentEvaluationArea.updateMany({
+      where: { evaluation: { userId: id } },
+      data: { confidence: 80 },
     });
     const eligible = await Promise.all([
       athletes.view(id),
@@ -705,7 +715,7 @@ describe('Free lesson with PostgreSQL', () => {
     const full = await lesson(1);
     const open = await lesson(4);
     await admin.assign(full, await requested([40, 50]));
-    const id = await athlete([60, 50]);
+    const id = await athlete([80, 90]);
     const view = await athletes.view(id);
     const slots = view.enabled ? view.slots.map((s) => s.id) : [];
     // La lezione al completo non si propone.
@@ -747,8 +757,8 @@ describe('Free lesson with PostgreSQL', () => {
       ConflictException,
     );
 
-    // Una rinuncia con R ancora da consolidare si può ritirare richiedendo il posto.
-    const undecided = await athlete([60, 50]);
+    // Una rinuncia a calibrazione aperta si può ritirare richiedendo il posto.
+    const undecided = await athlete([80, 90]);
     expect(await athletes.decline(undecided)).toMatchObject({
       phase: 'DECLINED',
     });
@@ -790,11 +800,11 @@ describe('Free lesson with PostgreSQL', () => {
   });
 
   it('AT-11: an internal anomaly suspends only the lesson and never reaches the athlete', async () => {
-    const id = await athlete([60, 60]);
+    const id = await athlete([80, 80]);
     expect(await athletes.view(id)).toMatchObject({ phase: 'ELIGIBLE' });
     const evidence =
       'Dichiara 5 partite a settimana, poi di non giocare da tre mesi.';
-    aiConfidence = 60;
+    aiConfidence = 80;
     aiAnomaly = { kind: 'CONTRADICTIONS', priority: 'HIGH', evidence };
     try {
       await calibration.openRound(id);

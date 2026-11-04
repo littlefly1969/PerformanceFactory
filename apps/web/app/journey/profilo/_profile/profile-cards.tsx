@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { FitRankingView } from "../../../components/fit-ranking-editor";
 import type { FreeLessonView } from "../../_account/account-data";
+import type { lessonProgress } from "../../_account/lesson-unlock";
 import {
   type Availability,
   WEEKDAYS,
@@ -160,10 +161,18 @@ export function FitCard({ view }: { view: FitRankingView }) {
 }
 
 /** Anello di avanzamento della scheda lime della lezione. */
-function LessonRing({ value }: { value: number }) {
+function LessonRing({
+  value,
+  label,
+  description,
+}: {
+  value: number;
+  label: string;
+  description: string;
+}) {
   const circ = 2 * Math.PI * 27;
   return (
-    <div className="pf-prof-lz-ring" role="img" aria-label={`Al ${value}%`}>
+    <div className="pf-prof-lz-ring" role="img" aria-label={description}>
       <svg viewBox="0 0 64 64" aria-hidden="true">
         <circle cx="32" cy="32" r="27" className="is-track" />
         <circle
@@ -175,7 +184,7 @@ function LessonRing({ value }: { value: number }) {
           strokeOpacity={value > 0 ? 1 : 0}
         />
       </svg>
-      <span>{value}%</span>
+      <span>{label}</span>
     </div>
   );
 }
@@ -192,16 +201,19 @@ const lessonWhen = (iso: string) => {
 };
 
 /**
- * La parte di calibrazione che diventa la lezione (demo PF10): anello e
- * «Continua la calibrazione» finché è bloccata, «Scegli il circolo» quando si
+ * La parte di calibrazione che diventa la lezione (demo PF10): anello delle
+ * aree Reali e «Continua la calibrazione» finché è bloccata, «Scegli il circolo» quando si
  * sblocca, la lezione richiesta o confermata dopo. Decide la fase del server.
  */
 export function LessonSection({
   view,
+  progress,
   calibrationHref,
   calibrationCta,
 }: {
   view: FreeLessonView | null | undefined;
+  /** Aree già Reali: la lezione si sblocca quando lo sono tutte. */
+  progress: ReturnType<typeof lessonProgress>;
   calibrationHref: string;
   calibrationCta: string;
 }) {
@@ -215,17 +227,23 @@ export function LessonSection({
       </section>
     );
   if (phase === "LOCKED") {
-    const { balance, toUnlock } = view.credits;
-    const value = toUnlock
-      ? Math.min(100, Math.round((balance / toUnlock) * 100))
-      : 0;
+    // Una revisione interna del profilo resta neutra per l'atleta.
+    const review = !!view.missing?.includes("PROFILE");
     return (
       <section className="pf-prof-lz-lock" aria-label="Lezione gratuita">
         <div className="pf-prof-lz-lock-head">
-          <LessonRing value={value} />
+          <LessonRing
+            value={progress.value}
+            label={progress.label}
+            description={`${progress.real} di ${progress.total} aree Reali`}
+          />
           <div>
             <span className="pf-prof-kicker">Lezione gratuita</span>
-            <h2>Continua la calibrazione per sbloccarla.</h2>
+            <h2>
+              {review
+                ? "Continuiamo a conoscere il tuo profilo."
+                : progress.title}
+            </h2>
           </div>
         </div>
         <Link href={calibrationHref} className="pf-prof-lz-cta">

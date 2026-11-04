@@ -11,6 +11,7 @@ import {
   useResource,
 } from "../_account/account-data";
 import { AccountScreen } from "../_account/account-shell";
+import { lessonProgress } from "../_account/lesson-unlock";
 import {
   closedUnconsolidated,
   definedAreas,
@@ -278,6 +279,7 @@ export default function ProfilePage() {
         {evaluation && step && (
           <LessonSection
             view={lesson.data}
+            progress={lessonProgress(j!)}
             calibrationHref={step.href}
             calibrationCta={
               step.kind === "lesson" || step.kind === "scenarios"

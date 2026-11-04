@@ -14,6 +14,7 @@ import {
   isClosed,
   isConsolidated,
 } from "./calibration-state";
+import { lessonProgress } from "./lesson-unlock";
 import { REVEAL_HREF, nextStep } from "./next-step";
 import "./account-home.css";
 
@@ -63,10 +64,23 @@ export function HexOrb({
 }
 
 /** Anello di avanzamento della scheda della lezione (S04 della demo). */
-function LessonRing({ value }: { value: number }) {
+function LessonRing({
+  value,
+  label,
+  description,
+}: {
+  value: number;
+  /** Testo nell'anello; senza, la percentuale. */
+  label?: string;
+  description?: string;
+}) {
   const c = 2 * Math.PI * 27;
   return (
-    <div className="pf-hm-ring" role="img" aria-label={`Al ${value}%`}>
+    <div
+      className="pf-hm-ring"
+      role="img"
+      aria-label={description ?? `Al ${value}%`}
+    >
       <svg viewBox="0 0 64 64" aria-hidden="true">
         <circle cx="32" cy="32" r="27" />
         <circle
@@ -78,7 +92,7 @@ function LessonRing({ value }: { value: number }) {
           strokeOpacity={value > 0 ? 1 : 0}
         />
       </svg>
-      <span>{value}%</span>
+      <span>{label ?? `${value}%`}</span>
     </div>
   );
 }
@@ -116,18 +130,26 @@ function Banner({
       </Link>
     );
   if (!lesson?.enabled) return null;
-  const { phase, seat, credits } = lesson;
+  const { phase, seat } = lesson;
   if (phase === "LOCKED") {
-    const value = credits.toUnlock
-      ? Math.min(100, Math.round((credits.balance / credits.toUnlock) * 100))
-      : 0;
+    // Si sblocca con tutte le aree Reali; una revisione interna resta neutra.
+    const progress = lessonProgress(j);
+    const review = !!lesson.missing?.includes("PROFILE");
     return (
       <section className="pf-hm-lesson is-locked" aria-label="Lezione gratuita">
         <div className="pf-hm-lesson-head">
-          <LessonRing value={value} />
+          <LessonRing
+            value={progress.value}
+            label={progress.label}
+            description={`${progress.real} di ${progress.total} aree Reali`}
+          />
           <div>
             <span className="pf-hm-kicker">Lezione gratuita</span>
-            <strong>Ancora qualche passo per sbloccarla.</strong>
+            <strong>
+              {review
+                ? "Continuiamo a conoscere il tuo profilo."
+                : progress.title}
+            </strong>
           </div>
         </div>
         <Link className="pf-hm-pill is-ink" href="/journey/calibrazione">

@@ -87,6 +87,40 @@ export function checkRule(
   };
 }
 
+/**
+ * Soglia oltre cui un'area è Reale: quella per area della regola di
+ * consolidamento di R o, senza soglia per area, quella complessiva. È il punto
+ * in cui lo Spider smette di essere tratteggiato su quell'area.
+ */
+export const realAreaThreshold = (consolidation: ConfidenceRule) =>
+  consolidation.minAreaConfidence ?? consolidation.minOverallConfidence;
+
+/**
+ * La lezione gratuita si sblocca solo quando è sbloccato tutto (decisione di
+ * Stefano del 4/11): tutte le aree Reali, oltre alla regola di eleggibilità
+ * in vigore (LESSON_ELIGIBILITY), che resta registrata con la richiesta.
+ * Senza una soglia per le aree Reali la lezione non si sblocca.
+ */
+export function lessonRuleMet(
+  lesson: ConfidenceRule,
+  consolidation: ConfidenceRule,
+  evaluation: Parameters<typeof checkRule>[1],
+) {
+  const real = realAreaThreshold(consolidation);
+  return (
+    real !== null &&
+    checkRule(lesson, evaluation).met &&
+    checkRule(
+      {
+        minOverallConfidence: null,
+        minAreaConfidence: real,
+        minAreasAtConfidence: null,
+      },
+      evaluation,
+    ).met
+  );
+}
+
 /** Una regola deve avere almeno un criterio, con valori nell'intervallo ammesso. */
 export function ruleProblems(rule: ConfidenceRule) {
   const problems: string[] = [];

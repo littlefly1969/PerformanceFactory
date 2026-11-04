@@ -27,7 +27,7 @@ const TEXT: Record<Kind, { title: string; hint: string }> = {
   },
   LESSON_ELIGIBILITY: {
     title: "Eleggibilità alla lezione gratuita",
-    hint: "Quando il profilo è abbastanza attendibile per sbloccare la lezione. È una regola separata dal consolidamento.",
+    hint: "Condizione in più per sbloccare la lezione: la lezione si sblocca solo quando tutte le aree sono Reali (soglia per area del consolidamento di R) e anche questa regola è soddisfatta.",
   },
 };
 

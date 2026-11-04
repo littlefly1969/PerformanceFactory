@@ -4,10 +4,12 @@
 
 Dall'inizio della calibrazione l'atleta vede la lezione gratuita al circolo come
 obiettivo: un'ora di padel in gruppo da 4, con un coach. È il premio per
-l'interesse dimostrato (PF-FS-PREPAYWALL §6): la sblocca un profilo abbastanza
-attendibile, secondo la regola di eleggibilità `LESSON_ELIGIBILITY` del back
-office, con il livello stimato e almeno un circolo che offre la lezione. I crediti
-di interazione restano solo come barra di progresso (OP-01). L'atleta richiede il
+l'interesse dimostrato (PF-FS-PREPAYWALL §6): si sblocca solo quando è sbloccato
+tutto, cioè con **tutte le aree Reali** (confidence di ogni area alla soglia per
+area del consolidamento di R, la stessa che rende pieno lo Spider; decisione di
+Stefano del 4/11), più la regola di eleggibilità `LESSON_ELIGIBILITY` del back
+office, il livello stimato e almeno un circolo che offre la lezione. I crediti
+di interazione non contano: la scheda bloccata mostra quante aree sono Reali. L'atleta richiede il
 posto; l'admin compone i gruppi per livello; il coach dà il suo feedback, che entra
 nella valutazione successiva come fonte distinta e, con R consolidata, chiude la
 calibrazione.
@@ -49,7 +51,8 @@ progetto `notes/slice4-lezione-gratuita.md`.
   atleti. Il programma resta dietro `programBeforePaywall` (decisione
   13 aperta).
 - **Due verifiche distinte (§6.2).** Eleggibilità dell'atleta: livello stimato con
-  R aperta e regola `LESSON_ELIGIBILITY` soddisfatta sull'ultima valutazione.
+  R aperta, tutte le aree Reali e regola `LESSON_ELIGIBILITY` soddisfatta
+  sull'ultima valutazione (`lessonRuleMet` in `confidence-policy.ts`).
   Erogabilità: almeno un circolo attivo con `freeLessonsEnabled`; il posto e la
   capienza si verificano quando l'admin assegna. La richiesta registra versione
   della regola e valutazione usate (`eligibilityPolicyId`,
@@ -193,8 +196,9 @@ della regola di eleggibilità, `lesson_declined`, `lesson_booked`,
 ## Sviluppo e test
 
 Default: traguardo visivo di 100 crediti, 30 per la prima valutazione, 20 per
-passo di calibrazione, 10 per micro-test del catalogo (storico); eleggibilità con confidence
-complessiva ≥ 50 (regola v1, da approvare, in `/admin/calibration`). Per provarla:
+passo di calibrazione, 10 per micro-test del catalogo (storico); eleggibilità con tutte
+le aree Reali (soglia per area del consolidamento, oggi 70) e confidence complessiva
+≥ 50 (regola v1 di `LESSON_ELIGIBILITY`, in `/admin/calibration`). Per provarla:
 accendere `free_lesson` in `/admin/feature-flags`. I circoli arrivano già pronti
 dal seed (vedi sotto); per aggiungerne o spegnerne uno si usa `/admin/partners`
 oppure `/admin/free-lessons`.

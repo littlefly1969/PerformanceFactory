@@ -31,8 +31,8 @@ In calibrazione non c'è il calendario: al suo posto «Analisi delle sei aree» 
   completata» con R consolidata) e la pillola corta «Calibrazione»; a fase chiusa
   porta agli scenari. Con la lezione sbloccata la scheda resta sulla calibrazione:
   al circolo porta la scheda lime della lezione.
-- **Lezione gratuita.** Bloccata: anello con i crediti raccolti e «Continua la
-  calibrazione per sbloccarla.». Sbloccata: «Scegli il circolo». Richiesta o
+- **Lezione gratuita.** Bloccata: anello con le aree già Reali («2/6») e «Rendi
+  Reali tutte e sei le aree per sbloccarla.»; si sblocca solo quando lo sono tutte. Sbloccata: «Scegli il circolo». Richiesta o
   assegnata: data, circolo, oppure «Richiesta inviata». Senza circoli in zona: «Non
   ancora disponibile nella tua zona.».
 - **Disponibilità.** Si salva già in fase gratuita, prima del programma (basta aver
@@ -50,7 +50,8 @@ In calibrazione non c'è il calendario: al suo posto «Analisi delle sei aree» 
 
 - Durate della sessione: i 5 valori che il server accetta (30, 45, 60, 90, 120+),
   non gli intervalli della demo.
-- La lezione si sblocca con la regola reale dei crediti, non con «70 di calibrazione».
+- La lezione si sblocca con tutte le aree Reali, non con «70 di calibrazione»: è il
+  testo del regalo («completamente Reale … niente più tratteggio»).
 - Il margine «±» di ogni area è calcolato nel browser dalla confidenza dell'area
   (l'API non lo dà per area), con la stessa regola dell'intervallo di R globale.
 - Invito e community non hanno persone o codici veri: il codice d'esempio deriva dal
