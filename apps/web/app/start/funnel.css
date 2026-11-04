@@ -295,6 +295,7 @@
   overflow: visible;
 }
 .pf4-figure circle,
+.pf4-figure path,
 .pf4-figure rect {
   fill: var(--pf4-ink);
 }

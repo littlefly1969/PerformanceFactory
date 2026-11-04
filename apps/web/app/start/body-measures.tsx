@@ -17,9 +17,35 @@ export function proposedMeasure(question: DiscoveryQuestion, fallback: number) {
   return min + Math.round((value - min) / step) * step;
 }
 
+/** Arto affusolato con estremità arrotondate, da (x1, y1) a (x2, y2). */
+function limb(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  from: number,
+  to: number,
+) {
+  const length = Math.hypot(x2 - x1, y2 - y1) || 1;
+  const nx = -(y2 - y1) / length;
+  const ny = (x2 - x1) / length;
+  const f = (n: number) => n.toFixed(2);
+  const a = [x1 + nx * from, y1 + ny * from];
+  const b = [x2 + nx * to, y2 + ny * to];
+  const c = [x2 - nx * to, y2 - ny * to];
+  const d = [x1 - nx * from, y1 - ny * from];
+  return (
+    `M${f(a[0])} ${f(a[1])}L${f(b[0])} ${f(b[1])}` +
+    `A${f(to)} ${f(to)} 0 0 0 ${f(c[0])} ${f(c[1])}` +
+    `L${f(d[0])} ${f(d[1])}` +
+    `A${f(from)} ${f(from)} 0 0 0 ${f(a[0])} ${f(a[1])}Z`
+  );
+}
+
 /**
- * Sagoma che segue le misure: l'altezza allunga la figura, il rapporto
- * peso/altezza (BMI) la allarga. È un'illustrazione, non una valutazione.
+ * Sagoma stilizzata che segue le misure: l'altezza allunga la figura, il
+ * rapporto peso/altezza (BMI) allarga busto e arti. È un'illustrazione, non
+ * una valutazione.
  */
 export function BodyFigure({
   height,
@@ -34,14 +60,33 @@ export function BodyFigure({
   const girth = clamp(bmi / 22, 0.72, 1.7);
   const figure = (GROUND - 4) * (h / SCALE_CM);
   const top = GROUND - figure;
-  const head = figure * 0.068 * (0.9 + 0.1 * girth);
-  const torsoTop = top + head * 2 + figure * 0.02;
-  const torsoHeight = figure * 0.36;
-  const torsoWidth = figure * 0.2 * girth;
-  const arm = figure * 0.052 * girth;
-  const legTop = torsoTop + torsoHeight - figure * 0.02;
-  const leg = (torsoWidth - figure * 0.012) / 2;
-  const center = 65;
+  const c = 65;
+  const at = (ratio: number) => top + figure * ratio;
+  const f = (n: number) => n.toFixed(2);
+  // Proporzioni di una figura di circa 7,5 teste; le spalle crescono meno.
+  const head = figure * 0.064;
+  const shoulder = figure * 0.118 * (0.82 + 0.18 * girth);
+  const waist = figure * 0.074 * girth;
+  const hip = figure * 0.088 * (0.6 + 0.4 * girth);
+  const neck = figure * 0.026 * (0.85 + 0.15 * girth);
+  const yNeck = at(0.12);
+  const yShoulder = at(0.175);
+  const yWaist = at(0.4);
+  const yHip = at(0.5);
+  const round = figure * 0.05;
+  const torso =
+    `M${f(c - neck)} ${f(yNeck)}L${f(c + neck)} ${f(yNeck)}` +
+    `L${f(c + neck)} ${f(yShoulder - round * 0.6)}` +
+    `Q${f(c + shoulder)} ${f(yShoulder - round * 0.6)} ${f(c + shoulder)} ${f(yShoulder + round)}` +
+    `Q${f(c + shoulder * 0.98)} ${f((yShoulder + yWaist) / 2)} ${f(c + waist)} ${f(yWaist)}` +
+    `Q${f(c + hip * 1.04)} ${f((yWaist + yHip) / 2)} ${f(c + hip)} ${f(yHip)}` +
+    `L${f(c - hip)} ${f(yHip)}` +
+    `Q${f(c - hip * 1.04)} ${f((yWaist + yHip) / 2)} ${f(c - waist)} ${f(yWaist)}` +
+    `Q${f(c - shoulder * 0.98)} ${f((yShoulder + yWaist) / 2)} ${f(c - shoulder)} ${f(yShoulder + round)}` +
+    `Q${f(c - shoulder)} ${f(yShoulder - round * 0.6)} ${f(c - neck)} ${f(yShoulder - round * 0.6)}Z`;
+  const arm = figure * 0.03 * (0.8 + 0.2 * girth);
+  const leg = hip * 0.5;
+  const foot = GROUND - 2;
   return (
     <svg
       className="pf4-figure"
@@ -50,37 +95,33 @@ export function BodyFigure({
       data-height={h}
       data-girth={girth.toFixed(2)}
     >
-      <ellipse cx={center} cy={GROUND} rx={torsoWidth * 0.9} ry="3" />
-      <circle cx={center} cy={top + head} r={head} />
-      <rect
-        x={center - torsoWidth / 2}
-        y={torsoTop}
-        width={torsoWidth}
-        height={torsoHeight}
-        rx={Math.min(torsoWidth / 3, 12)}
-      />
+      <ellipse cx={c} cy={GROUND} rx={hip * 1.5} ry="3" />
+      <circle cx={c} cy={top + head} r={head} />
+      <path d={torso} />
       {[-1, 1].map((side) => (
-        <rect
+        <path
           key={`arm${side}`}
-          x={
-            side < 0
-              ? center - torsoWidth / 2 - arm - 3
-              : center + torsoWidth / 2 + 3
-          }
-          y={torsoTop + 2}
-          width={arm}
-          height={figure * 0.38}
-          rx={arm / 2}
+          d={limb(
+            c + side * (shoulder - arm * 1.1),
+            yShoulder + round * 0.9,
+            c + side * (shoulder + figure * 0.035),
+            at(0.5),
+            arm,
+            arm * 0.72,
+          )}
         />
       ))}
       {[-1, 1].map((side) => (
-        <rect
+        <path
           key={`leg${side}`}
-          x={side < 0 ? center - torsoWidth / 2 : center + figure * 0.006}
-          y={legTop}
-          width={leg}
-          height={GROUND - 2 - legTop}
-          rx={Math.min(leg / 2, 6)}
+          d={limb(
+            c + side * (hip - leg),
+            yHip - leg * 0.4,
+            c + side * (leg * 0.9),
+            foot - leg * 0.5,
+            leg,
+            leg * 0.55,
+          )}
         />
       ))}
     </svg>

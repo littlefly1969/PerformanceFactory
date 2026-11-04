@@ -351,17 +351,31 @@ export default function StartPage() {
             }
           }}
           footer={
-            (!autoAdvance || !question.required) && (
-              <footer className="pf4-footer">
-                <button
-                  className="pf4-cta"
-                  disabled={!answerValid(question, draft)}
-                  onClick={() => move(1)}
-                >
-                  Continua
-                </button>
-              </footer>
-            )
+            <>
+              {(!autoAdvance || !question.required) && (
+                <footer className="pf4-footer">
+                  <button
+                    className="pf4-cta"
+                    disabled={!answerValid(question, draft)}
+                    onClick={() => move(1)}
+                  >
+                    Continua
+                  </button>
+                </footer>
+              )}
+              {/* Prima domanda: le campagne arrivano qui senza l'intro. */}
+              {index === 1 && (
+                <footer className="pf4-footer pf4-entry-note">
+                  <p>
+                    Continuando accetti i Termini di servizio e la Politica
+                    sulla privacy.
+                  </p>
+                  <p className="pf4-login">
+                    Hai già un account? <a href="/login">Accedi</a>
+                  </p>
+                </footer>
+              )}
+            </>
           }
         />
       )}

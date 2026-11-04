@@ -110,7 +110,8 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding-top: 48px;
+  /* Meno aria sui telefoni bassi: la pagina non deve scorrere senza motivo. */
+  padding-top: clamp(20px, 5.5dvh, 48px);
 }
 .pf-welcome-kicker {
   color: var(--pf-lime);
@@ -139,7 +140,7 @@
   align-items: center;
   justify-content: center;
   gap: 20px;
-  padding: 32px 0;
+  padding: clamp(12px, 3.8dvh, 32px) 0;
 }
 .pf-welcome-footer {
   padding-top: 16px;
@@ -175,8 +176,8 @@
 /* 01 · Foto profilo */
 .pf-photo {
   position: relative;
-  width: 220px;
-  height: 220px;
+  width: min(220px, max(150px, calc(100dvh - 410px)));
+  aspect-ratio: 1;
 }
 .pf-photo-tile {
   width: 100%;
@@ -237,6 +238,29 @@
   display: block;
   max-width: 100%;
   height: auto;
+}
+/*
+ * Spider senza nomi: occupa lo spazio che resta fra testo e pulsante, così
+ * è più grande possibile senza far scorrere la pagina.
+ */
+.pf-welcome-device:has(.pf-spider.is-bare) {
+  height: 100dvh;
+}
+.pf-welcome-device:has(.pf-spider.is-bare) .pf-welcome-body,
+.pf-welcome-center:has(> .pf-spider.is-bare) {
+  min-height: 0;
+}
+.pf-spider.is-bare {
+  flex: 1 1 0;
+  min-height: 150px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+.pf-spider.is-bare svg {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
 }
 .pf-spider-ring {
   fill: #ffffff08;

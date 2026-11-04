@@ -330,6 +330,20 @@
 }
 
 /* Pagine chiare senza campo (data, misure, analisi). */
+/*
+ * Titolo su una riga: il corpo scende quanto serve per stare nella colonna
+ * (0.42em: un carattere Space Grotesk leggero è largo circa 0.38em).
+ */
+.pf4-funnel .pf4-body:has(> .pf4-one-line) {
+  container-type: inline-size;
+}
+.pf4-funnel .pf4-body > h1.pf4-one-line {
+  font-size: min(
+    var(--pf4-title-size, 28px),
+    calc(100cqi / (var(--pf4-chars) * 0.42))
+  );
+  white-space: nowrap;
+}
 .pf4-funnel .pf4-plain h1 {
   font-size: 32px;
   line-height: 36px;
@@ -414,6 +428,17 @@
 .pf4-funnel .pf4-intro-sheet .pf4-error {
   margin-top: 12px;
 }
+/* Prima domanda: consenso implicito e accesso, in fondo al foglio. */
+.pf4-funnel .pf4-sheet .pf4-entry-note {
+  text-align: center;
+}
+.pf4-funnel .pf4-entry-note > p:first-child {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--pf4-muted);
+}
+.pf4-funnel .pf4-entry-note .pf4-login,
 .pf4-funnel .pf4-intro-sheet .pf4-login {
   display: flex;
   align-items: center;
@@ -425,6 +450,7 @@
   text-transform: uppercase;
   color: var(--pf4-muted);
 }
+.pf4-funnel .pf4-entry-note .pf4-login a,
 .pf4-funnel .pf4-intro-sheet .pf4-login a {
   margin-left: 4px;
   color: var(--pf4-ink);
