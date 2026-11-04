@@ -317,3 +317,24 @@ describe("calendarFile", () => {
     expect(ics).toContain("LOCATION:Padel Club Nord\\, Milano");
   });
 });
+
+describe("Lezione gratuita: bloccata", () => {
+  it("says every area must be Real and how many already are", async () => {
+    const j = journey();
+    const total = j.evaluation.drivers.length;
+    serve({
+      "/auth/journey": j,
+      "/athlete-journey/free-lesson": { ...lesson, phase: "LOCKED" },
+    });
+    render(<ClubPage />);
+    expect(
+      await screen.findByText(
+        /^Rendi Reali tutte e .+ le aree per sbloccarla\.$/,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByText(new RegExp(`^Aree Reali \\d+/${total}$`)),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/abbastanza attendibile/)).toBeNull();
+  });
+});

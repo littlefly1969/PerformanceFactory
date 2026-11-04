@@ -11,7 +11,7 @@ import {
   AccountTopBar,
   PillLink,
 } from "../_account/account-shell";
-import { useAccountJourney } from "../_account/calibration-state";
+import { definedAreas, useAccountJourney } from "../_account/calibration-state";
 import { summaryHref } from "../_account/next-step";
 import { ClubStep } from "./club-step";
 import { clubsFor, type Place } from "./club-location";
@@ -21,6 +21,16 @@ import { WhereStep } from "./where-step";
 import "./circolo.css";
 
 type Step = "where" | "club" | "when";
+type Journey = ReturnType<typeof useAccountJourney>["journey"];
+
+/** Aree già Reali: la lezione si sblocca solo quando lo sono tutte. */
+const lockedReal = (j: Journey) =>
+  j ? definedAreas(j.calibration, j.evaluation?.drivers ?? []).size : 0;
+const lockedTitle = (j: Journey) => {
+  const total = j?.evaluation?.drivers?.length ?? 0;
+  if (!total) return "Rendi Reali tutte le aree per sbloccarla.";
+  return `Rendi Reali tutte e ${total === 6 ? "sei" : total} le aree per sbloccarla.`;
+};
 const STEPS: Step[] = ["where", "club", "when"];
 
 /**
@@ -34,7 +44,7 @@ const STEPS: Step[] = ["where", "club", "when"];
  * circolo, e «Ci vediamo in campo» compare quando il posto è confermato.
  */
 export default function ClubPage() {
-  useAccountJourney();
+  const { journey: j } = useAccountJourney();
   const {
     data: view,
     error,
@@ -204,10 +214,12 @@ export default function ClubPage() {
           <div className="pf-lz-step">
             <span className="pf-acc-kicker is-lime">Lezione gratuita</span>
             <h1 className="pf-lz-title">Non ancora disponibile.</h1>
-            <p className="pf-lz-lead">
-              La lezione si sblocca quando il tuo profilo è abbastanza
-              attendibile: continua con le domande e i micro-test.
-            </p>
+            <p className="pf-lz-lead">{lockedTitle(j)}</p>
+            {j?.evaluation?.drivers?.length ? (
+              <p className="pf-lz-note">
+                Aree Reali {lockedReal(j)}/{j.evaluation.drivers.length}
+              </p>
+            ) : null}
             <PillLink href="/journey/calibrazione" tone="lime">
               Continua la calibrazione
             </PillLink>
