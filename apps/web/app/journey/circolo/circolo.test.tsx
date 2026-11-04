@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   render,
   screen,
@@ -201,6 +202,51 @@ describe("Lezione gratuita: dove sei", () => {
     expect(names[1]).toMatch(/^Padel Club Nord, \d+,\d km$/);
     // Senza coordinate il circolo resta in fondo, con la sua città.
     expect(names[2]).toBe("Padel Pescara, Pescara");
+  });
+
+  it("ignores a late position once the athlete has chosen a city", async () => {
+    let late: PositionCallback | null = null;
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      geolocation: {
+        getCurrentPosition: (ok: PositionCallback) => {
+          late = ok;
+        },
+      },
+    });
+    serve({
+      "/auth/journey": journey(),
+      "/area/suggestions": {
+        suggestions: [
+          {
+            placeId: null,
+            main: "Pescara",
+            secondary: "PE",
+            area: { city: "Pescara", postalCode: null, province: "PE" },
+          },
+        ],
+      },
+      "/athlete-journey/free-lesson": { ...lesson, slots },
+    });
+    render(<ClubPage />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: /Usa la mia posizione/ }),
+    );
+    await typeArea("Pesc");
+    await userEvent.click(
+      await screen.findByRole("button", { name: /Pescara/ }),
+    );
+    await screen.findByRole("heading", { name: "Dove giochi?" });
+    await userEvent.click(screen.getByRole("button", { name: /Gioco qui/ }));
+    expect(screen.getByRole("heading", { name: "Quando?" })).toBeTruthy();
+    // La posizione arriva dopo: non cambia la città né riporta indietro.
+    act(() =>
+      late!({
+        coords: { latitude: 45.452, longitude: 9.175 },
+      } as GeolocationPosition),
+    );
+    expect(screen.getByRole("heading", { name: "Quando?" })).toBeTruthy();
+    expect(screen.getByText("Padel Pescara")).toBeInTheDocument();
   });
 
   it("asks for CAP or city when the position is not allowed", async () => {

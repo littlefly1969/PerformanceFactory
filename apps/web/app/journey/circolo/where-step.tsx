@@ -41,6 +41,10 @@ export function WhereStep({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const session = useRef(newSessionToken());
+  // Ogni richiesta di luogo (posizione o risoluzione di un suggerimento) ha
+  // un numero: vale solo l'ultima, e nessuna dopo che il passo è chiuso.
+  const attempt = useRef(0);
+  useEffect(() => () => void (attempt.current += 1), []);
   const typed = query.trim();
 
   useEffect(() => {
@@ -76,6 +80,7 @@ export function WhereStep({
   }, [typed]);
 
   const chooseArea = (area: Area) => {
+    attempt.current += 1;
     session.current = newSessionToken();
     onPlace({ kind: "area", area });
   };
@@ -84,17 +89,21 @@ export function WhereStep({
     setMessage("");
     if (suggestion.area) return chooseArea(suggestion.area);
     if (!suggestion.placeId) return;
+    const mine = ++attempt.current;
+    setGeo("idle");
     setBusy(true);
     try {
       const { area } = await postJson<{ area: Area | null }>(
         `${AREA_PATH}/resolve`,
         { placeId: suggestion.placeId, sessionToken: session.current },
       );
+      if (mine !== attempt.current) return;
       if (area) chooseArea(area);
       else
         setMessage("Non troviamo questa zona: prova con un altro CAP o città.");
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : "Ricerca non riuscita.");
+      if (mine === attempt.current)
+        setMessage(e instanceof Error ? e.message : "Ricerca non riuscita.");
     } finally {
       setBusy(false);
     }
@@ -115,19 +124,24 @@ export function WhereStep({
   const askPosition = () => {
     setMessage("");
     if (!navigator.geolocation) return setGeo("unavailable");
+    const mine = ++attempt.current;
     setGeo("asking");
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
+        // Una zona scelta nel frattempo, o il passo chiuso, vince sul GPS.
+        if (mine !== attempt.current) return;
         setGeo("idle");
         onPlace({
           kind: "position",
           coords: { latitude: coords.latitude, longitude: coords.longitude },
         });
       },
-      (error) =>
+      (error) => {
+        if (mine !== attempt.current) return;
         setGeo(
           error.code === error.PERMISSION_DENIED ? "denied" : "unavailable",
-        ),
+        );
+      },
       { enableHighAccuracy: false, timeout: 10_000, maximumAge: 300_000 },
     );
   };
