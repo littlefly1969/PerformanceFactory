@@ -66,7 +66,7 @@ describe('calibration questions', () => {
     jest.mocked(requestStructuredProposal).mockReset();
   });
 
-  it('AT-09: accepts a variable group, numbering questions and options', () => {
+  it('AT-09: accepts a pair, numbering questions and options', () => {
     const result = validateCalibrationStep(
       step([question(), question({ text: 'Altra domanda?' })]),
       input,
@@ -154,20 +154,20 @@ describe('calibration questions', () => {
   });
 
   it.each([
-    ['a group of one', step([question()]), 'ASK_GROUP: da 2'],
+    ['a group of one', step([question()]), 'ASK_GROUP: da 2 a 2'],
     [
       'two questions for a single step',
       step([question(), question({ text: 'Altra?' })], 'ASK_SINGLE'),
       'ASK_SINGLE: da 1 a 1',
     ],
     [
-      'a group longer than the screen allows',
-      step(
-        Array.from({ length: 7 }, (_, i) =>
-          question({ text: `Domanda ${i}?` }),
-        ),
-      ),
-      'da 2 a 6',
+      'a group longer than a pair',
+      step([
+        question(),
+        question({ text: 'Altra?' }),
+        question({ text: 'Terza?' }),
+      ]),
+      'da 2 a 2',
     ],
     [
       'an action the server owns',
@@ -216,14 +216,14 @@ describe('calibration questions', () => {
       'numero di opzioni',
     ],
     [
-      'a micro-test on a driver not in focus',
-      step([], 'PROPOSE_MICRO_TEST', 'mental'),
-      'non in focus',
+      'a micro-test, which is out of the calibration cycle',
+      step([], 'PROPOSE_MICRO_TEST', 'tecnica'),
+      'azione non ammessa',
     ],
     [
       'a micro-test area on a question step',
       step([question()], 'ASK_SINGLE', 'tecnica'),
-      'solo con PROPOSE_MICRO_TEST',
+      'micro-test fuori dal ciclo',
     ],
   ])('rejects %s', (_label, raw, problem) => {
     const problems: string[] = [];
@@ -231,81 +231,28 @@ describe('calibration questions', () => {
     expect(problems.join(' ')).toContain(problem);
   });
 
-  it('leaves micro-tests to the AI, guided by the back-office ratio', () => {
-    const balance = {
-      questionsPerMicroTest: 3,
-      microTestsDone: 1,
-      microTestsSkipped: 0,
-      questionsAnswered: 8,
-    };
+  it('asks for pairs and never offers a micro-test to the engine', () => {
     const prompt = buildCalibrationPrompt({
       ...input,
-      microTestBalance: balance,
+      microTestBalance: {
+        questionsPerMicroTest: 3,
+        microTestsDone: 1,
+        microTestsSkipped: 0,
+        questionsAnswered: 8,
+      },
     });
-    expect(prompt.user.microTestBalance).toEqual(balance);
-    expect(prompt.system).toContain('è un’indicazione');
-    expect(prompt.system).toContain('non un vincolo');
-    expect(prompt.system).not.toContain('scegli PROPOSE_MICRO_TEST');
-    expect(buildCalibrationPrompt(input).user).not.toHaveProperty(
-      'microTestBalance',
-    );
+    expect(prompt.system).toContain('la coppia, esattamente 2 domande');
+    expect(prompt.system).not.toContain('PROPOSE_MICRO_TEST');
+    expect(prompt.user).not.toHaveProperty('microTestBalance');
   });
 
-  it('AT-12: proposes a micro-test on one driver in focus, without questions', () => {
-    expect(
-      validateCalibrationStep(step([], 'PROPOSE_MICRO_TEST', 'tecnica'), input),
-    ).toEqual({
-      action: 'PROPOSE_MICRO_TEST',
-      rationale: 'Mancano esempi concreti di colpi in partita.',
+  it('stub output passes its own contract: a pair, only on drivers in focus', () => {
+    const one = validateCalibrationStep(stubCalibrationQuestions(input), input);
+    expect(one).toMatchObject({
+      action: 'ASK_GROUP',
       targetAreas: ['tecnica'],
-      questions: [],
     });
-  });
-
-  it('ignores the questions a model writes into a micro-test step', () => {
-    const problems: string[] = [];
-    const written = question({
-      text: 'Esegui uno squat lento a corpo libero. Descrivi il risultato:',
-    });
-    expect(
-      validateCalibrationStep(
-        step(
-          [written, question({ areaId: 'mental' })],
-          'PROPOSE_MICRO_TEST',
-          'tecnica',
-        ),
-        input,
-        problems,
-      ),
-    ).toMatchObject({ action: 'PROPOSE_MICRO_TEST', questions: [] });
-    expect(problems).toEqual([]);
-  });
-
-  it('logs the questions ignored on a micro-test step', async () => {
-    process.env.AI_PROVIDER = 'gemini';
-    jest.mocked(requestStructuredProposal).mockResolvedValueOnce({
-      outputText: JSON.stringify(
-        step([question()], 'PROPOSE_MICRO_TEST', 'tecnica'),
-      ),
-      usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
-    });
-    const logger = new Logger('test');
-    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
-    const result = await generateCalibrationQuestions(logger, input);
-    expect(result).toMatchObject({
-      action: 'PROPOSE_MICRO_TEST',
-      targetAreas: ['tecnica'],
-      questions: [],
-    });
-    expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining('MICRO_TEST_STEP_QUESTIONS_IGNORED'),
-    );
-  });
-
-  it('stub output passes its own contract, only on drivers in focus', () => {
-    expect(
-      validateCalibrationStep(stubCalibrationQuestions(input), input),
-    ).toMatchObject({ action: 'ASK_SINGLE', targetAreas: ['tecnica'] });
+    expect(one?.questions).toHaveLength(2);
     const both = {
       ...input,
       targets: input.targets.map((t) => ({ ...t, focus: true })),

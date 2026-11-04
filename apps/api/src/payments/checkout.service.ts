@@ -12,6 +12,7 @@ import {
   Subscription,
   SubscriptionStatus,
 } from '@prisma/client';
+import { assertAvailability } from '../discovery/program-availability';
 import { PrismaService } from '../prisma/prisma.service';
 import { BillingCatalogService } from './billing-catalog.service';
 import { checkoutReturnUrls, checkoutTtlMinutes } from './payments-config';
@@ -85,6 +86,8 @@ async function assertPaywallReady(
     throw new ConflictException(
       'L’offerta non corrisponde al percorso che hai scelto',
     );
+  // Il programma parte subito dopo il pagamento: giorni e durata servono prima.
+  await assertAvailability(tx, userId);
 }
 
 /**
