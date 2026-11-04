@@ -32,16 +32,6 @@
   fill: #c8f02e1f;
   stroke: var(--acc-lime);
 }
-.pf-acc.is-dark .pf-acc-mini-real.has-arms {
-  stroke: none;
-}
-.pf-acc.is-dark .pf-acc-mini-arm {
-  stroke: var(--acc-lime);
-  opacity: 0.7;
-}
-.pf-acc.is-dark .pf-acc-mini-arm.is-defined {
-  opacity: 1;
-}
 .pf-acc.is-dark .pf-acc-badge {
   background: #ffffff14;
   color: #ffffffcc;

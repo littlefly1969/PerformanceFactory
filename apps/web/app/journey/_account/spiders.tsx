@@ -1,3 +1,5 @@
+import "./spiders.css";
+
 /** Spider dell'area atleta: grande nel profilo, piccolo nelle schede. */
 type Scale = { min: number; max: number };
 
