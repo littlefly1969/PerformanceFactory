@@ -57,7 +57,7 @@ nel browser: [intro](confronto-profilo-1.jpg) · [profilo](confronto-profilo-2.j
 
 ## Aggiornamento dell'installazione
 
-Una migrazione: `20261103233000_playtomic_level` aggiunge la colonna facoltativa
+Una migrazione: `20261104130000_playtomic_level` aggiunge la colonna facoltativa
 `playtomicLevel` ad `AthleteFitRanking`. Nessun seed, nessuna variabile d'ambiente
 nuova. Lo script di aggiornamento esegue le migrazioni dopo un dump del database.
 
