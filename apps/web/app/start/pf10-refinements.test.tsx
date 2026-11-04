@@ -72,10 +72,12 @@ describe("contatore della demo PF10", () => {
     const { container } = render(
       <Counter question={experience} onChange={onChange} />,
     );
-    const shown = () => container.querySelector(".pf4-counter span");
+    const shown = () => container.querySelector(".pf4-choice-counter span");
     const band = () => screen.getByRole("status");
     const minus = screen.getByRole("button", { name: "Diminuisci" });
     const plus = screen.getByRole("button", { name: "Aumenta" });
+    // Non è il «03 / 08» dell'intestazione: quello stile lo allinea a destra.
+    expect(container.querySelector(".pf4-counter")).toBeNull();
     // Il 3 iniziale è già una risposta: la fascia «1-3 anni».
     expect(shown()).toHaveTextContent(/^3$/);
     expect(band()).toHaveTextContent("1-3 anni");
@@ -116,7 +118,7 @@ describe("contatore della demo PF10", () => {
     const { container } = render(
       <Counter question={frequency} onChange={onChange} />,
     );
-    const shown = () => container.querySelector(".pf4-counter span");
+    const shown = () => container.querySelector(".pf4-choice-counter span");
     const band = () => screen.getByRole("status");
     const minus = screen.getByRole("button", { name: "Diminuisci" });
     const plus = screen.getByRole("button", { name: "Aumenta" });
@@ -146,7 +148,7 @@ describe("contatore della demo PF10", () => {
     await userEvent.click(screen.getByRole("button", { name: "Diminuisci" }));
     unmount();
     render(<Counter question={experience} value="1" onChange={onChange} />);
-    expect(document.querySelector(".pf4-counter span")).toHaveTextContent(
+    expect(document.querySelector(".pf4-choice-counter span")).toHaveTextContent(
       /^2$/,
     );
     expect(container).toBeTruthy();
