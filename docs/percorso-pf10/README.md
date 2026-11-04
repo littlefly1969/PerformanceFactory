@@ -80,7 +80,7 @@ seed, configurazione persistita, autenticazione, pagamenti o webhook.
 ## Obiettivi a risposta multipla (decisione di Stefano del 3 novembre 2026)
 
 «Qual è il tuo obiettivo principale?» diventa «Quali sono i tuoi obiettivi?» e si
-possono sceglierne più d'uno (migrazione `20261103230000_funnel_obiettivi_multipli`).
+possono sceglierne più d'uno (migrazione `20261104120000_funnel_obiettivi_multipli`).
 
 - Resta la stessa domanda obiettivo (`target: goalId`) con le stesse opzioni e
   gli stessi id; solo la domanda obiettivo può essere a scelta multipla, sport e
