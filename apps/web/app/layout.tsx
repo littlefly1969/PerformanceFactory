@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     title: "PF",
     statusBarStyle: "black",
   },
-  icons: { apple: "/icons/apple-touch-icon.png" },
+  icons: { apple: "/icons/apple-touch-icon.png?v=2" },
 };
 
 export const viewport: Viewport = {

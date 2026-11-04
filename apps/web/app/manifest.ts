@@ -17,11 +17,13 @@ export default function manifest(): MetadataRoute.Manifest {
     orientation: "portrait",
     background_color: "#000000",
     theme_color: "#000000",
+    // Icone: la P di PFMark scura su fondo lime, come l'anteprima in
+    // /benvenuto/installa. "?v=2" forza i telefoni a riscaricarle.
     icons: [
-      { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-      { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      { src: "/icons/icon-192.png?v=2", sizes: "192x192", type: "image/png" },
+      { src: "/icons/icon-512.png?v=2", sizes: "512x512", type: "image/png" },
       {
-        src: "/icons/icon-maskable-512.png",
+        src: "/icons/icon-maskable-512.png?v=2",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
