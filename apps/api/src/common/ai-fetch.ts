@@ -87,13 +87,13 @@ export async function aiFetch(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const startedAt = new Date();
     let recorded = false;
-    const record = async (
+    const record = (
       status: Parameters<typeof recordAiAttempt>[0]['status'],
       httpStatus: number | null = null,
     ) => {
       if (recorded) return;
       recorded = true;
-      await recordAiAttempt({
+      recordAiAttempt({
         provider: options.provider,
         model: safeModel(options.model),
         status,
@@ -107,7 +107,7 @@ export async function aiFetch(
     try {
       const response = await fetch(url, { ...init, signal: controller.signal });
       clearTimeout(timer);
-      await record(response.ok ? 'SUCCESS' : 'HTTP_ERROR', response.status);
+      record(response.ok ? 'SUCCESS' : 'HTTP_ERROR', response.status);
       if (response.ok) {
         return response;
       }
@@ -137,7 +137,7 @@ export async function aiFetch(
       continue;
     } catch (error) {
       clearTimeout(timer);
-      await record(
+      record(
         error instanceof Error && error.name === 'AbortError'
           ? 'TIMEOUT'
           : error instanceof TypeError

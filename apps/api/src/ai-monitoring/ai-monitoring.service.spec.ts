@@ -2,21 +2,29 @@ import { BadGatewayException, Logger } from '@nestjs/common';
 import { AiMonitoringService } from './ai-monitoring.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { aiFetch } from '../common/ai-fetch';
-import { recordAiValidationFailure } from '../common/ai-telemetry';
+import { recordAiValidationFailure, HttpAttempt } from '../common/ai-telemetry';
 import { AiProposalProviderService } from '../ai-orchestrator/proposal-provider.service';
 import { InitialQuestionsInput } from '../ai-orchestrator/initial-questions';
 
 function fixture() {
-  let sequence = 0;
   const db = {
     aiOperationLog: {
       create: jest
-        .fn()
-        .mockImplementation(() => Promise.resolve({ id: `op-${++sequence}` })),
+        .fn<Promise<{ id: string }>, [{ data: { id: string } }]>()
+        .mockImplementation(({ data }: { data: { id: string } }) =>
+          Promise.resolve({ id: data.id }),
+        ),
       update: jest.fn().mockResolvedValue({}),
       deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
     },
-    aiHttpAttempt: { create: jest.fn().mockResolvedValue({}) },
+    aiHttpAttempt: {
+      create: jest
+        .fn<
+          Promise<unknown>,
+          [{ data: HttpAttempt & { operationId: string } }]
+        >()
+        .mockResolvedValue({}),
+    },
   };
   return {
     db,
@@ -57,16 +65,18 @@ describe('persistent AI telemetry', () => {
         { provider: 'openai', model: 'gpt-test', retries: 1 },
       ),
     );
+    await service.flush();
+    const firstId = db.aiOperationLog.create.mock.calls[0][0].data.id;
     expect(db.aiHttpAttempt.create.mock.calls.map(([arg]) => arg.data)).toEqual(
       [
         expect.objectContaining({
-          operationId: 'op-1',
+          operationId: firstId,
           sequence: 1,
           httpStatus: 429,
           status: 'HTTP_ERROR',
         }),
         expect.objectContaining({
-          operationId: 'op-1',
+          operationId: firstId,
           sequence: 2,
           httpStatus: 200,
           status: 'SUCCESS',
@@ -117,6 +127,7 @@ describe('persistent AI telemetry', () => {
     await expect(
       new AiProposalProviderService(service).generateInitialQuestions(input),
     ).rejects.toBeInstanceOf(BadGatewayException);
+    await service.flush();
     expect(global.fetch).toHaveBeenCalledTimes(2);
     expect(db.aiHttpAttempt.create).toHaveBeenCalledTimes(2);
     expect(db.aiOperationLog.update).toHaveBeenLastCalledWith(
@@ -149,6 +160,7 @@ describe('persistent AI telemetry', () => {
         ),
       ),
     ).rejects.toThrow('timeout');
+    await service.flush();
     expect(db.aiHttpAttempt.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ status: 'TIMEOUT', httpStatus: null }),
@@ -178,10 +190,14 @@ describe('persistent AI telemetry', () => {
         await aiFetch('b', {}, { provider: 'gemini' });
       }),
     ]);
+    await service.flush();
+    const [firstId, secondId] = db.aiOperationLog.create.mock.calls.map(
+      ([arg]) => arg.data.id,
+    );
     expect(db.aiHttpAttempt.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          operationId: 'op-1',
+          operationId: firstId,
           provider: 'openai',
           sequence: 1,
         }),
@@ -190,7 +206,7 @@ describe('persistent AI telemetry', () => {
     expect(db.aiHttpAttempt.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          operationId: 'op-2',
+          operationId: secondId,
           provider: 'gemini',
           sequence: 1,
         }),
@@ -198,7 +214,7 @@ describe('persistent AI telemetry', () => {
     );
     expect(db.aiOperationLog.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'op-1' },
+        where: { id: firstId },
         data: expect.objectContaining({ validationFailures: 1 }),
       }),
     );
@@ -216,5 +232,6 @@ describe('persistent AI telemetry', () => {
     await expect(
       service.run('potential', () => Promise.reject(error)),
     ).rejects.toBe(error);
+    await service.flush();
   });
 });

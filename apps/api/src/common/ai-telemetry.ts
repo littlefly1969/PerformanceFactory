@@ -19,7 +19,7 @@ export type AiTrace = {
   validationFailures: number;
   validationCodes: Set<string>;
   lastAttempt?: HttpAttempt;
-  saveAttempt: (attempt: HttpAttempt) => Promise<void>;
+  saveAttempt: (attempt: HttpAttempt) => void;
 };
 export const aiTrace = new AsyncLocalStorage<AiTrace>();
 
@@ -48,12 +48,12 @@ export function recordAiValidationFailure(problems: string[] = []) {
   if (!matched) trace.validationCodes.add('STRUCTURE');
 }
 
-export async function recordAiAttempt(attempt: Omit<HttpAttempt, 'sequence'>) {
+export function recordAiAttempt(attempt: Omit<HttpAttempt, 'sequence'>) {
   const trace = aiTrace.getStore();
   if (!trace) return;
   const entry = { ...attempt, sequence: ++trace.sequence };
   trace.lastAttempt = entry;
-  await trace.saveAttempt(entry);
+  trace.saveAttempt(entry);
 }
 
 /** Model names are configuration, never copy arbitrary provider payloads. */

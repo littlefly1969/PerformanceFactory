@@ -108,6 +108,53 @@ describe('admin monitoring on PostgreSQL', () => {
     expect(result.daily[2]).toEqual(baseline.daily[2]);
   });
 
+  it('does not use an older completion to close a later registration attempt', async () => {
+    const service = new RegistrationReportService(db as PrismaService);
+    const baseline = await service.report(3);
+    const user = await db.user.create({
+      data: {
+        email: `${prefix}-reused@example.test`,
+        password: 'unused',
+        role: 'USER',
+      },
+    });
+    users.push(user.id);
+    const anonymousId = `${prefix}-reused`;
+    const startedAt = new Date(Date.now() - 5000);
+    await db.analyticsEvent.createMany({
+      data: [
+        {
+          name: 'registration_completed',
+          origin: 'SERVER',
+          userId: user.id,
+          anonymousId,
+          occurredAt: new Date(startedAt.getTime() - 60000),
+        },
+        {
+          name: 'registration_started',
+          origin: 'CLIENT',
+          anonymousId,
+          occurredAt: startedAt,
+        },
+      ],
+    });
+    const pending = await service.report(3);
+    expect(pending.totals.started - baseline.totals.started).toBe(1);
+    expect(pending.totals.pending - baseline.totals.pending).toBe(1);
+    await db.analyticsEvent.create({
+      data: {
+        name: 'registration_completed',
+        origin: 'SERVER',
+        userId: user.id,
+        anonymousId,
+        occurredAt: new Date(),
+      },
+    });
+    const completed = await service.report(3);
+    expect(completed.totals.pending).toBe(baseline.totals.pending);
+    expect(completed.totals.started).toBe(pending.totals.started);
+  });
+
   it('paginates persistent logs, detects missing outcomes, and cascades attempt deletion', async () => {
     const operation = await db.aiOperationLog.create({
       data: {

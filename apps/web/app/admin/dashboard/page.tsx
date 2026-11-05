@@ -96,8 +96,9 @@ export default function DashboardPage() {
         <p>
           Avviate: browser distinti che hanno aperto il modulo, contati una
           volta nel periodo e assegnati al primo giorno di apertura. Non
-          completate: tra questi, quelli senza una registrazione collegata al
-          momento dell’aggiornamento.
+          completate: tra questi, quelli senza una registrazione collegata
+          successiva o contemporanea al primo avvio, al momento
+          dell’aggiornamento.
         </p>
         <p>
           Account creati: registrazioni confermate dal server, nel giorno di

@@ -24,6 +24,7 @@ export class RegistrationReportService {
             SELECT 1 FROM "AnalyticsEvent" c
             WHERE c.name = 'registration_completed' AND c.origin = 'SERVER'
               AND c."userId" IS NOT NULL AND c."anonymousId" = s."anonymousId"
+              AND c."occurredAt" >= s.first_start
               AND c."occurredAt" <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
           ) AS pending
         FROM starts s
