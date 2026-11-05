@@ -114,7 +114,7 @@ export async function summarizeGeminiCycleHistory(
         },
       }),
     },
-    { provider: 'gemini' },
+    { provider: 'gemini', model },
   );
 
   const payload = (await response.json()) as {
@@ -195,7 +195,7 @@ export async function generateGeminiSpecialistOnboardingQuestions(
         },
       }),
     },
-    { provider: 'gemini' },
+    { provider: 'gemini', model },
   );
 
   const payload = (await response.json()) as {
@@ -264,7 +264,7 @@ export async function validateGeminiPerformanceGoal(
         },
       }),
     },
-    { provider: 'gemini' },
+    { provider: 'gemini', model },
   );
 
   const payload = (await response.json()) as {

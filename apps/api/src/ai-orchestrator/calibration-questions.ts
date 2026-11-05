@@ -1,3 +1,4 @@
+import { recordAiValidationFailure } from '../common/ai-telemetry';
 import type { MicroTestFormat, VideoChoice } from './micro-test-situations';
 import { BadGatewayException, Logger } from '@nestjs/common';
 import { hashJson } from './proposal-audit';
@@ -313,6 +314,7 @@ export async function generateCalibrationQuestions(
   const problems: string[] = [];
   const step = validateCalibrationStep(raw, input, problems);
   if (!step) {
+    recordAiValidationFailure(problems);
     logger.warn(
       `INVALID_CALIBRATION_QUESTIONS ${provider}/${model}: ${problems.join('; ')}`,
     );

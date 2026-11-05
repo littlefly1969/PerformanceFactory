@@ -1,3 +1,4 @@
+import { recordAiValidationFailure } from '../common/ai-telemetry';
 import { BadGatewayException, Logger } from '@nestjs/common';
 import { hashJson } from './proposal-audit';
 import { requestStructuredProposal } from './proposal-structured-transport';
@@ -286,6 +287,7 @@ export async function generateMicroTests(
     }
     const problems: string[] = [];
     const tests = validateMicroTests(raw, input, problems);
+    if (!tests) recordAiValidationFailure(problems);
     if (tests)
       return {
         provider,

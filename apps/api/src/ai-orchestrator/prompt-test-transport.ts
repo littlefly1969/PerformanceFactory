@@ -74,7 +74,7 @@ export async function testPrompt(input: {
           ],
         }),
       },
-      { provider: 'openai' },
+      { provider: 'openai', model },
     );
     const payload = (await response.json()) as {
       output_text?: string;
@@ -133,7 +133,7 @@ export async function testPrompt(input: {
         ],
       }),
     },
-    { provider: 'gemini' },
+    { provider: 'gemini', model },
   );
   const payload = (await response.json()) as {
     candidates?: Array<{

@@ -1,3 +1,4 @@
+import { recordAiValidationFailure } from '../common/ai-telemetry';
 import { BadGatewayException, Logger } from '@nestjs/common';
 import { hashJson } from './proposal-audit';
 import { requestStructuredProposal } from './proposal-structured-transport';
@@ -63,6 +64,7 @@ export async function evaluateAssessment(
   const problems: string[] = [];
   const output = validateAssessmentEvaluation(raw, input, problems);
   if (!output) {
+    recordAiValidationFailure(problems);
     logger.warn(
       `INVALID_ASSESSMENT_EVALUATION ${provider}/${model}: ${problems.join('; ')}`,
     );

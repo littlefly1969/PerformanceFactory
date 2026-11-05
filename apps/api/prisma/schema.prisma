@@ -2160,3 +2160,39 @@ model Passkey {
 
   @@index([userId])
 }
+
+// Operational metadata only: never prompts, answers, credentials or athlete IDs.
+model AiOperationLog {
+  id                 String         @id @default(uuid())
+  operation          String
+  provider           String?
+  model              String?
+  status             String         @default("RUNNING")
+  errorCode          String?
+  startedAt          DateTime       @default(now())
+  finishedAt         DateTime?
+  durationMs         Int?
+  validationFailures Int            @default(0)
+  validationCodes    String[]       @default([])
+  attempts           AiHttpAttempt[]
+
+  @@index([startedAt])
+  @@index([status, startedAt])
+  @@index([operation, startedAt])
+  @@index([provider, startedAt])
+}
+
+model AiHttpAttempt {
+  id          String         @id @default(uuid())
+  operationId String
+  sequence    Int
+  provider    String
+  model       String?
+  status      String
+  httpStatus  Int?
+  durationMs  Int
+  startedAt   DateTime
+  operation   AiOperationLog @relation(fields: [operationId], references: [id], onDelete: Cascade)
+
+  @@unique([operationId, sequence])
+}

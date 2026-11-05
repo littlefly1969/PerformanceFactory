@@ -1,9 +1,10 @@
+import { AiMonitoringService } from '../ai-monitoring/ai-monitoring.service';
 import {
   generateTrainingProposal,
   buildTrainingProposalPreview,
 } from './training-proposal';
 import { TrainingProposalInput } from './proposal-provider-model';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { evaluateAssessment } from './assessment-evaluation';
 import { AssessmentEvaluationInput } from './assessment-evaluation-model';
 import {
@@ -44,15 +45,24 @@ export * from './proposal-provider-model';
 
 @Injectable()
 export class AiProposalProviderService {
+  constructor(@Optional() private readonly monitoring?: AiMonitoringService) {}
   private readonly logger = new Logger(AiProposalProviderService.name);
   async generateCycleProposal(
     input: CycleProposalInput,
   ): Promise<CycleProposal> {
-    return generateCycleProposal(this.logger, input);
+    return this.monitoring
+      ? this.monitoring.run('cycle_proposal', () =>
+          generateCycleProposal(this.logger, input),
+        )
+      : generateCycleProposal(this.logger, input);
   }
 
   generateTrainingProposal(input: TrainingProposalInput) {
-    return generateTrainingProposal(this.logger, input);
+    return this.monitoring
+      ? this.monitoring.run('training_proposal', () =>
+          generateTrainingProposal(this.logger, input),
+        )
+      : generateTrainingProposal(this.logger, input);
   }
   buildTrainingProposalPreview(input: TrainingProposalInput) {
     return buildTrainingProposalPreview(input);
@@ -60,7 +70,11 @@ export class AiProposalProviderService {
   async summarizeCycleHistory(
     input: CycleHistorySummaryInput,
   ): Promise<CycleHistorySummaryResult> {
-    return summarizeCycleHistory(this.logger, input);
+    return this.monitoring
+      ? this.monitoring.run('cycle_history', () =>
+          summarizeCycleHistory(this.logger, input),
+        )
+      : summarizeCycleHistory(this.logger, input);
   }
 
   buildCycleProposalPreview(input: CycleProposalInput) {
@@ -72,39 +86,69 @@ export class AiProposalProviderService {
     context?: string;
     provider?: AiProvider | 'configured';
   }) {
-    return testPrompt(input);
+    return this.monitoring
+      ? this.monitoring.run('prompt_test', () => testPrompt(input))
+      : testPrompt(input);
   }
 
   async validatePerformanceGoal(
     input: GoalValidationInput,
   ): Promise<GoalValidationResult> {
-    return validatePerformanceGoal(this.logger, input);
+    return this.monitoring
+      ? this.monitoring.run('goal_validation', () =>
+          validatePerformanceGoal(this.logger, input),
+        )
+      : validatePerformanceGoal(this.logger, input);
   }
 
   async generateSpecialistOnboardingQuestions(
     input: SpecialistOnboardingQuestionInput,
   ): Promise<SpecialistOnboardingQuestionResult> {
-    return generateSpecialistOnboardingQuestions(this.logger, input);
+    return this.monitoring
+      ? this.monitoring.run('specialist_questions', () =>
+          generateSpecialistOnboardingQuestions(this.logger, input),
+        )
+      : generateSpecialistOnboardingQuestions(this.logger, input);
   }
 
   evaluateAssessment(input: AssessmentEvaluationInput) {
-    return evaluateAssessment(this.logger, input);
+    return this.monitoring
+      ? this.monitoring.run('assessment_evaluation', () =>
+          evaluateAssessment(this.logger, input),
+        )
+      : evaluateAssessment(this.logger, input);
   }
 
   generateCalibrationQuestions(input: CalibrationQuestionsInput) {
-    return generateCalibrationQuestions(this.logger, input);
+    return this.monitoring
+      ? this.monitoring.run('calibration_questions', () =>
+          generateCalibrationQuestions(this.logger, input),
+        )
+      : generateCalibrationQuestions(this.logger, input);
   }
 
   generateInitialQuestions(input: InitialQuestionsInput) {
-    return generateInitialQuestions(this.logger, input);
+    return this.monitoring
+      ? this.monitoring.run('initial_questions', () =>
+          generateInitialQuestions(this.logger, input),
+        )
+      : generateInitialQuestions(this.logger, input);
   }
 
   generateMicroTests(input: MicroTestInput) {
-    return generateMicroTests(this.logger, input);
+    return this.monitoring
+      ? this.monitoring.run('micro_tests', () =>
+          generateMicroTests(this.logger, input),
+        )
+      : generateMicroTests(this.logger, input);
   }
 
   generatePotential(input: PotentialGenerationInput) {
-    return generatePotential(this.logger, input);
+    return this.monitoring
+      ? this.monitoring.run('potential', () =>
+          generatePotential(this.logger, input),
+        )
+      : generatePotential(this.logger, input);
   }
 
   static requiresUserConsent(provider = process.env.AI_PROVIDER) {
