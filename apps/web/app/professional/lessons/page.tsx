@@ -1,11 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  EmptyState,
-  ProductShell,
-  StatusBadge,
-} from "@/app/components/product-shell";
+import { ProductShell, StatusBadge } from "@/app/components/product-shell";
+import { DataTable } from "@/app/components/workspace/data-table";
 import { API_BASE, secureFetch } from "@/app/lib/api";
 
 type Participant = {
@@ -166,6 +163,7 @@ export default function ProfessionalLessonsPage() {
   const [data, setData] = useState<Response>();
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -200,87 +198,161 @@ export default function ProfessionalLessonsPage() {
       description="Gruppi da 4 atleti in calibrazione. Dopo la lezione dai un voto da 1 a 5 almeno sul driver tecnico-tattico: entra nella loro valutazione accanto alle loro risposte, senza sostituirle."
     >
       {message && <div className="pf-alert warning">{message}</div>}
-      {data && data.lessons.length === 0 && (
-        <EmptyState
-          title="Nessuna lezione"
-          description="Le lezioni assegnate a te compaiono qui."
-        />
-      )}
-      <div className="pf-stack">
-        {data?.lessons.map((lesson) => (
-          <article className="pf-panel" key={lesson.id}>
-            <div className="pf-panel-header">
-              <h2>
-                {lesson.club.name} ·{" "}
-                {new Date(lesson.startsAt).toLocaleString("it-IT", {
-                  weekday: "long",
-                  day: "numeric",
-                  month: "long",
+      <section className="pf-panel">
+        <DataTable
+          label="Lezioni del coach"
+          rows={(data?.lessons ?? []).filter(
+            (l) => !status || l.status === status,
+          )}
+          loading={!data && !message}
+          rowKey={(l) => l.id}
+          initialSort={{ id: "date", direction: "desc" }}
+          searchText={(l) =>
+            `${l.club.name} ${l.club.city ?? ""} ${l.levelLabel ?? ""} ${l.participants.map((p) => [p.firstName, p.lastName].filter(Boolean).join(" ")).join(" ")}`
+          }
+          filters={
+            <select
+              aria-label="Stato lezioni del coach"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+            >
+              <option value="">Tutte le lezioni</option>
+              <option value="SCHEDULED">In programma</option>
+              <option value="COMPLETED">Svolte</option>
+            </select>
+          }
+          columns={[
+            {
+              id: "date",
+              label: "Data e ora",
+              value: (l) => new Date(l.startsAt).getTime(),
+              render: (l) =>
+                new Date(l.startsAt).toLocaleString("it-IT", {
+                  day: "2-digit",
+                  month: "short",
                   hour: "2-digit",
                   minute: "2-digit",
-                })}
-              </h2>
-              <StatusBadge
-                tone={lesson.status === "COMPLETED" ? "success" : "accent"}
-              >
-                {lesson.status === "COMPLETED" ? "Chiusa" : "In programma"}
-              </StatusBadge>
-            </div>
-            <p className="pf-muted">
-              {lesson.levelLabel ?? "Livello misto"} · {lesson.durationMinutes}{" "}
-              minuti
-              {!lesson.started &&
-                " · il feedback si apre all'inizio della lezione"}
-            </p>
-            <div className="pf-stack">
-              {lesson.participants.map((p) => (
-                <article className="pf-card" key={p.userId}>
-                  <h3>
-                    {[p.firstName, p.lastName].filter(Boolean).join(" ") ||
-                      "Atleta"}{" "}
-                    · {p.level ? LEVELS[p.level] : "livello non stimato"}
-                  </h3>
-                  {p.status === "ASSIGNED" ? (
-                    <FeedbackForm
-                      lesson={lesson}
-                      participant={p}
-                      ratings={data.ratings}
-                      busy={busy}
-                      onSubmit={(body) =>
-                        void run(
-                          `/${lesson.id}/feedback`,
-                          body,
-                          "Feedback inviato.",
-                        )
-                      }
-                      onNoShow={() =>
-                        void run(
-                          `/${lesson.id}/no-show`,
-                          { userId: p.userId },
-                          "Assenza registrata.",
-                        )
-                      }
-                    />
-                  ) : (
-                    <p className="pf-muted">
-                      {p.status === "NO_SHOW"
-                        ? "Assente"
-                        : `Feedback inviato: ${p.feedback
-                            .map((f) => {
-                              const driver = p.drivers.find(
-                                (d) => d.areaId === f.areaId,
-                              );
-                              return `${driver?.name ?? "driver"} ${f.rating}/5`;
-                            })
-                            .join(", ")}`}
-                    </p>
-                  )}
-                </article>
-              ))}
-            </div>
-          </article>
-        ))}
-      </div>
+                }),
+            },
+            {
+              id: "club",
+              label: "Circolo",
+              value: (l) => l.club.name,
+              render: (l) => (
+                <strong>
+                  {l.club.name}
+                  <small>{l.club.city}</small>
+                </strong>
+              ),
+            },
+            {
+              id: "level",
+              label: "Livello",
+              value: (l) => l.levelLabel ?? "",
+              render: (l) => l.levelLabel || "Misto",
+            },
+            {
+              id: "participants",
+              label: "Partecipanti",
+              value: (l) => l.participants.length,
+              render: (l) => l.participants.length,
+            },
+            {
+              id: "feedback",
+              label: "Da valutare",
+              value: (l) =>
+                l.participants.filter((p) => p.status === "ASSIGNED").length,
+              render: (l) =>
+                l.participants.filter((p) => p.status === "ASSIGNED").length,
+            },
+            {
+              id: "status",
+              label: "Stato",
+              value: (l) => l.status,
+              render: (l) => (
+                <StatusBadge
+                  tone={l.status === "COMPLETED" ? "success" : "accent"}
+                >
+                  {l.status === "COMPLETED" ? "Chiusa" : "In programma"}
+                </StatusBadge>
+              ),
+            },
+          ]}
+          renderDetails={(lesson) => (
+            <article className="pf-panel" key={lesson.id}>
+              <div className="pf-panel-header">
+                <h2>
+                  {lesson.club.name} ·{" "}
+                  {new Date(lesson.startsAt).toLocaleString("it-IT", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </h2>
+                <StatusBadge
+                  tone={lesson.status === "COMPLETED" ? "success" : "accent"}
+                >
+                  {lesson.status === "COMPLETED" ? "Chiusa" : "In programma"}
+                </StatusBadge>
+              </div>
+              <p className="pf-muted">
+                {lesson.levelLabel ?? "Livello misto"} ·{" "}
+                {lesson.durationMinutes} minuti
+                {!lesson.started &&
+                  " · il feedback si apre all'inizio della lezione"}
+              </p>
+              <div className="pf-stack">
+                {lesson.participants.map((p) => (
+                  <article className="pf-card" key={p.userId}>
+                    <h3>
+                      {[p.firstName, p.lastName].filter(Boolean).join(" ") ||
+                        "Atleta"}{" "}
+                      · {p.level ? LEVELS[p.level] : "livello non stimato"}
+                    </h3>
+                    {p.status === "ASSIGNED" ? (
+                      <FeedbackForm
+                        lesson={lesson}
+                        participant={p}
+                        ratings={data?.ratings ?? []}
+                        busy={busy}
+                        onSubmit={(body) =>
+                          void run(
+                            `/${lesson.id}/feedback`,
+                            body,
+                            "Feedback inviato.",
+                          )
+                        }
+                        onNoShow={() =>
+                          void run(
+                            `/${lesson.id}/no-show`,
+                            { userId: p.userId },
+                            "Assenza registrata.",
+                          )
+                        }
+                      />
+                    ) : (
+                      <p className="pf-muted">
+                        {p.status === "NO_SHOW"
+                          ? "Assente"
+                          : `Feedback inviato: ${p.feedback
+                              .map((f) => {
+                                const driver = p.drivers.find(
+                                  (d) => d.areaId === f.areaId,
+                                );
+                                return `${driver?.name ?? "driver"} ${f.rating}/5`;
+                              })
+                              .join(", ")}`}
+                      </p>
+                    )}
+                  </article>
+                ))}
+              </div>
+            </article>
+          )}
+        />
+      </section>
     </ProductShell>
   );
 }

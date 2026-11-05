@@ -1,0 +1,333 @@
+.ws-table-tools {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 0 0 14px;
+}
+.ws-filter-date {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--pf-muted);
+}
+.ws-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fff;
+  border: 1px solid var(--pf-border);
+  border-radius: 6px;
+  min-height: 36px;
+  padding: 0 10px;
+  flex: 1 1 240px;
+  max-width: 410px;
+}
+.ws-search input {
+  width: 100%;
+  border: none;
+  outline: none;
+  padding: 8px 0;
+  color: var(--pf-text);
+  background: transparent;
+  font-size: 13px;
+}
+.ws-search:focus-within {
+  outline: 2px solid #11766b;
+  outline-offset: 2px;
+}
+.ws-control,
+.ws-table-tools select,
+.ws-table-footer select {
+  background: #fff;
+  border: 1px solid var(--pf-border);
+  color: var(--pf-text);
+  border-radius: 6px;
+  padding: 6px 10px;
+  min-height: 34px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ws-control:hover:not(:disabled) {
+  background: #f1f5f7;
+}
+.ws-control:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.ws-table-scroll {
+  overflow: auto;
+  max-height: 65vh;
+  border: 1px solid var(--pf-border);
+  border-radius: 8px;
+  overscroll-behavior: contain;
+}
+.ws-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+  text-align: left;
+}
+.ws-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #f5f7f9;
+  color: #566773;
+  font-weight: 600;
+  font-size: 11px;
+  white-space: nowrap;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--pf-border);
+}
+.ws-table th button {
+  border: none;
+  color: inherit;
+  background: transparent;
+  font-weight: inherit;
+  cursor: pointer;
+  min-height: 24px;
+  padding: 0;
+  text-align: left;
+}
+.ws-table td {
+  padding: 17px 14px;
+  border-bottom: 1px solid #edf0f3;
+  vertical-align: middle;
+  font-variant-numeric: tabular-nums;
+}
+.ws-data.is-compact .ws-table td {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.ws-table tr:last-child td {
+  border-bottom: none;
+}
+.ws-table tbody > tr:hover > td {
+  background: #f8fafb;
+}
+.ws-table tr.is-expanded > td {
+  background: #eef6f4;
+}
+.ws-table td strong {
+  font-weight: 600;
+}
+.ws-table small {
+  display: block;
+  color: var(--pf-muted);
+  font-size: 11px;
+  margin-top: 3px;
+}
+.ws-table a {
+  color: #0c7569;
+  font-weight: 600;
+}
+.ws-table .ws-expand-cell {
+  width: 40px;
+  padding: 8px;
+}
+.ws-expand {
+  width: 27px;
+  height: 27px;
+  min-height: 27px;
+  border-radius: 5px;
+  border: 1px solid var(--pf-border);
+  background: #fff;
+  cursor: pointer;
+  color: #546572;
+  font-size: 17px;
+}
+.ws-table .ws-detail-cell {
+  background: #f8fafb;
+  padding: 20px;
+}
+.ws-detail-cell .pf-panel,
+.ws-detail-cell .pf-card {
+  margin: 0;
+  box-shadow: none;
+}
+.ws-detail-cell .pf-stack {
+  max-width: 100%;
+}
+.ws-no-results {
+  text-align: center;
+  color: var(--pf-muted);
+  height: 110px;
+}
+.ws-no-results button {
+  margin-left: 12px;
+}
+.ws-table-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-top: 14px;
+  font-size: 11px;
+  color: var(--pf-muted);
+}
+.ws-table-footer label,
+.ws-page-buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ws-table-footer .ws-control {
+  min-width: 34px;
+}
+.ws-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.ws-skip {
+  position: fixed;
+  left: 250px;
+  top: -60px;
+  z-index: 100;
+  padding: 10px;
+  background: #fff;
+  border: 2px solid #11766b;
+}
+.ws-skip:focus {
+  top: 8px;
+}
+.ws-menu-toggle {
+  display: none;
+}
+.ws-create {
+  border: 1px solid var(--pf-border);
+  background: #fff;
+  border-radius: 8px;
+  margin: 20px 0;
+}
+.ws-create > summary {
+  cursor: pointer;
+  padding: 14px 18px;
+  font-weight: 600;
+  font-size: 13px;
+}
+.ws-create > form,
+.ws-create > div {
+  padding: 18px;
+  border-top: 1px solid var(--pf-border);
+}
+.ws-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.ws-form-grid > button {
+  align-self: end;
+  justify-self: start;
+}
+.ws-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 0 0 20px;
+  flex-wrap: wrap;
+}
+.ws-tabs button {
+  border: 1px solid var(--pf-border);
+  border-radius: 6px;
+  background: white;
+  padding: 8px 16px;
+  color: var(--pf-muted);
+  cursor: pointer;
+  font-size: 13px;
+}
+.ws-tabs button[aria-pressed="true"] {
+  background: #e6f4f0;
+  color: #10695f;
+  border-color: #a7d3ca;
+  font-weight: 600;
+}
+@media (min-width: 1400px) {
+  .ws-shell .ws-split {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}
+@media (max-width: 1000px) {
+  .ws-sidebar {
+    width: 205px;
+  }
+  .ws-content {
+    padding: 24px 20px;
+  }
+  .ws-topbar {
+    padding: 10px 20px;
+  }
+  .ws-page-header {
+    flex-wrap: wrap;
+  }
+}
+@media (max-width: 760px) {
+  .ws-shell {
+    display: block;
+  }
+  .ws-sidebar {
+    position: static;
+    width: auto;
+    height: auto;
+  }
+  .ws-brand {
+    padding: 12px 16px;
+  }
+  .ws-sidebar nav,
+  .ws-sidebar .ws-account {
+    display: none;
+  }
+  .ws-sidebar.is-open nav {
+    display: block;
+    max-height: 55dvh;
+  }
+  .ws-sidebar.is-open .ws-account {
+    display: flex;
+  }
+  .ws-topbar {
+    padding: 9px 16px;
+    gap: 12px;
+  }
+  .ws-menu-toggle {
+    display: block;
+  }
+  .ws-environment {
+    display: none;
+  }
+  .ws-content {
+    padding: 20px 12px 40px;
+  }
+  .ws-page-header h1 {
+    font-size: 24px;
+  }
+  .ws-shell .pf-panel {
+    padding: 14px;
+  }
+  .ws-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .ws-table-tools > * {
+    max-width: none;
+  }
+  .ws-table-tools select {
+    max-width: 100%;
+  }
+  .ws-table th,
+  .ws-table td {
+    min-width: 110px;
+  }
+  .ws-table .ws-expand-cell {
+    min-width: 40px;
+  }
+  .ws-skip {
+    left: 10px;
+  }
+}

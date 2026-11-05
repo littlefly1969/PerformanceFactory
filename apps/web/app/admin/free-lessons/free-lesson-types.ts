@@ -24,7 +24,6 @@ export type Overview = {
     freeLessonsEnabled: boolean;
   }>;
   coaches: Array<{ id: string; email: string; firstName: string | null }>;
-  areas: Array<{ id: string; name: string }>;
   lessons: Array<{
     id: string;
     partnerId: string;
@@ -45,15 +44,6 @@ export type Overview = {
       preferredLessonId?: string | null;
     }
   >;
-  microTests: Array<{
-    id: string;
-    areaId: string;
-    areaName: string;
-    title: string;
-    instructions: string;
-    options: Array<{ value: string; label: string; score: number }>;
-    isActive: boolean;
-  }>;
 };
 
 export const LEVELS: Record<string, string> = {

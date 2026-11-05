@@ -6,13 +6,21 @@ import FlagsPage from "./page";
 import PartnersPage from "../partners/page";
 
 vi.mock("../../components/product-shell", () => ({
-  ProductShell: ({ title, children }: { title: string; children: ReactNode }) => (
+  ProductShell: ({
+    title,
+    children,
+  }: {
+    title: string;
+    children: ReactNode;
+  }) => (
     <main>
       <h1>{title}</h1>
       {children}
     </main>
   ),
-  StatusBadge: ({ children }: { children: ReactNode }) => <span>{children}</span>,
+  StatusBadge: ({ children }: { children: ReactNode }) => (
+    <span>{children}</span>
+  ),
 }));
 vi.mock("../../lib/api", () => ({
   API_BASE: "/api",
@@ -102,12 +110,15 @@ describe("admin ingresso", () => {
       },
     });
     render(<PartnersPage />);
-    expect(
-      await screen.findByText(/\/start\?club=padel-nord/),
-    ).toBeInTheDocument();
+    await screen.findByRole("table", { name: "Circoli" });
+    await userEvent.click(
+      screen.getByRole("button", { name: /Apri dettagli Padel Nord/ }),
+    );
+    expect(screen.getByText(/\/start\?club=padel-nord/)).toBeInTheDocument();
     expect(screen.getByText("Atterraggi").nextElementSibling).toHaveTextContent(
       "40",
     );
+    await userEvent.click(screen.getByText("+ Nuovo circolo"));
     await userEvent.type(screen.getByLabelText("Nome"), "Padel Sud");
     await userEvent.type(
       screen.getByLabelText("Codice (es. padel-roma-nord)"),

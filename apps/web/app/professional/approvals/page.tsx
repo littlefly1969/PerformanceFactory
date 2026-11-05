@@ -1,11 +1,8 @@
 "use client";
 
-import {
-  EmptyState,
-  ProductShell,
-  StatusBadge,
-} from "@/app/components/product-shell";
+import { ProductShell, StatusBadge } from "@/app/components/product-shell";
 import Link from "next/link";
+import { DataTable } from "@/app/components/workspace/data-table";
 import { formatDate } from "./professional-approvals-model";
 import { useProfessionalApprovals } from "./use-professional-approvals";
 
@@ -87,8 +84,51 @@ export default function ProfessionalApprovazioniPage() {
           </StatusBadge>
         </div>
 
-        <div className="pf-stack">
-          {groups.map((group) => (
+        <DataTable
+          label="Approvazioni per atleta"
+          rows={groups}
+          loading={loading}
+          rowKey={(g) => g.user.id}
+          searchText={(g) =>
+            `${g.user.email} ${g.plans.map((p) => p.title).join(" ")}`
+          }
+          columns={[
+            {
+              id: "athlete",
+              label: "Atleta",
+              value: (g) => g.user.email,
+              render: (g) => <strong>{g.user.email}</strong>,
+            },
+            {
+              id: "questions",
+              label: "Questionari",
+              value: (g) => g.questions.length,
+              render: (g) => g.questions.length,
+            },
+            {
+              id: "plans",
+              label: "Attività area",
+              value: (g) => g.plans.length,
+              render: (g) => g.plans.length,
+            },
+            {
+              id: "training",
+              label: "Revisioni allenatore",
+              value: (g) => g.trainingQuestions.length + g.trainingPlans.length,
+              render: (g) =>
+                g.trainingQuestions.length + g.trainingPlans.length,
+            },
+            {
+              id: "profile",
+              label: "Profilo",
+              render: (g) => (
+                <Link href={`/professional/users/${g.user.id}/performance`}>
+                  Apri profilo →
+                </Link>
+              ),
+            },
+          ]}
+          renderDetails={(group) => (
             <article key={group.user.id} className="pf-card pf-review-card">
               <div className="pf-card-top">
                 <div>
@@ -372,15 +412,9 @@ export default function ProfessionalApprovazioniPage() {
                 </div>
               ))}
             </article>
-          ))}
-
-          {!loading && groups.length === 0 && (
-            <EmptyState
-              title="Nessuna approvazione"
-              description="Nessun atleta collegato ha questionari o attivita in attesa di revisione."
-            />
           )}
-        </div>
+          empty="Nessuna approvazione in attesa."
+        />
       </section>
     </ProductShell>
   );

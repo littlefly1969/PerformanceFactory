@@ -1,5 +1,6 @@
 "use client";
 
+import { DataTable } from "@/app/components/workspace/data-table";
 import { StatusBadge } from "@/app/components/product-shell";
 import { displayUser, formatStatus } from "./admin-cycles-model";
 import type { AdminCyclesModel } from "./use-admin-cycles";
@@ -25,8 +26,57 @@ export function AthleteAssignments({ model }: { model: AdminCyclesModel }) {
           </p>
         </div>
       </div>
-      <div className="pf-grid pf-ownership-grid">
-        {athletes.map((athlete) => {
+      <DataTable
+        label="Assegnazione atleti"
+        rows={athletes}
+        rowKey={(a) => a.id}
+        searchText={(a) =>
+          `${displayUser(a)} ${a.email} ${formatStatus(a.onboarding.status)}`
+        }
+        columns={[
+          {
+            id: "athlete",
+            label: "Atleta",
+            value: (a) => displayUser(a),
+            render: (a) => (
+              <strong>
+                {displayUser(a)}
+                <small>{a.email}</small>
+              </strong>
+            ),
+          },
+          {
+            id: "active",
+            label: "Accesso",
+            value: (a) => Number(a.isActive),
+            render: (a) => (
+              <StatusBadge tone={a.isActive ? "success" : "warning"}>
+                {a.isActive ? "Abilitato" : "In attesa"}
+              </StatusBadge>
+            ),
+          },
+          {
+            id: "onboarding",
+            label: "Onboarding",
+            value: (a) => a.onboarding.status,
+            render: (a) => formatStatus(a.onboarding.status),
+          },
+          {
+            id: "ranking",
+            label: "Ranking",
+            value: (a) => a.latestSnapshot?.rankingGlobal ?? 0,
+            render: (a) => a.latestSnapshot?.rankingGlobal ?? "—",
+          },
+          {
+            id: "areas",
+            label: "Aree assegnate",
+            value: (a) =>
+              a.areaStates.filter((s) => s.linkedProfessional).length,
+            render: (a) =>
+              `${a.areaStates.filter((s) => s.linkedProfessional).length} / ${a.areaStates.length}`,
+          },
+        ]}
+        renderDetails={(athlete) => {
           const assignedCount = athlete.areaStates.filter(
             (state) => state.linkedProfessional,
           ).length;
@@ -127,8 +177,8 @@ export function AthleteAssignments({ model }: { model: AdminCyclesModel }) {
               </div>
             </article>
           );
-        })}
-      </div>
+        }}
+      />
     </section>
   );
 }

@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API_BASE, secureFetch, signOut } from "@/app/lib/api";
+import { WorkspaceShell } from "./workspace/workspace-shell";
 
 type NavItem = {
   href: string;
@@ -388,6 +389,33 @@ export function ProductShell({
     setLoggingOut(true);
     await signOut();
   };
+
+  if (
+    (me?.role === "ADMIN" && pathname.startsWith("/admin/")) ||
+    (me?.role === "PROFESSIONAL" &&
+      (pathname === "/professional" || pathname.startsWith("/professional/")))
+  ) {
+    return (
+      <WorkspaceShell
+        role={me.role}
+        pathname={pathname}
+        nav={resolvedNav}
+        email={me.email}
+        loggingOut={loggingOut}
+        onLogout={logout}
+        title={title}
+        eyebrow={eyebrow}
+        description={description}
+        titleMeta={titleMeta}
+        actions={actions}
+        stats={stats}
+        onBack={backAction ? goBack : undefined}
+        backLabel={backAction?.label}
+      >
+        {children}
+      </WorkspaceShell>
+    );
+  }
 
   return (
     <main
