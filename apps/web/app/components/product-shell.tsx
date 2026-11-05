@@ -409,7 +409,7 @@ export function ProductShell({
         titleMeta={titleMeta}
         actions={actions}
         stats={stats}
-        onBack={backAction ? goBack : undefined}
+        onBack={backAction || logicalBackHref ? goBack : undefined}
         backLabel={backAction?.label}
       >
         {children}
