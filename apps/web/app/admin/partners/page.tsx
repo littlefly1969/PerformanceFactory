@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ProductShell, StatusBadge } from "@/app/components/product-shell";
 import { adminRequest } from "../components/admin-request";
 import { ClubImages, resizeClubImage } from "./club-images";
+import { DataTable } from "@/app/components/workspace/data-table";
 
 type Partner = {
   id: string;
@@ -107,6 +108,7 @@ export default function AdminPartnersPage() {
   const [partners, setPartners] = useState<Partner[]>([]);
   const [funnel, setFunnel] = useState<Funnel>();
   const [days, setDays] = useState(30);
+  const [status, setStatus] = useState("");
   const [draft, setDraft] = useState(emptyDraft);
   const [edit, setEdit] = useState<{ id: string; details: Details } | null>(
     null,
@@ -181,13 +183,86 @@ export default function AdminPartnersPage() {
       ]}
     >
       {message && <div className="pf-alert warning">{message}</div>}
-      <section className="pf-dashboard-grid">
+      <section className="pf-dashboard-grid ws-split">
         <article className="pf-panel">
           <div className="pf-panel-header">
             <h2>Circoli</h2>
           </div>
-          <div className="pf-stack">
-            {partners.map((partner) => (
+          <DataTable
+            label="Circoli"
+            rows={partners.filter(
+              (p) =>
+                !status || (status === "active" ? p.isActive : !p.isActive),
+            )}
+            rowKey={(p) => p.id}
+            searchText={(p) =>
+              `${p.name} ${p.city ?? ""} ${p.province ?? ""} ${p.code}`
+            }
+            initialSort={{ id: "name", direction: "asc" }}
+            filters={
+              <select
+                aria-label="Stato circoli"
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              >
+                <option value="">Tutti gli stati</option>
+                <option value="active">Attivi</option>
+                <option value="inactive">Sospesi</option>
+              </select>
+            }
+            columns={[
+              {
+                id: "name",
+                label: "Circolo",
+                value: (p) => p.name,
+                render: (p) => (
+                  <strong>
+                    {p.name}
+                    <small>{p.code}</small>
+                  </strong>
+                ),
+              },
+              {
+                id: "city",
+                label: "Sede",
+                value: (p) => p.city ?? "",
+                render: (p) => (
+                  <>
+                    {p.city || "—"}
+                    <small>{p.province}</small>
+                  </>
+                ),
+              },
+              {
+                id: "athletes",
+                label: "Atleti",
+                value: (p) => p.attributedUsers,
+                render: (p) => p.attributedUsers,
+              },
+              {
+                id: "lesson",
+                label: "Lezione gratuita",
+                value: (p) => Number(p.freeLessonsEnabled),
+                render: (p) => (
+                  <StatusBadge
+                    tone={p.freeLessonsEnabled ? "success" : "neutral"}
+                  >
+                    {p.freeLessonsEnabled ? "Abilitata" : "Disattivata"}
+                  </StatusBadge>
+                ),
+              },
+              {
+                id: "status",
+                label: "Stato",
+                value: (p) => Number(p.isActive),
+                render: (p) => (
+                  <StatusBadge tone={p.isActive ? "success" : "neutral"}>
+                    {p.isActive ? "Attivo" : "Sospeso"}
+                  </StatusBadge>
+                ),
+              },
+            ]}
+            renderDetails={(partner) => (
               <article className="pf-card" key={partner.id}>
                 <div className="pf-card-top">
                   <div>
@@ -359,48 +434,51 @@ export default function AdminPartnersPage() {
                   </div>
                 )}
               </article>
-            ))}
-          </div>
-          <form
-            className="pf-stack"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void run(
-                () =>
-                  adminRequest("/admin/partners", "POST", {
-                    code: draft.code.trim().toLowerCase(),
-                    ...filledDetails(draft),
-                  }),
-                "Circolo creato.",
-              ).then((created) => created && setDraft(emptyDraft));
-            }}
-          >
-            <h3>Nuovo circolo</h3>
-            {(
-              [
-                ...DETAIL_FIELDS,
-                ["code", "Codice (es. padel-roma-nord)", true],
-              ] as const
-            ).map(([field, label, required]) => (
-              <label className="pf-field" key={field}>
-                {label}
-                <input
-                  className="pf-input"
-                  required={required}
-                  value={draft[field]}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      [field]: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-            ))}
-            <button className="pf-button" type="submit" disabled={busy}>
-              Crea circolo
-            </button>
-          </form>
+            )}
+          />
+          <details className="ws-create">
+            <summary>+ Nuovo circolo</summary>
+            <form
+              className="pf-stack"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void run(
+                  () =>
+                    adminRequest("/admin/partners", "POST", {
+                      code: draft.code.trim().toLowerCase(),
+                      ...filledDetails(draft),
+                    }),
+                  "Circolo creato.",
+                ).then((created) => created && setDraft(emptyDraft));
+              }}
+            >
+              <h3>Nuovo circolo</h3>
+              {(
+                [
+                  ...DETAIL_FIELDS,
+                  ["code", "Codice (es. padel-roma-nord)", true],
+                ] as const
+              ).map(([field, label, required]) => (
+                <label className="pf-field" key={field}>
+                  {label}
+                  <input
+                    className="pf-input"
+                    required={required}
+                    value={draft[field]}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        [field]: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              ))}
+              <button className="pf-button" type="submit" disabled={busy}>
+                Crea circolo
+              </button>
+            </form>
+          </details>
         </article>
         <article className="pf-panel">
           <div className="pf-panel-header">

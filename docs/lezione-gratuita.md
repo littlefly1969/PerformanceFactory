@@ -97,7 +97,7 @@ In `apps/api/src/free-lessons/free-lesson-rules.ts`, senza I/O:
   una nota facoltativa, solo dal coach della lezione e solo dopo l'inizio. Entra
   nell'input AI con `source: COACH_LESSON` e il voto convertito nella scala attiva;
   le risposte dell'atleta restano com'erano. La nuova valutazione ha `source =
-  COACH_LESSON`.
+COACH_LESSON`.
 
 ## Micro-test
 
@@ -106,8 +106,8 @@ della lezione: li propone il motore e li scrive l'AI (`docs/calibrazione.md`,
 «Micro-test come passo del motore»). Il pannello non propone più micro-test e
 non c'è limite giornaliero (PF-FS-PREPAYWALL §4.3, §4.4).
 
-- **Catalogo del back office**: resta come contenuto amministrativo in
-  `/admin/free-lessons` e non sostituisce mai in automatico i micro-test dell'AI.
+- **Catalogo storico**: l'editor manuale è stato rimosso da `/admin/free-lessons`.
+  API e dati precedenti restano disponibili; i micro-test attuali sono quelli dell'AI.
 - **Storico**: gli esiti già riportati nel vecchio pannello (`MicroTestCompletion`)
   restano evidenze `MICRO_TEST` nelle valutazioni e voci di credito; i lotti
   `MicroTestGeneration` restano come storico e non se ne creano di nuovi.
@@ -119,7 +119,7 @@ non c'è limite giornaliero (PF-FS-PREPAYWALL §4.3, §4.4).
   5 assegnazioni parallele su 4 posti.
 - **Stato della calibrazione**: assegnazione, rinuncia, assenza, annullamento e ogni
   valutazione prendono il lock della riga `AthleteCalibration` (`SELECT … FOR
-  UPDATE`). Ordine dei lock: prima la lezione, poi la calibrazione. Così una
+UPDATE`). Ordine dei lock: prima la lezione, poi la calibrazione. Così una
   valutazione che chiuderebbe per soglia vede sempre un posto appena assegnato.
 - **Crediti**: vincolo unico `(userId, sourceKey)` e `createMany` con
   `skipDuplicates`: letture parallele non duplicano voci.
@@ -138,17 +138,17 @@ non c'è limite giornaliero (PF-FS-PREPAYWALL §4.3, §4.4).
 
 ## Persistenza
 
-| Tabella | Contenuto |
-|---|---|
-| `FreeLessonConfig` | riga `default`: traguardo visivo dei crediti e punti per azione |
-| `InteractionCreditEntry` | ledger append-only: azione, punti, chiave dell'evento sorgente |
+| Tabella                            | Contenuto                                                                                                                                                             |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FreeLessonConfig`                 | riga `default`: traguardo visivo dei crediti e punti per azione                                                                                                       |
+| `InteractionCreditEntry`           | ledger append-only: azione, punti, chiave dell'evento sorgente                                                                                                        |
 | `MicroTest`, `MicroTestCompletion` | catalogo per driver con esiti e punteggi, o test su misura dell'atleta (`userId`: passo della calibrazione o lotto storico); esito storico del pannello, uno per test |
-| `MicroTestGeneration` | storico: lotti AI del vecchio pannello della lezione |
-| `FreeLesson` | circolo, coach, inizio, durata, capienza, livello del gruppo, stato |
-| `FreeLessonSeat` | posto dell'atleta, circolo, lezione, stato, consenso alla condivisione col coach, regola di eleggibilità e valutazione della richiesta |
-| `AthleteCalibration` | `lessonDeclinedAt`: rinuncia esplicita alla lezione |
-| `CoachLessonFeedback` | lezione, atleta, coach, driver, voto 1-5, nota, valutazione che lo ha incorporato |
-| `Partner` | nuovo campo `freeLessonsEnabled` |
+| `MicroTestGeneration`              | storico: lotti AI del vecchio pannello della lezione                                                                                                                  |
+| `FreeLesson`                       | circolo, coach, inizio, durata, capienza, livello del gruppo, stato                                                                                                   |
+| `FreeLessonSeat`                   | posto dell'atleta, circolo, lezione, stato, consenso alla condivisione col coach, regola di eleggibilità e valutazione della richiesta                                |
+| `AthleteCalibration`               | `lessonDeclinedAt`: rinuncia esplicita alla lezione                                                                                                                   |
+| `CoachLessonFeedback`              | lezione, atleta, coach, driver, voto 1-5, nota, valutazione che lo ha incorporato                                                                                     |
+| `Partner`                          | nuovo campo `freeLessonsEnabled`                                                                                                                                      |
 
 Vincoli `CHECK` su stati, capienza (1-8) e voto (1-5); un posto assegnato, svolto o
 assente ha sempre una lezione. Le lezioni non si cancellano (si annullano).
@@ -159,25 +159,25 @@ del catalogo non ha atleta né lotto, uno su misura li ha entrambi),
 
 ## API
 
-| Metodo e percorso | Ruolo | Effetto |
-|---|---|---|
-| `GET /athlete-journey/free-lesson` | `USER` | fase, crediti, circoli, posto; `{ enabled: false }` a flag spento |
-| `POST /athlete-journey/free-lesson/request` | `USER` | `{ partnerId, shareWithCoach: true }` |
-| `POST /athlete-journey/free-lesson/withdraw` | `USER` | ritira la richiesta o il posto prima della lezione |
-| `POST /athlete-journey/free-lesson/decline` | `USER` | sceglie di non fare la lezione: con R consolidata può andare agli scenari |
-| `GET /admin/free-lessons` | `ADMIN` | parametri, circoli, coach, lezioni, richieste, micro-test |
-| `PUT /admin/free-lessons/config` | `ADMIN` | parametri dei crediti |
-| `PATCH /admin/free-lessons/clubs/:id` | `ADMIN` | `{ freeLessonsEnabled }` |
-| `POST /admin/free-lessons/lessons` | `ADMIN` | nuova lezione |
-| `PATCH /admin/free-lessons/lessons/:id/coach` | `ADMIN` | coach della lezione |
-| `POST /admin/free-lessons/lessons/:id/seats` | `ADMIN` | assegna un posto |
-| `DELETE /admin/free-lessons/lessons/:id/seats/:userId` | `ADMIN` | toglie dal gruppo, la richiesta resta |
-| `POST /admin/free-lessons/lessons/:id/cancel` | `ADMIN` | annulla, i posti tornano richieste |
-| `POST /admin/free-lessons/micro-tests` | `ADMIN` | nuovo micro-test del catalogo |
-| `PATCH /admin/free-lessons/micro-tests/:id` | `ADMIN` | attiva o spegne |
-| `GET /professional/lessons` | `PROFESSIONAL` | lezioni del coach con i partecipanti; ogni lettura scrive `DataAccessAudit` |
-| `POST /professional/lessons/:id/feedback` | `PROFESSIONAL` | `{ userId, ratings: [{ areaId, rating }], note? }` |
-| `POST /professional/lessons/:id/no-show` | `PROFESSIONAL` | `{ userId }` |
+| Metodo e percorso                                      | Ruolo          | Effetto                                                                     |
+| ------------------------------------------------------ | -------------- | --------------------------------------------------------------------------- |
+| `GET /athlete-journey/free-lesson`                     | `USER`         | fase, crediti, circoli, posto; `{ enabled: false }` a flag spento           |
+| `POST /athlete-journey/free-lesson/request`            | `USER`         | `{ partnerId, shareWithCoach: true }`                                       |
+| `POST /athlete-journey/free-lesson/withdraw`           | `USER`         | ritira la richiesta o il posto prima della lezione                          |
+| `POST /athlete-journey/free-lesson/decline`            | `USER`         | sceglie di non fare la lezione: con R consolidata può andare agli scenari   |
+| `GET /admin/free-lessons`                              | `ADMIN`        | parametri, circoli, coach, lezioni, richieste, micro-test                   |
+| `PUT /admin/free-lessons/config`                       | `ADMIN`        | parametri dei crediti                                                       |
+| `PATCH /admin/free-lessons/clubs/:id`                  | `ADMIN`        | `{ freeLessonsEnabled }`                                                    |
+| `POST /admin/free-lessons/lessons`                     | `ADMIN`        | nuova lezione                                                               |
+| `PATCH /admin/free-lessons/lessons/:id/coach`          | `ADMIN`        | coach della lezione                                                         |
+| `POST /admin/free-lessons/lessons/:id/seats`           | `ADMIN`        | assegna un posto                                                            |
+| `DELETE /admin/free-lessons/lessons/:id/seats/:userId` | `ADMIN`        | toglie dal gruppo, la richiesta resta                                       |
+| `POST /admin/free-lessons/lessons/:id/cancel`          | `ADMIN`        | annulla, i posti tornano richieste                                          |
+| `POST /admin/free-lessons/micro-tests`                 | `ADMIN`        | nuovo micro-test del catalogo                                               |
+| `PATCH /admin/free-lessons/micro-tests/:id`            | `ADMIN`        | attiva o spegne                                                             |
+| `GET /professional/lessons`                            | `PROFESSIONAL` | lezioni del coach con i partecipanti; ogni lettura scrive `DataAccessAudit` |
+| `POST /professional/lessons/:id/feedback`              | `PROFESSIONAL` | `{ userId, ratings: [{ areaId, rating }], note? }`                          |
+| `POST /professional/lessons/:id/no-show`               | `PROFESSIONAL` | `{ userId }`                                                                |
 
 Eventi (event map A7, §11): `lesson_eligible` e `lesson_requested` con la versione
 della regola di eleggibilità, `lesson_declined`, `lesson_booked`,
@@ -189,8 +189,9 @@ della regola di eleggibilità, `lesson_declined`, `lesson_booked`,
   barra dei crediti (solo progresso), richiesta del posto,
   rinuncia e data della lezione.
 - `/admin/free-lessons`: richieste da collocare ordinate per circolo e livello,
-  lezioni con posti e coach, circoli che offrono la lezione, parametri dei crediti,
-  catalogo amministrativo dei micro-test.
+  calendario in tabella con ricerca, filtri e paginazione, dettagli di posti e coach,
+  circoli che offrono la lezione e parametri dei crediti. Il catalogo manuale storico
+  dei micro-test non è più esposto nell’interfaccia; API e dati storici restano.
 - `/professional/lessons`: lezioni del coach, feedback per atleta e assenze.
 
 ## Sviluppo e test
@@ -244,11 +245,11 @@ spegnibile con `GEOCODING_ENABLED=false`. Se non risponde o non trova
 l'indirizzo, le coordinate restano vuote e all'atleta si dice perché la
 distanza non si può calcolare, invece di mostrare un numero inventato:
 
-| `distance.reason` | Cosa vede l'atleta |
-|---|---|
-| `NO_ADDRESS` | manca l'indirizzo: lo si aggiunge dall'account |
+| `distance.reason`     | Cosa vede l'atleta                                                          |
+| --------------------- | --------------------------------------------------------------------------- |
+| `NO_ADDRESS`          | manca l'indirizzo: lo si aggiunge dall'account                              |
 | `ADDRESS_NOT_LOCATED` | l'indirizzo c'è ma non è stato riconosciuto: si può correggere dall'account |
-| `null` | la distanza c'è, per i circoli di cui si conosce la sede |
+| `null`                | la distanza c'è, per i circoli di cui si conosce la sede                    |
 
 Un circolo senza coordinate ha `distanceKm` nullo anche quando l'atleta è
 localizzato: la sua riga resta senza distanza, le altre la mostrano.

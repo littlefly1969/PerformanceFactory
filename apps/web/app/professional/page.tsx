@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   EmptyState,
   ProductShell,
   StatusBadge,
 } from "@/app/components/product-shell";
+import { DataTable } from "@/app/components/workspace/data-table";
 import { RadarChart } from "@/app/components/radar-chart";
 import { API_BASE, secureFetch } from "@/app/lib/api";
 
@@ -70,6 +71,7 @@ export default function ProfessionalDashboardPage() {
     questionApprovals: [],
   });
   const [loading, setLoading] = useState(false);
+  const latestRequest = useRef(0);
   const [message, setMessage] = useState<string | null>(null);
 
   const selectedUser = useMemo(
@@ -104,58 +106,70 @@ export default function ProfessionalDashboardPage() {
   );
 
   const loadDashboard = useCallback(async (preferredUserId?: string) => {
+    const requestId = ++latestRequest.current;
     setLoading(true);
     setMessage(null);
+    setSnapshot(null);
+    try {
+      const [usersRes, inboxRes] = await Promise.all([
+        secureFetch(`${API_BASE}/relationships/my-users`, {
+          credentials: "include",
+        }),
+        secureFetch(`${API_BASE}/professional/approvals`, {
+          credentials: "include",
+        }),
+      ]);
 
-    const [usersRes, inboxRes] = await Promise.all([
-      secureFetch(`${API_BASE}/relationships/my-users`, {
-        credentials: "include",
-      }),
-      secureFetch(`${API_BASE}/professional/approvals`, {
-        credentials: "include",
-      }),
-    ]);
+      if (requestId !== latestRequest.current) return;
+      if (usersRes.status === 401 || inboxRes.status === 401) {
+        setMessage(
+          "Accedi con un account professionista per aprire questo ambiente.",
+        );
+        return;
+      }
 
-    if (usersRes.status === 401 || inboxRes.status === 401) {
-      setMessage("Accedi con un account professionista per aprire questo ambiente.");
-      setLoading(false);
-      return;
-    }
+      if (!usersRes.ok) {
+        setMessage("Impossibile caricare gli atleti collegati.");
+        return;
+      }
 
-    if (!usersRes.ok) {
-      setMessage("Impossibile caricare gli atleti collegati.");
-      setLoading(false);
-      return;
-    }
-
-    const loadedUsers = (await usersRes.json()) as LinkedUser[];
-    const nextSelected =
-      preferredUserId || loadedUsers[0]?.id || "";
-    setUsers(loadedUsers);
-    setSelectedUserId(nextSelected);
-    setInbox(
-      inboxRes.ok
-        ? ((await inboxRes.json()) as InboxResponse)
-        : { planItems: [], questionApprovals: [] },
-    );
-
-    if (nextSelected) {
-      const profileRes = await secureFetch(
-        `${API_BASE}/performance/profile/current?userId=${encodeURIComponent(nextSelected)}`,
-        { credentials: "include" },
+      const loadedUsers = (await usersRes.json()) as LinkedUser[];
+      if (requestId !== latestRequest.current) return;
+      const nextSelected = preferredUserId || loadedUsers[0]?.id || "";
+      setUsers(loadedUsers);
+      setSelectedUserId(nextSelected);
+      setInbox(
+        inboxRes.ok
+          ? ((await inboxRes.json()) as InboxResponse)
+          : { planItems: [], questionApprovals: [] },
       );
-      setSnapshot(
-        profileRes.ok ? ((await profileRes.json()) as Snapshot) : null,
-      );
-    } else {
-      setSnapshot(null);
-    }
 
-    setLoading(false);
+      if (nextSelected) {
+        const profileRes = await secureFetch(
+          `${API_BASE}/performance/profile/current?userId=${encodeURIComponent(nextSelected)}`,
+          { credentials: "include" },
+        );
+        const nextSnapshot = profileRes.ok
+          ? ((await profileRes.json()) as Snapshot)
+          : null;
+        if (requestId !== latestRequest.current) return;
+        setSnapshot(nextSnapshot);
+      } else {
+        setSnapshot(null);
+      }
+    } catch {
+      if (requestId === latestRequest.current)
+        setMessage("Impossibile aggiornare il riepilogo. Riprova.");
+    } finally {
+      if (requestId === latestRequest.current) setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     void loadDashboard();
+    return () => {
+      latestRequest.current += 1;
+    };
   }, [loadDashboard]);
 
   const changeSelected = (userId: string) => {
@@ -202,14 +216,88 @@ export default function ProfessionalDashboardPage() {
     >
       {message && <div className="pf-alert warning">{message}</div>}
 
-      <section className="pf-dashboard-grid">
+      <section className="pf-panel">
+        <div className="pf-panel-header">
+          <div>
+            <h2>Elenco atleti</h2>
+            <p className="pf-muted">
+              Atleti collegati disponibili per questo professionista.
+            </p>
+          </div>
+        </div>
+        <DataTable
+          label="Atleti collegati"
+          rows={users}
+          loading={loading}
+          rowKey={(u) => u.id}
+          searchText={(u) => u.email}
+          empty="Nessun atleta collegato."
+          columns={[
+            {
+              id: "email",
+              label: "Atleta",
+              value: (u) => u.email,
+              render: (u) => (
+                <strong>
+                  {u.email}
+                  <small>{u.id.slice(0, 8)}</small>
+                </strong>
+              ),
+            },
+            {
+              id: "pending",
+              label: "Revisioni in attesa",
+              value: (u) =>
+                inbox.planItems.filter((p) => p.planRelease.user.id === u.id)
+                  .length +
+                inbox.questionApprovals.filter(
+                  (q) => q.questionSet.user.id === u.id,
+                ).length,
+              render: (u) => {
+                const n =
+                  inbox.planItems.filter((p) => p.planRelease.user.id === u.id)
+                    .length +
+                  inbox.questionApprovals.filter(
+                    (q) => q.questionSet.user.id === u.id,
+                  ).length;
+                return (
+                  <StatusBadge tone={n ? "warning" : "success"}>
+                    {n ? `${n} in attesa` : "Nessuna"}
+                  </StatusBadge>
+                );
+              },
+            },
+            {
+              id: "actions",
+              label: "Azioni",
+              render: (u) => (
+                <div className="pf-actions">
+                  <button
+                    type="button"
+                    className="pf-button-secondary"
+                    aria-pressed={u.id === selectedUserId}
+                    onClick={() => changeSelected(u.id)}
+                  >
+                    {u.id === selectedUserId ? "Selezionato" : "Seleziona"}
+                  </button>
+                  <Link href={`/professional/users/${u.id}/performance`}>
+                    Apri profilo →
+                  </Link>
+                </div>
+              ),
+            },
+          ]}
+        />
+      </section>
+
+      <section className="pf-dashboard-grid ws-split">
         <article className="pf-panel pf-focus-panel">
           <div className="pf-panel-header">
             <div>
               <h2>{selectedUser?.email ?? "Atleta selezionato"}</h2>
               <p className="pf-muted">
-                Profilo performance visibile solo per atleti collegati e
-                aree di competenza.
+                Profilo performance visibile solo per atleti collegati e aree di
+                competenza.
               </p>
             </div>
             {snapshot && (
@@ -242,7 +330,9 @@ export default function ProfessionalDashboardPage() {
                 </p>
               </div>
               <div className="pf-actions">
-                <Link className="pf-button" href="/professional/approvals">Rivedi approvazioni</Link>
+                <Link className="pf-button" href="/professional/approvals">
+                  Rivedi approvazioni
+                </Link>
                 {selectedUserId && (
                   <Link
                     className="pf-button-secondary"
@@ -260,54 +350,6 @@ export default function ProfessionalDashboardPage() {
             />
           )}
         </aside>
-      </section>
-
-      <section className="pf-panel">
-        <div className="pf-panel-header">
-          <div>
-            <h2>Elenco atleti</h2>
-            <p className="pf-muted">
-              Atleti collegati disponibili per questo professionista.
-            </p>
-          </div>
-        </div>
-        <div className="pf-grid">
-          {users.map((user) => {
-            const selected = user.id === selectedUserId;
-            const pendingPlan = inbox.planItems.filter(
-              (item) => item.planRelease.user.id === user.id,
-            ).length;
-            const pendingQuestions = inbox.questionApprovals.filter(
-              (item) => item.questionSet.user.id === user.id,
-            ).length;
-            return (
-              <button
-                key={user.id}
-                className={`pf-roster-card ${selected ? "selected" : ""}`}
-                type="button"
-                onClick={() => changeSelected(user.id)}
-              >
-                <span>
-                  <strong>{user.email}</strong>
-                  <small>{user.id.slice(0, 8)}</small>
-                </span>
-                <StatusBadge
-                  tone={pendingPlan + pendingQuestions ? "warning" : "success"}
-                >
-                  {pendingPlan + pendingQuestions
-                    ? `${pendingPlan + pendingQuestions} in attesa`
-                    : "Libero"}
-                </StatusBadge>
-              </button>
-            );
-          })}
-          {!loading && users.length === 0 && (
-            <EmptyState
-              title="Nessun atleta collegato"
-              description="Collega atleti dall'ambiente amministratore o dai dati demo."
-            />
-          )}
-        </div>
       </section>
     </ProductShell>
   );
