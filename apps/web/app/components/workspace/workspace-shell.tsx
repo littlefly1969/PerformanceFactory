@@ -6,6 +6,7 @@ import { PFMark } from "../pf-mark";
 
 type Item = { href: string; label: string; children?: Item[] };
 const ADMIN_GROUPS = [
+  { label: "Monitoraggio", paths: ["/admin/dashboard", "/admin/ai-logs"] },
   {
     label: "Operatività",
     paths: [

@@ -1,3 +1,4 @@
+import { recordAiAttempt, safeModel } from './ai-telemetry';
 import {
   BadRequestException,
   Logger,
@@ -6,6 +7,7 @@ import {
 
 export type AiFetchOptions = {
   provider: 'openai' | 'gemini';
+  model?: string;
   timeoutMs?: number;
   retries?: number;
 };
@@ -83,11 +85,29 @@ export async function aiFetch(
   const maxAttempts = (options.retries ?? DEFAULT_RETRIES) + 1;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const startedAt = new Date();
+    let recorded = false;
+    const record = (
+      status: Parameters<typeof recordAiAttempt>[0]['status'],
+      httpStatus: number | null = null,
+    ) => {
+      if (recorded) return;
+      recorded = true;
+      recordAiAttempt({
+        provider: options.provider,
+        model: safeModel(options.model),
+        status,
+        httpStatus,
+        startedAt,
+        durationMs: Date.now() - startedAt.getTime(),
+      });
+    };
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await fetch(url, { ...init, signal: controller.signal });
       clearTimeout(timer);
+      record(response.ok ? 'SUCCESS' : 'HTTP_ERROR', response.status);
       if (response.ok) {
         return response;
       }
@@ -117,6 +137,13 @@ export async function aiFetch(
       continue;
     } catch (error) {
       clearTimeout(timer);
+      record(
+        error instanceof Error && error.name === 'AbortError'
+          ? 'TIMEOUT'
+          : error instanceof TypeError
+            ? 'NETWORK_ERROR'
+            : 'UNKNOWN_ERROR',
+      );
       if (
         error instanceof BadRequestException ||
         error instanceof AiQuotaExhaustedException

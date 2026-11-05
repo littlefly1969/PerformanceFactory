@@ -45,7 +45,7 @@ export async function requestStructuredProposal(
           },
         }),
       },
-      { provider },
+      { provider, model },
     );
     const payload = (await response.json()) as {
       output_text?: string;
@@ -92,7 +92,7 @@ export async function requestStructuredProposal(
         },
       }),
     },
-    { provider },
+    { provider, model },
   );
   const payload = (await response.json()) as {
     candidates?: Array<{

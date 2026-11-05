@@ -112,7 +112,7 @@ export async function summarizeOpenAiCycleHistory(
         },
       }),
     },
-    { provider: 'openai' },
+    { provider: 'openai', model },
   );
 
   const payload = (await response.json()) as {
@@ -185,7 +185,7 @@ export async function generateOpenAiSpecialistOnboardingQuestions(
         },
       }),
     },
-    { provider: 'openai' },
+    { provider: 'openai', model },
   );
 
   const payload = (await response.json()) as {
@@ -254,7 +254,7 @@ export async function validateOpenAiPerformanceGoal(
         },
       }),
     },
-    { provider: 'openai' },
+    { provider: 'openai', model },
   );
 
   const payload = (await response.json()) as {

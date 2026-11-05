@@ -1,3 +1,4 @@
+import { recordAiValidationFailure } from '../common/ai-telemetry';
 import { BadGatewayException, Logger } from '@nestjs/common';
 import { AiQuotaExhaustedException } from '../common/ai-fetch';
 import { hashJson } from './proposal-audit';
@@ -161,6 +162,7 @@ export async function generateInitialQuestions(
               ).outputText,
             );
       const questions = validateInitialQuestions(raw, input, problems);
+      if (!questions) recordAiValidationFailure(problems);
       if (questions)
         return {
           provider,
