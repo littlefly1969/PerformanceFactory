@@ -1,3 +1,4 @@
+import { recordAiError } from '../common/ai-telemetry';
 import { recordAiValidationFailure } from '../common/ai-telemetry';
 import { BadGatewayException, Logger } from '@nestjs/common';
 import { hashJson } from './proposal-audit';
@@ -281,7 +282,8 @@ export async function generateMicroTests(
       );
       try {
         raw = JSON.parse(result.outputText);
-      } catch {
+      } catch (error) {
+        recordAiError(error, 'PARSE');
         raw = null;
       }
     }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ProductShell } from "@/app/components/product-shell";
 import { useAdminReport } from "../components/use-admin-report";
+import { DiagnosticControl } from "./diagnostic-control";
 import { LogDetail } from "./log-detail";
 import { Logs, OPERATIONS, STATUS, dateTime, duration } from "./log-model";
 
@@ -13,6 +14,7 @@ export default function AiLogsPage() {
     operation: "",
     status: "",
     pageSize: "25",
+    diagnostics: "",
   });
   const [page, setPage] = useState(1);
   const [auto, setAuto] = useState(false);
@@ -54,6 +56,7 @@ export default function AiLogsPage() {
         },
       ]}
     >
+      <DiagnosticControl />
       <section className="pf-panel report-filters" aria-label="Filtri log AI">
         <div className="ws-table-tools">
           <label>
@@ -113,6 +116,18 @@ export default function AiLogsPage() {
               ))}
             </select>
           </label>
+          <label>
+            Acquisizione
+            <select
+              aria-label="Acquisizione"
+              value={filters.diagnostics}
+              onChange={(e) => change("diagnostics", e.target.value)}
+            >
+              <option value="">Tutte</option>
+              <option value="true">Con diagnostica integrale</option>
+              <option value="false">Solo metadati</option>
+            </select>
+          </label>
           <button className="ws-control" disabled={loading} onClick={refresh}>
             {loading ? "Aggiornamento…" : "Aggiorna"}
           </button>
@@ -138,7 +153,7 @@ export default function AiLogsPage() {
             <span>ID</span>
             <input
               aria-label="ID operazione"
-              placeholder="Cerca un ID operazione completo"
+              placeholder="ID invocazione AI o processo completo"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               pattern="[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
@@ -157,6 +172,7 @@ export default function AiLogsPage() {
                 operation: "",
                 status: "",
                 pageSize: "25",
+                diagnostics: "",
               });
               setId("");
               setSearch("");
@@ -169,8 +185,9 @@ export default function AiLogsPage() {
         </form>
         <p className="pf-muted">
           Conservazione: 30 giorni. Lo storico inizia con questa versione; le
-          chiamate precedenti non sono ricostruibili. Non contiene prompt,
-          risposte degli atleti o chiavi API.
+          chiamate precedenti non sono ricostruibili. Con diagnostica attiva
+          include prompt e risposte integrali, escluse soltanto chiavi API e
+          credenziali.
         </p>
         <p className="pf-muted" role="status">
           {data
@@ -216,6 +233,7 @@ export default function AiLogsPage() {
                 <th>Durata</th>
                 <th>Tentativi HTTP</th>
                 <th>Output non validi</th>
+                <th>Diagnostica</th>
                 <th>Dettaglio</th>
               </tr>
             </thead>
@@ -246,6 +264,14 @@ export default function AiLogsPage() {
                   <td>{r._count.attempts}</td>
                   <td>{r.validationFailures}</td>
                   <td>
+                    {r.diagnosticsEnabled ? "Integrale" : "Metadati"}
+                    {r.contextId && (
+                      <small className="report-id" title={r.contextId}>
+                        Processo {r.contextId.slice(0, 8)}
+                      </small>
+                    )}
+                  </td>
+                  <td>
                     <button
                       className="ws-control"
                       id={`ai-log-${r.id}`}
@@ -261,7 +287,7 @@ export default function AiLogsPage() {
               ))}
               {!data?.rows.length && (
                 <tr>
-                  <td colSpan={8} className="ws-no-results">
+                  <td colSpan={9} className="ws-no-results">
                     {loading
                       ? "Caricamento…"
                       : error

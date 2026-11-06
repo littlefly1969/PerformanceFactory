@@ -7,6 +7,24 @@ export type Attempt = {
   httpStatus: number | null;
   durationMs: number;
   startedAt: string;
+  request?: {
+    url: string;
+    method: string;
+    headers: Record<string, string>;
+    body: string | null;
+    timeoutMs: number;
+    maxAttempts: number;
+    httpAttempt: number;
+  } | null;
+  response?: {
+    status?: number;
+    statusText?: string;
+    headers?: Record<string, string>;
+    body?: string;
+    captureError?: string;
+    error?: unknown;
+  } | null;
+  captureState?: string | null;
 };
 export type Operation = {
   id: string;
@@ -20,7 +38,9 @@ export type Operation = {
   durationMs: number | null;
   validationFailures: number;
   validationCodes: string[];
-  _count: { attempts: number };
+  diagnosticsEnabled?: boolean;
+  contextId?: string | null;
+  _count: { attempts: number; events?: number };
 };
 export type Logs = {
   rows: Operation[];
@@ -40,6 +60,7 @@ export const OPERATIONS: Record<string, string> = {
   potential: "Potenziale",
   cycle_proposal: "Proposta ciclo",
   training_proposal: "Proposta allenamento",
+  area_schedule: "Calendario di area",
   cycle_history: "Riepilogo ciclo",
   goal_validation: "Verifica obiettivo",
   specialist_questions: "Domande specialista",
@@ -62,6 +83,12 @@ export const ERRORS: Record<string, string> = {
   INVALID_ASSESSMENT_EVALUATION: "Valutazione restituita dall’AI non valida.",
   INVALID_CALIBRATION_QUESTIONS: "Domande di calibrazione non valide.",
   INVALID_MICRO_TESTS: "Micro-test restituiti dall’AI non validi.",
+  BUSINESS_PROCESS_FAILED:
+    "Errore nel processo dopo la risposta AI: consulta lo stage e l’eccezione completa.",
+  INVALID_POTENTIAL: "Scenari rifiutati dai controlli del potenziale.",
+  INVALID_AI_OUTPUT:
+    "Output AI rifiutato dai controlli applicativi. Consulta il dettaglio degli errori.",
+  UNSAFE_TRAINING_CONTENT: "Contenuto rifiutato dai controlli del programma.",
   INVALID_OUTPUT: "Risposta AI non conforme ai controlli.",
   OUTPUT_ERROR:
     "Risposta HTTP ricevuta, elaborazione dell’output non riuscita.",
@@ -96,4 +123,20 @@ export const VALIDATION: Record<string, string> = {
   DRIVERS: "Driver non coerenti",
   COUNT: "Numero di elementi non conforme",
   STRUCTURE: "Struttura o campi non validi",
+  SCHEDULE: "Calendario e vincoli di allenamento",
+};
+
+export type DiagnosticOperation = Operation & {
+  attempts: Attempt[];
+  invocationInput?: string | null;
+  invocationOutput?: string | null;
+  errorDetail?: unknown;
+  events?: {
+    id: string;
+    sequence: number;
+    attemptSequence: number | null;
+    phase: string;
+    detail: unknown;
+    createdAt: string;
+  }[];
 };

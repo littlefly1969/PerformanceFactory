@@ -1,4 +1,5 @@
-import { recordAiAttempt, safeModel } from './ai-telemetry';
+import { diagnosticHeaders, redactAiText } from './ai-diagnostic-redaction';
+import { aiTrace, recordAiAttempt, safeModel } from './ai-telemetry';
 import {
   BadRequestException,
   Logger,
@@ -87,19 +88,37 @@ export async function aiFetch(
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const startedAt = new Date();
     let recorded = false;
+    let sequence: number | undefined;
+    const trace = aiTrace.getStore();
+    const request = trace?.diagnosticsEnabled
+      ? {
+          url: redactAiText(url),
+          method: init.method ?? 'GET',
+          headers: diagnosticHeaders(init.headers),
+          body: typeof init.body === 'string' ? redactAiText(init.body) : null,
+          ...(init.body != null &&
+            typeof init.body !== 'string' && {
+              bodyCaptureError: 'Corpo non testuale non supportato',
+            }),
+          timeoutMs,
+          maxAttempts,
+          httpAttempt: attempt,
+        }
+      : undefined;
     const record = (
       status: Parameters<typeof recordAiAttempt>[0]['status'],
       httpStatus: number | null = null,
     ) => {
       if (recorded) return;
       recorded = true;
-      recordAiAttempt({
+      sequence = recordAiAttempt({
         provider: options.provider,
         model: safeModel(options.model),
         status,
         httpStatus,
         startedAt,
         durationMs: Date.now() - startedAt.getTime(),
+        ...(request && { request, captureState: 'PENDING' }),
       });
     };
     const controller = new AbortController();
@@ -108,6 +127,8 @@ export async function aiFetch(
       const response = await fetch(url, { ...init, signal: controller.signal });
       clearTimeout(timer);
       record(response.ok ? 'SUCCESS' : 'HTTP_ERROR', response.status);
+      if (trace?.diagnosticsEnabled && sequence)
+        captureResponse(trace, sequence, response);
       if (response.ok) {
         return response;
       }
@@ -145,6 +166,26 @@ export async function aiFetch(
             : 'UNKNOWN_ERROR',
       );
       if (
+        trace?.diagnosticsEnabled &&
+        sequence &&
+        !trace.lastAttempt?.httpStatus
+      ) {
+        trace.saveResponse?.(
+          sequence,
+          {
+            error:
+              error instanceof Error
+                ? {
+                    name: error.name,
+                    message: redactAiText(error.message),
+                    stack: redactAiText(error.stack ?? ''),
+                  }
+                : redactAiText(String(error)),
+          },
+          'NO_RESPONSE',
+        );
+      }
+      if (
         error instanceof BadRequestException ||
         error instanceof AiQuotaExhaustedException
       ) {
@@ -170,4 +211,56 @@ export async function aiFetch(
   throw new BadRequestException(
     `Provider ${options.provider} non raggiungibile dopo ${maxAttempts} tentativi`,
   );
+}
+
+/** Tee the body, without awaiting diagnostics or consuming the caller's Response. */
+function captureResponse(
+  trace: NonNullable<ReturnType<typeof aiTrace.getStore>>,
+  sequence: number,
+  response: Response,
+) {
+  try {
+    const headers = diagnosticHeaders(response.headers);
+    const capture = response
+      .clone()
+      .text()
+      .then(
+        (body) => {
+          trace.saveResponse?.(
+            sequence,
+            {
+              status: response.status,
+              statusText: response.statusText,
+              headers,
+              body: redactAiText(body),
+            },
+            'CAPTURED',
+          );
+        },
+        (error: unknown) => {
+          trace.saveResponse?.(
+            sequence,
+            {
+              status: response.status,
+              headers,
+              captureError: redactAiText(
+                error instanceof Error ? error.message : String(error),
+              ),
+            },
+            'FAILED',
+          );
+        },
+      );
+    trace.trackCapture?.(capture);
+  } catch (error) {
+    trace.saveResponse?.(
+      sequence,
+      {
+        captureError: redactAiText(
+          error instanceof Error ? error.message : String(error),
+        ),
+      },
+      'FAILED',
+    );
+  }
 }

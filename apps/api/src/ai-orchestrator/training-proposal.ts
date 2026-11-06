@@ -1,3 +1,7 @@
+import {
+  recordAiError,
+  recordAiValidationFailure,
+} from '../common/ai-telemetry';
 import { BadRequestException, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { hashJson } from './proposal-audit';
@@ -59,12 +63,14 @@ export function buildTrainingProposalPreview(input: TrainingProposalInput) {
     inputJson,
   };
 }
-function object(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value))
+function object(value: unknown, path = '$'): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    recordAiValidationFailure(['Oggetto atteso'], { path, received: value });
     throw new BadRequestException({
       code: 'INVALID_AI_OUTPUT',
       message: 'Output training non valido',
     });
+  }
   return value as Record<string, unknown>;
 }
 export function normalizeTrainingProposal(
@@ -81,21 +87,30 @@ export function normalizeTrainingProposal(
   } = {},
 ): TrainingCycleProposal {
   const raw = object(parsed);
-  const fail = (): never => {
+  const fail = (reason: string, detail: unknown): never => {
+    recordAiValidationFailure([reason], detail);
     throw new BadRequestException({
       code: 'INVALID_AI_OUTPUT',
       message: 'Output training incompleto',
     });
   };
-  if (
-    typeof raw.summaryText !== 'string' ||
-    !raw.summaryText.trim() ||
-    !Array.isArray(raw.planItems) ||
-    !Array.isArray(raw.questions)
-  )
-    fail();
-  const planItems = (raw.planItems as unknown[]).map((value) => {
-    const item = object(value);
+  if (typeof raw.summaryText !== 'string' || !raw.summaryText.trim())
+    fail('summaryText mancante o vuoto', {
+      path: '$.summaryText',
+      received: raw.summaryText,
+    });
+  if (!Array.isArray(raw.planItems))
+    fail('planItems deve essere un array', {
+      path: '$.planItems',
+      received: raw.planItems,
+    });
+  if (!Array.isArray(raw.questions))
+    fail('questions deve essere un array', {
+      path: '$.questions',
+      received: raw.questions,
+    });
+  const planItems = (raw.planItems as unknown[]).map((value, index) => {
+    const item = object(value, `$.planItems[${index}]`);
     return {
       type: item.type,
       title: item.title,
@@ -116,10 +131,19 @@ export function normalizeTrainingProposal(
     input.trainingWindow.startsOn,
   );
   const layout = cycleQuestionLayout(input);
-  if ((raw.questions as unknown[]).length !== layout.questions) fail();
+  if ((raw.questions as unknown[]).length !== layout.questions)
+    fail('Numero di domande non conforme', {
+      path: '$.questions',
+      expected: layout.questions,
+      received: (raw.questions as unknown[]).length,
+    });
   const questions = (raw.questions as unknown[]).map((value, index) => {
-    const q = object(value);
-    if (typeof q.text !== 'string' || !q.text.trim()) fail();
+    const q = object(value, `$.questions[${index}]`);
+    if (typeof q.text !== 'string' || !q.text.trim())
+      fail('Testo della domanda mancante o vuoto', {
+        path: `$.questions[${index}].text`,
+        received: q.text,
+      });
     return {
       text: q.text as string,
       objectiveRef:
@@ -221,7 +245,8 @@ export async function generateTrainingProposal(
   let parsed: unknown;
   try {
     parsed = JSON.parse(result.outputText);
-  } catch {
+  } catch (error) {
+    recordAiError(error, 'PARSE');
     throw new BadRequestException({
       code: 'INVALID_AI_OUTPUT',
       message: 'Output training non JSON',

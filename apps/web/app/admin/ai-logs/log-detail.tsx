@@ -1,9 +1,9 @@
 "use client";
+import { DiagnosticDetail } from "./diagnostic-detail";
 import { useEffect, useRef } from "react";
 import { useAdminReport } from "../components/use-admin-report";
 import {
-  Attempt,
-  Operation,
+  DiagnosticOperation,
   OPERATIONS,
   STATUS,
   ERRORS,
@@ -25,9 +25,10 @@ export function LogDetail({
   useEffect(() => {
     heading.current?.focus();
   }, []);
-  const { data, error, loading, refresh } = useAdminReport<
-    Operation & { attempts: Attempt[] }
-  >(`/admin/ai-logs/${id}`, auto ? 15000 : 0);
+  const { data, error, loading, refresh } = useAdminReport<DiagnosticOperation>(
+    `/admin/ai-logs/${id}`,
+    auto ? 15000 : 0,
+  );
   return (
     <section
       className="pf-panel report-detail"
@@ -106,6 +107,7 @@ export function LogDetail({
               essere stato interrotto; il risultato non è confermato.
             </p>
           )}
+          <DiagnosticDetail data={data} />
           <h3>Tentativi HTTP ({data.attempts.length})</h3>
           <p className="pf-muted">
             HTTP 200 indica il trasporto riuscito. L’esito completo comprende

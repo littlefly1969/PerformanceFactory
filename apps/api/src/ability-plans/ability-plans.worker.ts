@@ -1,3 +1,6 @@
+import { withAiBusinessContext } from '../common/ai-diagnostic-context';
+import { recordAiError, currentAiTrace } from '../common/ai-telemetry';
+import { diagnosticError } from '../common/ai-diagnostic-redaction';
 import {
   Injectable,
   Logger,
@@ -10,10 +13,7 @@ import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiProposalProviderService } from '../ai-orchestrator/proposal-provider.service';
 import { prepareCycleProposalInput } from '../ai-orchestrator/cycle-generation';
-import {
-  generateAreaScheduleProposal,
-  prepareAreaScheduleInput,
-} from '../ai-orchestrator/area-schedule';
+import { prepareAreaScheduleInput } from '../ai-orchestrator/area-schedule';
 import { persistAreaProposal } from '../ai-orchestrator/cycle-persistence';
 import { publishCycle } from '../ai-orchestrator/cycle-publication';
 import { AbilityPlansService } from './ability-plans.service';
@@ -78,6 +78,11 @@ export class AbilityPlansWorker
     }
   }
   async resume(id: string) {
+    return withAiBusinessContext(id, 'ABILITY_PLAN', () =>
+      this.processOperation(id),
+    );
+  }
+  private async processOperation(id: string) {
     const token = randomUUID();
     const claim = await this.prisma.abilityPlanOperation.updateMany({
       where: {
@@ -152,7 +157,7 @@ export class AbilityPlansWorker
               this.logger,
               scheduled,
               unsafeTrainingTerms,
-              (input) => generateAreaScheduleProposal(this.logger, input),
+              (input) => this.provider.generateAreaScheduleProposal(input),
             )
           : await generateSafeProposal(
               this.logger,
@@ -285,6 +290,7 @@ export class AbilityPlansWorker
         });
       }
     } catch (error) {
+      recordAiError(error, 'BUSINESS', { operationId: id });
       const response =
         error instanceof HttpException ? error.getResponse() : null;
       const code =
@@ -306,7 +312,9 @@ export class AbilityPlansWorker
           ),
         },
       });
-      this.logger.warn(`Ability operation ${id}: ${code}; retry scheduled`);
+      this.logger.warn(
+        `Ability operation ${id}: ${code}; retry scheduled${currentAiTrace()?.diagnosticsEnabled ? `; diagnostic=${JSON.stringify(diagnosticError(error))}` : ''}`,
+      );
     } finally {
       clearInterval(heartbeat);
     }

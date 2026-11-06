@@ -1,5 +1,13 @@
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsUUID,
+  Matches,
+  Max,
+  Min,
+} from 'class-validator';
 import { AI_OPERATIONS } from './ai-monitoring.service';
 
 export class AiLogsQueryDto {
@@ -29,4 +37,6 @@ export class AiLogsQueryDto {
   @IsOptional()
   @IsUUID()
   id?: string;
+  @IsOptional() @IsIn(['true', 'false']) diagnostics?: string;
+  @IsOptional() @Matches(/^[A-Z0-9_]{1,100}$/) errorCode?: string;
 }

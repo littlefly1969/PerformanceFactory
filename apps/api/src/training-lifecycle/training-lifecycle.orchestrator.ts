@@ -1,3 +1,6 @@
+import { withAiBusinessContext } from '../common/ai-diagnostic-context';
+import { currentAiTrace, recordAiError } from '../common/ai-telemetry';
+import { diagnosticError } from '../common/ai-diagnostic-redaction';
 import { AbilityPlansService } from '../ability-plans/ability-plans.service';
 import { athleteDate, dateOnly } from '../athlete/training-sessions';
 import {
@@ -120,7 +123,9 @@ export class TrainingLifecycleOrchestrator
     }, 10000);
     heartbeat.unref();
     try {
-      await this.generateAndPublishCycle(operationId, leaseToken);
+      await withAiBusinessContext(operationId, 'TRAINING_LIFECYCLE', () =>
+        this.generateAndPublishCycle(operationId, leaseToken),
+      );
     } finally {
       clearInterval(heartbeat);
     }
@@ -213,6 +218,7 @@ export class TrainingLifecycleOrchestrator
     } catch (error) {
       if (error instanceof LifecycleError && error.code === 'LEASE_LOST')
         return;
+      recordAiError(error, 'BUSINESS', { operationId, stage });
       const response =
         error instanceof HttpException ? error.getResponse() : null;
       const code =
@@ -242,7 +248,7 @@ export class TrainingLifecycleOrchestrator
         },
       });
       this.logger.warn(
-        `Training operation ${operationId}: ${code}; retry scheduled`,
+        `Training operation ${operationId}: ${code}; retry scheduled${currentAiTrace()?.diagnosticsEnabled ? `; diagnostic=${JSON.stringify(diagnosticError(error))}` : ''}`,
       );
     }
   }

@@ -1,3 +1,4 @@
+import { recordAiValidationFailure } from '../common/ai-telemetry';
 import { BadRequestException, Logger } from '@nestjs/common';
 import { findUnsafeTerm } from './micro-test-safety';
 import { CycleProposalInput } from './proposal-provider-model';
@@ -101,6 +102,10 @@ export async function generateSafeProposal<
     });
     const term = unsafeTrainingTerm(proposal, terms);
     if (!term) return proposal;
+    recordAiValidationFailure(
+      ['Contenuto rifiutato dal controllo di sicurezza del programma'],
+      { term, attempt, proposal },
+    );
     logger.warn(
       `UNSAFE_TRAINING_CONTENT ${proposal.provider}/${proposal.model} tentativo ${attempt}: ${term}`,
     );

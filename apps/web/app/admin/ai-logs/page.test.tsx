@@ -44,6 +44,10 @@ it("uses server filters and pagination and opens the full failed operation despi
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string) => {
+      if (url.endsWith("/configuration"))
+        return new Response(
+          JSON.stringify({ enabled: false, changes: [], writer: {} }),
+        );
       urls.push(url);
       if (url.endsWith(`/${id}`))
         return new Response(
@@ -103,14 +107,26 @@ it("uses server filters and pagination and opens the full failed operation despi
   ).not.toBeInTheDocument();
 });
 it("makes an unavailable API explicit and allows retry", async () => {
-  const fetchMock = vi
-    .fn()
-    .mockResolvedValue(new Response("{}", { status: 503 }));
+  const fetchMock = vi.fn((url: string) =>
+    Promise.resolve(
+      url.endsWith("/configuration")
+        ? new Response(
+            JSON.stringify({ enabled: false, changes: [], writer: {} }),
+          )
+        : new Response("{}", { status: 503 }),
+    ),
+  );
   vi.stubGlobal("fetch", fetchMock);
   render(<Page />);
   expect(await screen.findByRole("alert")).toHaveTextContent(
     "Dati non disponibili",
   );
   await userEvent.click(screen.getByRole("button", { name: "Aggiorna" }));
-  await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  await waitFor(() =>
+    expect(
+      fetchMock.mock.calls.filter(
+        ([url]) => !String(url).endsWith("/configuration"),
+      ),
+    ).toHaveLength(2),
+  );
 });

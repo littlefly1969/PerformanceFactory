@@ -1,3 +1,4 @@
+import { recordAiError } from '../common/ai-telemetry';
 import { recordAiValidationFailure } from '../common/ai-telemetry';
 import type { MicroTestFormat, VideoChoice } from './micro-test-situations';
 import { BadGatewayException, Logger } from '@nestjs/common';
@@ -307,7 +308,8 @@ export async function generateCalibrationQuestions(
     );
     try {
       raw = JSON.parse(result.outputText);
-    } catch {
+    } catch (error) {
+      recordAiError(error, 'PARSE');
       raw = null;
     }
   }

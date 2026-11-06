@@ -1,3 +1,5 @@
+import { AreaScheduleInput } from './proposal-provider-model';
+import { generateAreaScheduleProposal } from './area-schedule';
 import { AiMonitoringService } from '../ai-monitoring/ai-monitoring.service';
 import {
   generateTrainingProposal,
@@ -51,16 +53,20 @@ export class AiProposalProviderService {
     input: CycleProposalInput,
   ): Promise<CycleProposal> {
     return this.monitoring
-      ? this.monitoring.run('cycle_proposal', () =>
-          generateCycleProposal(this.logger, input),
+      ? this.monitoring.run(
+          'cycle_proposal',
+          () => generateCycleProposal(this.logger, input),
+          input,
         )
       : generateCycleProposal(this.logger, input);
   }
 
   generateTrainingProposal(input: TrainingProposalInput) {
     return this.monitoring
-      ? this.monitoring.run('training_proposal', () =>
-          generateTrainingProposal(this.logger, input),
+      ? this.monitoring.run(
+          'training_proposal',
+          () => generateTrainingProposal(this.logger, input),
+          input,
         )
       : generateTrainingProposal(this.logger, input);
   }
@@ -71,8 +77,10 @@ export class AiProposalProviderService {
     input: CycleHistorySummaryInput,
   ): Promise<CycleHistorySummaryResult> {
     return this.monitoring
-      ? this.monitoring.run('cycle_history', () =>
-          summarizeCycleHistory(this.logger, input),
+      ? this.monitoring.run(
+          'cycle_history',
+          () => summarizeCycleHistory(this.logger, input),
+          input,
         )
       : summarizeCycleHistory(this.logger, input);
   }
@@ -87,7 +95,7 @@ export class AiProposalProviderService {
     provider?: AiProvider | 'configured';
   }) {
     return this.monitoring
-      ? this.monitoring.run('prompt_test', () => testPrompt(input))
+      ? this.monitoring.run('prompt_test', () => testPrompt(input), input)
       : testPrompt(input);
   }
 
@@ -95,8 +103,10 @@ export class AiProposalProviderService {
     input: GoalValidationInput,
   ): Promise<GoalValidationResult> {
     return this.monitoring
-      ? this.monitoring.run('goal_validation', () =>
-          validatePerformanceGoal(this.logger, input),
+      ? this.monitoring.run(
+          'goal_validation',
+          () => validatePerformanceGoal(this.logger, input),
+          input,
         )
       : validatePerformanceGoal(this.logger, input);
   }
@@ -105,50 +115,72 @@ export class AiProposalProviderService {
     input: SpecialistOnboardingQuestionInput,
   ): Promise<SpecialistOnboardingQuestionResult> {
     return this.monitoring
-      ? this.monitoring.run('specialist_questions', () =>
-          generateSpecialistOnboardingQuestions(this.logger, input),
+      ? this.monitoring.run(
+          'specialist_questions',
+          () => generateSpecialistOnboardingQuestions(this.logger, input),
+          input,
         )
       : generateSpecialistOnboardingQuestions(this.logger, input);
   }
 
   evaluateAssessment(input: AssessmentEvaluationInput) {
     return this.monitoring
-      ? this.monitoring.run('assessment_evaluation', () =>
-          evaluateAssessment(this.logger, input),
+      ? this.monitoring.run(
+          'assessment_evaluation',
+          () => evaluateAssessment(this.logger, input),
+          input,
         )
       : evaluateAssessment(this.logger, input);
   }
 
   generateCalibrationQuestions(input: CalibrationQuestionsInput) {
     return this.monitoring
-      ? this.monitoring.run('calibration_questions', () =>
-          generateCalibrationQuestions(this.logger, input),
+      ? this.monitoring.run(
+          'calibration_questions',
+          () => generateCalibrationQuestions(this.logger, input),
+          input,
         )
       : generateCalibrationQuestions(this.logger, input);
   }
 
   generateInitialQuestions(input: InitialQuestionsInput) {
     return this.monitoring
-      ? this.monitoring.run('initial_questions', () =>
-          generateInitialQuestions(this.logger, input),
+      ? this.monitoring.run(
+          'initial_questions',
+          () => generateInitialQuestions(this.logger, input),
+          input,
         )
       : generateInitialQuestions(this.logger, input);
   }
 
   generateMicroTests(input: MicroTestInput) {
     return this.monitoring
-      ? this.monitoring.run('micro_tests', () =>
-          generateMicroTests(this.logger, input),
+      ? this.monitoring.run(
+          'micro_tests',
+          () => generateMicroTests(this.logger, input),
+          input,
         )
       : generateMicroTests(this.logger, input);
   }
 
   generatePotential(input: PotentialGenerationInput) {
     return this.monitoring
-      ? this.monitoring.run('potential', () =>
-          generatePotential(this.logger, input),
+      ? this.monitoring.run(
+          'potential',
+          () => generatePotential(this.logger, input),
+          input,
         )
       : generatePotential(this.logger, input);
+  }
+
+  generateAreaScheduleProposal(input: AreaScheduleInput) {
+    return this.monitoring
+      ? this.monitoring.run(
+          'area_schedule',
+          () => generateAreaScheduleProposal(this.logger, input),
+          input,
+        )
+      : generateAreaScheduleProposal(this.logger, input);
   }
 
   static requiresUserConsent(provider = process.env.AI_PROVIDER) {
