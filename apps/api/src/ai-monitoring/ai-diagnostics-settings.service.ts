@@ -3,8 +3,14 @@ import {
   Logger,
   OnModuleInit,
   OnModuleDestroy,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+
+export const AI_SETTINGS_READ_TIMEOUT_MS = 500;
+export const AI_SETTINGS_REFRESH_MS = 5000;
+export const AI_SETTINGS_MAX_AGE_MS = 10000;
+const MAX_PENDING_READS = 2;
 
 @Injectable()
 export class AiDiagnosticsSettingsService
@@ -13,6 +19,8 @@ export class AiDiagnosticsSettingsService
   private readonly logger = new Logger(AiDiagnosticsSettingsService.name);
   private timer?: ReturnType<typeof setInterval>;
   private refreshPending = false;
+  private readonly pendingReads = new Set<Promise<unknown>>();
+  private verifiedAt: number | null = null;
   private enabled = false;
   private version = 0;
   private lastWarningAt = 0;
@@ -32,36 +40,70 @@ export class AiDiagnosticsSettingsService
     if (this.current && row && row.updatedAt < this.current.updatedAt) return;
     this.current = row;
     this.enabled = row?.enabled ?? false;
+    this.verifiedAt = Date.now();
   }
   snapshot() {
-    return this.enabled;
+    const age = this.verifiedAt === null ? -1 : Date.now() - this.verifiedAt;
+    return this.enabled && age >= 0 && age < AI_SETTINGS_MAX_AGE_MS;
   }
   async onModuleInit() {
-    // Bound startup only; AI requests never wait on this read.
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-    await Promise.race([
-      this.refresh(),
-      new Promise<void>((resolve) => {
-        timeout = setTimeout(resolve, 500);
-      }),
-    ]);
-    if (timeout) clearTimeout(timeout);
-    this.timer = setInterval(() => void this.refresh(), 5000);
+    // Only startup waits for this bounded read; AI snapshots remain synchronous.
+    await this.refresh();
+    this.timer = setInterval(() => void this.refresh(), AI_SETTINGS_REFRESH_MS);
     this.timer.unref();
   }
   onModuleDestroy() {
     if (this.timer) clearInterval(this.timer);
+    this.version++;
+    this.enabled = false;
+    this.verifiedAt = null;
+  }
+  private unavailable() {
+    return new ServiceUnavailableException(
+      'Impossibile verificare lo stato della diagnostica AI',
+    );
+  }
+  private async boundedRead<T>(query: () => Promise<T>): Promise<T> {
+    // A timeout does not cancel Prisma promises. Bound the actual outstanding
+    // reads too, so a stalled backend cannot progressively exhaust the pool.
+    if (this.pendingReads.size >= MAX_PENDING_READS) throw this.unavailable();
+    const pending = Promise.resolve(query());
+    this.pendingReads.add(pending);
+    void pending.then(
+      () => this.pendingReads.delete(pending),
+      () => this.pendingReads.delete(pending),
+    );
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      return await Promise.race([
+        pending,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(this.unavailable()),
+            AI_SETTINGS_READ_TIMEOUT_MS,
+          );
+        }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+  private invalidate(version: number) {
+    if (version !== this.version) return;
+    this.enabled = false;
+    this.verifiedAt = null;
   }
   private async refresh() {
     if (this.refreshPending) return;
     this.refreshPending = true;
     const version = this.version;
     try {
-      const row = await this.prisma.aiDiagnosticControl.findUnique({
-        where: { id: 'global' },
-      });
+      const row = await this.boundedRead(() =>
+        this.prisma.aiDiagnosticControl.findUnique({ where: { id: 'global' } }),
+      );
       if (version === this.version) this.apply(row);
     } catch {
+      this.invalidate(version);
       if (Date.now() - this.lastWarningAt >= 60000) {
         this.lastWarningAt = Date.now();
         this.logger.warn('AI_DIAGNOSTIC_SETTINGS_UNAVAILABLE');
@@ -72,23 +114,35 @@ export class AiDiagnosticsSettingsService
   }
   async read() {
     const version = this.version;
-    const [row, changes] = await Promise.all([
-      this.prisma.aiDiagnosticControl.findUnique({ where: { id: 'global' } }),
-      this.prisma.aiDiagnosticControlChange.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: 10,
-      }),
-    ]);
-    if (version === this.version) {
-      this.version++;
-      this.apply(row);
+    let row;
+    let changes;
+    try {
+      row = await this.boundedRead(() =>
+        this.prisma.aiDiagnosticControl.findUnique({ where: { id: 'global' } }),
+      );
+      if (version === this.version) {
+        this.version++;
+        this.apply(row);
+      }
+      changes = await this.boundedRead(() =>
+        this.prisma.aiDiagnosticControlChange.findMany({
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        }),
+      );
+    } catch (error) {
+      this.invalidate(version);
+      throw error;
     }
     return {
       enabled: this.enabled,
       updatedAt: this.current?.updatedAt ?? null,
       updatedById: this.current?.updatedById ?? null,
       changes,
-      propagationSeconds: 5,
+      propagationSeconds: AI_SETTINGS_REFRESH_MS / 1000,
+      verifiedAt: this.verifiedAt === null ? null : new Date(this.verifiedAt),
+      captureEnabled: this.snapshot(),
+      maxVerificationAgeSeconds: AI_SETTINGS_MAX_AGE_MS / 1000,
       retentionDays: 30,
     };
   }

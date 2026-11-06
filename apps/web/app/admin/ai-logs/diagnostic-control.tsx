@@ -6,6 +6,7 @@ import { dateTime } from "./log-model";
 
 type Control = {
   enabled: boolean;
+  captureEnabled?: boolean;
   updatedAt: string | null;
   updatedById: string | null;
   changes: {
@@ -79,11 +80,13 @@ export function DiagnosticControl() {
       </div>
       <p>
         <strong
-          className={`report-status ${data?.enabled ? "report-status-success" : ""}`}
+          className={`report-status ${data?.enabled && data.captureEnabled !== false ? "report-status-success" : ""}`}
         >
           {data
             ? data.enabled
-              ? "ATTIVA"
+              ? data.captureEnabled === false
+                ? "ACQUISIZIONE SOSPESA"
+                : "ATTIVA"
               : "DISATTIVA"
             : "Stato non disponibile"}
         </strong>{" "}
@@ -94,7 +97,9 @@ export function DiagnosticControl() {
       <p className="pf-muted">
         La scelta si applica alle nuove invocazioni; sulle altre istanze può
         richiedere fino a 5 secondi. Lo storico precedente non può essere
-        ricostruito. Un’invocazione già avviata mantiene la modalità iniziale.
+        ricostruito. Se la verifica dello stato non riesce, la cattura completa
+        per le nuove invocazioni si arresta; la verifica vale al massimo 10
+        secondi. Un’invocazione già avviata mantiene la modalità iniziale.
       </p>
       {error && (
         <p role="alert" className="pf-alert warning">

@@ -26,7 +26,7 @@ export function redactAiText(text: string): string {
     }
   }
   // Mask credential values without reformatting surrounding or malformed JSON.
-  result = maskCredentialValues(result);
+  result = maskTextCredentialHeaders(maskCredentialValues(result));
   return result
     .replace(/\b(Bearer|Basic)\s+[A-Za-z0-9+/_.=-]+/gi, `$1 ${MASK}`)
     .replace(
@@ -132,4 +132,78 @@ function credentialValueEnd(text: string, start: number): number {
     } else if (!structured && (char === ',' || /\s/.test(char))) return i;
   }
   return text.length;
+}
+
+const TEXT_CREDENTIAL_HEADERS =
+  '(?:authorization|proxy-authorization|x-api-key|api[-_]?key|x-goog-api-key|x-auth-token|cookie|set-cookie)';
+function maskTextCredentialHeaders(text: string): string {
+  // A real header occupies its line. Keep any separately labelled application
+  // fields in malformed/mixed text, as well as literal JSON newline escapes.
+  const lines = new RegExp(
+    `(^|[\\r\\n])([ \\t]*${TEXT_CREDENTIAL_HEADERS}[ \\t]*:[ \\t]*)([^\\r\\n]*)`,
+    'gi',
+  );
+  let result = text.replace(
+    lines,
+    (_match: string, newline: string, prefix: string, value: string) => {
+      const boundary = value.search(
+        /\\[rn]|[,;][ \t]*(?:\\?["'])?[\w-]+(?:\\?["'])?[ \t]*:/,
+      );
+      const end = boundary < 0 ? value.length : boundary;
+      const credential = value.slice(0, end);
+      if (!credential.trim()) return newline + prefix + value;
+      const trailing = credential.match(/[ \t]*$/)![0];
+      const bare = credential.slice(0, credential.length - trailing.length);
+      const quote = bare.match(/^(\\?["'])/)?.[0];
+      const closing = bare.match(/(\\?["'])$/)?.[0] ?? '';
+      return (
+        newline +
+        prefix +
+        (quote ?? '') +
+        MASK +
+        closing +
+        trailing +
+        value.slice(end)
+      );
+    },
+  );
+  // Credentials may also be embedded in a sentence or a response string.
+  // Match only the labelled credential, leaving adjacent application data.
+  const prefix =
+    String.raw`(?<![\w-])` +
+    `(${TEXT_CREDENTIAL_HEADERS}(?:\\\\?["'])?[ \\t]*:[ \\t]*)`;
+  const escaped = new RegExp(
+    prefix + String.raw`(\\["'])([^\\\r\n]*?)\2`,
+    'gi',
+  );
+  result = result.replace(
+    escaped,
+    (_match: string, label: string, quote: string) =>
+      label + quote + MASK + quote,
+  );
+  const inline = new RegExp(
+    prefix +
+      String.raw`(?:(Bearer|Basic|Token|ApiKey)[ \t]+)?(?:"((?:\\.|[^"\\\r\n])*)"|'((?:\\.|[^'\\\r\n])*)'|([^\s,;'"` +
+      '`' +
+      String.raw`<>{}\[\]\\]+))`,
+    'gi',
+  );
+  return result.replace(
+    inline,
+    (
+      _match: string,
+      label: string,
+      scheme: string | undefined,
+      doubleQuoted: string | undefined,
+      singleQuoted: string | undefined,
+    ) => {
+      const quote =
+        doubleQuoted !== undefined
+          ? '"'
+          : singleQuoted !== undefined
+            ? "'"
+            : '';
+      return label + (scheme ? `${scheme} ` : '') + quote + MASK + quote;
+    },
+  );
 }

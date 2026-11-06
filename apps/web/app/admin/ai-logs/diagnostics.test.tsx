@@ -60,6 +60,27 @@ it("lets an administrator enable complete logging and clearly displays its scope
   await userEvent.click(screen.getByText("Stato scritture e ultime modifiche"));
   expect(screen.getByText("admin-1")).toBeInTheDocument();
 });
+it("distinguishes globally enabled diagnostics from capture suspended pending verification", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            enabled: true,
+            captureEnabled: false,
+            changes: [],
+            writer: {},
+          }),
+        ),
+      ),
+    ),
+  );
+  render(<DiagnosticControl />);
+  await screen.findByText("ACQUISIZIONE SOSPESA");
+  expect(screen.queryByText("ATTIVA")).not.toBeInTheDocument();
+  expect(screen.getByText(/al massimo 10 secondi/)).toBeInTheDocument();
+});
 const operation: DiagnosticOperation = {
   id: "call-id",
   operation: "training_proposal",
