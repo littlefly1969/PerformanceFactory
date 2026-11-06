@@ -1,3 +1,7 @@
+import {
+  recordAiError,
+  recordAiValidationFailure,
+} from '../common/ai-telemetry';
 import { BadGatewayException, Logger } from '@nestjs/common';
 import { ProgramHorizon } from '@prisma/client';
 import { hashJson } from './proposal-audit';
@@ -217,13 +221,15 @@ export async function generatePotential(
     );
     try {
       raw = JSON.parse(result.outputText);
-    } catch {
+    } catch (error) {
+      recordAiError(error, 'PARSE');
       raw = null;
     }
   }
   const problems: string[] = [];
   const scenarios = validatePotential(raw, input, problems);
   if (!scenarios) {
+    recordAiValidationFailure(problems);
     logger.warn(
       `INVALID_POTENTIAL ${provider}/${model}: ${problems.join('; ')}`,
     );

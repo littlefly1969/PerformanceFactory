@@ -1,3 +1,4 @@
+import { recordAiValidationFailure } from '../common/ai-telemetry';
 import { BadRequestException, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { buildAuditInput, buildAuditOutput, hashJson } from './proposal-audit';
@@ -140,6 +141,11 @@ export function normalizeProposal(
     }));
 
   if (planItems.length === 0 || questions.length !== questionLayout.questions) {
+    recordAiValidationFailure(['Proposta incompleta dopo la normalizzazione'], {
+      parsed,
+      normalized: { planItems, questions },
+      expectedQuestions: questionLayout.questions,
+    });
     throw new BadRequestException(
       `Validazione proposta ${provider} non riuscita`,
     );

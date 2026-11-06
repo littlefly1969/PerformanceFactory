@@ -23,7 +23,11 @@ export class AiLogsService {
       startedAt: { gte: new Date(now.getTime() - query.days * 86400000) },
       ...(query.provider && { provider: query.provider }),
       ...(query.operation && { operation: query.operation }),
-      ...(query.id && { id: query.id }),
+      ...(query.id && { OR: [{ id: query.id }, { contextId: query.id }] }),
+      ...(query.diagnostics && {
+        diagnosticsEnabled: query.diagnostics === 'true',
+      }),
+      ...(query.errorCode && { errorCode: query.errorCode }),
     };
     if (query.status === 'INTERRUPTED')
       where.AND = [{ status: 'RUNNING', startedAt: { lt: stale } }];
@@ -55,7 +59,22 @@ export class AiLogsService {
           orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
           skip: (page - 1) * query.pageSize,
           take: query.pageSize,
-          include: { _count: { select: { attempts: true } } },
+          select: {
+            id: true,
+            operation: true,
+            provider: true,
+            model: true,
+            status: true,
+            errorCode: true,
+            startedAt: true,
+            finishedAt: true,
+            durationMs: true,
+            validationFailures: true,
+            validationCodes: true,
+            diagnosticsEnabled: true,
+            contextId: true,
+            _count: { select: { attempts: true, events: true } },
+          },
         });
         return {
           rows: rows.map((r) => ({ ...r, status: logStatus(r, now) })),
@@ -80,7 +99,10 @@ export class AiLogsService {
           gte: new Date(Date.now() - LOG_RETENTION_DAYS * 86400000),
         },
       },
-      include: { attempts: { orderBy: { sequence: 'asc' } } },
+      include: {
+        attempts: { orderBy: { sequence: 'asc' } },
+        events: { orderBy: { sequence: 'asc' } },
+      },
     });
     if (!row)
       throw new NotFoundException('Operazione non trovata o storico scaduto');

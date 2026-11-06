@@ -1,3 +1,4 @@
+import { recordAiValidationFailure } from '../common/ai-telemetry';
 import { BadRequestException } from '@nestjs/common';
 import {
   ScheduleConstraints,
@@ -33,7 +34,14 @@ export function validateTrainingSchedule(
   constraints: ScheduleConstraints,
   startsOn: string,
 ) {
-  const invalid = (reason: string): never => {
+  let currentPath = '$';
+  const invalid = (reason: string, path = currentPath): never => {
+    recordAiValidationFailure([`Calendario AI non valido: ${reason}`], {
+      path,
+      constraints,
+      startsOn,
+      proposal,
+    });
     throw new BadRequestException({
       code: 'INVALID_AI_OUTPUT',
       message: `Calendario AI non valido: ${reason}`,
@@ -43,7 +51,8 @@ export function validateTrainingSchedule(
   const counts = [0, 0],
     days = new Set<number>();
   const start = dateOnly(startsOn);
-  for (const session of proposal.planItems) {
+  for (const [index, session] of proposal.planItems.entries()) {
+    currentPath = `$.planItems[${index}]`;
     if (
       !session ||
       !['type', 'title', 'body'].every(
@@ -60,36 +69,40 @@ export function validateTrainingSchedule(
       offset >= constraints.operationalWindowDays ||
       days.has(offset)
     )
-      invalid('giorno fuori finestra o duplicato');
+      invalid('giorno fuori finestra o duplicato', `${currentPath}.dayOffset`);
     if (
       !Number.isInteger(session.durationMinutes) ||
       session.durationMinutes <= 0 ||
       session.durationMinutes > constraints.availability.sessionDurationMinutes
     )
-      invalid('durata oltre la disponibilità');
+      invalid(
+        'durata oltre la disponibilità',
+        `${currentPath}.durationMinutes`,
+      );
     if (
       session.sets != null &&
       (!Number.isInteger(session.sets) || session.sets < 1)
     )
-      invalid('serie non valide');
+      invalid('serie non valide', `${currentPath}.sets`);
     if (
       session.restSeconds != null &&
       (!Number.isInteger(session.restSeconds) || session.restSeconds < 0)
     )
-      invalid('recupero non valido');
+      invalid('recupero non valido', `${currentPath}.restSeconds`);
     for (const key of ['equipment', 'reps'] as const)
       if (session[key] != null && typeof session[key] !== 'string')
-        invalid('dettagli non validi');
+        invalid('dettagli non validi', `${currentPath}.${key}`);
     const date = new Date(start.getTime() + offset * 86400000);
     const weekday = date.getUTCDay() || 7;
     if (
       constraints.availability.preferredDays?.length &&
       !constraints.availability.preferredDays.includes(weekday)
     )
-      invalid('giorno non disponibile');
+      invalid('giorno non disponibile', `${currentPath}.dayOffset`);
     counts[Math.floor(offset / 7)]++;
     days.add(offset);
   }
+  currentPath = '$.planItems';
   const { minSessionsPerWeek: min, maxSessionsPerWeek: max } =
     constraints.prescription;
   if (
@@ -110,5 +123,5 @@ export function validateTrainingSchedule(
     !Number.isInteger(proposal.sessionsPerWeek) ||
     proposal.sessionsPerWeek !== Math.max(...counts)
   )
-    invalid('riepilogo frequenza incoerente');
+    invalid('riepilogo frequenza incoerente', '$.sessionsPerWeek');
 }

@@ -1,3 +1,4 @@
+import { recordAiError } from '../common/ai-telemetry';
 import { BadRequestException } from '@nestjs/common';
 import { GoalValidationStatus } from './proposal-provider-model';
 
@@ -12,7 +13,8 @@ export function parseProposalJson(outputText: string, providerName: string) {
         orderIndex?: number;
       }>;
     };
-  } catch {
+  } catch (error) {
+    recordAiError(error, 'PARSE');
     throw new BadRequestException(
       `La risposta proposta ${providerName} non e un JSON valido`,
     );
@@ -31,7 +33,8 @@ export function parseHistorySummaryJson(
       unresolvedRisks?: string[];
       progressionNotes?: string[];
     };
-  } catch {
+  } catch (error) {
+    recordAiError(error, 'PARSE');
     throw new BadRequestException(
       `La risposta sunto storico ${providerName} non e un JSON valido`,
     );
@@ -49,7 +52,8 @@ export function parseSpecialistOnboardingQuestionJson(
         questions?: Array<{ text?: string; orderIndex?: number }>;
       }>;
     };
-  } catch {
+  } catch (error) {
+    recordAiError(error, 'PARSE');
     throw new BadRequestException(
       `La risposta domande specialistiche ${providerName} non e un JSON valido`,
     );
@@ -71,7 +75,8 @@ export function parseGoalValidationJson(
       area_prompts?: Record<string, unknown>;
       next_step?: string;
     };
-  } catch {
+  } catch (error) {
+    recordAiError(error, 'PARSE');
     throw new BadRequestException(
       `La risposta validazione obiettivo ${providerName} non e un JSON valido`,
     );

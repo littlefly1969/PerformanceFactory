@@ -1,3 +1,5 @@
+import { AiDiagnosticsSettingsService } from '../src/ai-monitoring/ai-diagnostics-settings.service';
+import { AiMonitoringService } from '../src/ai-monitoring/ai-monitoring.service';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { CanActivate, ExecutionContext } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
@@ -22,7 +24,7 @@ class TestAuth implements CanActivate {
       .getRequest<{ headers: Record<string, string>; user?: unknown }>();
     const role = req.headers['x-role'];
     if (!role) return false;
-    req.user = { role };
+    req.user = { role, id: 'admin-test' };
     return true;
   }
 }
@@ -32,12 +34,21 @@ describe('admin reporting access and validation', () => {
     list: jest.fn().mockResolvedValue({ rows: [] }),
     detail: jest.fn().mockResolvedValue({ attempts: [] }),
   };
+  const controls = {
+    read: jest.fn().mockResolvedValue({ enabled: false, changes: [] }),
+    update: jest.fn().mockResolvedValue({ enabled: true }),
+  };
   const registrations = { report: jest.fn().mockResolvedValue({ daily: [] }) };
   beforeAll(async () => {
     const module = await Test.createTestingModule({
       controllers: [AiLogsController, AnalyticsController],
       providers: [
         RolesGuard,
+        { provide: AiDiagnosticsSettingsService, useValue: controls },
+        {
+          provide: AiMonitoringService,
+          useValue: { health: () => ({ pendingWrites: 0 }) },
+        },
         { provide: PrismaService, useValue: {} },
         { provide: AiLogsService, useValue: logs },
         { provide: RegistrationReportService, useValue: registrations },
@@ -60,6 +71,7 @@ describe('admin reporting access and validation', () => {
   const paths = [
     '/admin/analytics/registrations',
     '/admin/ai-logs',
+    '/admin/ai-logs/configuration',
     '/admin/ai-logs/11111111-1111-4111-8111-111111111111',
   ];
   it.each(paths)(
@@ -127,5 +139,40 @@ describe('admin reporting access and validation', () => {
         })
       ).statusCode,
     ).toBe(400);
+  });
+  it('allows only ADMIN to change capture and rejects malformed settings', async () => {
+    for (const role of ['', 'USER', 'PROFESSIONAL', 'AI_TUNER']) {
+      expect(
+        (
+          await app.inject({
+            method: 'PATCH',
+            url: '/admin/ai-logs/configuration',
+            headers: role ? { 'x-role': role } : {},
+            payload: { enabled: true },
+          })
+        ).statusCode,
+      ).toBe(403);
+    }
+    expect(
+      (
+        await app.inject({
+          method: 'PATCH',
+          url: '/admin/ai-logs/configuration',
+          headers: { 'x-role': 'ADMIN' },
+          payload: { enabled: 'true' },
+        })
+      ).statusCode,
+    ).toBe(400);
+    expect(
+      (
+        await app.inject({
+          method: 'PATCH',
+          url: '/admin/ai-logs/configuration',
+          headers: { 'x-role': 'ADMIN' },
+          payload: { enabled: true },
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(controls.update).toHaveBeenLastCalledWith(true, 'admin-test');
   });
 });

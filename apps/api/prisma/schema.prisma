@@ -2161,7 +2161,7 @@ model Passkey {
   @@index([userId])
 }
 
-// Operational metadata only: never prompts, answers, credentials or athlete IDs.
+// Operational metadata plus explicitly admin-enabled full diagnostics. Credentials are removed.
 model AiOperationLog {
   id                 String         @id @default(uuid())
   operation          String
@@ -2174,12 +2174,19 @@ model AiOperationLog {
   durationMs         Int?
   validationFailures Int            @default(0)
   validationCodes    String[]       @default([])
+  diagnosticsEnabled Boolean        @default(false)
+  contextId          String?
+  invocationInput    String?
+  invocationOutput   String?
+  errorDetail        Json?
+  events             AiDiagnosticEvent[]
   attempts           AiHttpAttempt[]
 
   @@index([startedAt])
   @@index([status, startedAt])
   @@index([operation, startedAt])
   @@index([provider, startedAt])
+  @@index([contextId, startedAt])
 }
 
 model AiHttpAttempt {
@@ -2192,7 +2199,38 @@ model AiHttpAttempt {
   httpStatus  Int?
   durationMs  Int
   startedAt   DateTime
+  request     Json?
+  response    Json?
+  captureState String?
   operation   AiOperationLog @relation(fields: [operationId], references: [id], onDelete: Cascade)
 
   @@unique([operationId, sequence])
+}
+
+
+model AiDiagnosticEvent {
+  id String @id @default(uuid())
+  operationId String
+  sequence Int
+  attemptSequence Int?
+  phase String
+  detail Json
+  createdAt DateTime @default(now())
+  operation AiOperationLog @relation(fields: [operationId], references: [id], onDelete: Cascade)
+  @@unique([operationId, sequence])
+}
+
+model AiDiagnosticControl {
+  id String @id @default("global")
+  enabled Boolean @default(false)
+  updatedAt DateTime @updatedAt
+  updatedById String?
+}
+
+model AiDiagnosticControlChange {
+  id String @id @default(uuid())
+  enabled Boolean
+  actorId String
+  createdAt DateTime @default(now())
+  @@index([createdAt])
 }

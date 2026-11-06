@@ -1,3 +1,4 @@
+import { diagnosticJson } from '../common/ai-diagnostic-redaction';
 import { Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 import {
@@ -33,7 +34,7 @@ export function logDebugPrompt(
   }
 
   logger.log(
-    JSON.stringify({
+    diagnosticJson({
       provider,
       model,
       prompt: inputJson.prompt,

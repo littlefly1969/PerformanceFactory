@@ -1,3 +1,4 @@
+import { recordAiError } from '../common/ai-telemetry';
 import { recordAiValidationFailure } from '../common/ai-telemetry';
 import { BadGatewayException, Logger } from '@nestjs/common';
 import { AiQuotaExhaustedException } from '../common/ai-fetch';
@@ -190,7 +191,8 @@ export async function generateInitialQuestions(
 function parse(text: string) {
   try {
     return JSON.parse(text) as unknown;
-  } catch {
+  } catch (error) {
+    recordAiError(error, 'PARSE');
     return null;
   }
 }
