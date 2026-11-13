@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { resetInstallPromptForTests } from "../../lib/pwa";
+import { resetTapGuard } from "../_components/tap-guard";
 import InstallaPage from "./page";
 
 vi.mock("../../lib/api", () => ({
@@ -26,7 +27,11 @@ function setup({
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
       requests.push(`${init?.method ?? "GET"} ${url}`);
-      return new Response("{}");
+      return new Response(
+        url.endsWith("/athlete-journey/profile")
+          ? JSON.stringify({ firstName: "Mario Rossi" })
+          : "{}",
+      );
     }),
   );
   vi.stubGlobal("navigator", { ...navigator, userAgent, maxTouchPoints: 5 });
@@ -39,6 +44,7 @@ function setup({
 
 afterEach(() => {
   cleanup();
+  resetTapGuard();
   resetInstallPromptForTests();
   vi.unstubAllGlobals();
 });
@@ -62,7 +68,32 @@ describe("04 · La tua app", () => {
     await userEvent.click(
       screen.getByRole("button", { name: "Continua nel browser" }),
     );
+    // Prima della home, «Sei dentro, Mario.» (demo V11).
+    expect(
+      await screen.findByRole("heading", { name: "Sei dentro, Mario." }),
+    ).toBeInTheDocument();
+    expect(assign).not.toHaveBeenCalled();
+    resetTapGuard();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Entra nell’app/ }),
+    );
     expect(assign).toHaveBeenCalledWith("/journey");
+  });
+
+  it("ignores the second tap of a double tap: «Sei dentro» stays", async () => {
+    const { assign } = setup({ userAgent: IPHONE });
+    render(<InstallaPage />);
+    // Il primo tocco arriva dalla slide 4, il secondo cade qui su «Più tardi».
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Più tardi" }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: /Sei dentro/ }),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Entra nell’app/ }),
+    );
+    expect(assign).not.toHaveBeenCalled();
   });
 
   it("offers the one-tap install on Android", async () => {

@@ -1,9 +1,43 @@
 "use client";
-import { useEffect, useRef, useState, type Ref } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type Ref,
+} from "react";
 
 /**
- * Campo da padel della demo PF10 visto dall'alto: linee che si tracciano,
- * quattro giocatori e una pallina che va e viene. Solo illustrazione.
+ * Orologio comune dei campi del funnel: ogni domanda monta il suo campo, ma
+ * lo scambio continua da dove era invece di ripartire (demo V11). Il primo
+ * campo fissa l'inizio; gli altri spostano le animazioni del tempo passato.
+ */
+let courtEpoch: number | undefined;
+/** Dopo questo tempo le linee sono già tracciate: niente più ingresso. */
+const COURT_INTRO_MS = 2200;
+
+export function courtShift(now = Date.now()) {
+  if (courtEpoch === undefined) courtEpoch = now;
+  return Math.max(0, now - courtEpoch);
+}
+
+/** Solo per i test: il prossimo campo riparte da zero. */
+export function resetCourtClock() {
+  courtEpoch = undefined;
+}
+
+/** I quattro giocatori, nell'ordine in cui ricevono la pallina. */
+const PLAYERS = [
+  { x: 78, y: 58 },
+  { x: 276, y: 104 },
+  { x: 112, y: 114 },
+  { x: 242, y: 50 },
+];
+
+/**
+ * Campo da padel della demo visto dall'alto: linee che si tracciano, quattro
+ * giocatori e una pallina che va dritta da un giocatore all'altro, senza
+ * fermarsi a rete, sempre in loop. Solo illustrazione.
  */
 export function PadelCourt({
   ballRef,
@@ -14,9 +48,11 @@ export function PadelCourt({
   /** Zona di colpo evidenziata: "idle" visibile, "hot" pallina dentro. */
   zone?: "idle" | "hot";
 }) {
+  const [shift] = useState(() => courtShift());
   return (
     <div
-      className={`pf4-court${ballRef ? " is-manual" : ""}`}
+      className={`pf4-court${ballRef ? " is-manual" : ""}${shift > COURT_INTRO_MS ? " is-settled" : ""}`}
+      style={{ "--pf4-court-shift": `-${shift}ms` } as CSSProperties}
       aria-hidden="true"
     >
       <span className="pf4-court-glow" />
@@ -61,35 +97,47 @@ export function PadelCourt({
           />
         )}
         <g className="pf4-court-players">
-          <circle cx="78" cy="58" r="5" />
-          <circle cx="112" cy="114" r="5" />
-          <circle cx="276" cy="104" r="5" />
-          <circle cx="242" cy="50" r="5" />
+          {PLAYERS.map((p) => (
+            <circle key={`${p.x}-${p.y}`} cx={p.x} cy={p.y} r="5" />
+          ))}
+        </g>
+        <g className="pf4-court-hits">
+          {PLAYERS.map((p) => (
+            <circle key={`${p.x}-${p.y}`} cx={p.x} cy={p.y} r="8" />
+          ))}
         </g>
         <g className="pf4-court-ball" ref={ballRef}>
-          <circle r="10" className="pf4-court-ball-halo" />
-          <circle r="4.5" />
+          <g className="pf4-court-ball-lift">
+            <circle r="10" className="pf4-court-ball-halo" />
+            <circle r="4.5" />
+          </g>
         </g>
       </svg>
     </div>
   );
 }
 
-/** Tappe dello scambio, come i keyframe CSS: [fase, x, y, scala]. */
-const RALLY: [number, number, number, number][] = [
-  [0, 84, 60, 1],
-  [0.04, 84, 60, 1],
-  [0.25, 177, 52, 1.7],
-  [0.46, 270, 102, 1],
-  [0.54, 270, 102, 1],
-  [0.75, 177, 112, 1.7],
-  [0.96, 84, 60, 1],
-  [1, 84, 60, 1],
+/**
+ * Tappe dello scambio, come i keyframe CSS: [fase, x, y]. La pallina si ferma
+ * un attimo su ogni giocatore e vola dritta al successivo.
+ */
+const RALLY: [number, number, number][] = [
+  [0, 86, 58],
+  [0.03, 86, 58],
+  [0.22, 268, 104],
+  [0.28, 268, 104],
+  [0.47, 120, 114],
+  [0.53, 120, 114],
+  [0.72, 234, 50],
+  [0.78, 234, 50],
+  [0.97, 86, 58],
+  [1, 86, 58],
 ];
-const ZONE = { x: 270, y: 102 };
-/** Uno scambio completo; la finestra di colpo è tollerante (≈ mezzo secondo). */
-export const RHYTHM_PERIOD_MS = 2600;
-export const RHYTHM_WINDOW = { from: 0.4, to: 0.6 };
+/** Zona di colpo: il giocatore vicino, a sinistra, a metà scambio. */
+const ZONE = { x: 120, y: 114 };
+/** Uno scambio completo, come l'animazione; la finestra è ≈ mezzo secondo. */
+export const RHYTHM_PERIOD_MS = 4000;
+export const RHYTHM_WINDOW = { from: 0.43, to: 0.57 };
 export const RHYTHM_GOAL = 3;
 /** Un salto oltre questo (scheda in background, frame perso) non conta. */
 const MAX_FRAME_MS = 50;
@@ -97,22 +145,25 @@ const MAX_FRAME_MS = 50;
 export function rallyAt(phase: number) {
   const p = ((phase % 1) + 1) % 1;
   const i = RALLY.findIndex(([at], k) => p <= at && k > 0);
-  const [a0, x0, y0, s0] = RALLY[i - 1];
-  const [a1, x1, y1, s1] = RALLY[i];
+  const [a0, x0, y0] = RALLY[i - 1];
+  const [a1, x1, y1] = RALLY[i];
   const t = a1 === a0 ? 0 : (p - a0) / (a1 - a0);
   const e = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+  // In volo la pallina si ingrandisce a metà strada: è il pallonetto.
+  const flying = x0 !== x1 || y0 !== y1;
   return {
     x: x0 + (x1 - x0) * e,
     y: y0 + (y1 - y0) * e,
-    scale: s0 + (s1 - s0) * e,
+    scale: flying ? 1 + 0.6 * Math.sin(Math.PI * e) : 1,
   };
 }
 
 /** Esito di un colpo alla fase data dello scambio. */
 export function judgeHit(phase: number) {
   if (phase >= RHYTHM_WINDOW.from && phase <= RHYTHM_WINDOW.to) return "hit";
-  if (phase > 0.15 && phase < RHYTHM_WINDOW.from) return "early";
-  if (phase > RHYTHM_WINDOW.to && phase < 0.85) return "late";
+  // Prima arriva dal giocatore lontano (fermo fino a 0.28), poi riparte.
+  if (phase > 0.28 && phase < RHYTHM_WINDOW.from) return "early";
+  if (phase > RHYTHM_WINDOW.to && phase < 0.72) return "late";
   return "wait";
 }
 
@@ -138,11 +189,20 @@ export function usePrefersReducedMotion() {
 }
 
 /**
+ * Campo dell'intro. Il minigioco «Trova il ritmo» si accende solo con il flag
+ * `funnel_rhythm_game` (decisione di Stefano, 13 novembre 2026: per ora
+ * spento); senza, resta il campo animato.
+ */
+export function RhythmCourt({ enabled = false }: { enabled?: boolean }) {
+  return enabled ? <RhythmGame /> : <PadelCourt />;
+}
+
+/**
  * Minigioco facoltativo «Trova il ritmo» dentro il campo dell'intro: nessun
  * passaggio, nessun salvataggio, nessun effetto sul percorso. Si ferma e si
  * ripulisce quando si lascia la schermata.
  */
-export function RhythmCourt() {
+function RhythmGame() {
   const reduced = usePrefersReducedMotion();
   const [playing, setPlaying] = useState(false);
   const [hits, setHits] = useState(0);

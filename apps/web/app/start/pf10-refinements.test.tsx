@@ -81,6 +81,7 @@ describe("contatore della demo PF10", () => {
     // Il 3 iniziale è già una risposta: la fascia «1-3 anni».
     expect(shown()).toHaveTextContent(/^3$/);
     expect(band()).toHaveTextContent("1-3 anni");
+    expect(band()).not.toHaveClass("pf4-sr");
     expect(onChange).toHaveBeenLastCalledWith("1");
     await userEvent.click(minus);
     await userEvent.click(minus);
@@ -124,6 +125,8 @@ describe("contatore della demo PF10", () => {
     const plus = screen.getByRole("button", { name: "Aumenta" });
     expect(shown()).toHaveTextContent(/^3$/);
     expect(band()).toHaveTextContent("3-4 volte");
+    // Demo V11: niente riga «3-4 volte» a video, solo per i lettori di schermo.
+    expect(band()).toHaveClass("pf4-sr");
     expect(onChange).toHaveBeenLastCalledWith("1");
     await userEvent.click(minus);
     expect(band()).toHaveTextContent("1-2 volte");

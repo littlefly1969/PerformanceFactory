@@ -13,6 +13,11 @@ export type ChoiceCounter = {
   display: (n: number) => string;
   /** `value`: valore dell'opzione configurata che la fascia deve avere. */
   bands: { upTo: number; label: string; value: string }[];
+  /**
+   * Fascia in grigio sopra il numero. Sulla frequenza la demo V11 l'ha tolta
+   * («3-4 volte»): resta solo per chi usa un lettore di schermo.
+   */
+  showBand: boolean;
 };
 
 const COUNTERS: Record<string, ChoiceCounter> = {
@@ -22,6 +27,7 @@ const COUNTERS: Record<string, ChoiceCounter> = {
     max: 11,
     start: 3,
     display: (n) => (n <= 0 ? "<1" : n >= 11 ? "10+" : String(n)),
+    showBand: true,
     bands: [
       { upTo: 0, label: "Meno di un anno", value: "Meno di un anno" },
       { upTo: 3, label: "1-3 anni", value: "1-3 anni" },
@@ -34,6 +40,7 @@ const COUNTERS: Record<string, ChoiceCounter> = {
     max: 7,
     start: 3,
     display: String,
+    showBand: false,
     bands: [
       { upTo: 2, label: "1-2 volte", value: "1-2 volte" },
       { upTo: 4, label: "3-4 volte", value: "3-4 volte" },

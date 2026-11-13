@@ -1,5 +1,7 @@
+"use client";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { tapGuard } from "./tap-guard";
 import "./welcome.css";
 
 /**
@@ -27,10 +29,11 @@ export function WelcomeShell({
   children: ReactNode;
   footer?: ReactNode;
 }) {
+  const guard = tapGuard(`welcome-${step ?? "other"}`);
   return (
     <main className="pf-welcome">
       <div className="pf-welcome-device">
-        <header className="pf-welcome-header">
+        <header className="pf-welcome-header" onClickCapture={guard}>
           {back && (
             <Link className="pf-welcome-back" href={back} aria-label="Indietro">
               ←
@@ -62,7 +65,11 @@ export function WelcomeShell({
           )}
         </header>
         <section className="pf-welcome-body">{children}</section>
-        {footer && <footer className="pf-welcome-footer">{footer}</footer>}
+        {footer && (
+          <footer className="pf-welcome-footer" onClickCapture={guard}>
+            {footer}
+          </footer>
+        )}
       </div>
     </main>
   );

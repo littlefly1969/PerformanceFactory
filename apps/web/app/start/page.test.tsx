@@ -125,10 +125,25 @@ describe("PF4 configured journey", () => {
       JSON.parse(window.sessionStorage.getItem(DRAFT_KEY)!).answers,
     ).toEqual({ "backend-first": "option-a" });
   });
+  it("hides the rhythm game while its flag is off", async () => {
+    mockConfig();
+    render(<StartPage />);
+    await screen.findByRole("button", { name: "Inizia il percorso →" });
+    expect(screen.queryByRole("button", { name: "Prova il ritmo" })).toBeNull();
+  });
   it("keeps the rhythm game optional: the journey starts mid-game, nothing is saved", async () => {
     vi.stubGlobal("requestAnimationFrame", () => 1);
     vi.stubGlobal("cancelAnimationFrame", vi.fn());
-    mockConfig();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => ({
+        ok: true,
+        json: async () =>
+          url.endsWith("/public/features")
+            ? { funnel_rhythm_game: true }
+            : config,
+      })),
+    );
     render(<StartPage />);
     await userEvent.click(
       await screen.findByRole("button", { name: "Prova il ritmo" }),

@@ -8,10 +8,13 @@ import {
   type InstallPlatform,
 } from "../../lib/pwa";
 import { PFMark } from "../../start/pf4-shell";
+import { tapGuard } from "../_components/tap-guard";
+import { EnteredScreen } from "./entered";
 import "../../start/pf4.css";
 import "./installa.css";
 
 const HOME = "/journey";
+const guard = tapGuard("welcome-5");
 
 /** Chiude la sequenza lato server: vale anche per l'app installata su iOS. */
 async function completeWelcome() {
@@ -79,6 +82,7 @@ export default function InstallaPage() {
   const [outcome, setOutcome] = useState<"accepted" | "dismissed">();
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState<Promise<boolean>>();
+  const [entered, setEntered] = useState(false);
 
   useEffect(() => {
     // Già aperta dalla Home: niente da installare, si va alla home.
@@ -94,17 +98,20 @@ export default function InstallaPage() {
     // Se il salvataggio non è riuscito si riprova: altrimenti /journey
     // riproporrebbe la sequenza di benvenuto.
     if (!(await saved)) await completeWelcome();
-    window.location.assign(HOME);
+    setEntered(true);
   };
 
   const showButton = install.canPrompt && !outcome;
   const done = outcome === "accepted" || install.installed;
   const guide = platform && !showButton && !done ? GUIDES[platform] : null;
 
+  // Dopo la slide 5 la demo V11 chiude con «Sei dentro, Mario.».
+  if (entered)
+    return <EnteredScreen onEnter={() => window.location.assign(HOME)} />;
   return (
     <main className="pf-welcome">
       <div className="pf-welcome-frame">
-        <header className="pf-welcome-top">
+        <header className="pf-welcome-top" onClickCapture={guard}>
           <a
             className="pf-welcome-top-back"
             href="/benvenuto/regalo"
@@ -173,7 +180,7 @@ export default function InstallaPage() {
           )}
         </section>
 
-        <footer className="pf-welcome-actions">
+        <footer className="pf-welcome-actions" onClickCapture={guard}>
           {showButton ? (
             <>
               <button

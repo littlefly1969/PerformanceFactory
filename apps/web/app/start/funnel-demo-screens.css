@@ -309,7 +309,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   .pf4-funnel .pf4-court-ball {
-    transform: translate(84px, 60px);
+    transform: translate(86px, 58px);
+  }
+  .pf4-funnel .pf4-court-hits {
+    display: none;
   }
   .pf4-funnel .pf4-court-trace {
     stroke-dashoffset: 0;
@@ -341,5 +344,54 @@
   }
   .pf4-funnel .pf4-intro-sheet .pf4-cta {
     margin-top: 18px;
+  }
+}
+
+/*
+ * Domande con il campo (demo V11): intestazione e campo restano fermi, le
+ * risposte scorrono dentro il foglio e «Continua» resta in fondo, con la
+ * sfumatura sopra le risposte. Le domande con il quadrante numerico no: la
+ * tastiera del telefono coprirebbe il campo da compilare.
+ */
+.pf4-funnel .pf4-device:has(.pf4-sheet-fixed) {
+  height: 100dvh;
+}
+.pf4-funnel .pf4-stage:has(> .pf4-sheet-fixed) {
+  min-height: 0;
+  overflow: hidden;
+}
+.pf4-funnel .pf4-stage:has(> .pf4-sheet-fixed) > .pf4-hero {
+  flex-shrink: 0;
+}
+.pf4-funnel .pf4-sheet-fixed {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.pf4-funnel .pf4-sheet-fixed .pf4-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-bottom: 32px;
+}
+.pf4-funnel .pf4-sheet-fixed .pf4-footer {
+  position: relative;
+  background: var(--pf4-paper);
+}
+.pf4-funnel .pf4-sheet-fixed .pf4-footer:not(.pf4-entry-note)::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 64px;
+  background: linear-gradient(to top, var(--pf4-paper) 12%, #f5f5f200);
+  pointer-events: none;
+}
+@media (min-width: 900px) {
+  .pf4-funnel .pf4-device:has(.pf4-sheet-fixed) {
+    height: calc(100dvh - 80px);
   }
 }

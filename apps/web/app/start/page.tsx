@@ -88,8 +88,30 @@ function startServerDraft(
   });
 }
 
+/**
+ * Flag pubblici (solo quelli accesi al 100%): il funnel è prima del login.
+ * Senza risposta tutto resta spento.
+ */
+function usePublicFlag(key: string) {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    let active = true;
+    fetch(`${API_BASE}/public/features`, { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : {}))
+      .then((flags: Record<string, unknown>) => {
+        if (active) setOn(flags?.[key] === true);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [key]);
+  return on;
+}
+
 export default function StartPage() {
   const googlePending = usePendingGoogle();
+  const rhythmGame = usePublicFlag("funnel_rhythm_game");
   const [googleError, setGoogleError] = useState("");
   const [config, setConfig] = useState<DiscoveryConfiguration>();
   const [draft, setDraft] = useState<DiscoveryDraft>();
@@ -283,7 +305,7 @@ export default function StartPage() {
       {draft.currentStep === "intro" && (
         <>
           <div className="pf4-hero pf4-hero-court">
-            <RhythmCourt />
+            <RhythmCourt enabled={rhythmGame} />
           </div>
           <div className="pf4-sheet pf4-intro-sheet">
             <div className="pf4-body pf4-intro">
