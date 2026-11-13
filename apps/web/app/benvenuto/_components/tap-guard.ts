@@ -16,9 +16,14 @@ let last: { at: number; screen: string } | null = null;
  * pulsante («Salta» della 4 sopra «Più tardi» della 5), e l'ultima slide si
  * salta. Si ignora un tocco arrivato su un'altra slide entro `TAP_GUARD_MS`
  * dal tocco precedente. Va in `onClickCapture` di intestazione e piede.
+ *
+ * Solo per i tocchi e i click del puntatore: l'attivazione da tastiera
+ * (Invio o Spazio, `detail` 0) passa sempre e non conta come tocco, così
+ * chi naviga da tastiera può scorrere le slide senza attese.
  */
 export function tapGuard(screen: string) {
   return (event: MouseEvent) => {
+    if (event.detail === 0) return;
     const now = Date.now();
     if (last && last.screen !== screen && now - last.at < TAP_GUARD_MS) {
       event.preventDefault();

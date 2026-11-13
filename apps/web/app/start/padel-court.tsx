@@ -17,6 +17,10 @@ let courtEpoch: number | undefined;
 const COURT_INTRO_MS = 2200;
 
 export function courtShift(now = Date.now()) {
+  // Nel rendering lato server l'orologio non parte: il campo idratato
+  // nasce a 0 come quello del server e il primo campo nel browser avvia
+  // l'orologio, quindi niente differenze di stile all'idratazione.
+  if (typeof window === "undefined") return 0;
   if (courtEpoch === undefined) courtEpoch = now;
   return Math.max(0, now - courtEpoch);
 }

@@ -218,4 +218,17 @@ describe("campo del funnel", () => {
     resetCourtClock();
     expect(courtShift(7000)).toBe(0);
   });
+
+  it("does not start the clock while rendering on the server", () => {
+    vi.stubGlobal("window", undefined);
+    try {
+      expect(courtShift(1000)).toBe(0);
+      expect(courtShift(9000)).toBe(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    // Il campo idratato nasce a 0 come quello del server e avvia l'orologio.
+    expect(courtShift(20000)).toBe(0);
+    expect(courtShift(21000)).toBe(1000);
+  });
 });
