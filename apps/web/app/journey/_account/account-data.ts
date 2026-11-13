@@ -60,7 +60,9 @@ export type FreeLessonView =
         | "ASSIGNED"
         | "ATTENDED"
         | "NO_SHOW"
-        | "CLOSED";
+        | "CLOSED"
+        /** Circoli che la offrono, ma tutti al completo: niente da scegliere né rifiutare. */
+        | "FULL";
       missing: Array<"LEVEL" | "CONFIDENCE" | "PROFILE">;
       credits: { balance: number; toUnlock: number };
       clubs: LessonClub[];

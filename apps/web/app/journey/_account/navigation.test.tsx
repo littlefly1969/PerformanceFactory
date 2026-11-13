@@ -364,6 +364,16 @@ describe("Prossimo passo della fase gratuita", () => {
       "/journey/calibrazione",
     ],
     [
+      // Tutti i circoli al completo: si va agli scenari senza rinunciare.
+      "every club full and R consolidated",
+      calibration(null, "FREE_LEVEL_ESTIMATED", {
+        ruleMet: true,
+        canFinish: true,
+      }),
+      { ...lesson, phase: "FULL" },
+      "/journey/calibrazione",
+    ],
+    [
       "lesson declined",
       calibration(null),
       { ...lesson, phase: "DECLINED" },
@@ -391,6 +401,20 @@ describe("Prossimo passo della fase gratuita", () => {
     // Lo stesso passo guida la home e la scheda della lezione nel profilo.
     const j = journey({ calibration: current }) as unknown as Journey;
     expect(nextStep(j, view as unknown as FreeLessonView).href).toBe(href);
+  });
+
+  it("says the clubs are full in the profile, with no circle to choose", async () => {
+    serve({
+      "/auth/journey": journey({ calibration: calibration(null) }),
+      "/athlete-journey/profile": PROFILE,
+      "/athlete-journey/free-lesson": { ...lesson, phase: "FULL" },
+    });
+    render(<ProfilePage />);
+    expect(
+      await screen.findByText("Al momento i circoli sono al completo."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Scegli il circolo/)).toBeNull();
+    expect(screen.queryByText(/Ho cambiato idea/)).toBeNull();
   });
 
   it("no longer shows the «Fase gratuita» card in the profile (demo V11)", async () => {

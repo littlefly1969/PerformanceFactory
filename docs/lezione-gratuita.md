@@ -85,7 +85,8 @@ In `apps/api/src/free-lessons/free-lesson-rules.ts`, senza I/O:
   `CONFIDENCE`, o `PROFILE` quando una segnalazione interna `HIGH` aperta sospende
   la lezione, con un messaggio neutro; vedi `docs/calibrazione.md`), `UNAVAILABLE` (nessun circolo, o nessuna calibrazione),
   `ELIGIBLE`, `DECLINED` (rinuncia o ritiro), `REQUESTED`, `ASSIGNED`, `ATTENDED`,
-  `NO_SHOW`, `CLOSED` (R già chiusa). Un posto svolto o perso per assenza consuma
+  `NO_SHOW`, `CLOSED` (R già chiusa), `FULL` (circoli che la offrono, ma
+  nessuno con posti in calendario). Un posto svolto o perso per assenza consuma
   il beneficio; una rinuncia o un ritiro prima della lezione no.
 - **Posto**: uno per atleta (`FreeLessonSeat.userId` è la chiave). Richiesta solo in
   un circolo con `freeLessonsEnabled` e con il consenso a mostrare al coach nome,
@@ -99,6 +100,11 @@ In `apps/api/src/free-lessons/free-lesson-rules.ts`, senza I/O:
   rifiuta la richiesta (400). Chi ha già chiesto un circolo che poi si riempie lo
   tiene e può cambiare solo l'orario. Senza lezioni in calendario un circolo è
   quindi al completo: le lezioni vanno create da `/admin/free-lessons`.
+  Se tutti i circoli che offrono la lezione sono al completo la fase è `FULL`
+  (review di Stefano su #83): la lezione è momentaneamente non disponibile, non
+  una rinuncia. Non si richiede né si rifiuta, e con R consolidata l'atleta va
+  agli scenari senza dichiarare nulla (il gate di `lessonGate` conta solo i
+  circoli con posti). Un posto già richiesto resta tale.
 - **Rinuncia**: «Non voglio fare la lezione di prova» su «Dove sei?» e «Dove
   giochi?» porta al profilo con «Va bene. Se ci ripensi, la lezione resta qui.»;
   home e profilo mostrano «Hai scelto di non fare la lezione.» con «Ho cambiato

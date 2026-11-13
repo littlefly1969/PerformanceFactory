@@ -120,6 +120,20 @@ export default function ClubPage() {
       </AccountScreen>
     );
 
+  // Tutti i circoli al completo: non è una rinuncia, si prosegue (demo V11).
+  if (view.phase === "FULL")
+    return (
+      <AccountScreen top={top} tone="dark">
+        <span className="pf-acc-kicker is-lime">Lezione di prova</span>
+        <h1 className="pf-lz-title">Al momento i circoli sono al completo.</h1>
+        <p className="pf-lz-lead">
+          Nessun posto libero per la lezione di prova: appena un circolo
+          pubblica nuove date la ritrovi qui. Intanto puoi andare avanti, la tua
+          R si chiude con le tue risposte.
+        </p>
+      </AccountScreen>
+    );
+
   const { phase, clubs, slots, seat } = view;
   const booked = (phase === "REQUESTED" || phase === "ASSIGNED") && !!seat;
   const canRequest =

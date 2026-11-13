@@ -227,6 +227,13 @@ export function LessonSection({
         <p>Non ancora disponibile nella tua zona.</p>
       </section>
     );
+  if (phase === "FULL")
+    return (
+      <section className="pf-prof-lz-off" aria-label="Lezione gratuita">
+        <span className="pf-prof-kicker">Lezione di prova</span>
+        <p>Al momento i circoli sono al completo.</p>
+      </section>
+    );
   if (phase === "LOCKED") {
     // Una revisione interna del profilo resta neutra per l'atleta.
     const review = !!view.missing?.includes("PROFILE");

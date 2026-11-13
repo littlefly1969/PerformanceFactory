@@ -807,6 +807,48 @@ describe('Free lesson with PostgreSQL', () => {
     });
   });
 
+  it('V11: with every club full the athlete reaches the scenarios without declining', async () => {
+    // Nessun posto in calendario, ma il circolo offre ancora la lezione.
+    const open = await prisma.freeLesson.findMany({
+      where: { status: 'SCHEDULED', startsAt: { gt: new Date() } },
+      select: { id: true },
+    });
+    const ids = open.map((l) => l.id);
+    await prisma.freeLesson.updateMany({
+      where: { id: { in: ids } },
+      data: { status: 'CANCELLED' },
+    });
+    try {
+      const id = await athlete([80, 90]);
+      const view = await athletes.view(id);
+      expect(view).toMatchObject({ phase: 'FULL' });
+      expect(
+        (view.enabled ? view.clubs : []).find((c) => c.id === partnerId),
+      ).toMatchObject({ available: false });
+      await expect(athletes.request(id, partnerId)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      // Non è una rinuncia: niente da rifiutare, e gli scenari sono aperti.
+      await expect(athletes.decline(id)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      await calibration.finish(id);
+      expect(await status(id)).toBe('CALIBRATION_COMPLETED');
+      expect(
+        (
+          await prisma.athleteCalibration.findUniqueOrThrow({
+            where: { userId: id },
+          })
+        ).lessonDeclinedAt,
+      ).toBeNull();
+    } finally {
+      await prisma.freeLesson.updateMany({
+        where: { id: { in: ids } },
+        data: { status: 'SCHEDULED' },
+      });
+    }
+  });
+
   it('AT-15/AT-16/AT-18: with a lesson possible the scenarios wait for it or for an explicit decline', async () => {
     // Regola di consolidamento soddisfatta, livello stimato, circolo che offre
     // la lezione: prima degli scenari si richiede o si rifiuta la lezione.

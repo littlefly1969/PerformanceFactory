@@ -476,4 +476,28 @@ describe("Lezione gratuita: circoli al completo (demo V11)", () => {
       true,
     );
   });
+
+  it("with every club full says so, without asking to decline", async () => {
+    serve({
+      "/auth/journey": journey(),
+      "/athlete-journey/free-lesson": {
+        ...lesson,
+        phase: "FULL",
+        clubs: lesson.clubs.map((club) => ({ ...club, available: false })),
+        slots: [],
+      },
+    });
+    render(<ClubPage />);
+    expect(
+      await screen.findByRole("heading", {
+        name: "Al momento i circoli sono al completo.",
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", {
+        name: "Non voglio fare la lezione di prova",
+      }),
+    ).toBeNull();
+    expect(screen.queryByRole("radiogroup")).toBeNull();
+  });
 });

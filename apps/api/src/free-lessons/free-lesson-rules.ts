@@ -101,7 +101,9 @@ export type LessonPhase =
   | 'ASSIGNED'
   | 'ATTENDED'
   | 'NO_SHOW'
-  | 'CLOSED';
+  | 'CLOSED'
+  /** Circoli che offrono la lezione, ma nessuno con posti in calendario. */
+  | 'FULL';
 
 /**
  * PROFILE: una segnalazione interna aperta sospende la lezione; l'atleta legge
@@ -121,6 +123,11 @@ export function lessonEligibility(input: {
   calibrationStatus: string | null;
   eligibilityMet: boolean;
   clubs: number;
+  /**
+   * Circoli con almeno una lezione in calendario con posti liberi: senza,
+   * la lezione è momentaneamente non disponibile (FULL), non rifiutata.
+   */
+  bookable: number;
   seatStatus: string | null;
   declined: boolean;
   /** Segnalazione HIGH aperta: mai un posto già richiesto o assegnato. */
@@ -145,6 +152,8 @@ export function lessonEligibility(input: {
   if (input.suspended) return { phase: 'LOCKED', missing: ['PROFILE'] };
   // Territorio non servito: nessuna promessa, R e paywall proseguono (AT-16).
   if (input.clubs === 0) return { phase: 'UNAVAILABLE', missing: [] };
+  // Tutti al completo: niente scelta da fare, si prosegue senza rinunciare.
+  if (input.bookable === 0) return { phase: 'FULL', missing: [] };
   if (input.declined || seatStatus === 'WITHDRAWN')
     return { phase: 'DECLINED', missing: [] };
   return { phase: 'ELIGIBLE', missing: [] };
