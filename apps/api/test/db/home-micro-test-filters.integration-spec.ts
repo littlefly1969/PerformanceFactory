@@ -2,6 +2,7 @@ import { Test } from '@nestjs/testing';
 import { BadGatewayException } from '@nestjs/common';
 import { Prisma, UserRole } from '@prisma/client';
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -369,6 +370,104 @@ describe('Home micro-test filters with PostgreSQL', () => {
     expect(await filterState(id, 'OFF_COURT')).toMatchObject({
       status: 'DONE_TODAY',
     });
+  });
+
+  it('migration: counts the micro-tests proposed earlier today, before the deploy', async () => {
+    const id = await athlete();
+    const now = new Date();
+    let sequence = 0;
+    /** Round storico del micro-test, come lo salvava il codice prima dei filtri. */
+    const legacy = (
+      microTest: Record<string, unknown>,
+      status: string,
+      createdAt = now,
+    ) =>
+      prisma.calibrationRound.create({
+        data: {
+          userId: id,
+          sequence: ++sequence,
+          status,
+          action: 'PROPOSE_MICRO_TEST',
+          targetAreas: [AREAS[0]],
+          provider: 'stub',
+          model: 'stub',
+          promptHash: 'h',
+          createdAt,
+          questionsJson: [
+            {
+              id: 't1',
+              areaId: AREAS[0],
+              text: 'Prova storica',
+              options: [
+                { value: 'o1', label: 'Poco', score: 20 },
+                { value: 'o2', label: 'Molto', score: 80 },
+              ],
+              microTest: {
+                instructions: 'Istruzioni.',
+                durationMinutes: 5,
+                safetyNotes: '',
+                title: 'Prova storica',
+                ...microTest,
+              },
+            },
+          ] as Prisma.InputJsonValue,
+        },
+      });
+    const situation = { situation: { index: 0, total: 1, label: 'Fondo' } };
+    const theory = [
+      await legacy(situation, 'SKIPPED', new Date(now.getTime() - 1000)),
+      await legacy(situation, 'EVALUATED'),
+    ];
+    const practical = await legacy({}, 'OPEN');
+    const offCourt = await legacy({ setting: 'OFF_COURT' }, 'SKIPPED');
+    // Ieri non conta: il limite è del giorno.
+    await legacy(situation, 'SKIPPED', new Date(now.getTime() - 2 * DAY_MS));
+
+    // Il blocco di backfill della migrazione, eseguito sui dati storici (due volte: è idempotente).
+    const sql = readFileSync(
+      resolve(
+        __dirname,
+        '../../prisma/migrations/20261113190000_micro_test_filtri/migration.sql',
+      ),
+      'utf8',
+    );
+    const backfill = sql.slice(sql.indexOf('-- BACKFILL-MICRO-TEST-SLOTS'));
+    await prisma.$executeRawUnsafe(backfill);
+    await prisma.$executeRawUnsafe(backfill);
+
+    const taken = await slots(id);
+    expect(
+      taken
+        .map((s) => [s.roundId, s.filter, s.slot, s.status, s.day])
+        .sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+    ).toEqual(
+      [
+        [theory[0].id, 'THEORY', 1, 'READY', romeDay(now)],
+        [theory[1].id, 'THEORY', 2, 'READY', romeDay(now)],
+        [practical.id, 'ON_COURT', 1, 'READY', romeDay(now)],
+        [offCourt.id, 'OFF_COURT', 1, 'READY', romeDay(now)],
+      ].sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+    );
+    // Teorici: due già proposti oggi, quindi niente AI fino a domani.
+    const calls = testSpy.mock.calls.length;
+    await home.prepare(id, 'THEORY');
+    expect(testSpy.mock.calls.length).toBe(calls);
+    const view = await home.view(id);
+    expect(view.filters.map((f) => [f.filter, f.status, f.usedToday])).toEqual([
+      ['THEORY', 'DONE_TODAY', 2],
+      ['ON_COURT', 'READY', 1],
+      ['OFF_COURT', 'PREPARING', 1],
+    ]);
+    // Fuori dal campo resta un posto, poi basta.
+    await home.prepare(id, 'OFF_COURT');
+    expect(testSpy.mock.calls.length).toBe(calls + 1);
+    expect(await filterState(id, 'OFF_COURT')).toMatchObject({
+      status: 'READY',
+      usedToday: 2,
+    });
+    expect((await slots(id, 'OFF_COURT')).map((s) => s.slot).sort()).toEqual([
+      1, 2,
+    ]);
   });
 
   it('keeps the limit in the database: the same slot cannot be taken twice', async () => {
