@@ -1,3 +1,4 @@
+"use client";
 import { AccountScreen, AccountTopBar } from "../../_account/account-shell";
 import { useProfileOrigin } from "../_profile/profile-origin";
 import "../_profile/profile.css";
