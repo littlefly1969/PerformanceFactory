@@ -1,4 +1,5 @@
 import {
+  Body,
   Controller,
   Get,
   Header,
@@ -9,26 +10,31 @@ import {
 } from '@nestjs/common';
 import { ApiCookieAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CalibrationQuestion } from '../../ai-orchestrator/calibration-questions';
+import {
+  MICRO_TEST_FILTERS,
+  MicroTestFilter,
+} from '../../ai-orchestrator/micro-test-practical';
 import { AuthenticatedGuard } from '../../common/guards/authenticated.guard';
 import { loadFreeLessonSettings } from '../../free-lessons/free-lesson-config';
 import { performanceDriverName as driverName } from '../../performance/performance-display';
 import { PrismaService } from '../../prisma/prisma.service';
 import { publicRound } from './calibration-closing';
+import { loadCalibrationSettings } from './calibration-config';
 import { isCalibrationClosed } from './calibration-rules';
 import { CalibrationService } from './calibration.service';
-import { openHomeMicroTest } from './home-micro-test-prepare';
+import { MicroTestPrepareDto } from './dto/calibration.dto';
+import {
+  SLOT_STALE_MS,
+  openHomeMicroTests,
+  romeDay,
+  roundFilter,
+} from './home-micro-test-prepare';
+
+export { romeDay };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** Micro-test già fatti mostrati per filtro. */
 const HISTORY = 5;
-
-/** Giorno di calendario in Italia (AAAA-MM-GG): la serie segue i giorni dell'atleta. */
-export const romeDay = (date: Date) =>
-  new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Rome',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date);
 
 const shift = (day: string, days: number) =>
   new Date(Date.parse(`${day}T12:00:00Z`) + days * DAY_MS)
@@ -85,6 +91,7 @@ export class HomeMicroTestService {
           answeredAt: true,
           evaluatedAt: true,
           questionsJson: true,
+          microTestSlot: { select: { filter: true } },
         },
       }),
       this.prisma.assessmentEvaluation.findUnique({
@@ -105,51 +112,116 @@ export class HomeMicroTestService {
       ],
       now,
     );
-    const history = rounds
+    const done = rounds
       .filter((r) => r.action === 'PROPOSE_MICRO_TEST')
-      .slice(0, HISTORY)
-      .map((r) => {
-        const { first, test } = testOf(r);
-        return {
-          roundId: r.id,
-          completedAt: r.evaluatedAt ?? r.answeredAt,
-          title: test?.title ?? first?.text ?? '',
-          points: points.get(`round:${r.id}`) ?? settings.creditsMicroTest,
-        };
-      });
+      .map((r) => ({ round: r, filter: roundFilter(r) }));
+    // Gli ultimi fatti di ciascun filtro: ogni filtro ha il suo archivio.
+    const history = MICRO_TEST_FILTERS.flatMap((filter) =>
+      done
+        .filter((d) => d.filter === filter)
+        .slice(0, HISTORY)
+        .map(({ round: r }) => {
+          const { first, test } = testOf(r);
+          return {
+            roundId: r.id,
+            filter,
+            completedAt: r.evaluatedAt ?? r.answeredAt,
+            title: test?.title ?? first?.text ?? '',
+            points: points.get(`round:${r.id}`) ?? settings.creditsMicroTest,
+          };
+        }),
+    );
     const base = { streak, history };
     if (!calibration || isCalibrationClosed(calibration.status))
-      return { ...base, status: 'UNAVAILABLE' as const, test: null };
-    const open = await openHomeMicroTest(this.prisma, userId);
-    if (!open) return { ...base, status: 'PREPARING' as const, test: null };
-    const { first, test } = testOf(open);
-    const area = await this.prisma.area.findUnique({
-      where: { id: first.areaId },
+      return {
+        ...base,
+        status: 'UNAVAILABLE' as const,
+        test: null,
+        filters: [],
+        limit: null,
+      };
+    const [open, slots, config] = await Promise.all([
+      openHomeMicroTests(this.prisma, userId),
+      this.prisma.microTestSlot.findMany({
+        where: {
+          userId,
+          OR: [{ day: romeDay(now) }, { status: 'PREPARING' }],
+        },
+        select: { filter: true, day: true, status: true, claimedAt: true },
+      }),
+      loadCalibrationSettings(this.prisma),
+    ]);
+    const limit = config.microTestsPerDay;
+    const areaIds = [
+      ...new Set(open.flatMap((r) => testOf(r).first?.areaId ?? [])),
+    ];
+    const areas = await this.prisma.area.findMany({
+      where: { id: { in: areaIds } },
       select: { id: true, name: true },
     });
+    const filters = MICRO_TEST_FILTERS.map((filter) => {
+      const round = open.find((r) => r.filter === filter);
+      const used = slots.filter(
+        (s) => s.filter === filter && s.day === romeDay(now),
+      ).length;
+      const preparing = slots.some(
+        (s) =>
+          s.filter === filter &&
+          s.status === 'PREPARING' &&
+          s.claimedAt.getTime() > now.getTime() - SLOT_STALE_MS,
+      );
+      const state = { filter, usedToday: Math.min(used, limit), limit };
+      if (round) {
+        const { first, test } = testOf(round);
+        const area = areas.find((a) => a.id === first.areaId);
+        return {
+          ...state,
+          status:
+            round.status === 'EVALUATING'
+              ? ('EVALUATING' as const)
+              : ('READY' as const),
+          test: {
+            roundId: round.id,
+            filter,
+            title: test?.title ?? first.text,
+            area: { id: first.areaId, name: area ? driverName(area.name) : '' },
+            durationMinutes: test?.durationMinutes ?? null,
+            format: test?.situation
+              ? ('SITUATIONAL' as const)
+              : ('PRACTICAL' as const),
+            points: settings.creditsMicroTest,
+            round: publicRound(round),
+          },
+        };
+      }
+      // Senza test aperto: si prepara finché il filtro ha posti oggi.
+      return {
+        ...state,
+        status:
+          preparing || used < limit
+            ? ('PREPARING' as const)
+            : ('DONE_TODAY' as const),
+        test: null,
+      };
+    });
+    // Riepilogo per la home: il primo pronto, poi quello in valutazione.
+    const summary =
+      filters.find((f) => f.status === 'READY') ??
+      filters.find((f) => f.status === 'EVALUATING') ??
+      filters.find((f) => f.status === 'PREPARING') ??
+      filters[0];
     return {
       ...base,
-      status:
-        open.status === 'EVALUATING'
-          ? ('EVALUATING' as const)
-          : ('READY' as const),
-      test: {
-        roundId: open.id,
-        title: test?.title ?? first.text,
-        area: { id: first.areaId, name: area ? driverName(area.name) : '' },
-        durationMinutes: test?.durationMinutes ?? null,
-        format: test?.situation
-          ? ('SITUATIONAL' as const)
-          : ('PRACTICAL' as const),
-        points: settings.creditsMicroTest,
-        round: publicRound(open),
-      },
+      status: summary.status,
+      test: summary.test,
+      filters,
+      limit,
     };
   }
 
-  /** Prepara il micro-test se manca (l'AI lavora), poi la vista aggiornata. */
-  async prepare(userId: string) {
-    await this.calibration.prepareMicroTest(userId);
+  /** Prepara il micro-test del filtro se manca (l'AI lavora), poi la vista aggiornata. */
+  async prepare(userId: string, filter: MicroTestFilter = 'THEORY') {
+    await this.calibration.prepareMicroTest(userId, filter);
     return this.view(userId);
   }
 }
@@ -163,7 +235,7 @@ export class HomeMicroTestController {
 
   @ApiOperation({
     summary:
-      'Micro-test della home: quello pronto, i giorni di fila e gli ultimi fatti',
+      'Micro-test della home per filtro: quello pronto, i posti del giorno, i giorni di fila e gli ultimi fatti',
   })
   @Header('Cache-Control', 'private, no-store')
   @Get()
@@ -173,10 +245,13 @@ export class HomeMicroTestController {
 
   @ApiOperation({
     summary:
-      "Prepara il prossimo micro-test se manca: l'AI sceglie fra le aree meno sviluppate",
+      "Prepara il micro-test del filtro (Teorici, Sul campo, Fuori dal campo) se manca e se il limite del giorno lo consente: l'AI sceglie fra le aree meno sviluppate",
   })
   @Post()
-  prepare(@Req() req: { user: { id: string } }) {
-    return this.home.prepare(req.user.id);
+  prepare(
+    @Req() req: { user: { id: string } },
+    @Body() body: MicroTestPrepareDto,
+  ) {
+    return this.home.prepare(req.user.id, body?.filter ?? 'THEORY');
   }
 }

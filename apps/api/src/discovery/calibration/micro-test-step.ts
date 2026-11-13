@@ -11,6 +11,7 @@ import {
   CalibrationQuestionsResult,
 } from '../../ai-orchestrator/calibration-questions';
 import { AiProposalProviderService } from '../../ai-orchestrator/proposal-provider.service';
+import { MicroTestFilter } from '../../ai-orchestrator/micro-test-practical';
 import { PrismaService } from '../../prisma/prisma.service';
 import { videoCatalog } from '../../coaching-videos/coaching-videos';
 import { chosenOptions } from '../choice-answers';
@@ -114,7 +115,11 @@ export async function generateTailoredMicroTest(
   ai: AiProposalProviderService,
   userId: string,
   input: AssessmentEvaluationInput,
-  { areaIds, reason }: { areaIds: string[]; reason: string },
+  {
+    areaIds,
+    reason,
+    filter,
+  }: { areaIds: string[]; reason: string; filter?: MicroTestFilter },
 ) {
   const [prompt, proposed, latest, videos, settings] = await Promise.all([
     loadActiveAssessmentPrompt(prisma, 'MICRO_TEST'),
@@ -166,6 +171,7 @@ export async function generateTailoredMicroTest(
     videos: catalog,
     unsafeTerms: settings.unsafeMicroTestTerms,
     ...(areaIds.length > 1 ? { chooseOne: true } : {}),
+    ...(filter ? { filter } : {}),
   });
   return {
     ...result.tests[0],
@@ -196,6 +202,10 @@ export async function microTestQuestions(
       optionsJson: (situational
         ? test.situations
         : test.options) as unknown as Prisma.InputJsonValue,
+      format: test.format,
+      setting: test.setting,
+      steps: test.steps,
+      timerSeconds: test.timerSeconds,
       userId,
     },
     select: { id: true },
@@ -215,6 +225,14 @@ export async function microTestQuestions(
     format: test.format,
     video: test.video,
     results: test.results,
+    ...(situational
+      ? {}
+      : {
+          setting: test.setting,
+          steps: test.steps,
+          timerSeconds: test.timerSeconds,
+          question: test.question,
+        }),
   };
   if (!situational)
     return [
@@ -286,6 +304,15 @@ export const publicMicroTest = (q: CalibrationQuestion, answers?: unknown) => {
       durationMinutes: test.durationMinutes,
       safetyNotes: test.safetyNotes,
       ...(test.title ? { title: test.title } : {}),
+      ...(!situation && test.steps
+        ? {
+            format: 'PRACTICAL' as const,
+            setting: test.setting ?? null,
+            steps: test.steps,
+            timerSeconds: test.timerSeconds ?? null,
+            question: test.question ?? '',
+          }
+        : {}),
       ...(situation
         ? {
             format: 'SITUATIONAL' as const,

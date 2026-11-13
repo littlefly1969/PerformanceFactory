@@ -14,6 +14,7 @@ const select = {
   maxDays: true,
   programBeforePaywall: true,
   questionsPerMicroTest: true,
+  microTestsPerDay: true,
   initialQuestionsPerArea: true,
   unsafeMicroTestTerms: true,
   unsafeTrainingTerms: true,

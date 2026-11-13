@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { AiProposalProviderService } from '../../ai-orchestrator/proposal-provider.service';
 import { loadActiveAssessmentPrompt } from '../../ai-orchestrator/assessment-prompts';
 import { CalibrationQuestion } from '../../ai-orchestrator/calibration-questions';
+import { MicroTestFilter } from '../../ai-orchestrator/micro-test-practical';
 import { AnalyticsService } from '../../analytics/analytics.service';
 import { requireAiConsent, saveEvaluation } from '../assessment-evaluation';
 import { loadSpecialistQuestionRecords } from '../../onboarding/onboarding-questions';
@@ -546,7 +547,11 @@ export class CalibrationService {
   }
 
   /** Micro-test della home: vedi prepareHomeMicroTest. */
-  prepareMicroTest(userId: string, now = new Date()) {
+  prepareMicroTest(
+    userId: string,
+    filter: MicroTestFilter = 'THEORY',
+    now = new Date(),
+  ) {
     return prepareHomeMicroTest(
       {
         prisma: this.prisma,
@@ -559,6 +564,7 @@ export class CalibrationService {
         release: (id, lease) => this.release(id, lease),
       },
       userId,
+      filter,
       now,
     );
   }
