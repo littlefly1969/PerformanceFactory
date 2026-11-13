@@ -62,10 +62,9 @@ describe("Profilo dell'atleta", () => {
     expect(
       await screen.findByRole("link", { name: /Scegli il circolo/ }),
     ).toHaveAttribute("href", "/journey/circolo");
-    // Il prossimo passo segue lo stato: qui un micro-test aperto.
-    expect(
-      screen.getByRole("link", { name: /Fai il micro-test/ }),
-    ).toHaveAttribute("href", "/journey/coach");
+    // Demo V11: niente scheda «Fase gratuita» e niente riga sulla media.
+    expect(screen.queryByText("Fase gratuita")).toBeNull();
+    expect(screen.queryByText(/non è la media/)).toBeNull();
     // Nessuna area abbastanza conosciuta: valori stimati e lati tratteggiati.
     expect(
       screen.getByRole("img", {

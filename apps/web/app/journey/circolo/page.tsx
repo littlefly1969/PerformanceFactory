@@ -126,9 +126,10 @@ export default function ClubPage() {
     (phase === "ELIGIBLE" || phase === "DECLINED" || phase === "REQUESTED") &&
     (!booked || editing);
   const search = place ? clubsFor(clubs, place) : null;
-  // Il circolo da cui arriva l'atleta (QR) è il primo proposto, se c'è.
+  // Il circolo da cui arriva l'atleta (QR) è il primo proposto, se ha posto.
   const fallbackId =
-    search?.clubs.find((c) => c.id === view.attributedClubId)?.id ??
+    search?.clubs.find((c) => c.id === view.attributedClubId && c.available)
+      ?.id ??
     search?.clubs[0]?.id ??
     "";
   const selectedId = search?.clubs.some((c) => c.id === clubId)
@@ -147,6 +148,17 @@ export default function ClubPage() {
   const chosenSlot =
     daySlots.find((s) => s.id === slotId) ??
     (daySlots.length === 1 ? daySlots[0] : undefined);
+
+  // Rinuncia (demo V11): si torna al profilo, dove il banner permette di
+  // cambiare idea finché la calibrazione è aperta.
+  const decline =
+    phase === "ELIGIBLE"
+      ? () =>
+          void call("/decline").then(
+            (ok) =>
+              ok && window.location.assign(summaryHref("lezione-rifiutata")),
+          )
+      : undefined;
 
   const book = () =>
     void call("/request", {
@@ -277,6 +289,8 @@ export default function ClubPage() {
               go("when");
             }}
             onChangePlace={() => go("where")}
+            onDecline={decline}
+            busy={busy}
           />
         )}
         {canRequest && step === "when" && club && (
@@ -301,16 +315,14 @@ export default function ClubPage() {
             }
           />
         )}
-        {canRequest && step === "where" && phase === "ELIGIBLE" && (
+        {canRequest && step === "where" && decline && (
           <button
             type="button"
             className="pf-acc-link pf-lz-decline"
             disabled={busy}
-            onClick={() =>
-              void call("/decline", {}, "Hai scelto di non fare la lezione.")
-            }
+            onClick={decline}
           >
-            Preferisco non fare la lezione
+            Non voglio fare la lezione di prova
           </button>
         )}
         {phase === "ATTENDED" && (
@@ -327,15 +339,6 @@ export default function ClubPage() {
         {phase === "CLOSED" && (
           <p>
             La calibrazione è chiusa: la lezione gratuita serviva a completarla.
-          </p>
-        )}
-        {phase === "DECLINED" && step === "where" && !done && (
-          <p className="pf-lz-fine">
-            Hai scelto di non fare la lezione: se cambi idea, scegli il circolo
-            qui.{" "}
-            <Link className="pf-lz-inline" href={summaryHref("lezione")}>
-              Torna al riepilogo
-            </Link>
           </p>
         )}
       </div>

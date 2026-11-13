@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { MultiChoiceStep } from "../choice-options";
+import { mixedOptions } from "../mix-order";
 import type { Calibration } from "../journey-types";
 import {
   type FreeLessonView,
@@ -22,7 +23,7 @@ import {
   useAccountJourney,
 } from "../_account/calibration-state";
 import { DarkQuestion, SingleOptions } from "../_account/dark-question";
-import { REVEAL_HREF } from "../_account/next-step";
+import { REVEAL_HREF, summaryHref } from "../_account/next-step";
 import { MiniSpider } from "../_account/spiders";
 import { type HexFailure, HexPrep } from "../_account/assessment-hex";
 import { useAutoRetry } from "../_account/auto-retry";
@@ -78,14 +79,14 @@ function RoundQuestions({
       {q.multiple ? (
         <MultiChoiceStep
           key={q.id}
-          options={q.options}
+          options={mixedOptions(q.options, q.id)}
           initial={answers[q.id]}
           busy={busy}
           onSubmit={(value) => next(value)}
         />
       ) : (
         <SingleOptions
-          options={q.options}
+          options={mixedOptions(q.options, q.id)}
           selected={answers[q.id]}
           busy={busy}
           onSelect={(value) => next(String(value))}
@@ -312,13 +313,14 @@ export default function CalibrationPage() {
           La tua lezione gratuita
         </PillLink>
       ) : null}
+      {/* Fine calibrazione: si esce verso il profilo (demo V11). */}
       {c?.canFinish || phase === "ELIGIBLE" || lessonPending ? (
-        <a className="pf-acc-link" href="/journey">
-          Salva e vai alla home
+        <a className="pf-acc-link" href={summaryHref("calibrazione")}>
+          Salva e vai al profilo
         </a>
       ) : (
-        <PillLink href="/journey" tone="lime">
-          Salva e vai alla home
+        <PillLink href={summaryHref("calibrazione")} tone="lime">
+          Salva e vai al profilo
         </PillLink>
       )}
     </>

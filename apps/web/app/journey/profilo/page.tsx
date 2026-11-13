@@ -53,8 +53,9 @@ const GearIcon = () => (
  * Profilo dell'atleta nella fase gratuita, come la demo PF10: testata scura
  * con l'esagono grande (aree definite a linea piena, le altre tratteggiate),
  * la calibrazione che diventa la lezione, disponibilità e classifica FIT da
- * compilare o modificare, le sei aree, il prossimo passo, l'analisi delle
- * aree, l'invito e la community. Il calendario arriva con l'abbonamento.
+ * compilare o modificare, le sei aree, l'analisi delle aree, l'invito e la
+ * community. Come nella demo V11, la scheda «Fase gratuita» non c'è: gli
+ * scenari si raggiungono dalla home. Il calendario arriva con l'abbonamento.
  */
 export default function ProfilePage() {
   const { journey: j, error, busy, action } = useAccountJourney();
@@ -126,23 +127,6 @@ export default function ProfilePage() {
   const total = evaluation?.drivers.length ?? 0;
   const availabilityDone =
     !!availability.data && availabilityComplete(availability.data);
-  // Scheda «Fase gratuita» come la demo: mentre si calibra «Calibrazione in
-  // corso» (o completata) con la pillola corta «Calibrazione». Quando il passo
-  // è la lezione (circolo da scegliere o lezione da gestire) o gli scenari,
-  // destinazione e pulsante restano quelli del prossimo passo.
-  const phase = !step
-    ? null
-    : step.kind === "scenarios" || step.kind === "lesson"
-      ? { title: step.kicker, href: step.href, cta: step.cta, label: step.cta }
-      : {
-          title:
-            step.kind === "finish"
-              ? "Calibrazione completata"
-              : "Calibrazione in corso",
-          href: step.href,
-          cta: "Calibrazione",
-          label: step.cta,
-        };
   return (
     <AccountScreen nav="profile" coachDot={microTestOpen(calibration)}>
       <header className="pf-prof-head">
@@ -236,8 +220,11 @@ export default function ProfilePage() {
             {info && (
               <div className="pf-prof-info" id="pf-prof-info">
                 <div>
+                  {/* Con il profilo completo, come nella demo V11, niente intervallo. */}
                   <b>
-                    Tra {global.low} e {global.high}
+                    {closed
+                      ? "Stima stabile"
+                      : `Tra ${global.low} e ${global.high}`}
                   </b>
                   <span>
                     Confidenza complessiva {percent(global.confidence)}
@@ -245,12 +232,8 @@ export default function ProfilePage() {
                 </div>
                 <p>
                   {closed
-                    ? "La stima è consolidata: le tue risposte bastano per un valore affidabile."
+                    ? `Hai dati sufficienti in tutte e ${total === 6 ? "sei" : total} le aree: la stima regge abbastanza per costruire il piano.`
                     : "La stima si basa su dati ancora parziali. L’intervallo si stringe man mano che completi le aree."}
-                </p>
-                <p className="is-muted">
-                  R non è la media dei sei punteggi. P3, P6 e P12 si mostrano
-                  quando la calibrazione è chiusa.
                 </p>
                 <span className="pf-prof-info-note">
                   Soglia di completezza{" "}
@@ -327,19 +310,6 @@ export default function ProfilePage() {
                 </li>
               ))}
             </ul>
-          </section>
-        )}
-
-        {evaluation && phase && (
-          <section className="pf-prof-phase" aria-label="Prossimo passo">
-            <div>
-              <span className="pf-prof-kicker">Fase gratuita</span>
-              <strong>{phase.title}</strong>
-            </div>
-            <Link href={phase.href} aria-label={phase.label}>
-              <span>{phase.cta}</span>
-              <span aria-hidden="true">→</span>
-            </Link>
           </section>
         )}
 

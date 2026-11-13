@@ -40,6 +40,11 @@ export type LessonClub = {
   /** Percorsi relativi alla base dell'API, versionati dal back office. */
   logoUrl: string | null;
   photoUrl: string | null;
+  /**
+   * Almeno una lezione in calendario con posti liberi: «Disponibile».
+   * Altrimenti «Al completo» e il circolo non si sceglie (demo V11).
+   */
+  available: boolean;
 };
 
 export type FreeLessonView =

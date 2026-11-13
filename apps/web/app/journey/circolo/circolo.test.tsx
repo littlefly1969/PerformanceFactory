@@ -103,7 +103,9 @@ describe("Lezione gratuita: dove sei", () => {
     const cards = within(screen.getByRole("radiogroup", { name: "Circolo" }));
     expect(cards.getAllByRole("radio")).toHaveLength(1);
     expect(
-      cards.getByRole("radio", { name: "Padel Pescara, Pescara" }),
+      cards.getByRole("radio", {
+        name: "Padel Pescara, Pescara, Disponibile",
+      }),
     ).toBeTruthy();
     expect(screen.queryByText(/km/)).toBeNull();
 
@@ -198,10 +200,10 @@ describe("Lezione gratuita: dove sei", () => {
     const names = screen
       .getAllByRole("radio")
       .map((r) => r.getAttribute("aria-label"));
-    expect(names[0]).toMatch(/^Circolo Navigli, 0,\d km$/);
-    expect(names[1]).toMatch(/^Padel Club Nord, \d+,\d km$/);
+    expect(names[0]).toMatch(/^Circolo Navigli, 0,\d km, Disponibile$/);
+    expect(names[1]).toMatch(/^Padel Club Nord, \d+,\d km, Disponibile$/);
     // Senza coordinate il circolo resta in fondo, con la sua città.
-    expect(names[2]).toBe("Padel Pescara, Pescara");
+    expect(names[2]).toBe("Padel Pescara, Pescara, Disponibile");
   });
 
   it("ignores a late position once the athlete has chosen a city", async () => {
@@ -382,5 +384,96 @@ describe("Lezione gratuita: bloccata", () => {
       await screen.findByText(new RegExp(`^Aree Reali \\d+/${total}$`)),
     ).toBeInTheDocument();
     expect(screen.queryByText(/abbastanza attendibile/)).toBeNull();
+  });
+});
+
+describe("Lezione gratuita: circoli al completo (demo V11)", () => {
+  const withFull = {
+    ...lesson,
+    slots,
+    clubs: lesson.clubs.map((club) =>
+      club.id === "c2" ? { ...club, available: false } : club,
+    ),
+  };
+  const nearNavigli = () =>
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      geolocation: {
+        getCurrentPosition: (ok: PositionCallback) =>
+          ok({
+            coords: { latitude: 45.452, longitude: 9.175 },
+          } as GeolocationPosition),
+      },
+    });
+
+  it("lists the available clubs first, counts them and never books a full one", async () => {
+    nearNavigli();
+    const calls = serve({
+      "/auth/journey": journey(),
+      "/athlete-journey/free-lesson": withFull,
+    });
+    render(<ClubPage />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: /Usa la mia posizione/ }),
+    );
+    expect(
+      await screen.findByText(
+        "2 circoli disponibili per la lezione di prova · 1 al completo.",
+      ),
+    ).toBeInTheDocument();
+    const names = screen
+      .getAllByRole("radio")
+      .map((r) => r.getAttribute("aria-label"));
+    // Navigli è il più vicino ma è al completo: va in fondo.
+    expect(names[0]).toMatch(/^Padel Club Nord, .* km, Disponibile$/);
+    expect(names[2]).toMatch(/^Circolo Navigli, .* km, Al completo$/);
+    await userEvent.click(screen.getByRole("radio", { name: /Navigli/ }));
+    const full = screen.getByRole("button", { name: /Al completo/ });
+    expect(full).toHaveAttribute("aria-disabled", "true");
+    await userEvent.click(full);
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Questo circolo al momento è al completo: nessun posto per la lezione di prova.",
+    );
+    expect(
+      screen.getByRole("heading", { name: "Dove giochi?" }),
+    ).toBeInTheDocument();
+    expect(calls.some((c) => c.url.endsWith("/free-lesson/request"))).toBe(
+      false,
+    );
+  });
+
+  it("declines from «Dove giochi?» and goes back to the profile", async () => {
+    nearNavigli();
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, assign });
+    const calls = serve({
+      "/auth/journey": journey(),
+      "/free-lesson/decline": { ...withFull, phase: "DECLINED" },
+      "/athlete-journey/free-lesson": withFull,
+    });
+    render(<ClubPage />);
+    // Il link c'è già su «Dove sei?».
+    expect(
+      await screen.findByRole("button", {
+        name: "Non voglio fare la lezione di prova",
+      }),
+    ).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Usa la mia posizione/ }),
+    );
+    await screen.findByRole("heading", { name: "Dove giochi?" });
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "Non voglio fare la lezione di prova",
+      }),
+    );
+    await waitFor(() =>
+      expect(assign).toHaveBeenCalledWith(
+        "/journey/profilo?esito=lezione-rifiutata",
+      ),
+    );
+    expect(calls.some((c) => c.url.endsWith("/free-lesson/decline"))).toBe(
+      true,
+    );
   });
 });

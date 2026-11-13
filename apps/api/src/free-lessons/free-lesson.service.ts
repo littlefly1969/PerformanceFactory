@@ -28,6 +28,13 @@ import { checkPreferredLesson, lessonSlots } from './lesson-slots';
 
 type Db = PrismaService | Prisma.TransactionClient;
 
+export const CLUB_FULL =
+  'Questo circolo al momento è al completo: nessun posto per la lezione di prova.';
+
+/** Circoli con almeno una lezione in calendario con posti liberi. */
+const openClubs = (slots: Array<{ partnerId: string }>) =>
+  new Set(slots.map((slot) => slot.partnerId));
+
 /**
  * Le due verifiche della lezione (PF-FS-PREPAYWALL §6.2) sull'ultima
  * valutazione: regola di eleggibilità in vigore, livello, circoli. Restituisce
@@ -130,6 +137,7 @@ export class FreeLessonService {
       },
     });
     const detailById = new Map(details.map((d) => [d.id, d]));
+    const open = openClubs(slots);
     const clubsForAthlete = clubs.map((club) => {
       const detail = detailById.get(club.id);
       return {
@@ -145,6 +153,9 @@ export class FreeLessonService {
           'photo',
           detail?.photoUpdatedAt ?? null,
         ),
+        // «Disponibile» con almeno una lezione in calendario con posto,
+        // altrimenti «Al completo» e non si sceglie (demo V11).
+        available: open.has(club.id),
       };
     });
     const seat = check.seat
@@ -237,7 +248,7 @@ export class FreeLessonService {
     if (!club) throw new BadRequestException('Circolo non disponibile');
     await this.prisma.$transaction(async (tx) => {
       await lockCalibration(tx, userId);
-      const { phase, missing, policy, evaluationId } = await checkLesson(
+      const { phase, missing, policy, evaluationId, seat } = await checkLesson(
         tx,
         userId,
       );
@@ -246,6 +257,11 @@ export class FreeLessonService {
         lessonId,
         partnerId,
       );
+      // Un circolo al completo non si sceglie; chi l'ha già richiesto può
+      // tenerlo e cambiare solo l'orario preferito.
+      const kept = phase === 'REQUESTED' && seat?.partnerId === partnerId;
+      if (!kept && !openClubs(await lessonSlots(tx)).has(partnerId))
+        throw new BadRequestException(CLUB_FULL);
       if (phase === 'REQUESTED')
         // Cambio di circolo o di orario finché il posto non è assegnato.
         return void (await tx.freeLessonSeat.update({

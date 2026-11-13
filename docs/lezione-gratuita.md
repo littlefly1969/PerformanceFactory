@@ -91,6 +91,21 @@ In `apps/api/src/free-lessons/free-lesson-rules.ts`, senza I/O:
   un circolo con `freeLessonsEnabled` e con il consenso a mostrare al coach nome,
   livello stimato e driver (`coachSharingAcceptedAt`). Email e telefono non vanno
   al coach.
+- **Disponibile / Al completo** (demo V11, decisione di Stefano del 13 novembre
+  2026): un circolo è «Disponibile» se ha almeno una lezione in calendario nei
+  prossimi 21 giorni con posti liberi, altrimenti è «Al completo». `GET
+  /athlete-journey/free-lesson` lo dice per ogni circolo (`available`); l'atleta
+  vede prima i disponibili e non può scegliere un circolo al completo, e il server
+  rifiuta la richiesta (400). Chi ha già chiesto un circolo che poi si riempie lo
+  tiene e può cambiare solo l'orario. Senza lezioni in calendario un circolo è
+  quindi al completo: le lezioni vanno create da `/admin/free-lessons`.
+- **Rinuncia**: «Non voglio fare la lezione di prova» su «Dove sei?» e «Dove
+  giochi?» porta al profilo con «Va bene. Se ci ripensi, la lezione resta qui.»;
+  home e profilo mostrano «Hai scelto di non fare la lezione.» con «Ho cambiato
+  idea», che riapre la scelta del circolo finché la calibrazione è aperta.
+- **Immagini**: all'atleta si mostrano la foto e le iniziali del circolo (prima e
+  ultima parola significativa del nome), mai il logo, anche nel regalo dopo la
+  registrazione.
 - **Assegnazione**: richiesta nello stesso circolo della lezione, lezione futura e
   non piena, calibrazione aperta con il livello stimato.
 - **Feedback**: voto 1-5 per driver (almeno uno, il tecnico-tattico in evidenza) e
@@ -216,7 +231,8 @@ e foto si caricano dal back office (`/admin/partners`): il seed non inventa
 dati.
 
 Ogni circolo parte attivo, con `freeLessonsEnabled` acceso e una o due lezioni
-in calendario (gruppo da 4, un'ora, livello «Principianti» o «Intermedi»),
+in calendario (le date sono quelle dei giorni dopo il seed: passate quelle, il
+circolo è «Al completo» finché il back office non ne crea di nuove; gruppo da 4, un'ora, livello «Principianti» o «Intermedi»),
 assegnate al coach demo `coach_padel@example.it`. Le lezioni hanno un UUID
 deterministico (versione 5, dal codice del circolo e dal numero della lezione),
 quindi le API le accettano e rieseguire il seed non le duplica.

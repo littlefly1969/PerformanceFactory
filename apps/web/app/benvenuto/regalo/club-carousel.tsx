@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE } from "@/app/lib/api";
+import { clubInitials } from "@/app/lib/club-initials";
 
 export type GiftClub = {
   id: string;
@@ -15,14 +16,6 @@ export type GiftClub = {
 /** Pausa tra un circolo e il successivo, e dopo un tocco dell'atleta. */
 export const CAROUSEL_STEP_MS = 3500;
 const RESUME_AFTER_TOUCH_MS = 8000;
-
-const initials = (name: string) =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0]!.toUpperCase())
-    .join("");
 
 const prefersReducedMotion = () =>
   typeof window !== "undefined" &&
@@ -120,18 +113,10 @@ export function ClubCarousel({ clubs }: { clubs: GiftClub[] }) {
               <span className="pf-gift-photo pf-gift-photo-empty" />
             )}
             <div className="pf-gift-club-id">
-              {club.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element -- immagine dall'API, già ridimensionata
-                <img
-                  className="pf-gift-logo"
-                  src={`${API_BASE}${club.logoUrl}`}
-                  alt={`Logo ${club.name}`}
-                />
-              ) : (
-                <span className="pf-gift-logo pf-gift-logo-empty" aria-hidden>
-                  {initials(club.name)}
-                </span>
-              )}
+              {/* Iniziali al posto del logo, come nella demo V11. */}
+              <span className="pf-gift-logo pf-gift-logo-empty" aria-hidden>
+                {clubInitials(club.name)}
+              </span>
               <div>
                 <strong>{club.name}</strong>
                 {club.city && <span>{club.city}</span>}

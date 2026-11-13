@@ -17,7 +17,7 @@ const areas = [
 ];
 
 describe("GiftScreen", () => {
-  it("shows the clubs with logo, photo or initials and the Real areas", () => {
+  it("shows the clubs with photo and initials (never the logo) and the Real areas", () => {
     render(
       <GiftScreen
         clubs={[
@@ -45,17 +45,16 @@ describe("GiftScreen", () => {
     const first = within(carousel).getByRole("group", {
       name: "1 di 2: Padelus",
     });
-    expect(within(first).getByAltText("Logo Padelus")).toHaveAttribute(
-      "src",
-      "/api/partners/c1/logo?v=1",
-    );
+    // Demo V11: iniziali al posto del logo, anche quando il logo c'è.
+    expect(within(first).queryByAltText("Logo Padelus")).toBeNull();
+    expect(within(first).getByText("P")).toBeInTheDocument();
     expect(within(first).getByText("L'Aquila")).toBeInTheDocument();
     expect(
       within(
         within(carousel).getByRole("group", {
           name: "2 di 2: Padel Roma Nord",
         }),
-      ).getByText("PR"),
+      ).getByText("PN"),
     ).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe(
       "1Una lezione di prova, gratis.",

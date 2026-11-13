@@ -10,8 +10,17 @@ consolidamento** in vigore è soddisfatta R è consolidata, ma la calibrazione r
 aperta (decisione di Stefano, 28 ottobre 2026). Con R consolidata («calibrazione
 sufficiente», `ruleMet`) l'app non propone più «Continua la calibrazione»: il
 passo in giallo è la scelta del circolo, la lezione in attesa, gli scenari o
-«Salva e vai alla home» (decisione di Stefano, 4 novembre 2026). Nessuna attesa
-fra i round (specifica PF-FS-PREPAYWALL §4.3).
+«Salva e vai al profilo» (decisione di Stefano, 4 novembre 2026; dalla demo V11
+del 13 novembre ogni uscita dal risultato della calibrazione, anche «Salva i
+progressi ed esci», porta al profilo e non alla home). Nessuna attesa fra i
+round (specifica PF-FS-PREPAYWALL §4.3).
+
+Le risposte delle domande dell'assessment e della calibrazione si mostrano in
+ordine misto (demo V11): l'AI le scrive in ordine di punteggio, la pagina le
+mescola con un ordine fisso per domanda (`app/journey/mix-order.ts`), mai
+crescente o decrescente con tre o quattro risposte. Le opzioni esclusive
+(«Nessuna») restano in fondo; valori e punteggi salvati non cambiano. Le
+domande a quantità restano sul quadrante numerico.
 
 La calibrazione si chiude solo in tre modi:
 

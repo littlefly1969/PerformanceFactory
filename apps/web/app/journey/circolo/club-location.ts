@@ -64,12 +64,25 @@ export type ClubSearch = {
   scope: "near" | "city" | "province" | "all";
 };
 
+/** Prima i circoli disponibili, poi quelli al completo, nello stesso ordine. */
+const availableFirst = (search: ClubSearch): ClubSearch => ({
+  ...search,
+  clubs: [...search.clubs].sort(
+    (a, b) => Number(b.available) - Number(a.available),
+  ),
+});
+
 /**
  * Circoli da mostrare per il luogo scelto. Con la posizione tutti, dal più
  * vicino (chi non ha coordinate in fondo); con una zona quelli della città,
  * poi della provincia, e se non ce n'è nessuno tutti, in ordine di nome.
+ * In ogni caso i disponibili vengono prima di quelli al completo.
  */
 export function clubsFor(clubs: LessonClub[], place: Place): ClubSearch {
+  return availableFirst(placedClubs(clubs, place));
+}
+
+function placedClubs(clubs: LessonClub[], place: Place): ClubSearch {
   if (place.kind === "position") {
     const placed = clubs.map((club) => ({
       ...club,

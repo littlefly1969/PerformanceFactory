@@ -21,7 +21,6 @@ const show = (
           ruleMet,
         }) as unknown as Calibration
       }
-      onHome={() => {}}
     />,
   );
 
@@ -51,12 +50,15 @@ describe("ProvisionalReady (S11)", () => {
     expect(
       screen.getByRole("link", { name: /Continua la calibrazione/ }),
     ).toHaveClass("is-lime");
-    expect(
-      screen.getByRole("link", { name: "Salva i progressi ed esci" }),
-    ).toHaveClass("pf-acc-link");
+    const exit = screen.getByRole("link", {
+      name: "Salva i progressi ed esci",
+    });
+    expect(exit).toHaveClass("pf-acc-link");
+    // Demo V11: uscendo si va al profilo, non alla home.
+    expect(exit).toHaveAttribute("href", "/journey/profilo?esito=calibrazione");
   });
 
-  it("when sufficient, hides «Continua» and «Salva e vai alla home» turns yellow", () => {
+  it("when sufficient, hides «Continua» and «Salva e vai al profilo» turns yellow", () => {
     show(72, true);
     expect(
       screen.queryByRole("button", { name: /Continua la calibrazione/ }),
@@ -64,9 +66,9 @@ describe("ProvisionalReady (S11)", () => {
     expect(
       screen.queryByRole("link", { name: /Continua la calibrazione/ }),
     ).toBeNull();
-    expect(
-      screen.getByRole("button", { name: /Salva e vai alla home/ }),
-    ).toHaveClass("pf-acc-pill", "is-lime");
+    const exit = screen.getByRole("link", { name: /Salva e vai al profilo/ });
+    expect(exit).toHaveClass("pf-acc-pill", "is-lime");
+    expect(exit).toHaveAttribute("href", "/journey/profilo?esito=calibrazione");
   });
 
   it("draws a solid spider arm for each defined area, dashed for the others", () => {

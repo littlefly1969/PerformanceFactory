@@ -54,6 +54,7 @@ describe('Free lesson with PostgreSQL', () => {
   const inputs: AssessmentEvaluationInput[] = [];
   const users: string[] = [];
   const lessons: string[] = [];
+  const extraPartners: string[] = [];
   const microTests: string[] = [];
   const originalUrl = process.env.DATABASE_URL;
 
@@ -250,6 +251,19 @@ describe('Free lesson with PostgreSQL', () => {
       adminId,
     );
     await prisma.freeLessonConfig.deleteMany();
+    // Una lezione con posti liberi: senza, il circolo è «Al completo».
+    lessons.push(
+      (
+        await admin.createLesson(
+          {
+            partnerId,
+            startsAt: new Date(Date.now() + 10 * DAY_MS).toISOString(),
+            capacity: 8,
+          },
+          adminId,
+        )
+      ).id,
+    );
   });
 
   afterAll(async () => {
@@ -270,7 +284,9 @@ describe('Free lesson with PostgreSQL', () => {
     await prisma.freeLesson.deleteMany({ where: { id: { in: lessons } } });
     await prisma.microTest.deleteMany({ where: { id: { in: microTests } } });
     await prisma.user.deleteMany({ where: { id: { in: users } } });
-    await prisma.partner.deleteMany({ where: { id: partnerId } });
+    await prisma.partner.deleteMany({
+      where: { id: { in: [partnerId, ...extraPartners] } },
+    });
     process.env.DATABASE_URL = originalUrl;
     await prisma.$disconnect();
   });
@@ -741,6 +757,53 @@ describe('Free lesson with PostgreSQL', () => {
     // La preferenza si cambia finché il posto non è assegnato.
     expect(await athletes.request(id, partnerId)).toMatchObject({
       seat: { preferredLessonId: null },
+    });
+  });
+
+  it('V11: a club with no free lesson in the calendar is full and cannot be chosen', async () => {
+    const full = (
+      await prisma.partner.create({
+        data: {
+          code: `fl-${randomUUID().slice(0, 8)}`,
+          name: 'Circolo pieno',
+          freeLessonsEnabled: true,
+        },
+      })
+    ).id;
+    extraPartners.push(full);
+    const id = await athlete([80, 90]);
+    const view = await athletes.view(id);
+    const clubs = view.enabled ? view.clubs : [];
+    expect(clubs.find((c) => c.id === partnerId)).toMatchObject({
+      available: true,
+    });
+    expect(clubs.find((c) => c.id === full)).toMatchObject({
+      available: false,
+    });
+    await expect(athletes.request(id, full)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(await prisma.freeLessonSeat.count({ where: { userId: id } })).toBe(
+      0,
+    );
+    // Con la richiesta già fatta il circolo resta, anche se si riempie.
+    await athletes.request(id, partnerId);
+    await prisma.freeLessonSeat.update({
+      where: { userId: id },
+      data: { partnerId: full },
+    });
+    expect(await athletes.request(id, full)).toMatchObject({
+      phase: 'REQUESTED',
+      seat: { club: { id: full } },
+    });
+    await prisma.freeLessonSeat.update({
+      where: { userId: id },
+      data: { partnerId },
+    });
+    // Gli altri test contano i soli circoli che offrono la lezione.
+    await prisma.partner.update({
+      where: { id: full },
+      data: { freeLessonsEnabled: false },
     });
   });
 

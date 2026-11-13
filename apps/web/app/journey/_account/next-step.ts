@@ -164,6 +164,7 @@ export const OUTCOMES = {
   "micro-test-rimandato":
     "Micro-test rimandato: lo ritrovi quando continui la calibrazione.",
   lezione: "Lezione gratuita aggiornata.",
+  "lezione-rifiutata": "Va bene. Se ci ripensi, la lezione resta qui.",
   disponibilita: "Disponibilità salvata.",
   classifica: "Classifica salvata: ricalcoliamo la tua R.",
 } as const;

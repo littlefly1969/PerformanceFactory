@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { FitRankingView } from "../../../components/fit-ranking-editor";
 import type { FreeLessonView } from "../../_account/account-data";
+import { LessonDeclined } from "../../_account/lesson-declined";
 import type { lessonProgress } from "../../_account/lesson-unlock";
 import {
   type Availability,
@@ -253,7 +254,8 @@ export function LessonSection({
       </section>
     );
   }
-  if (phase === "ELIGIBLE" || phase === "DECLINED")
+  if (phase === "DECLINED") return <LessonDeclined />;
+  if (phase === "ELIGIBLE")
     return (
       <Link href="/journey/circolo" className="pf-prof-lz-ready">
         <span className="pf-prof-lz-pin" aria-hidden="true">
