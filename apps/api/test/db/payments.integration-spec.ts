@@ -258,9 +258,13 @@ describe('Payments on PostgreSQL (stub provider)', () => {
       where: { id: checkout.subscriptionId },
     });
     const subscriptionRef = `stub_sub_${randomUUID()}`;
+    // Periodo esplicito: senza, l'attivazione calcola la fine dall'orologio
+    // reale e le date fisse dei test diventano false col passare dei giorni.
     await send('CHECKOUT_COMPLETED', {
       checkoutId: pending.providerCheckoutId,
       subscriptionRef,
+      currentPeriodStart: '2026-10-07T10:00:00.000Z',
+      currentPeriodEnd: '2026-11-07T10:00:00.000Z',
       occurredAt: '2026-10-07T10:00:00.000Z',
     });
     return { subscriptionId: checkout.subscriptionId, subscriptionRef };
