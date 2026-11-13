@@ -10,7 +10,7 @@ import {
   AccountTopBar,
   PillButton,
 } from "../../_account/account-shell";
-import { summaryHref } from "../../_account/next-step";
+import { useProfileOrigin } from "../_profile/profile-origin";
 import {
   AVAILABILITY_PATH,
   type Availability,
@@ -47,6 +47,7 @@ const fromServer = (a: Availability | undefined): Draft => ({
  */
 export default function AvailabilityPage() {
   const router = useRouter();
+  const origin = useProfileOrigin();
   const { data, error: loadError } =
     useAthlete<Availability>(AVAILABILITY_PATH);
   const [edited, setEdited] = useState<Draft | null>(null);
@@ -83,7 +84,7 @@ export default function AvailabilityPage() {
         sessionDurationMinutes: draft.minutes,
         preferredDays: draft.days.map((d) => d + 1),
       });
-      router.push(summaryHref("disponibilita"));
+      router.push(origin.done("disponibilita"));
     } catch (e) {
       setMessage(
         (e as Error).message || "Non è stato possibile salvare. Riprova.",
@@ -94,9 +95,7 @@ export default function AvailabilityPage() {
 
   return (
     <AccountScreen
-      top={
-        <AccountTopBar title="La tua disponibilità" back="/journey/profilo" />
-      }
+      top={<AccountTopBar title="La tua disponibilità" back={origin.back} />}
       footer={
         <PillButton
           tone="lime"

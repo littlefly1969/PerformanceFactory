@@ -16,7 +16,7 @@ import {
   AccountTopBar,
   PillButton,
 } from "../../_account/account-shell";
-import { summaryHref } from "../../_account/next-step";
+import { useProfileOrigin } from "../_profile/profile-origin";
 import { PLAYTOMIC_BANDS, parsePlaytomic } from "../_profile/playtomic";
 import "../_profile/profile.css";
 import "../_profile/profile-edit.css";
@@ -58,6 +58,7 @@ const initial = (view: FitRankingView | undefined) => ({
  */
 export default function RankingPage() {
   const router = useRouter();
+  const origin = useProfileOrigin();
   const { data: view, error: loadError } = useAthlete<FitRankingView>(
     "/athlete-journey/fit-ranking",
   );
@@ -118,7 +119,7 @@ export default function RankingPage() {
         setBusy(false);
         return;
       }
-      router.push(summaryHref("classifica"));
+      router.push(origin.done("classifica"));
     } catch (e) {
       setMessage(
         (e as Error).message ||
@@ -155,9 +156,7 @@ export default function RankingPage() {
 
   return (
     <AccountScreen
-      top={
-        <AccountTopBar title="La tua classifica FIT" back="/journey/profilo" />
-      }
+      top={<AccountTopBar title="La tua classifica FIT" back={origin.back} />}
       footer={
         <PillButton
           tone="lime"

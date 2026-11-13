@@ -1,0 +1,300 @@
+/* Profilo dell'abbonato (demo V11, piano attivo): parti in più del profilo. */
+.pf-acc .pf-prof-kicker.is-lime {
+  color: var(--acc-lime);
+}
+
+/* Riga del ranking sotto la testata. */
+.pf-prof-body .pf-sub-rank {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 20px;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #eaeae7;
+  transition:
+    transform 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 0.2s ease;
+}
+.pf-sub-rank:active {
+  opacity: 0.86;
+  transform: scale(0.985);
+}
+.pf-sub-rank-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pf-sub-rank-text b {
+  font-size: 17px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+.pf-sub-rank-text small {
+  font-size: 12px;
+  color: var(--acc-muted);
+}
+.pf-sub-rank-arrow {
+  color: var(--acc-muted);
+}
+
+/* Pop-up «Sei entrato in PFx». */
+.pf-sub-pop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #0b0b0c66;
+  backdrop-filter: blur(6px);
+  animation: pf-sub-fade 0.25s ease both;
+}
+.pf-sub-pop-card {
+  position: relative;
+  width: min(354px, 100%);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 36px 22px 22px;
+  border-radius: 32px;
+  background: var(--acc-ink);
+  color: #fff;
+  text-align: center;
+  animation: pf-sub-rise 0.36s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+.pf-sub-pop-glow {
+  position: absolute;
+  left: 50%;
+  top: -40px;
+  width: 260px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(#c8f02e40, transparent 70%);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.pf-sub-pop-card .pf-rank-hex {
+  margin-bottom: 14px;
+}
+.pf-sub-pop-card h2 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: -0.035em;
+}
+.pf-sub-pop-card p {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 20px;
+  color: #ffffffb3;
+}
+.pf-sub-pop-card .pf-acc-pill {
+  position: relative;
+}
+.pf-sub-pop-close {
+  margin-top: 6px;
+  padding: 10px;
+  border: 0;
+  background: none;
+  color: #ffffffb3;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+@keyframes pf-sub-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes pf-sub-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+}
+
+/* Abbonamento attivo · Gestisci. */
+.pf-sub-plan-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-top: 8px;
+  padding: 18px 18px 18px 22px;
+  border-radius: 28px;
+  background: var(--acc-ink);
+  color: #fff;
+}
+.pf-sub-plan-card strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 20px;
+}
+.pf-prof-body .pf-sub-plan-card a {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  border-radius: 999px;
+  background: var(--acc-lime);
+  color: var(--acc-ink);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+
+/* Piano: versione, blocco, sessioni, serie. */
+.pf-sub-plan {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.pf-prof-body .pf-sub-plan-head {
+  display: block;
+  padding: 0 0 14px;
+  border-bottom: 1px solid var(--acc-line);
+}
+.pf-sub-plan-head b {
+  display: block;
+  margin-top: 6px;
+  font-size: 17px;
+  font-weight: 400;
+}
+.pf-sub-plan-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 4px 10px;
+}
+.pf-sub-plan-stats p {
+  margin: 8px 0 10px;
+  font-size: 12px;
+  color: var(--acc-muted);
+}
+.pf-sub-plan-stats p b {
+  font-size: 26px;
+  font-weight: 400;
+  letter-spacing: -0.04em;
+  color: var(--acc-ink);
+}
+.pf-sub-bars {
+  display: flex;
+  gap: 4px;
+}
+.pf-sub-bars i {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: #eaeae7;
+}
+.pf-sub-bars.is-ink i.is-on {
+  background: var(--acc-ink);
+}
+.pf-sub-bars.is-lime i.is-on {
+  background: var(--acc-lime);
+}
+.pf-prof-body .pf-sub-streak {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-radius: 24px;
+  box-shadow: inset 0 0 0 1px #eaeae7;
+}
+.pf-sub-streak b {
+  display: block;
+  margin-top: 6px;
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+}
+.pf-sub-streak small {
+  max-width: 170px;
+  font-size: 11px;
+  line-height: 15px;
+  text-align: right;
+  color: var(--acc-muted);
+}
+.pf-sub-streak small span {
+  display: block;
+  margin-top: 4px;
+  color: var(--acc-ink);
+}
+
+/* Coach e preferenze. */
+.pf-sub-coach b {
+  display: block;
+  margin-top: 8px;
+  font-size: 17px;
+  font-weight: 400;
+}
+.pf-sub-prefs {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #eaeae7;
+}
+.pf-sub-prefs h2 {
+  margin: 0;
+}
+.pf-sub-prefs .pf4-athlete-section {
+  margin: 0;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--acc-line);
+}
+.pf-sub-prefs .pf4-athlete-section .pf4-kicker {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 9px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--acc-muted);
+}
+.pf-sub-prefs .pf4-check {
+  display: flex;
+  gap: 12px;
+  font-size: 14px;
+  line-height: 20px;
+}
+.pf-sub-prefs .pf4-check input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  flex: none;
+  accent-color: #0b0b0c;
+}
+.pf-sub-prefs .pf4-athlete-section h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 400;
+}
+.pf-sub-prefs .pf4-athlete-section p {
+  font-size: 13px;
+  color: var(--acc-text);
+}
+.pf-sub-prefs .pf4-text-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--acc-ink);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+}

@@ -1,6 +1,7 @@
 "use client";
 import { useResource, type AthleteProfile } from "../../_account/account-data";
 import { AccountScreen, AccountTopBar } from "../../_account/account-shell";
+import { useProfileOrigin } from "../_profile/profile-origin";
 import "../_profile/profile.css";
 import "../_profile/fake-pages.css";
 
@@ -15,10 +16,11 @@ const sampleCode = (name: string) =>
  */
 export default function InvitePage() {
   const profile = useResource<AthleteProfile>("/athlete-journey/profile");
+  const origin = useProfileOrigin();
   const code = sampleCode(profile.data?.firstName ?? "");
   return (
     <AccountScreen
-      top={<AccountTopBar title="Invita un compagno" back="/journey/profilo" />}
+      top={<AccountTopBar title="Invita un compagno" back={origin.back} />}
       footer={
         <button type="button" className="pf-acc-pill is-lime" disabled>
           <span>Condividi il codice</span>
