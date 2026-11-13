@@ -1,0 +1,239 @@
+/* Filtri e prova pratica del micro-test, come la demo V10. */
+
+.pf-mt-filters {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.pf-mt-kinds {
+  display: flex;
+  gap: 6px;
+}
+.pf-mt-kinds button {
+  min-height: 34px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  box-shadow: inset 0 0 0 1px #ffffff00;
+  color: #ffffff80;
+  font: inherit;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  transition:
+    color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.pf-mt-kinds button[aria-checked="true"] {
+  box-shadow: inset 0 0 0 1px #ffffffd9;
+  color: #fff;
+}
+.pf-mt-wheres {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  animation: pf-mt-fade 0.25s ease both;
+}
+.pf-mt-wheres button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  box-shadow: inset 0 0 0 1px #ffffff38;
+  color: #fff;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+.pf-mt-wheres button[aria-checked="true"] {
+  background: var(--acc-lime);
+  box-shadow: none;
+  color: var(--acc-ink);
+}
+.pf-mt-wheres svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+/* Prova pratica. */
+.pf-mt-prac-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pf-mt-exit {
+  min-height: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #ffffff99;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+.pf-mt-prac-title,
+.pf-acc .pf-mt h2.pf-mt-prac-title {
+  margin: 18px 0 0;
+  font-size: 30px;
+  line-height: 34px;
+  font-weight: 300;
+  letter-spacing: -0.045em;
+  text-wrap: balance;
+}
+.pf-mt-prac-steps {
+  display: grid;
+  gap: 14px;
+  margin: 20px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.pf-mt-prac-steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  font-size: 15px;
+  line-height: 22px;
+  color: #ffffffe0;
+  animation: pf-mt-rise 0.4s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+.pf-mt-prac-steps li span {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px #ffffff59;
+  font-size: 12px;
+}
+
+/* Timer ad anello. */
+.pf-mt-timer {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  margin-top: 22px;
+  padding: 18px 20px;
+  border: 0;
+  border-radius: 22px;
+  background: #ffffff12;
+  color: #fff;
+  font: inherit;
+  text-align: left;
+}
+.pf-mt-timer-ring {
+  position: relative;
+  flex: none;
+  width: 60px;
+  height: 60px;
+}
+.pf-mt-timer-ring svg {
+  position: absolute;
+  inset: 0;
+}
+.pf-mt-timer-ring circle {
+  fill: none;
+  stroke-width: 4;
+}
+.pf-mt-timer-ring circle:first-child {
+  stroke: #ffffff1f;
+}
+.pf-mt-timer-ring circle:last-child {
+  stroke: var(--acc-lime);
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.25s linear;
+}
+.pf-mt-timer-ring b {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "PF4 Space Grotesk", sans-serif;
+  font-size: 15px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.pf-mt-timer-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.pf-mt-timer-text strong {
+  font-size: 16px;
+  font-weight: 500;
+}
+.pf-mt-timer-text small {
+  font-size: 12px;
+  color: #ffffff8c;
+}
+.pf-mt-timer.is-done .pf-mt-timer-text strong {
+  color: var(--acc-lime);
+}
+
+/* Esiti a tessere. */
+.pf-mt-tiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.pf-mt-tiles button {
+  display: flex;
+  align-items: flex-end;
+  min-height: 96px;
+  padding: 14px;
+  border: 0;
+  border-radius: 18px;
+  background: #ffffff12;
+  box-shadow: inset 0 0 0 1px #ffffff1f;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  line-height: 19px;
+  text-align: left;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease;
+}
+.pf-mt-tiles button.is-selected {
+  background: var(--acc-lime);
+  box-shadow: none;
+  color: var(--acc-ink);
+}
+.pf-mt-tiles button:disabled {
+  opacity: 0.6;
+}
+
+/* Limite del giorno raggiunto. */
+.pf-mt-done-day {
+  align-items: center;
+  text-align: center;
+}
+.pf-mt-done-day .pf-mt-history {
+  align-self: stretch;
+  text-align: left;
+}
+
+@media (max-width: 360px) {
+  .pf-mt-tiles button {
+    min-height: 84px;
+    font-size: 13px;
+  }
+}

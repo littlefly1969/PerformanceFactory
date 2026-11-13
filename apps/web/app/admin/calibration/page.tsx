@@ -10,6 +10,7 @@ type Settings = {
   maxDays: number;
   programBeforePaywall: boolean;
   questionsPerMicroTest: number;
+  microTestsPerDay: number;
   initialQuestionsPerArea: number;
   unsafeMicroTestTerms?: string[];
   unsafeTrainingTerms?: string[];
@@ -48,6 +49,11 @@ const FIELDS: { key: NumericKey; label: string; hint: string }[] = [
     key: "questionsPerMicroTest",
     label: "Domande per ogni micro-prova",
     hint: "Indicazione per l'AI: in media una micro-prova ogni N domande. L'AI ne tiene conto ma decide passo per passo. 0 = nessuna indicazione.",
+  },
+  {
+    key: "microTestsPerDay",
+    label: "Micro-test al giorno per filtro",
+    hint: "Quanti micro-test della home può fare l'atleta ogni giorno per ciascun filtro (Teorici, Pratici sul campo, Pratici fuori dal campo), da 1 a 10. Contano anche quelli saltati.",
   },
   {
     key: "initialQuestionsPerArea",

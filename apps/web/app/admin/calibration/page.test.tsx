@@ -28,6 +28,7 @@ const settings = {
   maxDays: 30,
   programBeforePaywall: false,
   questionsPerMicroTest: 0,
+  microTestsPerDay: 2,
   unsafeMicroTestTerms: ["sprint", "farmac"],
   unsafeTrainingTerms: [] as string[],
 };
@@ -116,6 +117,7 @@ it("saves the calibration parameters, without time-based fields, and shows the s
     maxDays: 30,
     programBeforePaywall: false,
     questionsPerMicroTest: 3,
+    microTestsPerDay: 2,
   });
   expect(puts[0]).not.toHaveProperty("confidenceThreshold");
   expect(await screen.findByText(/Parametri salvati/)).toBeVisible();

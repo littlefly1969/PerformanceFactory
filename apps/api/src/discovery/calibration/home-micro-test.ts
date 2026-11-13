@@ -72,6 +72,8 @@ const testOf = (round: { questionsJson: unknown }) => {
  * quello pronto, la serie di giorni e gli ultimi fatti. L'esito aggiorna il
  * profilo provvisorio, quindi a calibrazione chiusa non c'è.
  */
+type FilterViews = Awaited<ReturnType<HomeMicroTestService['filterViews']>>;
+
 @Injectable()
 export class HomeMicroTestService {
   constructor(
@@ -137,9 +139,34 @@ export class HomeMicroTestService {
         ...base,
         status: 'UNAVAILABLE' as const,
         test: null,
-        filters: [],
+        filters: [] as FilterViews['filters'],
         limit: null,
       };
+    const { filters, limit } = await this.filterViews(
+      userId,
+      now,
+      settings.creditsMicroTest,
+    );
+    // Riepilogo per la home: il primo pronto, poi quello in valutazione.
+    const summary =
+      filters.find((f) => f.status === 'READY') ??
+      filters.find((f) => f.status === 'EVALUATING') ??
+      filters.find((f) => f.status === 'PREPARING') ??
+      filters[0];
+    return {
+      ...base,
+      status: summary.status,
+      test: summary.test,
+      filters,
+      limit,
+    };
+  }
+
+  /**
+   * Stato di ciascun filtro: il test aperto, oppure PREPARING finché ha posti
+   * oggi (o una preparazione in corso), altrimenti DONE_TODAY.
+   */
+  private async filterViews(userId: string, now: Date, points: number) {
     const [open, slots, config] = await Promise.all([
       openHomeMicroTests(this.prisma, userId),
       this.prisma.microTestSlot.findMany({
@@ -189,7 +216,7 @@ export class HomeMicroTestService {
             format: test?.situation
               ? ('SITUATIONAL' as const)
               : ('PRACTICAL' as const),
-            points: settings.creditsMicroTest,
+            points,
             round: publicRound(round),
           },
         };
@@ -204,19 +231,7 @@ export class HomeMicroTestService {
         test: null,
       };
     });
-    // Riepilogo per la home: il primo pronto, poi quello in valutazione.
-    const summary =
-      filters.find((f) => f.status === 'READY') ??
-      filters.find((f) => f.status === 'EVALUATING') ??
-      filters.find((f) => f.status === 'PREPARING') ??
-      filters[0];
-    return {
-      ...base,
-      status: summary.status,
-      test: summary.test,
-      filters,
-      limit,
-    };
+    return { filters, limit };
   }
 
   /** Prepara il micro-test del filtro se manca (l'AI lavora), poi la vista aggiornata. */

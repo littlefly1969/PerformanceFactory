@@ -93,6 +93,8 @@ export type MicroTestResult = {
   confidence?: { before: number | null; after: number | null };
   correct?: number;
   total?: number;
+  /** Prova pratica: l'esito scelto dall'atleta. */
+  answer?: string | null;
   summary?: string;
   video?: ChosenVideo | null;
   /** Crediti del micro-test dal back office, mostrati come punti. */
@@ -102,27 +104,51 @@ export type MicroTestResult = {
   takeaway?: string;
 };
 
+/** Filtri del micro-test: Teorici, Pratici sul campo, Pratici fuori dal campo. */
+export type MicroTestFilter = "THEORY" | "ON_COURT" | "OFF_COURT";
+
+type HomeMicroTestStatus =
+  | "READY"
+  | "PREPARING"
+  | "EVALUATING"
+  /** Il filtro ha usato i suoi micro-test di oggi. */
+  | "DONE_TODAY";
+
+export type HomeMicroTestReady = {
+  roundId: string;
+  filter?: MicroTestFilter;
+  title: string;
+  area: { id: string; name: string };
+  durationMinutes: number | null;
+  format: "PRACTICAL" | "SITUATIONAL";
+  /** Punti che vale, dalla configurazione del back office. */
+  points: number;
+  round: NonNullable<Calibration["round"]>;
+};
+
 /**
- * Micro-test della home, fuori dal ciclo di calibrazione: ce n'è sempre uno
- * pronto (o in preparazione) finché la fase gratuita è aperta.
+ * Micro-test della home, fuori dal ciclo di calibrazione: uno pronto (o in
+ * preparazione) per filtro, fino al limite del giorno, finché la fase
+ * gratuita è aperta.
  */
 export type HomeMicroTest = {
-  status: "READY" | "PREPARING" | "EVALUATING" | "FAILED" | "UNAVAILABLE";
-  test: {
-    roundId: string;
-    title: string;
-    area: { id: string; name: string };
-    durationMinutes: number | null;
-    format: "PRACTICAL" | "SITUATIONAL";
-    /** Punti che vale, dalla configurazione del back office. */
-    points: number;
-    round: NonNullable<Calibration["round"]>;
-  } | null;
+  /** Riepilogo per la home: il primo filtro con un test pronto. */
+  status: HomeMicroTestStatus | "FAILED" | "UNAVAILABLE";
+  test: HomeMicroTestReady | null;
   /** Giorni di fila con almeno un micro-test e la settimana da lunedì. */
   streak: { days: number; week: boolean[] };
-  /** Micro-test già fatti, dal più recente. */
+  /** Stato di ciascun filtro, con i posti usati oggi; vuoto a fase chiusa. */
+  filters?: {
+    filter: MicroTestFilter;
+    status: HomeMicroTestStatus;
+    usedToday: number;
+    limit: number;
+    test: HomeMicroTestReady | null;
+  }[];
+  /** Micro-test già fatti, dal più recente, per filtro. */
   history: {
     roundId: string;
+    filter?: MicroTestFilter;
     completedAt: string;
     title: string;
     points: number;
