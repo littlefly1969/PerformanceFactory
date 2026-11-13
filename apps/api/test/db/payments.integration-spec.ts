@@ -364,6 +364,9 @@ describe('Payments on PostgreSQL (stub provider)', () => {
     });
 
     it('converges to the newest state whatever the processing order', async () => {
+      // Il rinnovo allunga l'accesso solo oltre quello del checkout (oggi + un
+      // periodo): la fine del periodo va calcolata da oggi, non fissata.
+      const periodEnd = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000);
       for (const order of [0, 1, 2, 3]) {
         const user = await newUser();
         const { subscriptionId, subscriptionRef } = await activate(user);
@@ -375,7 +378,7 @@ describe('Payments on PostgreSQL (stub provider)', () => {
         const paid = () =>
           send('PAYMENT_SUCCEEDED', {
             subscriptionRef,
-            periodEnd: '2026-12-07T10:00:00.000Z',
+            periodEnd: periodEnd.toISOString(),
             occurredAt: '2026-11-07T10:05:00.000Z',
           });
         if (order === 0) {
@@ -396,7 +399,7 @@ describe('Payments on PostgreSQL (stub provider)', () => {
         ).toMatchObject({
           status: 'ACTIVE',
           graceEndsAt: null,
-          entitlementEndAt: new Date('2026-12-07T10:00:00.000Z'),
+          entitlementEndAt: periodEnd,
           lastProviderEventAt: new Date('2026-11-07T10:05:00.000Z'),
         });
       }
