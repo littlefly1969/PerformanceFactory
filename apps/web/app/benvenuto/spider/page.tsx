@@ -2,11 +2,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { API_BASE, secureFetch } from "../../lib/api";
-import {
-  EstimatedSpider,
-  type SpiderDriver,
-} from "../../components/estimated-spider";
+import type { SpiderDriver } from "../../components/estimated-spider";
 import { WelcomeIntro, WelcomeShell } from "../_components/welcome-shell";
+import { PerformancePreview } from "./performance-preview";
 
 const NEXT = "/benvenuto/regalo";
 
@@ -43,7 +41,6 @@ export default function WelcomeSpiderPage() {
     };
   }, []);
 
-  const estimated = estimate?.estimated ?? true;
   return (
     <WelcomeShell
       step={3}
@@ -57,40 +54,28 @@ export default function WelcomeSpiderPage() {
     >
       <WelcomeIntro
         step={3}
-        kicker="Il tuo Spider"
-        title={
-          <>
-            Questo sei tu.
-            <br />
-            Per ora.
-          </>
-        }
+        kicker="La tua performance"
+        title="Qui troverai la tua performance."
       >
-        {estimated
-          ? "Il tratteggio indica una stima basata sulle tue risposte. Ogni test in campo la rende reale."
-          : "È la tua prima valutazione: ogni test in campo la rende più precisa."}
+        Sei aree in un esagono: dopo l’assessment vedi il tuo livello reale e
+        fin dove puoi arrivare. Si aggiorna a ogni allenamento.
       </WelcomeIntro>
       <div className="pf-welcome-center">
         {estimate && (
-          <EstimatedSpider
+          <PerformancePreview
             drivers={estimate.drivers}
             scale={estimate.scale}
-            estimated={estimated}
-            labels={false}
           />
         )}
         {!estimate && !error && (
           <p className="pf-welcome-note" role="status">
-            Prepariamo il tuo Spider…
+            Prepariamo la tua performance…
           </p>
         )}
         {error && (
           <p role="alert" className="pf-welcome-error">
             {error}
           </p>
-        )}
-        {estimate && estimated && (
-          <p className="pf-spider-legend">Profilo stimato</p>
         )}
       </div>
     </WelcomeShell>

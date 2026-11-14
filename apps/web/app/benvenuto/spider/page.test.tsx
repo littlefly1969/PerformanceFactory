@@ -1,6 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import WelcomeSpiderPage from "./page";
+import { shortArea } from "./performance-preview";
 
 vi.mock("@/app/lib/api", () => ({
   API_BASE: "/api",
@@ -22,29 +23,33 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("benvenuto 02 · primo Spider", () => {
-  it("disegna lo Spider stimato tratteggiato e porta al regalo", async () => {
+describe("benvenuto 03 · la tua performance", () => {
+  it("mostra la stima del funnel come reale, le sei aree scritte e porta al regalo", async () => {
     serve({ estimated: true, scale: { min: 0, max: 100 }, drivers });
     const { container } = render(<WelcomeSpiderPage />);
-    expect(await screen.findByText("Profilo stimato")).toBeTruthy();
+    expect(
+      await screen.findByRole("heading", {
+        name: "Qui troverai la tua performance.",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByText("03 · La tua performance")).toBeTruthy();
     expect(screen.getByRole("img").getAttribute("aria-label")).toContain(
-      "Spider stimato: Tecnica 50",
+      "Tecnica 50",
     );
-    expect(container.querySelector(".pf-spider-shape.is-estimated")).toBeTruthy();
-    // Senza nomi delle aree nel grafico: restano solo nell'etichetta accessibile.
-    expect(container.querySelector(".pf-spider-label")).toBeNull();
-    expect(container.querySelector(".pf-spider.is-bare")).toBeTruthy();
+    expect(container.querySelector(".pf-wk-perf-real")).toBeTruthy();
+    // Le sei aree scritte intorno all'esagono.
+    expect(container.querySelectorAll(".pf-wk-perf-label")).toHaveLength(6);
+    // Il potenziale non esiste prima dell'assessment: solo in legenda.
+    expect(screen.getByText("Potenziale · dopo l’assessment")).toBeTruthy();
+    expect(screen.getByText("Reale")).toBeTruthy();
     expect(
       screen.getByRole("link", { name: "Continua" }).getAttribute("href"),
     ).toBe("/benvenuto/regalo");
   });
 
-  it("con una valutazione già fatta lo Spider è pieno", async () => {
-    serve({ estimated: false, scale: { min: 0, max: 100 }, drivers });
-    const { container } = render(<WelcomeSpiderPage />);
-    expect(await screen.findByRole("img")).toBeTruthy();
-    expect(screen.queryByText("Profilo stimato")).toBeNull();
-    expect(container.querySelector(".pf-spider-shape.is-estimated")).toBeNull();
+  it("accorcia i nomi lunghi delle aree", () => {
+    expect(shortArea("Preparazione atletica")).toBe("Preparazione");
+    expect(shortArea("Tecnico-tattico")).toBe("Tecnico-tattico");
   });
 
   it("mostra l'errore dell'API", async () => {

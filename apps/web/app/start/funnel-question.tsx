@@ -85,7 +85,7 @@ export function FunnelQuestion({
           <PadelCourt />
         )}
       </div>
-      <div className="pf4-sheet">
+      <div className={`pf4-sheet${numeric ? "" : " pf4-sheet-fixed"}`}>
         <section
           className={`pf4-body pf4-question${numeric ? " pf4-question-number" : ""}${stepper ? " pf4-question-stepper" : ""}`}
         >

@@ -1,4 +1,7 @@
+import { tapGuard } from "../_components/tap-guard";
 import { ClubCarousel, type GiftClub } from "./club-carousel";
+
+const guard = tapGuard("welcome-4");
 
 export type GiftArea = { id: string; name: string; real: boolean };
 
@@ -36,7 +39,7 @@ export function GiftScreen({
   return (
     <main className="pf-gift">
       <div className="pf-gift-column">
-        <header className="pf-gift-header">
+        <header className="pf-gift-header" onClickCapture={guard}>
           <a className="pf-gift-back" href="/benvenuto/spider" aria-label="Indietro">
             ←
           </a>
@@ -81,7 +84,12 @@ export function GiftScreen({
           )}
         </section>
 
-        <button type="button" className="pf-gift-continue" onClick={onContinue}>
+        <button
+          type="button"
+          className="pf-gift-continue"
+          onClickCapture={guard}
+          onClick={onContinue}
+        >
           Continua
         </button>
       </div>

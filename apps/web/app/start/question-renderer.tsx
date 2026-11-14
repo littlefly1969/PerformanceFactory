@@ -285,7 +285,7 @@ function initialNumber(
 
 /**
  * Contatore della demo PF10: nel pulsante solo il numero, sopra in grigio la
- * fascia. Parte dal valore iniziale già scelto, così «Continua» è attivo.
+ * fascia (non sulla frequenza, demo V11). Parte dal valore iniziale già scelto, così «Continua» è attivo.
  */
 function CounterStepper({
   question,
@@ -325,7 +325,12 @@ function CounterStepper({
       role="group"
       aria-label={question.title}
     >
-      <output aria-live="polite">{counter.bands[band].label}</output>
+      <output
+        aria-live="polite"
+        className={counter.showBand ? undefined : "pf4-sr"}
+      >
+        {counter.bands[band].label}
+      </output>
       <div>
         <button
           type="button"

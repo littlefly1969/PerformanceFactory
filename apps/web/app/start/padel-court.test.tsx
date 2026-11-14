@@ -7,8 +7,11 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  courtShift,
   judgeHit,
+  PadelCourt,
   rallyAt,
+  resetCourtClock,
   RHYTHM_PERIOD_MS,
   RhythmCourt,
 } from "./padel-court";
@@ -60,25 +63,45 @@ const toZone = RHYTHM_PERIOD_MS * 0.5;
 beforeEach(() => reducedMotion(false));
 afterEach(() => {
   cleanup();
+  resetCourtClock();
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
 describe("Trova il ritmo", () => {
-  it("judges a tolerant window around the far player", () => {
+  it("judges a tolerant window around the near player", () => {
     expect(judgeHit(0.5)).toBe("hit");
-    expect(judgeHit(0.41)).toBe("hit");
-    expect(judgeHit(0.59)).toBe("hit");
+    expect(judgeHit(0.44)).toBe("hit");
+    expect(judgeHit(0.56)).toBe("hit");
     expect(judgeHit(0.3)).toBe("early");
-    expect(judgeHit(0.7)).toBe("late");
+    expect(judgeHit(0.65)).toBe("late");
     expect(judgeHit(0.05)).toBe("wait");
-    expect(rallyAt(0.5)).toMatchObject({ x: 270, y: 102 });
-    expect(rallyAt(0)).toMatchObject({ x: 84, y: 60 });
+    expect(judgeHit(0.25)).toBe("wait");
+    expect(rallyAt(0.5)).toMatchObject({ x: 120, y: 114, scale: 1 });
+    expect(rallyAt(0)).toMatchObject({ x: 86, y: 58 });
+  });
+
+  it("flies straight from player to player, never stopping at the net", () => {
+    // Fermate solo sui quattro giocatori, mai sulla rete (x = 177).
+    expect(rallyAt(0.25)).toMatchObject({ x: 268, y: 104, scale: 1 });
+    expect(rallyAt(0.75)).toMatchObject({ x: 234, y: 50, scale: 1 });
+    // A metà volo la pallina si ingrandisce: è il pallonetto.
+    const mid = rallyAt(0.125);
+    expect(mid.x).toBeCloseTo(177, 0);
+    expect(mid.scale).toBeCloseTo(1.6, 1);
+  });
+
+  it("is only the animated court while the flag is off", () => {
+    render(<RhythmCourt />);
+    expect(screen.queryByRole("button", { name: "Prova il ritmo" })).toBeNull();
+    expect(document.querySelectorAll(".pf4-court-players circle")).toHaveLength(
+      4,
+    );
   });
 
   it("starts only on request and counts three hits to complete", () => {
     const frames = fakeFrames();
-    render(<RhythmCourt />);
+    render(<RhythmCourt enabled />);
     expect(frames.pending()).toBe(0);
     expect(screen.queryByRole("button", { name: "Colpisci" })).toBeNull();
 
@@ -111,7 +134,7 @@ describe("Trova il ritmo", () => {
 
   it("lets a miss continue without penalty", () => {
     const frames = fakeFrames();
-    render(<RhythmCourt />);
+    render(<RhythmCourt enabled />);
     fireEvent.click(screen.getByRole("button", { name: "Prova il ritmo" }));
     frames.advance(RHYTHM_PERIOD_MS * 0.3);
     fireEvent.click(screen.getByRole("button", { name: "Colpisci" }));
@@ -124,7 +147,7 @@ describe("Trova il ritmo", () => {
 
   it("does not jump ahead after a background tab", () => {
     const frames = fakeFrames();
-    render(<RhythmCourt />);
+    render(<RhythmCourt enabled />);
     fireEvent.click(screen.getByRole("button", { name: "Prova il ritmo" }));
     frames.advance(160);
     // 10 secondi in un solo frame valgono al massimo 50 ms.
@@ -136,7 +159,7 @@ describe("Trova il ritmo", () => {
 
   it("pauses while hidden and cleans up on close and unmount", () => {
     const frames = fakeFrames();
-    const { unmount } = render(<RhythmCourt />);
+    const { unmount } = render(<RhythmCourt enabled />);
     fireEvent.click(screen.getByRole("button", { name: "Prova il ritmo" }));
     expect(frames.pending()).toBe(1);
     Object.defineProperty(document, "hidden", {
@@ -167,8 +190,45 @@ describe("Trova il ritmo", () => {
   it("stays static without timed interactions with reduced motion", () => {
     reducedMotion(true);
     const frames = fakeFrames();
-    render(<RhythmCourt />);
+    render(<RhythmCourt enabled />);
     expect(screen.queryByRole("button", { name: "Prova il ritmo" })).toBeNull();
     expect(frames.pending()).toBe(0);
+  });
+});
+
+describe("campo del funnel", () => {
+  it("keeps the rally going across questions instead of restarting it", () => {
+    vi.useFakeTimers();
+    const first = render(<PadelCourt />);
+    const court = () => document.querySelector(".pf4-court") as HTMLElement;
+    expect(court().style.getPropertyValue("--pf4-court-shift")).toBe("-0ms");
+    expect(court()).not.toHaveClass("is-settled");
+    first.unmount();
+    // La domanda dopo, tre secondi più tardi: lo scambio riprende da lì e
+    // le linee sono già tracciate.
+    vi.advanceTimersByTime(3000);
+    render(<PadelCourt />);
+    expect(court().style.getPropertyValue("--pf4-court-shift")).toBe("-3000ms");
+    expect(court()).toHaveClass("is-settled");
+  });
+
+  it("measures the shift from the first court", () => {
+    expect(courtShift(1000)).toBe(0);
+    expect(courtShift(5000)).toBe(4000);
+    resetCourtClock();
+    expect(courtShift(7000)).toBe(0);
+  });
+
+  it("does not start the clock while rendering on the server", () => {
+    vi.stubGlobal("window", undefined);
+    try {
+      expect(courtShift(1000)).toBe(0);
+      expect(courtShift(9000)).toBe(0);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+    // Il campo idratato nasce a 0 come quello del server e avvia l'orologio.
+    expect(courtShift(20000)).toBe(0);
+    expect(courtShift(21000)).toBe(1000);
   });
 });

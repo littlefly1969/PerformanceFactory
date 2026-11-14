@@ -113,6 +113,11 @@ La pagina è `/admin/feature-flags`. Primo flag: `referral_share`, che mostra
 all'atleta nel profilo il suo link di invito (`GET /athlete/referral`, codice
 generato al primo uso).
 
+`funnel_rhythm_game` accende il minigioco «Prova il ritmo» nell'intro del
+funnel. Il funnel è prima del login, quindi vale solo acceso al 100% (lo legge
+`GET /public/features`). Nasce spento: decisione di Stefano del 13 novembre
+2026 (vedi `demo-v11.md`).
+
 ## Testi corretti
 
 - Niente più «7 giorni gratis», «Attiva la prova gratuita» e «Prova gratuita
