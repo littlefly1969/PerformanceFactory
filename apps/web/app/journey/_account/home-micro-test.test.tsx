@@ -130,12 +130,14 @@ describe("Risultato del micro-test", () => {
     await userEvent.click(
       await screen.findByRole("button", { name: /Inizia il micro-test/ }),
     );
-    await userEvent.click(screen.getByRole("button", { name: /Spesso/ }));
+    await userEvent.click(screen.getByRole("radio", { name: /Spesso/ }));
     await userEvent.click(
-      screen.getByRole("button", { name: /Invia l’esito/ }),
+      screen.getByRole("button", { name: /Salva il risultato/ }),
     );
     expect(await screen.findByText("40% → 35%")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Invia l’esito/ })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: /Salva il risultato/ }),
+    ).toBeNull();
     expect(window.location.search).toBe(`?round=${ROUND.id}`);
     expect(
       calls.filter((u) => u.endsWith("/calibration/answers")),

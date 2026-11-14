@@ -116,8 +116,16 @@ export type Calibration = {
         durationMinutes: number | null;
         safetyNotes: string;
         title?: string;
-        /** Situazioni di gioco: una voce per situazione, spiegata dopo la risposta. */
-        format?: "SITUATIONAL";
+        /** Situazioni di gioco (teorico) o prova pratica con i suoi passaggi. */
+        format?: "SITUATIONAL" | "PRACTICAL";
+        /** Prova pratica: sul campo o fuori dal campo; nullo nei test storici. */
+        setting?: "ON_COURT" | "OFF_COURT" | null;
+        /** Passaggi numerati della prova pratica. */
+        steps?: string[];
+        /** Secondi del timer; nullo se la prova non è a tempo. */
+        timerSeconds?: number | null;
+        /** Domanda dell'esito («Com'è andata?»). */
+        question?: string;
         situation?: {
           index: number;
           total: number;

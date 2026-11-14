@@ -14,6 +14,16 @@ import {
   Min,
 } from 'class-validator';
 import { POLICY_KINDS } from '../confidence-policy';
+import { MICRO_TEST_FILTERS } from '../../../ai-orchestrator/micro-test-practical';
+import type { MicroTestFilter } from '../../../ai-orchestrator/micro-test-practical';
+
+/** Filtro del micro-test della home da preparare; senza, i teorici. */
+export class MicroTestPrepareDto {
+  @ApiPropertyOptional({ enum: MICRO_TEST_FILTERS })
+  @IsOptional()
+  @IsIn(MICRO_TEST_FILTERS)
+  filter?: MicroTestFilter;
+}
 
 export class CalibrationAnswersDto {
   @ApiProperty()
@@ -75,6 +85,14 @@ export class UpdateCalibrationConfigDto {
   @Min(0)
   @Max(50)
   questionsPerMicroTest?: number;
+
+  /** Micro-test della home al giorno per ciascun filtro (Teorici, Sul campo, Fuori dal campo). */
+  @ApiPropertyOptional({ minimum: 1, maximum: 10 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  microTestsPerDay?: number;
 
   /** Domande conoscitive iniziali per driver, scritte dall'AI. */
   @ApiPropertyOptional({ minimum: 1, maximum: 4 })

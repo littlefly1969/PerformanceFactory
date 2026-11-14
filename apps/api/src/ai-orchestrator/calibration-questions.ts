@@ -1,5 +1,6 @@
 import { recordAiValidationFailure } from '../common/ai-telemetry';
 import type { MicroTestFormat, VideoChoice } from './micro-test-situations';
+import type { PracticalSetting } from './micro-test-practical';
 import { BadGatewayException, Logger } from '@nestjs/common';
 import { hashJson } from './proposal-audit';
 import { requestStructuredProposal } from './proposal-structured-transport';
@@ -196,6 +197,11 @@ export type CalibrationQuestion = {
     video?: VideoChoice | null;
     /** Frase e consiglio per livello del risultato; assenti nei test storici. */
     results?: { verdict: string; takeaway: string }[];
+    /** Prova pratica: luogo, passaggi, timer e domanda dell'esito; assenti nei test storici. */
+    setting?: PracticalSetting | null;
+    steps?: string[];
+    timerSeconds?: number | null;
+    question?: string;
     /** Solo nelle situazioni di gioco: una voce per situazione. */
     situation?: {
       index: number;

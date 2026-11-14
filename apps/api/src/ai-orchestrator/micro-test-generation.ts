@@ -23,6 +23,14 @@ import {
   DEFAULT_UNSAFE_MICRO_TEST_TERMS,
   findUnsafeTerm,
 } from './micro-test-safety';
+import {
+  MicroTestFilter,
+  PRACTICAL_SCHEMA,
+  PracticalFields,
+  practicalRules,
+  stubPractical,
+  validatePractical,
+} from './micro-test-practical';
 
 /** Tipo di prompt in AiPromptVersion per i micro-test su misura. */
 export const MICRO_TEST_PROMPT_TYPE = 'MICRO_TESTS';
@@ -30,7 +38,7 @@ export const MICRO_TEST_PROMPT_TYPE = 'MICRO_TESTS';
 export const DEFAULT_MICRO_TEST_PROMPT = [
   'Sei il preparatore di Performance Factory, la piattaforma di allenamento al padel, e scrivi micro-test pratici per un atleta amatoriale maggiorenne durante l’assessment. Lo sport è il padel: esercizi, situazioni e lessico sono di padel, mai di tennis o di altri sport di racchetta. Il motore di calibrazione ha deciso che su un driver serve un’evidenza diversa dall’autodichiarazione: ricevi il profilo dell’atleta, la scala dei punteggi, il driver (score R provvisorio, confidenza, lacune di evidenza e risposte già date, ciascuna con la sua fonte), il motivo del passo, le limitazioni dichiarate e i micro-test già proposti.',
   'Scopo: ogni micro-test produce l’evidenza che manca alla valutazione di quel driver. Parti dalle lacune indicate e dalle risposte già date; verifica con un esercizio ciò che l’atleta ha dichiarato e che la valutazione non sa ancora confermare. Non chiedere di nuovo ciò che è già chiaro.',
-  'Forma: un esercizio da 5-10 minuti che l’atleta svolge da solo o con un compagno, in campo o a casa, con un risultato che può contare (quante riuscite su 10, quanti secondi, quante volte di fila, quanti punti su 5 scambi). Per i driver non tecnici (preparazione, mental, nutrizione) usa una prova osservabile o un diario di un giorno con un conteggio preciso, non un’autovalutazione generica.',
+  'Forma: un esercizio da 2-10 minuti che l’atleta svolge da solo o con un compagno, sul campo oppure fuori dal campo (a casa o in palestra), in pochi passaggi da seguire e, se serve, con un tempo da tenere, con un risultato che può contare (quante riuscite su 10, quanti secondi, quante volte di fila, quanti punti su 5 scambi). Per i driver non tecnici (preparazione, mental, nutrizione) usa una prova osservabile o un diario di un giorno con un conteggio preciso, non un’autovalutazione generica.',
   'Su misura: adatta difficoltà, contesto e soglie a ciò che sai dell’atleta (classifica FIT dichiarata, esperienza, frequenza di gioco, obiettivo, limiti dichiarati). Un principiante non riceve esercizi da agonista; chi gioca spesso riceve soglie più alte. Se l’atleta ha dichiarato dolori o limitazioni, scegli una prova senza carico fisico o a basso impatto.',
   'Obiettivo informativo: dichiara in una frase quale lacuna del driver il test chiude. Indica la durata solo se si può stimare con buon senso.',
   'Istruzioni: cosa preparare, cosa fare passo per passo, cosa contare. Solo pala, palline, un muro o un campo da padel, un cronometro: niente attrezzi particolari, niente salti ripetuti, carichi, sprint massimali o altri rischi.',
@@ -85,6 +93,11 @@ export type MicroTestInput = {
    * meno sviluppati) dove una prova ha più senso. Senza, uno per driver.
    */
   chooseOne?: boolean;
+  /**
+   * Micro-test della home: il filtro scelto dall'atleta (Teorici, Pratici sul
+   * campo o fuori dal campo) impone forma e luogo. Senza, li sceglie l'AI.
+   */
+  filter?: MicroTestFilter;
 };
 
 /**
@@ -98,7 +111,7 @@ export type MicroTestOutcome = { verdict: string; takeaway: string };
 export const PHYSICAL_LOADS = ['NONE', 'LOW', 'MODERATE'] as const;
 export type PhysicalLoad = (typeof PHYSICAL_LOADS)[number];
 
-export type GeneratedMicroTest = {
+export type GeneratedMicroTest = PracticalFields & {
   areaId: string;
   title: string;
   instructions: string;
@@ -154,6 +167,7 @@ function formatRules(input: MicroTestInput) {
     '- l’esito lo riporta l’atleta: descrivi fasce che può contare da solo, senza strumenti di misura.',
     `- options (solo PRACTICAL): da ${l.minOptions} a ${l.maxOptions} esiti in ordine crescente, label di massimo ${l.option} caratteri, score crescenti tra ${input.scale.minScore} e ${input.scale.maxScore}.`,
     situationRules(input),
+    practicalRules(input),
     `- results: l'esito da mostrare all'atleta per ogni livello del risultato, dal più basso al più alto: nella prova pratica uno per esito (stesso ordine di options), nelle situazioni uno per numero di risposte corrette da 0 a tutte (quindi situazioni + 1). verdict: frase breve di massimo ${l.verdict} caratteri (per esempio «Ci sei quasi.»); takeaway: consiglio concreto di massimo ${l.takeaway} caratteri.`,
     FIT_RANKING_RULE,
     PADEL_SPORT_RULE,
@@ -183,9 +197,14 @@ const schema = {
           'situations',
           'video',
           'results',
+          'setting',
+          'steps',
+          'timerSeconds',
+          'question',
         ],
         properties: {
           ...SITUATIONS_SCHEMA,
+          ...PRACTICAL_SCHEMA,
           results: {
             type: 'array',
             items: {
@@ -240,6 +259,7 @@ export function buildMicroTestPrompt(
         ? 'Un solo micro-test su misura, sul driver fra quelli ricevuti dove ha più senso.'
         : 'Un micro-test su misura per ciascun driver ricevuto.',
       reason: input.reason ?? null,
+      ...(input.filter ? { filter: input.filter } : {}),
       scale: input.scale,
       athleteContext: input.athleteContext,
       fitRanking: input.fitRanking ?? null,
@@ -315,7 +335,9 @@ export function stubMicroTests(input: MicroTestInput) {
   const { minScore, maxScore } = input.scale;
   const step = (maxScore - minScore) / 3;
   const video = input.videos?.[0];
-  const situational = input.proposedTitles.length % 2 === 1;
+  const situational = input.filter
+    ? input.filter === 'THEORY'
+    : input.proposedTitles.length % 2 === 1;
   const targets = input.chooseOne ? input.targets.slice(0, 1) : input.targets;
   const results = (levels: number) =>
     Array.from({ length: levels }, (_, k) => ({
@@ -342,6 +364,10 @@ export function stubMicroTests(input: MicroTestInput) {
             safetyNotes: '',
             options: [],
             format: 'SITUATIONAL',
+            setting: null,
+            steps: [],
+            timerSeconds: null,
+            question: '',
             situations: stubSituations(input, target.name),
             video: {
               videoId: video?.id ?? null,
@@ -362,6 +388,7 @@ export function stubMicroTests(input: MicroTestInput) {
               score: Math.round(minScore + step * k),
             })),
             format: 'PRACTICAL',
+            ...stubPractical(input.filter),
             situations: [],
             video: {
               videoId: video?.id ?? null,
@@ -439,6 +466,7 @@ export function validateMicroTests(
     const situations = situational
       ? validateSituations(entry.situations, input, catalog, problems, n)
       : [];
+    const practical = validatePractical(entry, format, input, problems, n);
     const video = validateVideo(entry.video, catalog, problems, String(n));
     const physicalLoad = PHYSICAL_LOADS.find((p) => p === entry.physicalLoad);
     if (situational && physicalLoad !== 'NONE')
@@ -459,6 +487,8 @@ export function validateMicroTests(
         informationGoal,
         safetyNotes,
         situationsText(situations),
+        ...practical.steps,
+        practical.question,
       ].join('. '),
       unsafeTerms(input),
     );
@@ -510,6 +540,7 @@ export function validateMicroTests(
       safetyNotes,
       options: parsed,
       format,
+      ...practical,
       situations,
       video,
       results,

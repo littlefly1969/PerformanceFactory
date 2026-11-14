@@ -271,6 +271,12 @@ describe('Micro-test engine step with PostgreSQL', () => {
       instructions: expect.any(String) as string,
       durationMinutes: 10,
       safetyNotes: expect.any(String) as string,
+      // Prova pratica: passaggi e domanda dell'esito; il motore non dà il luogo.
+      format: 'PRACTICAL',
+      setting: null,
+      steps: expect.any(Array) as string[],
+      timerSeconds: null,
+      question: expect.any(String) as string,
     });
     expect(JSON.stringify(visible)).not.toMatch(/score|promptHash|provider/);
 
@@ -440,8 +446,8 @@ describe('Micro-test engine step with PostgreSQL', () => {
       streak: { days: 1 },
     });
 
-    const ready = await home.prepare(id);
-    expect(tests.at(-1)).toMatchObject({ chooseOne: true });
+    const ready = await home.prepare(id, 'ON_COURT');
+    expect(tests.at(-1)).toMatchObject({ chooseOne: true, filter: 'ON_COURT' });
     expect(tests.at(-1)!.targets.map((t) => t.areaId)).toEqual([
       AREAS[1],
       AREAS[0],
@@ -452,7 +458,7 @@ describe('Micro-test engine step with PostgreSQL', () => {
     });
     // Una seconda richiesta non ne prepara un altro.
     const calls = testSpy.mock.calls.length;
-    await home.prepare(id);
+    await home.prepare(id, 'ON_COURT');
     expect(testSpy.mock.calls.length).toBe(calls);
 
     // Il ciclo di calibrazione va avanti per conto suo.
@@ -483,11 +489,11 @@ describe('Micro-test engine step with PostgreSQL', () => {
     });
 
     // Il prossimo va su un'altra area, e il fatto entra nello storico.
-    const next = await home.prepare(id);
+    const next = await home.prepare(id, 'ON_COURT');
     expect(next).toMatchObject({
       status: 'READY',
       test: { area: { id: AREAS[0] } },
-      history: [{ roundId: round.id, points: 10 }],
+      history: [{ roundId: round.id, filter: 'ON_COURT', points: 10 }],
     });
 
     // A fase gratuita chiusa il micro-test non c'è più.
@@ -499,6 +505,8 @@ describe('Micro-test engine step with PostgreSQL', () => {
       status: 'UNAVAILABLE',
       test: null,
     });
-    await expect(calibration.prepareMicroTest(id)).resolves.toBe(false);
+    await expect(calibration.prepareMicroTest(id, 'THEORY')).resolves.toBe(
+      false,
+    );
   });
 });

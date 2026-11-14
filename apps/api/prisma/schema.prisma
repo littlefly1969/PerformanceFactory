@@ -49,126 +49,127 @@ enum OnboardingInputType {
 }
 
 model User {
-  abilityPlanOperations AbilityPlanOperation[]
-  areaSessions AreaSession[]
-  discovery AthleteDiscovery?
-  fitRankings AthleteFitRanking[]
-  assessmentEvaluations AssessmentEvaluation[]
-  assessmentAnomalies   AssessmentAnomaly[]
-  reviewedAnomalies     AssessmentAnomaly[]    @relation("AnomalyReviewer")
-  calibration           AthleteCalibration?
-  calibrationRounds     CalibrationRound[]
-  potentialScenarios    PotentialScenario[]
-  calibrationConfigUpdates CalibrationConfig[] @relation("CalibrationConfigUpdatedBy")
-  confidencePolicies       ConfidencePolicy[]  @relation("ConfidencePolicyCreatedBy")
+  abilityPlanOperations    AbilityPlanOperation[]
+  areaSessions             AreaSession[]
+  discovery                AthleteDiscovery?
+  fitRankings              AthleteFitRanking[]
+  assessmentEvaluations    AssessmentEvaluation[]
+  assessmentAnomalies      AssessmentAnomaly[]
+  reviewedAnomalies        AssessmentAnomaly[]      @relation("AnomalyReviewer")
+  calibration              AthleteCalibration?
+  calibrationRounds        CalibrationRound[]
+  potentialScenarios       PotentialScenario[]
+  calibrationConfigUpdates CalibrationConfig[]      @relation("CalibrationConfigUpdatedBy")
+  confidencePolicies       ConfidencePolicy[]       @relation("ConfidencePolicyCreatedBy")
   interactionCredits       InteractionCreditEntry[]
   microTestCompletions     MicroTestCompletion[]
   personalMicroTests       MicroTest[]
   microTestGenerations     MicroTestGeneration[]
+  microTestSlots           MicroTestSlot[]
   freeLessonSeat           FreeLessonSeat?
   engagement               UserEngagement?
-  coachedLessons           FreeLesson[]          @relation("FreeLessonCoach")
-  lessonFeedbackReceived   CoachLessonFeedback[] @relation("LessonFeedbackAthlete")
-  lessonFeedbackGiven      CoachLessonFeedback[] @relation("LessonFeedbackCoach")
-  freeLessonConfigUpdates  FreeLessonConfig[]    @relation("FreeLessonConfigUpdatedBy")
-  id        String   @id @default(uuid())
-  email     String   @unique
-  password  String
-  role      UserRole
-  firstName String?
-  lastName  String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
+  coachedLessons           FreeLesson[]             @relation("FreeLessonCoach")
+  lessonFeedbackReceived   CoachLessonFeedback[]    @relation("LessonFeedbackAthlete")
+  lessonFeedbackGiven      CoachLessonFeedback[]    @relation("LessonFeedbackCoach")
+  freeLessonConfigUpdates  FreeLessonConfig[]       @relation("FreeLessonConfigUpdatedBy")
+  id                       String                   @id @default(uuid())
+  email                    String                   @unique
+  password                 String
+  role                     UserRole
+  firstName                String?
+  lastName                 String?
+  isActive                 Boolean                  @default(true)
+  createdAt                DateTime                 @default(now())
   /// Dichiarazione di maggiore eta raccolta alla registrazione (Blueprint A2.6-A2.7).
-  adultConfirmedAt DateTime?
+  adultConfirmedAt         DateTime?
   /// Foto profilo facoltativa: data URL ridimensionata dal client (benvenuto 01).
-  avatarImage      String?
+  avatarImage              String?
   /// Tester selezionati per i feature flag in beta.
-  isBetaTester     Boolean   @default(false)
+  isBetaTester             Boolean                  @default(false)
   /// Codice personale da condividere per il referral (A8.19).
-  referralCode     String?   @unique
-  address          UserAddress?
-  attribution      UserAttribution?  @relation("UserAttribution")
-  referredUsers    UserAttribution[] @relation("ReferredUsers")
-  analyticsEvents  AnalyticsEvent[]
-  featureFlagsUpdated FeatureFlag[]       @relation("FeatureFlagUpdatedBy")
-  featureFlagChanges  FeatureFlagChange[] @relation("FeatureFlagChangeActor")
-  betaTesterChanges   BetaTesterChange[]  @relation("BetaTesterChangeUser")
-  betaTesterActions   BetaTesterChange[]  @relation("BetaTesterChangeActor")
+  referralCode             String?                  @unique
+  address                  UserAddress?
+  attribution              UserAttribution?         @relation("UserAttribution")
+  referredUsers            UserAttribution[]        @relation("ReferredUsers")
+  analyticsEvents          AnalyticsEvent[]
+  featureFlagsUpdated      FeatureFlag[]            @relation("FeatureFlagUpdatedBy")
+  featureFlagChanges       FeatureFlagChange[]      @relation("FeatureFlagChangeActor")
+  betaTesterChanges        BetaTesterChange[]       @relation("BetaTesterChangeUser")
+  betaTesterActions        BetaTesterChange[]       @relation("BetaTesterChangeActor")
 
   professionalLinks ProfessionalUserLink[] @relation("ProfessionalLinks")
   userLinks         ProfessionalUserLink[] @relation("UserLinks")
 
-  feedbackEntries      FeedbackEntry[]
-  consents             Consent[]
-  consentDocuments     ConsentDocument[]
-  authIdentities       AuthIdentity[]
-  passkeys             Passkey[]
-  assignments          UserAssignment[]
-  currentStates        CurrentState[]
-  kpiDaily             KpiDaily[]
-  aiInteractions       AiInteraction[]
-  aiCycleHistorySummaries AiCycleHistorySummary[]
-  onboardingAssessment UserOnboardingAssessment?
-  onboardingQuestions  UserOnboardingQuestion[]
-  performanceGoal      UserPerformanceGoal?
-  sportSelection       UserSportSelection?
-  userAreaPromptInstructions UserAreaPromptInstruction[]
+  feedbackEntries             FeedbackEntry[]
+  consents                    Consent[]
+  consentDocuments            ConsentDocument[]
+  authIdentities              AuthIdentity[]
+  passkeys                    Passkey[]
+  assignments                 UserAssignment[]
+  currentStates               CurrentState[]
+  kpiDaily                    KpiDaily[]
+  aiInteractions              AiInteraction[]
+  aiCycleHistorySummaries     AiCycleHistorySummary[]
+  onboardingAssessment        UserOnboardingAssessment?
+  onboardingQuestions         UserOnboardingQuestion[]
+  performanceGoal             UserPerformanceGoal?
+  sportSelection              UserSportSelection?
+  userAreaPromptInstructions  UserAreaPromptInstruction[]
   trainingLifecycleOperations TrainingLifecycleOperation[]
-  trainingSessions TrainingSession[]
-  trainingPlanReleases TrainingPlanRelease[]
-  trainingQuestionSets TrainingQuestionSet[]
-  trainingUserAnswers  TrainingUserAnswer[]
+  trainingSessions            TrainingSession[]
+  trainingPlanReleases        TrainingPlanRelease[]
+  trainingQuestionSets        TrainingQuestionSet[]
+  trainingUserAnswers         TrainingUserAnswer[]
 
-  performanceProfileSnapshots PerformanceProfileSnapshot[]
-  planReleases                ImprovementPlanRelease[]
-  questionSets                QuestionSet[]
-  userAnswers                 UserAnswer[]
-  aiContextSummaries          AiContextSummary[]
-  aiProposalAudits            AiProposalAudit[]
-  professionalAreaCompetences ProfessionalAreaCompetence[] @relation("ProfessionalAreaCompetence")
-  coachSpecializationCompetences CoachSpecializationCompetence[] @relation("CoachSpecializationCompetence")
-  coachUserLinks             CoachUserLink[]              @relation("CoachLinks")
-  athleteCoachLinks          CoachUserLink[]              @relation("AthleteCoachLinks")
-  approvedPlanItems           PlanItem[]                   @relation("PlanItemApprovedBy")
-  approvedTrainingItems       TrainingPlanItem[]           @relation("TrainingPlanItemApprovedBy")
-  questionSetApprovals        QuestionSetAreaApproval[]    @relation("QuestionSetAreaProfessional")
-  questionSetApprovalActors   QuestionSetAreaApproval[]    @relation("QuestionSetAreaApprovedBy")
-  trainingQuestionSetApprovals TrainingQuestionSetCoachApproval[] @relation("TrainingQuestionSetCoach")
+  performanceProfileSnapshots       PerformanceProfileSnapshot[]
+  planReleases                      ImprovementPlanRelease[]
+  questionSets                      QuestionSet[]
+  userAnswers                       UserAnswer[]
+  aiContextSummaries                AiContextSummary[]
+  aiProposalAudits                  AiProposalAudit[]
+  professionalAreaCompetences       ProfessionalAreaCompetence[]       @relation("ProfessionalAreaCompetence")
+  coachSpecializationCompetences    CoachSpecializationCompetence[]    @relation("CoachSpecializationCompetence")
+  coachUserLinks                    CoachUserLink[]                    @relation("CoachLinks")
+  athleteCoachLinks                 CoachUserLink[]                    @relation("AthleteCoachLinks")
+  approvedPlanItems                 PlanItem[]                         @relation("PlanItemApprovedBy")
+  approvedTrainingItems             TrainingPlanItem[]                 @relation("TrainingPlanItemApprovedBy")
+  questionSetApprovals              QuestionSetAreaApproval[]          @relation("QuestionSetAreaProfessional")
+  questionSetApprovalActors         QuestionSetAreaApproval[]          @relation("QuestionSetAreaApprovedBy")
+  trainingQuestionSetApprovals      TrainingQuestionSetCoachApproval[] @relation("TrainingQuestionSetCoach")
   trainingQuestionSetApprovalActors TrainingQuestionSetCoachApproval[] @relation("TrainingQuestionSetApprovedBy")
-  proposedPlanReleases        ImprovementPlanRelease[]     @relation("PlanReleaseProposedBy")
-  proposedTrainingReleases    TrainingPlanRelease[]        @relation("TrainingPlanReleaseProposedBy")
-  publishedPlanReleases       ImprovementPlanRelease[]     @relation("PlanReleasePublishedBy")
-  cycleAuditActors            CycleAuditLog[]              @relation("CycleAuditActor")
-  cycleAuditUsers             CycleAuditLog[]              @relation("CycleAuditUser")
-  createdAreaGenerationConfigs AiAreaGenerationConfig[]     @relation("AiAreaGenerationConfigCreatedBy")
-  updatedAreaGenerationConfigs AiAreaGenerationConfig[]     @relation("AiAreaGenerationConfigUpdatedBy")
-  createdOnboardingTemplates  OnboardingQuestionTemplate[] @relation("OnboardingTemplateCreatedBy")
-  updatedOnboardingTemplates  OnboardingQuestionTemplate[] @relation("OnboardingTemplateUpdatedBy")
-  createdGoalPromptConfigs    AiGoalPromptConfig[]         @relation("AiGoalPromptConfigCreatedBy")
-  updatedGoalPromptConfigs    AiGoalPromptConfig[]         @relation("AiGoalPromptConfigUpdatedBy")
-  createdSportSpecializationPrompts SportSpecializationAreaPrompt[] @relation("SportSpecializationPromptCreatedBy")
-  updatedSportSpecializationPrompts SportSpecializationAreaPrompt[] @relation("SportSpecializationPromptUpdatedBy")
-  createdAiPromptVersions      AiPromptVersion[]            @relation("AiPromptVersionCreatedBy")
-  createdAiPromptReplays      AiPromptReplay[]             @relation("AiPromptReplayCreatedBy")
-  createdAiGoldenContexts     AiGoldenContext[]            @relation("AiGoldenContextCreatedBy")
-  createdAiEvaluationRuns     AiEvaluationRun[]            @relation("AiEvaluationRunCreatedBy")
-  aiReplayFeedbacks           AiReplayFeedback[]           @relation("AiReplayFeedbackCreatedBy")
-  ratedAiEvaluationResults    AiEvaluationResult[]         @relation("AiEvaluationResultRatedBy")
-  subscriptions               Subscription[]
-  paymentCustomers            PaymentCustomer[]
+  proposedPlanReleases              ImprovementPlanRelease[]           @relation("PlanReleaseProposedBy")
+  proposedTrainingReleases          TrainingPlanRelease[]              @relation("TrainingPlanReleaseProposedBy")
+  publishedPlanReleases             ImprovementPlanRelease[]           @relation("PlanReleasePublishedBy")
+  cycleAuditActors                  CycleAuditLog[]                    @relation("CycleAuditActor")
+  cycleAuditUsers                   CycleAuditLog[]                    @relation("CycleAuditUser")
+  createdAreaGenerationConfigs      AiAreaGenerationConfig[]           @relation("AiAreaGenerationConfigCreatedBy")
+  updatedAreaGenerationConfigs      AiAreaGenerationConfig[]           @relation("AiAreaGenerationConfigUpdatedBy")
+  createdOnboardingTemplates        OnboardingQuestionTemplate[]       @relation("OnboardingTemplateCreatedBy")
+  updatedOnboardingTemplates        OnboardingQuestionTemplate[]       @relation("OnboardingTemplateUpdatedBy")
+  createdGoalPromptConfigs          AiGoalPromptConfig[]               @relation("AiGoalPromptConfigCreatedBy")
+  updatedGoalPromptConfigs          AiGoalPromptConfig[]               @relation("AiGoalPromptConfigUpdatedBy")
+  createdSportSpecializationPrompts SportSpecializationAreaPrompt[]    @relation("SportSpecializationPromptCreatedBy")
+  updatedSportSpecializationPrompts SportSpecializationAreaPrompt[]    @relation("SportSpecializationPromptUpdatedBy")
+  createdAiPromptVersions           AiPromptVersion[]                  @relation("AiPromptVersionCreatedBy")
+  createdAiPromptReplays            AiPromptReplay[]                   @relation("AiPromptReplayCreatedBy")
+  createdAiGoldenContexts           AiGoldenContext[]                  @relation("AiGoldenContextCreatedBy")
+  createdAiEvaluationRuns           AiEvaluationRun[]                  @relation("AiEvaluationRunCreatedBy")
+  aiReplayFeedbacks                 AiReplayFeedback[]                 @relation("AiReplayFeedbackCreatedBy")
+  ratedAiEvaluationResults          AiEvaluationResult[]               @relation("AiEvaluationResultRatedBy")
+  subscriptions                     Subscription[]
+  paymentCustomers                  PaymentCustomer[]
 }
 
 model AuthIdentity {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   userId        String
   provider      String
   subject       String
   email         String
-  emailVerified Boolean  @default(false)
+  emailVerified Boolean   @default(false)
   profileJson   Json?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   lastLoginAt   DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -208,42 +209,42 @@ model UserSportSelection {
 }
 
 model UserPerformanceGoal {
-  id                String    @id @default(uuid())
-  userId            String    @unique
-  goalText          String
-  interpretedGoal   String?
-  normalizedGoal    Json?
-  goalEvaluation    Json?
+  id                        String    @id @default(uuid())
+  userId                    String    @unique
+  goalText                  String
+  interpretedGoal           String?
+  normalizedGoal            Json?
+  goalEvaluation            Json?
   suggestedReformulatedGoal String?
-  questionsToUser   Json?
-  nextStep          String?
-  validationStatus  String    @default("PENDING")
-  validationMessage String?
-  rejectionReason   String?
-  frozenAt          DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  questionsToUser           Json?
+  nextStep                  String?
+  validationStatus          String    @default("PENDING")
+  validationMessage         String?
+  rejectionReason           String?
+  frozenAt                  DateTime?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
 
-  user User @relation(fields: [userId], references: [id])
+  user                   User                        @relation(fields: [userId], references: [id])
   areaPromptInstructions UserAreaPromptInstruction[]
 }
 
 model AiGoalPromptConfig {
-  id          String   @id @default(uuid())
-  name        String   @unique
-  basePrompt  String
-  version     Int      @default(1)
-  isActive    Boolean  @default(true)
-  activePromptVersionId String? @unique
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  createdById String?
-  updatedById String?
+  id                    String   @id @default(uuid())
+  name                  String   @unique
+  basePrompt            String
+  version               Int      @default(1)
+  isActive              Boolean  @default(true)
+  activePromptVersionId String?  @unique
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  createdById           String?
+  updatedById           String?
 
-  createdBy User? @relation("AiGoalPromptConfigCreatedBy", fields: [createdById], references: [id])
-  updatedBy User? @relation("AiGoalPromptConfigUpdatedBy", fields: [updatedById], references: [id])
-  activePromptVersion AiPromptVersion? @relation("AiGoalPromptConfigActiveVersion", fields: [activePromptVersionId], references: [id])
-  promptVersions AiPromptVersion[] @relation("AiGoalPromptConfigVersions")
+  createdBy           User?             @relation("AiGoalPromptConfigCreatedBy", fields: [createdById], references: [id])
+  updatedBy           User?             @relation("AiGoalPromptConfigUpdatedBy", fields: [updatedById], references: [id])
+  activePromptVersion AiPromptVersion?  @relation("AiGoalPromptConfigActiveVersion", fields: [activePromptVersionId], references: [id])
+  promptVersions      AiPromptVersion[] @relation("AiGoalPromptConfigVersions")
 
   @@index([isActive, version])
 }
@@ -273,22 +274,22 @@ model OnboardingQuestionTemplate {
 }
 
 model UserOnboardingQuestion {
-  id            String                @id @default(uuid())
+  id            String              @id @default(uuid())
   userId        String
   areaId        String
   text          String
   orderIndex    Int
-  inputType     OnboardingInputType   @default(SCORE)
+  inputType     OnboardingInputType @default(SCORE)
   optionsJson   Json?
   /// Domanda scritta dall'AI a scelta multipla: la risposta è un elenco di valori.
-  multiple      Boolean               @default(false)
+  multiple      Boolean             @default(false)
   provider      String
   model         String
   promptVersion String
   promptHash    String
   inputJson     Json
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   area Area @relation(fields: [areaId], references: [id], onDelete: Cascade)
@@ -311,13 +312,13 @@ model AiAreaGenerationConfig {
   createdById             String?
   updatedById             String?
 
-  area      Area  @relation(fields: [areaId], references: [id], onDelete: Cascade)
-  createdBy User? @relation("AiAreaGenerationConfigCreatedBy", fields: [createdById], references: [id])
-  updatedBy User? @relation("AiAreaGenerationConfigUpdatedBy", fields: [updatedById], references: [id])
-  activePromptVersion AiPromptVersion? @relation("AiAreaGenerationConfigActiveVersion", fields: [activePromptVersionId], references: [id])
-  promptVersions AiPromptVersion[] @relation("AiAreaGenerationConfigVersions")
-  replays   AiPromptReplay[]     @relation("AiPromptReplayAreaConfig")
-  evalResults AiEvaluationResult[] @relation("AiEvaluationResultAreaConfig")
+  area                Area                 @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  createdBy           User?                @relation("AiAreaGenerationConfigCreatedBy", fields: [createdById], references: [id])
+  updatedBy           User?                @relation("AiAreaGenerationConfigUpdatedBy", fields: [updatedById], references: [id])
+  activePromptVersion AiPromptVersion?     @relation("AiAreaGenerationConfigActiveVersion", fields: [activePromptVersionId], references: [id])
+  promptVersions      AiPromptVersion[]    @relation("AiAreaGenerationConfigVersions")
+  replays             AiPromptReplay[]     @relation("AiPromptReplayAreaConfig")
+  evalResults         AiEvaluationResult[] @relation("AiEvaluationResultAreaConfig")
 }
 
 model Sport {
@@ -333,53 +334,53 @@ model Sport {
 }
 
 model SportSpecialization {
-  id                    String   @id @default(uuid())
-  sportId               String
-  key                   String
-  label                 String
-  trainingPrompt        String?
-  trainingPromptVersion Int      @default(1)
-  trainingPromptActive  Boolean  @default(true)
-  activeTrainingPromptVersionId String? @unique
-  isActive              Boolean  @default(true)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                            String   @id @default(uuid())
+  sportId                       String
+  key                           String
+  label                         String
+  trainingPrompt                String?
+  trainingPromptVersion         Int      @default(1)
+  trainingPromptActive          Boolean  @default(true)
+  activeTrainingPromptVersionId String?  @unique
+  isActive                      Boolean  @default(true)
+  createdAt                     DateTime @default(now())
+  updatedAt                     DateTime @updatedAt
 
-  sport      Sport                           @relation(fields: [sportId], references: [id], onDelete: Cascade)
-  prompts    SportSpecializationAreaPrompt[]
-  activeTrainingPromptVersion AiPromptVersion? @relation("SportSpecializationActiveTrainingPromptVersion", fields: [activeTrainingPromptVersionId], references: [id])
-  trainingPromptVersions AiPromptVersion[] @relation("SportSpecializationTrainingPromptVersions")
-  selections UserSportSelection[]
-  coachCompetences CoachSpecializationCompetence[]
-  coachLinks        CoachUserLink[]
-  trainingPlanReleases TrainingPlanRelease[]
-  trainingQuestionSets TrainingQuestionSet[]
+  sport                       Sport                           @relation(fields: [sportId], references: [id], onDelete: Cascade)
+  prompts                     SportSpecializationAreaPrompt[]
+  activeTrainingPromptVersion AiPromptVersion?                @relation("SportSpecializationActiveTrainingPromptVersion", fields: [activeTrainingPromptVersionId], references: [id])
+  trainingPromptVersions      AiPromptVersion[]               @relation("SportSpecializationTrainingPromptVersions")
+  selections                  UserSportSelection[]
+  coachCompetences            CoachSpecializationCompetence[]
+  coachLinks                  CoachUserLink[]
+  trainingPlanReleases        TrainingPlanRelease[]
+  trainingQuestionSets        TrainingQuestionSet[]
 
   @@unique([sportId, key])
   @@index([sportId, isActive])
 }
 
 model SportSpecializationAreaPrompt {
-  id               String   @id @default(uuid())
-  specializationId String
-  areaId           String
-  basePrompt       String
-  isEnabledDriver  Boolean  @default(true)
-  isScheduled      Boolean  @default(false)
-  version          Int      @default(1)
-  isActive         Boolean  @default(true)
-  activePromptVersionId String? @unique
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  createdById      String?
-  updatedById      String?
+  id                    String   @id @default(uuid())
+  specializationId      String
+  areaId                String
+  basePrompt            String
+  isEnabledDriver       Boolean  @default(true)
+  isScheduled           Boolean  @default(false)
+  version               Int      @default(1)
+  isActive              Boolean  @default(true)
+  activePromptVersionId String?  @unique
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  createdById           String?
+  updatedById           String?
 
-  specialization SportSpecialization @relation(fields: [specializationId], references: [id], onDelete: Cascade)
-  area           Area                @relation(fields: [areaId], references: [id], onDelete: Cascade)
-  createdBy      User?               @relation("SportSpecializationPromptCreatedBy", fields: [createdById], references: [id])
-  updatedBy      User?               @relation("SportSpecializationPromptUpdatedBy", fields: [updatedById], references: [id])
-  activePromptVersion AiPromptVersion? @relation("SportSpecializationAreaPromptActiveVersion", fields: [activePromptVersionId], references: [id])
-  promptVersions AiPromptVersion[] @relation("SportSpecializationAreaPromptVersions")
+  specialization      SportSpecialization @relation(fields: [specializationId], references: [id], onDelete: Cascade)
+  area                Area                @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  createdBy           User?               @relation("SportSpecializationPromptCreatedBy", fields: [createdById], references: [id])
+  updatedBy           User?               @relation("SportSpecializationPromptUpdatedBy", fields: [updatedById], references: [id])
+  activePromptVersion AiPromptVersion?    @relation("SportSpecializationAreaPromptActiveVersion", fields: [activePromptVersionId], references: [id])
+  promptVersions      AiPromptVersion[]   @relation("SportSpecializationAreaPromptVersions")
 
   @@unique([specializationId, areaId])
   @@index([specializationId, isActive])
@@ -399,18 +400,18 @@ model AiPromptVersion {
   sportSpecializationId           String?
   assessmentPromptConfigId        String?
 
-  createdBy User? @relation("AiPromptVersionCreatedBy", fields: [createdById], references: [id])
-  goalPromptConfig AiGoalPromptConfig? @relation("AiGoalPromptConfigVersions", fields: [goalPromptConfigId], references: [id], onDelete: Cascade)
-  activeForGoalPromptConfig AiGoalPromptConfig? @relation("AiGoalPromptConfigActiveVersion")
-  areaGenerationConfig AiAreaGenerationConfig? @relation("AiAreaGenerationConfigVersions", fields: [areaGenerationConfigId], references: [id], onDelete: Cascade)
-  activeForAreaGenerationConfig AiAreaGenerationConfig? @relation("AiAreaGenerationConfigActiveVersion")
-  sportSpecializationAreaPrompt SportSpecializationAreaPrompt? @relation("SportSpecializationAreaPromptVersions", fields: [sportSpecializationAreaPromptId], references: [id], onDelete: Cascade)
-  activeForSportSpecializationAreaPrompt SportSpecializationAreaPrompt? @relation("SportSpecializationAreaPromptActiveVersion")
-  sportSpecialization SportSpecialization? @relation("SportSpecializationTrainingPromptVersions", fields: [sportSpecializationId], references: [id], onDelete: Cascade)
-  activeForSportSpecializationTrainingPrompt SportSpecialization? @relation("SportSpecializationActiveTrainingPromptVersion")
-  assessmentPromptConfig AiAssessmentPromptConfig? @relation("AiAssessmentPromptConfigVersions", fields: [assessmentPromptConfigId], references: [id], onDelete: Cascade)
-  activeForAssessmentPromptConfig AiAssessmentPromptConfig? @relation("AiAssessmentPromptConfigActiveVersion")
-  assessmentEvaluations AssessmentEvaluation[]
+  createdBy                                  User?                          @relation("AiPromptVersionCreatedBy", fields: [createdById], references: [id])
+  goalPromptConfig                           AiGoalPromptConfig?            @relation("AiGoalPromptConfigVersions", fields: [goalPromptConfigId], references: [id], onDelete: Cascade)
+  activeForGoalPromptConfig                  AiGoalPromptConfig?            @relation("AiGoalPromptConfigActiveVersion")
+  areaGenerationConfig                       AiAreaGenerationConfig?        @relation("AiAreaGenerationConfigVersions", fields: [areaGenerationConfigId], references: [id], onDelete: Cascade)
+  activeForAreaGenerationConfig              AiAreaGenerationConfig?        @relation("AiAreaGenerationConfigActiveVersion")
+  sportSpecializationAreaPrompt              SportSpecializationAreaPrompt? @relation("SportSpecializationAreaPromptVersions", fields: [sportSpecializationAreaPromptId], references: [id], onDelete: Cascade)
+  activeForSportSpecializationAreaPrompt     SportSpecializationAreaPrompt? @relation("SportSpecializationAreaPromptActiveVersion")
+  sportSpecialization                        SportSpecialization?           @relation("SportSpecializationTrainingPromptVersions", fields: [sportSpecializationId], references: [id], onDelete: Cascade)
+  activeForSportSpecializationTrainingPrompt SportSpecialization?           @relation("SportSpecializationActiveTrainingPromptVersion")
+  assessmentPromptConfig                     AiAssessmentPromptConfig?      @relation("AiAssessmentPromptConfigVersions", fields: [assessmentPromptConfigId], references: [id], onDelete: Cascade)
+  activeForAssessmentPromptConfig            AiAssessmentPromptConfig?      @relation("AiAssessmentPromptConfigActiveVersion")
+  assessmentEvaluations                      AssessmentEvaluation[]
 
   @@unique([goalPromptConfigId, version])
   @@unique([areaGenerationConfigId, version])
@@ -435,8 +436,8 @@ model UserAreaPromptInstruction {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  user User @relation(fields: [userId], references: [id])
-  area Area @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  user User                @relation(fields: [userId], references: [id])
+  area Area                @relation(fields: [areaId], references: [id], onDelete: Cascade)
   goal UserPerformanceGoal @relation(fields: [goalId], references: [id], onDelete: Cascade)
 
   @@unique([userId, areaId])
@@ -476,9 +477,9 @@ model ProfessionalUserLink {
 
 model Area {
   abilityPlanOperations AbilityPlanOperation[]
-  areaSessions AreaSession[]
-  id   String @id @default(uuid())
-  name String @unique
+  areaSessions          AreaSession[]
+  id                    String                 @id @default(uuid())
+  name                  String                 @unique
 
   feedbackEntries FeedbackEntry[]
   contents        GuidanceContent[]
@@ -518,17 +519,17 @@ model FeedbackEntry {
 }
 
 model Consent {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   userId        String
   type          String
-  version       String   @default("v1")
+  version       String    @default("v1")
   documentTitle String?
   documentHash  String?
   documentBody  Json?
   ipAddress     String?
   userAgent     String?
   source        String?
-  grantedAt     DateTime @default(now())
+  grantedAt     DateTime  @default(now())
   withdrawnAt   DateTime?
 
   user User @relation(fields: [userId], references: [id])
@@ -628,9 +629,9 @@ model PerformanceProfileSnapshot {
   reason        String
   createdAt     DateTime @default(now())
 
-  user         User                             @relation(fields: [userId], references: [id])
-  areas        PerformanceProfileSnapshotArea[]
-  planReleases ImprovementPlanRelease[]
+  user                 User                             @relation(fields: [userId], references: [id])
+  areas                PerformanceProfileSnapshotArea[]
+  planReleases         ImprovementPlanRelease[]
   trainingPlanReleases TrainingPlanRelease[]
 }
 
@@ -649,23 +650,23 @@ model PerformanceProfileSnapshotArea {
 }
 
 model ImprovementPlanRelease {
-  abilityOperation AbilityPlanOperation?
-  approvalSource String?
-  approvedAt DateTime?
-  startsOn DateTime? @db.Date
-  endsOn DateTime? @db.Date
-  windowDays Int?
+  abilityOperation  AbilityPlanOperation?
+  approvalSource    String?
+  approvedAt        DateTime?
+  startsOn          DateTime?             @db.Date
+  endsOn            DateTime?             @db.Date
+  windowDays        Int?
   trainingReleaseId String?
-  trainingRelease TrainingPlanRelease? @relation("AreaScheduleWindow", fields: [trainingReleaseId], references: [id], onDelete: SetNull)
-  sessions AreaSession[]
-  id          String      @id @default(uuid())
-  userId      String
-  areaId      String
-  version     Int
-  status      String      @default("PENDING_APPROVAL")
-  generatedBy String      @default("AI")
-  createdAt   DateTime    @default(now())
-  cycleStatus CycleStatus @default(PROPOSED)
+  trainingRelease   TrainingPlanRelease?  @relation("AreaScheduleWindow", fields: [trainingReleaseId], references: [id], onDelete: SetNull)
+  sessions          AreaSession[]
+  id                String                @id @default(uuid())
+  userId            String
+  areaId            String
+  version           Int
+  status            String                @default("PENDING_APPROVAL")
+  generatedBy       String                @default("AI")
+  createdAt         DateTime              @default(now())
+  cycleStatus       CycleStatus           @default(PROPOSED)
 
   sourceSnapshotId String?
   sourceSnapshot   PerformanceProfileSnapshot? @relation(fields: [sourceSnapshotId], references: [id])
@@ -690,69 +691,70 @@ model ImprovementPlanRelease {
 }
 
 model TrainingLifecycleOperation {
-  id String @id @default(uuid())
-  userId String
-  generationKey String @unique
-  previousReleaseId String? @unique
-  releaseId String? @unique
-  approvalMode String @default("AUTO")
-  requestedById String?
-  createdAt DateTime @default(now())
-  completedAt DateTime?
-  leaseToken String?
-  leaseUntil DateTime?
-  attempts Int @default(0)
-  nextAttemptAt DateTime @default(now())
-  lastErrorCode String?
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  release TrainingPlanRelease? @relation("LifecycleResult", fields: [releaseId], references: [id], onDelete: SetNull)
-  previousRelease TrainingPlanRelease? @relation("LifecyclePrevious", fields: [previousReleaseId], references: [id], onDelete: Cascade)
-  auditLogs CycleAuditLog[]
+  id                String               @id @default(uuid())
+  userId            String
+  generationKey     String               @unique
+  previousReleaseId String?              @unique
+  releaseId         String?              @unique
+  approvalMode      String               @default("AUTO")
+  requestedById     String?
+  createdAt         DateTime             @default(now())
+  completedAt       DateTime?
+  leaseToken        String?
+  leaseUntil        DateTime?
+  attempts          Int                  @default(0)
+  nextAttemptAt     DateTime             @default(now())
+  lastErrorCode     String?
+  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  release           TrainingPlanRelease? @relation("LifecycleResult", fields: [releaseId], references: [id], onDelete: SetNull)
+  previousRelease   TrainingPlanRelease? @relation("LifecyclePrevious", fields: [previousReleaseId], references: [id], onDelete: Cascade)
+  auditLogs         CycleAuditLog[]
+
   @@index([completedAt, nextAttemptAt, leaseUntil])
 }
 
 model TrainingPlanRelease {
-  startsOn DateTime? @db.Date
-  endsOn DateTime? @db.Date
-  windowDays Int @default(14)
-  lifecycleManaged Boolean @default(false)
-  approvalMode String @default("MANUAL")
-  approvalSource String?
-  approvedAt DateTime?
-  sessionApprovalMode String @default("INHERIT_PLAN")
-  previousReleaseId String? @unique
-  previousRelease TrainingPlanRelease? @relation("TrainingSequence", fields: [previousReleaseId], references: [id], onDelete: SetNull)
-  nextRelease TrainingPlanRelease? @relation("TrainingSequence")
-  lifecycleOperation TrainingLifecycleOperation? @relation("LifecycleResult")
+  startsOn              DateTime?                   @db.Date
+  endsOn                DateTime?                   @db.Date
+  windowDays            Int                         @default(14)
+  lifecycleManaged      Boolean                     @default(false)
+  approvalMode          String                      @default("MANUAL")
+  approvalSource        String?
+  approvedAt            DateTime?
+  sessionApprovalMode   String                      @default("INHERIT_PLAN")
+  previousReleaseId     String?                     @unique
+  previousRelease       TrainingPlanRelease?        @relation("TrainingSequence", fields: [previousReleaseId], references: [id], onDelete: SetNull)
+  nextRelease           TrainingPlanRelease?        @relation("TrainingSequence")
+  lifecycleOperation    TrainingLifecycleOperation? @relation("LifecycleResult")
   continuationOperation TrainingLifecycleOperation? @relation("LifecyclePrevious")
-  auditLogs CycleAuditLog[]
-  id               String   @id @default(uuid())
-  userId           String
-  version          Int
-  status           String   @default("PENDING_APPROVAL")
-  cycleStatus      CycleStatus @default(WAITING_APPROVALS)
-  generatedBy      String   @default("AI")
-  summaryText      String
-  outputJson       Json
-  provider         String
-  model            String
-  promptVersion    String
-  promptHash       String
-  createdAt        DateTime @default(now())
-  publishedAt      DateTime?
-  archivedAt       DateTime?
-  sourceSnapshotId String?
-  proposedByAdminId String?
-  specializationId String
+  auditLogs             CycleAuditLog[]
+  id                    String                      @id @default(uuid())
+  userId                String
+  version               Int
+  status                String                      @default("PENDING_APPROVAL")
+  cycleStatus           CycleStatus                 @default(WAITING_APPROVALS)
+  generatedBy           String                      @default("AI")
+  summaryText           String
+  outputJson            Json
+  provider              String
+  model                 String
+  promptVersion         String
+  promptHash            String
+  createdAt             DateTime                    @default(now())
+  publishedAt           DateTime?
+  archivedAt            DateTime?
+  sourceSnapshotId      String?
+  proposedByAdminId     String?
+  specializationId      String
 
-  user           User                       @relation(fields: [userId], references: [id])
+  user           User                        @relation(fields: [userId], references: [id])
   sourceSnapshot PerformanceProfileSnapshot? @relation(fields: [sourceSnapshotId], references: [id])
-  proposedBy     User?                      @relation("TrainingPlanReleaseProposedBy", fields: [proposedByAdminId], references: [id])
-  specialization SportSpecialization        @relation(fields: [specializationId], references: [id])
+  proposedBy     User?                       @relation("TrainingPlanReleaseProposedBy", fields: [proposedByAdminId], references: [id])
+  specialization SportSpecialization         @relation(fields: [specializationId], references: [id])
   sessions       TrainingSession[]
   items          TrainingPlanItem[]
   questionSets   TrainingQuestionSet[]
-  areaSchedules  ImprovementPlanRelease[] @relation("AreaScheduleWindow")
+  areaSchedules  ImprovementPlanRelease[]    @relation("AreaScheduleWindow")
 
   @@unique([userId, version])
   @@index([userId, status, createdAt])
@@ -766,32 +768,33 @@ enum TrainingSessionStatus {
 }
 
 model TrainingSession {
-  id String @id @default(uuid())
-  userId String
+  id                    String                @id @default(uuid())
+  userId                String
   trainingPlanReleaseId String
-  trainingPlanItemId String
-  scheduledDate DateTime @db.Date
-  sequence Int
-  status TrainingSessionStatus @default(SCHEDULED)
-  completedAt DateTime?
-  skippedAt DateTime?
-  completionNotes String?
-  completionRating Int?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user User @relation(fields: [userId], references: [id])
-  trainingPlanRelease TrainingPlanRelease @relation(fields: [trainingPlanReleaseId], references: [id], onDelete: Cascade)
-  trainingPlanItem TrainingPlanItem @relation(fields: [trainingPlanItemId], references: [id], onDelete: Cascade)
+  trainingPlanItemId    String
+  scheduledDate         DateTime              @db.Date
+  sequence              Int
+  status                TrainingSessionStatus @default(SCHEDULED)
+  completedAt           DateTime?
+  skippedAt             DateTime?
+  completionNotes       String?
+  completionRating      Int?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  user                  User                  @relation(fields: [userId], references: [id])
+  trainingPlanRelease   TrainingPlanRelease   @relation(fields: [trainingPlanReleaseId], references: [id], onDelete: Cascade)
+  trainingPlanItem      TrainingPlanItem      @relation(fields: [trainingPlanItemId], references: [id], onDelete: Cascade)
+
   @@unique([trainingPlanReleaseId, trainingPlanItemId])
   @@index([userId, scheduledDate])
   @@index([trainingPlanReleaseId, scheduledDate])
 }
 
 model TrainingPlanItem {
-  approvalSource String?
-  orderIndex Int @default(0)
-  sessions TrainingSession[]
-  id                    String @id @default(uuid())
+  approvalSource        String?
+  orderIndex            Int               @default(0)
+  sessions              TrainingSession[]
+  id                    String            @id @default(uuid())
   trainingPlanReleaseId String
 
   type     String
@@ -826,9 +829,9 @@ model TrainingQuestionSet {
   publishedAt DateTime?
   closedAt    DateTime?
 
-  trainingPlanRelease TrainingPlanRelease @relation(fields: [trainingPlanReleaseId], references: [id], onDelete: Cascade)
-  user                User                @relation(fields: [userId], references: [id])
-  specialization      SportSpecialization @relation(fields: [specializationId], references: [id])
+  trainingPlanRelease TrainingPlanRelease                @relation(fields: [trainingPlanReleaseId], references: [id], onDelete: Cascade)
+  user                User                               @relation(fields: [userId], references: [id])
+  specialization      SportSpecialization                @relation(fields: [specializationId], references: [id])
   questions           TrainingQuestion[]
   approvals           TrainingQuestionSetCoachApproval[]
 
@@ -843,7 +846,7 @@ model TrainingQuestion {
   objectiveRef String?
   orderIndex   Int
 
-  questionSet TrainingQuestionSet @relation(fields: [trainingQuestionSetId], references: [id], onDelete: Cascade)
+  questionSet TrainingQuestionSet    @relation(fields: [trainingQuestionSetId], references: [id], onDelete: Cascade)
   options     TrainingAnswerOption[]
   answers     TrainingUserAnswer[]
 }
@@ -855,7 +858,7 @@ model TrainingAnswerOption {
   label String
   score Float
 
-  question TrainingQuestion @relation(fields: [trainingQuestionId], references: [id], onDelete: Cascade)
+  question TrainingQuestion     @relation(fields: [trainingQuestionId], references: [id], onDelete: Cascade)
   answers  TrainingUserAnswer[]
 }
 
@@ -874,15 +877,15 @@ model TrainingUserAnswer {
 }
 
 model TrainingQuestionSetCoachApproval {
-  approvalSource String?
-  id                String    @id @default(uuid())
+  approvalSource        String?
+  id                    String    @id @default(uuid())
   trainingQuestionSetId String
-  coachId           String
-  status            String    @default("PENDING")
-  approvedByCoachId String?
-  approvedAt        DateTime?
-  rejectedAt        DateTime?
-  rejectionReason   String?
+  coachId               String
+  status                String    @default("PENDING")
+  approvedByCoachId     String?
+  approvedAt            DateTime?
+  rejectedAt            DateTime?
+  rejectionReason       String?
 
   questionSet TrainingQuestionSet @relation(fields: [trainingQuestionSetId], references: [id], onDelete: Cascade)
   coach       User                @relation("TrainingQuestionSetCoach", fields: [coachId], references: [id])
@@ -906,7 +909,7 @@ model CoachSpecializationCompetence {
 }
 
 model CoachUserLink {
-  id               String @id @default(uuid())
+  id               String   @id @default(uuid())
   coachId          String
   userId           String
   specializationId String
@@ -947,24 +950,25 @@ model PlanItem {
 
 /// Occorrenze datate delle attivita di un'area schedulata, gemelle di TrainingSession.
 model AreaSession {
-  id String @id @default(uuid())
-  userId String
-  planReleaseId String
-  planItemId String
-  areaId String
-  scheduledDate DateTime @db.Date
-  sequence Int
-  status TrainingSessionStatus @default(SCHEDULED)
-  completedAt DateTime?
-  skippedAt DateTime?
-  completionNotes String?
+  id               String                 @id @default(uuid())
+  userId           String
+  planReleaseId    String
+  planItemId       String
+  areaId           String
+  scheduledDate    DateTime               @db.Date
+  sequence         Int
+  status           TrainingSessionStatus  @default(SCHEDULED)
+  completedAt      DateTime?
+  skippedAt        DateTime?
+  completionNotes  String?
   completionRating Int?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user User @relation(fields: [userId], references: [id])
-  planRelease ImprovementPlanRelease @relation(fields: [planReleaseId], references: [id], onDelete: Cascade)
-  planItem PlanItem @relation(fields: [planItemId], references: [id], onDelete: Cascade)
-  area Area @relation(fields: [areaId], references: [id])
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  user             User                   @relation(fields: [userId], references: [id])
+  planRelease      ImprovementPlanRelease @relation(fields: [planReleaseId], references: [id], onDelete: Cascade)
+  planItem         PlanItem               @relation(fields: [planItemId], references: [id], onDelete: Cascade)
+  area             Area                   @relation(fields: [areaId], references: [id])
+
   @@unique([planReleaseId, planItemId])
   @@index([userId, scheduledDate])
   @@index([planReleaseId, scheduledDate])
@@ -1136,18 +1140,18 @@ model PerformanceScaleConfig {
 
 model CycleAuditLog {
   trainingPlanReleaseId String?
-  operationId String?
-  coachId String?
-  source String @default("USER")
-  metadata Json?
-  trainingPlanRelease TrainingPlanRelease? @relation(fields: [trainingPlanReleaseId], references: [id], onDelete: Cascade)
-  operation TrainingLifecycleOperation? @relation(fields: [operationId], references: [id], onDelete: SetNull)
-  id            String   @id @default(uuid())
-  userId        String
-  planReleaseId String?
-  action        String
-  actorId       String?
-  createdAt     DateTime @default(now())
+  operationId           String?
+  coachId               String?
+  source                String                      @default("USER")
+  metadata              Json?
+  trainingPlanRelease   TrainingPlanRelease?        @relation(fields: [trainingPlanReleaseId], references: [id], onDelete: Cascade)
+  operation             TrainingLifecycleOperation? @relation(fields: [operationId], references: [id], onDelete: SetNull)
+  id                    String                      @id @default(uuid())
+  userId                String
+  planReleaseId         String?
+  action                String
+  actorId               String?
+  createdAt             DateTime                    @default(now())
 
   user        User                    @relation("CycleAuditUser", fields: [userId], references: [id])
   planRelease ImprovementPlanRelease? @relation(fields: [planReleaseId], references: [id])
@@ -1169,24 +1173,24 @@ model ProfessionalAreaCompetence {
 }
 
 model AiPromptReplay {
-  id                          String   @id @default(uuid())
-  sourceAuditId               String
-  areaConfigId                String?
-  createdById                 String
-  initialContextOverride      String?
-  responseFormatOverride      String?
-  status                      String
-  input                       Json?
-  output                      Json?
-  errorMessage                String?
-  inputTokens                 Int?
-  outputTokens                Int?
-  totalTokens                 Int?
-  durationMs                  Int?
-  provider                    String
-  model                       String
-  correlationId               String?
-  createdAt                   DateTime @default(now())
+  id                     String   @id @default(uuid())
+  sourceAuditId          String
+  areaConfigId           String?
+  createdById            String
+  initialContextOverride String?
+  responseFormatOverride String?
+  status                 String
+  input                  Json?
+  output                 Json?
+  errorMessage           String?
+  inputTokens            Int?
+  outputTokens           Int?
+  totalTokens            Int?
+  durationMs             Int?
+  provider               String
+  model                  String
+  correlationId          String?
+  createdAt              DateTime @default(now())
 
   sourceAudit AiProposalAudit         @relation(fields: [sourceAuditId], references: [id], onDelete: Cascade)
   areaConfig  AiAreaGenerationConfig? @relation("AiPromptReplayAreaConfig", fields: [areaConfigId], references: [id])
@@ -1254,14 +1258,14 @@ model AiEvaluationRun {
 }
 
 model AiEvaluationResult {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   runId             String
   goldenContextId   String
   areaConfigId      String?
   variantLabel      String
   status            String
-  provider          String   @default("unknown")
-  model             String   @default("unknown")
+  provider          String    @default("unknown")
+  model             String    @default("unknown")
   input             Json?
   output            Json?
   errorMessage      String?
@@ -1278,7 +1282,7 @@ model AiEvaluationResult {
   notes             String?
   ratedById         String?
   ratedAt           DateTime?
-  createdAt         DateTime @default(now())
+  createdAt         DateTime  @default(now())
 
   run           AiEvaluationRun         @relation(fields: [runId], references: [id], onDelete: Cascade)
   goldenContext AiGoldenContext         @relation(fields: [goldenContextId], references: [id], onDelete: Cascade)
@@ -1290,29 +1294,29 @@ model AiEvaluationResult {
 }
 
 model AthleteDiscovery {
-  userId String @id
-  version BigInt
-  draft Json
-  configuration Json
-  phase String @default("CONSENTS")
-  assessmentAnswers Json @default("{}")
-  currentQuestion Int @default(0)
-  operationAt DateTime?
-  baselineId String?
+  userId               String          @id
+  version              BigInt
+  draft                Json
+  configuration        Json
+  phase                String          @default("CONSENTS")
+  assessmentAnswers    Json            @default("{}")
+  currentQuestion      Int             @default(0)
+  operationAt          DateTime?
+  baselineId           String?
   programDurationWeeks Int?
-  durationSelectedAt DateTime?
+  durationSelectedAt   DateTime?
   /// Orizzonte scelto dopo il reveal di P3/P6/P12 (Blueprint A5): 3, 6 o 12 mesi.
-  programHorizon ProgramHorizon?
-  horizonSelectedAt DateTime?
+  programHorizon       ProgramHorizon?
+  horizonSelectedAt    DateTime?
   /// ACTIVATED (A10, PF-FS-PREPAYWALL §7.3): R consolidata, P e gap mostrati.
-  activatedAt DateTime?
+  activatedAt          DateTime?
   /// Prima apertura del paywall, dopo la scelta dell'orizzonte.
-  paywallViewedAt DateTime?
+  paywallViewedAt      DateTime?
   /// Fine della sequenza di benvenuto (foto, Spider, regalo, installazione app):
   /// lato server perché su iOS l'app installata non condivide lo storage con Safari.
-  welcomeCompletedAt DateTime?
-  createdAt DateTime @default(now())
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  welcomeCompletedAt   DateTime?
+  createdAt            DateTime        @default(now())
+  user                 User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 /// Bozza anonima del Quiz Funnel (PF-FS-PREPAYWALL F1, AT-04): salvata lato
@@ -1334,24 +1338,25 @@ model QuizDraft {
 }
 
 model AbilityPlanOperation {
-  id String @id @default(uuid())
-  userId String
-  areaId String
-  generationKey String @unique
-  releaseId String? @unique
+  id                String                  @id @default(uuid())
+  userId            String
+  areaId            String
+  generationKey     String                  @unique
+  releaseId         String?                 @unique
   trainingReleaseId String?
-  approvalMode String @default("AUTO")
-  requestedById String?
-  createdAt DateTime @default(now())
-  completedAt DateTime?
-  leaseToken String?
-  leaseUntil DateTime?
-  attempts Int @default(0)
-  nextAttemptAt DateTime @default(now())
-  lastErrorCode String?
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  area Area @relation(fields: [areaId], references: [id], onDelete: Cascade)
-  release ImprovementPlanRelease? @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+  approvalMode      String                  @default("AUTO")
+  requestedById     String?
+  createdAt         DateTime                @default(now())
+  completedAt       DateTime?
+  leaseToken        String?
+  leaseUntil        DateTime?
+  attempts          Int                     @default(0)
+  nextAttemptAt     DateTime                @default(now())
+  lastErrorCode     String?
+  user              User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  area              Area                    @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  release           ImprovementPlanRelease? @relation(fields: [releaseId], references: [id], onDelete: SetNull)
+
   @@index([completedAt, nextAttemptAt, leaseUntil])
   @@index([userId, areaId])
 }
@@ -1371,7 +1376,7 @@ model AiAssessmentPromptConfig {
   updatedById           String?
 
   /// EVALUATION valuta le risposte (R e confidence); CALIBRATION scrive le domande dei round; MICRO_TEST i micro-test su misura.
-  kind                  String   @default("EVALUATION")
+  kind String @default("EVALUATION")
 
   activePromptVersion AiPromptVersion?  @relation("AiAssessmentPromptConfigActiveVersion", fields: [activePromptVersionId], references: [id])
   promptVersions      AiPromptVersion[] @relation("AiAssessmentPromptConfigVersions")
@@ -1383,39 +1388,39 @@ model AiAssessmentPromptConfig {
 /// Prima valutazione dell'assessment: R provvisoria per driver con confidence, mai P.
 /// Ogni valutazione conserva fonte, versione del prompt, input e output validati.
 model AssessmentEvaluation {
-  id                String   @id @default(uuid())
-  userId            String
+  id                    String   @id @default(uuid())
+  userId                String
   /// 1 = prima valutazione dell'assessment; le successive incrementano. Unico per atleta.
-  sequence          Int      @default(1)
-  status            String   @default("PROVISIONAL")
-  source            String   @default("SELF_ASSESSMENT")
-  summary           String
-  overallConfidence Int
+  sequence              Int      @default(1)
+  status                String   @default("PROVISIONAL")
+  source                String   @default("SELF_ASSESSMENT")
+  summary               String
+  overallConfidence     Int
   /// Livello stimato (A2.5): BEGINNER, INTERMEDIATE, ADVANCED, COMPETITIVE, PRO. Assente nelle valutazioni precedenti.
-  level             String?
-  levelConfidence   Int?
-  minScore          Float
-  maxScore          Float
-  provider          String
-  model             String
-  promptVersionId   String?
-  promptHash        String
-  inputJson         Json
-  outputJson        Json
-  latencyMs         Int?
+  level                 String?
+  levelConfidence       Int?
+  minScore              Float
+  maxScore              Float
+  provider              String
+  model                 String
+  promptVersionId       String?
+  promptHash            String
+  inputJson             Json
+  outputJson            Json
+  latencyMs             Int?
   /// Versione della regola di consolidamento applicata dopo questa valutazione.
   consolidationPolicyId String?
-  createdAt         DateTime @default(now())
+  createdAt             DateTime @default(now())
 
-  user          User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  promptVersion AiPromptVersion?           @relation(fields: [promptVersionId], references: [id], onDelete: SetNull)
-  consolidationPolicy ConfidencePolicy?    @relation(fields: [consolidationPolicyId], references: [id], onDelete: Restrict)
-  areas         AssessmentEvaluationArea[]
-  round         CalibrationRound?
-  scenarios     PotentialScenario[]
+  user                 User                       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  promptVersion        AiPromptVersion?           @relation(fields: [promptVersionId], references: [id], onDelete: SetNull)
+  consolidationPolicy  ConfidencePolicy?          @relation(fields: [consolidationPolicyId], references: [id], onDelete: Restrict)
+  areas                AssessmentEvaluationArea[]
+  round                CalibrationRound?
+  scenarios            PotentialScenario[]
   microTestGenerations MicroTestGeneration[]
-  lessonSeats   FreeLessonSeat[]
-  anomalies     AssessmentAnomaly[]
+  lessonSeats          FreeLessonSeat[]
+  anomalies            AssessmentAnomaly[]
 
   @@unique([userId, sequence])
   @@index([userId, createdAt])
@@ -1451,15 +1456,15 @@ model PotentialScenario {
 }
 
 model AssessmentEvaluationArea {
-  id            String @id @default(uuid())
-  evaluationId  String
-  areaId        String
-  score         Float
-  confidence    Int
-  rationale     String
-  evidenceGaps  Json
+  id           String  @id @default(uuid())
+  evaluationId String
+  areaId       String
+  score        Float
+  confidence   Int
+  rationale    String
+  evidenceGaps Json
   /// Commitment profile dell'area (A2.2): LOW, MEDIUM, HIGH o UNKNOWN.
-  commitment    String?
+  commitment   String?
 
   evaluation AssessmentEvaluation @relation(fields: [evaluationId], references: [id], onDelete: Cascade)
   area       Area                 @relation(fields: [areaId], references: [id])
@@ -1599,36 +1604,36 @@ model PaymentEvent {
 
 /// Circolo o partner territoriale attribuibile (Index, A2.11, A5.11-A5.13).
 model Partner {
-  id        String   @id @default(uuid())
-  kind      String   @default("CLUB")
+  id                 String    @id @default(uuid())
+  kind               String    @default("CLUB")
   /// Codice usato nei link e nei QR (?club=codice), minuscolo.
-  code      String   @unique
-  name      String
-  city      String?
+  code               String    @unique
+  name               String
+  city               String?
   /// Sigla della provincia, due lettere maiuscole (es. CH, AQ, PE, TE).
-  province  String?
-  address   String?
-  postalCode String?
+  province           String?
+  address            String?
+  postalCode         String?
   /// Sito ufficiale o pagina social del circolo.
-  website   String?
+  website            String?
   /// Coordinate della sede, risolte dall'indirizzo: servono per dire
   /// all'atleta quanto dista il circolo. Nulle se non risolte.
-  latitude  Float?
-  longitude Float?
-  geocodedAt DateTime?
+  latitude           Float?
+  longitude          Float?
+  geocodedAt         DateTime?
   /// Place ID Google della sede, se le coordinate vengono da Google: con esso
   /// si rinnovano prima dei 30 giorni. Nullo con coordinate Nominatim.
-  placeId   String?
-  isActive  Boolean  @default(true)
+  placeId            String?
+  isActive           Boolean   @default(true)
   /// Il circolo offre la lezione gratuita di gruppo (A4.8, A7.2); spento di default.
-  freeLessonsEnabled Boolean @default(false)
+  freeLessonsEnabled Boolean   @default(false)
   /// Logo e foto del circolo per il carosello del regalo: data URL PNG, JPEG o WebP già ridimensionati dal back office.
-  logoImage      String?
-  logoUpdatedAt  DateTime?
-  photoImage     String?
-  photoUpdatedAt DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  logoImage          String?
+  logoUpdatedAt      DateTime?
+  photoImage         String?
+  photoUpdatedAt     DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   attributions UserAttribution[]
   freeLessons  FreeLesson[]
@@ -1638,7 +1643,7 @@ model Partner {
 /// Indirizzo dell'atleta: senza di esso non si puo dire quanto dista un
 /// circolo dalla lezione gratuita (A4.8). Lo scrive e lo cancella l'atleta.
 model UserAddress {
-  userId     String    @id
+  userId     String        @id
   street     String
   postalCode String
   city       String
@@ -1780,23 +1785,23 @@ model AthleteFitRanking {
 /// fine dei round non consolidano R (PF-FS-PREPAYWALL §7.2).
 /// Stato del percorso, separato da abbonamento ed engagement.
 model AthleteCalibration {
-  userId           String    @id
+  userId                String    @id
   /// FREE_CALIBRATING, FREE_LEVEL_ESTIMATED, CALIBRATION_COMPLETED
-  status           String    @default("FREE_CALIBRATING")
-  startedAt        DateTime
-  deadlineAt       DateTime
-  levelEstimatedAt DateTime?
-  completedAt      DateTime?
+  status                String    @default("FREE_CALIBRATING")
+  startedAt             DateTime
+  deadlineAt            DateTime
+  levelEstimatedAt      DateTime?
+  completedAt           DateTime?
   /// CONFIDENCE_REACHED; CLOSING_ASSESSMENT e DEADLINE_REACHED solo nello storico
-  completionReason String?
+  completionReason      String?
   /// Versione della regola di consolidamento che ha chiuso la calibrazione.
   consolidationPolicyId String?
   /// L'atleta, eleggibile e con un circolo disponibile, ha scelto di non fare
   /// la lezione gratuita: R si consolida con la sola regola di confidence.
-  lessonDeclinedAt DateTime?
+  lessonDeclinedAt      DateTime?
   /// Lease di un'operazione in corso (generazione domande o valutazione).
-  operationAt      DateTime?
-  updatedAt        DateTime  @updatedAt
+  operationAt           DateTime?
+  updatedAt             DateTime  @updatedAt
 
   user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   consolidationPolicy ConfidencePolicy? @relation(fields: [consolidationPolicyId], references: [id], onDelete: Restrict)
@@ -1859,8 +1864,10 @@ model CalibrationRound {
   evaluatedAt     DateTime?
   evaluationId    String?   @unique
 
-  user       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  evaluation AssessmentEvaluation? @relation(fields: [evaluationId], references: [id], onDelete: SetNull)
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  evaluation    AssessmentEvaluation? @relation(fields: [evaluationId], references: [id], onDelete: SetNull)
+  /// Posto del giorno occupato dal micro-test della home; assente negli altri round.
+  microTestSlot MicroTestSlot?
 
   @@unique([userId, sequence])
   @@index([userId, status])
@@ -1924,6 +1931,8 @@ model CalibrationConfig {
   programBeforePaywall     Boolean  @default(false)
   /// Indicazione per il motore: una micro-prova ogni N domande; 0 = nessuna.
   questionsPerMicroTest    Int      @default(0)
+  /// Micro-test della home al giorno per filtro (Teorici, Sul campo, Fuori dal campo).
+  microTestsPerDay         Int      @default(2)
   /// Domande conoscitive iniziali per driver, scritte dall'AI dopo la classifica FIT.
   initialQuestionsPerArea  Int      @default(2)
   /// Parole o frasi vietate nei micro-test generati dall'AI, gestite dall'amministratore.
@@ -1979,6 +1988,14 @@ model MicroTest {
   instructions String
   /// Esiti selezionabili: [{ value, label, score }] nella scala della valutazione.
   optionsJson  Json
+  /// PRACTICAL oppure SITUATIONAL (teorico); nullo nei test storici.
+  format       String?
+  /// Solo PRACTICAL: ON_COURT (sul campo) oppure OFF_COURT (fuori dal campo).
+  setting      String?
+  /// Passaggi numerati della prova pratica; vuoto nelle situazioni di gioco.
+  steps        String[] @default([])
+  /// Secondi del timer della prova pratica; nullo se la prova non ha un tempo.
+  timerSeconds Int?
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   /// Atleta per cui l'AI ha scritto il test (passo della calibrazione o lotto
@@ -2021,6 +2038,33 @@ model MicroTestGeneration {
 
   @@unique([userId, evaluationId])
   @@index([userId, status, createdAt])
+}
+
+/// Posti giornalieri del micro-test della home, per filtro: un posto si prende
+/// prima di chiamare l'AI, così il limite giornaliero regge anche con richieste
+/// concorrenti (vincolo unico) e la stessa prova non si prepara due volte.
+model MicroTestSlot {
+  id        String   @id @default(uuid())
+  userId    String
+  /// Giorno di calendario in Italia (AAAA-MM-GG) in cui il posto è stato preso.
+  day       String
+  /// THEORY (Teorici), ON_COURT (Pratici sul campo) o OFF_COURT (Pratici fuori dal campo).
+  filter    String
+  /// Numero del posto nel giorno, da 1 al limite del back office.
+  slot      Int
+  /// PREPARING (l'AI scrive il test) oppure READY (il round del test esiste).
+  status    String   @default("PREPARING")
+  /// Proprietario della preparazione: solo lui salva il test.
+  token     String?
+  claimedAt DateTime
+  roundId   String?  @unique
+  createdAt DateTime @default(now())
+
+  user  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  round CalibrationRound? @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, day, filter, slot])
+  @@index([userId, filter, status])
 }
 
 model MicroTestCompletion {
@@ -2072,12 +2116,12 @@ model FreeLesson {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  partner  Partner               @relation(fields: [partnerId], references: [id])
-  coach    User?                 @relation("FreeLessonCoach", fields: [coachId], references: [id], onDelete: SetNull)
-  seats    FreeLessonSeat[]      @relation("FreeLessonSeatLesson")
+  partner     Partner               @relation(fields: [partnerId], references: [id])
+  coach       User?                 @relation("FreeLessonCoach", fields: [coachId], references: [id], onDelete: SetNull)
+  seats       FreeLessonSeat[]      @relation("FreeLessonSeatLesson")
   /// Posti che indicano questa lezione come preferita: il gruppo lo compone l'admin.
-  preferredBy FreeLessonSeat[]   @relation("FreeLessonSeatPreference")
-  feedback CoachLessonFeedback[]
+  preferredBy FreeLessonSeat[]      @relation("FreeLessonSeatPreference")
+  feedback    CoachLessonFeedback[]
 
   @@index([partnerId, startsAt])
   @@index([coachId, startsAt])
@@ -2085,28 +2129,28 @@ model FreeLesson {
 
 /// Il posto dell'atleta: uno per persona (A7.2 «1 seat / user»).
 model FreeLessonSeat {
-  userId                 String    @id
-  partnerId              String
-  lessonId               String?
+  userId                  String    @id
+  partnerId               String
+  lessonId                String?
   /// REQUESTED, ASSIGNED, ATTENDED, NO_SHOW oppure WITHDRAWN
-  status                 String    @default("REQUESTED")
+  status                  String    @default("REQUESTED")
   /// L'atleta accetta che il coach della lezione veda nome, livello e driver.
-  coachSharingAcceptedAt DateTime
-  requestedAt            DateTime  @default(now())
-  assignedAt             DateTime?
+  coachSharingAcceptedAt  DateTime
+  requestedAt             DateTime  @default(now())
+  assignedAt              DateTime?
   /// Decisione di eleggibilità al momento della richiesta (PF-FS-PREPAYWALL
   /// §10.3): versione della regola e valutazione su cui è stata presa.
   eligibilityPolicyId     String?
   eligibilityEvaluationId String?
   /// Giorno e orario indicati dall'atleta fra le lezioni in calendario; il gruppo lo compone l'admin.
-  preferredLessonId      String?
-  updatedAt              DateTime  @updatedAt
+  preferredLessonId       String?
+  updatedAt               DateTime  @updatedAt
 
-  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  partner              Partner               @relation(fields: [partnerId], references: [id])
-  lesson               FreeLesson?           @relation("FreeLessonSeatLesson", fields: [lessonId], references: [id], onDelete: Restrict)
-  preferredLesson      FreeLesson?           @relation("FreeLessonSeatPreference", fields: [preferredLessonId], references: [id], onDelete: SetNull)
-  eligibilityPolicy    ConfidencePolicy?     @relation(fields: [eligibilityPolicyId], references: [id], onDelete: Restrict)
+  user                  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  partner               Partner               @relation(fields: [partnerId], references: [id])
+  lesson                FreeLesson?           @relation("FreeLessonSeatLesson", fields: [lessonId], references: [id], onDelete: Restrict)
+  preferredLesson       FreeLesson?           @relation("FreeLessonSeatPreference", fields: [preferredLessonId], references: [id], onDelete: SetNull)
+  eligibilityPolicy     ConfidencePolicy?     @relation(fields: [eligibilityPolicyId], references: [id], onDelete: Restrict)
   eligibilityEvaluation AssessmentEvaluation? @relation(fields: [eligibilityEvaluationId], references: [id], onDelete: SetNull)
 
   @@index([lessonId, status])
@@ -2163,17 +2207,17 @@ model Passkey {
 
 // Operational metadata only: never prompts, answers, credentials or athlete IDs.
 model AiOperationLog {
-  id                 String         @id @default(uuid())
+  id                 String          @id @default(uuid())
   operation          String
   provider           String?
   model              String?
-  status             String         @default("RUNNING")
+  status             String          @default("RUNNING")
   errorCode          String?
-  startedAt          DateTime       @default(now())
+  startedAt          DateTime        @default(now())
   finishedAt         DateTime?
   durationMs         Int?
-  validationFailures Int            @default(0)
-  validationCodes    String[]       @default([])
+  validationFailures Int             @default(0)
+  validationCodes    String[]        @default([])
   attempts           AiHttpAttempt[]
 
   @@index([startedAt])

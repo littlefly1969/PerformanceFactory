@@ -101,8 +101,10 @@ export default function CoachPage() {
             hasEvaluation={!!j.evaluation}
             resultRound={resultRound}
             saved={saved}
-            onPrepare={async () => {
-              micro.setData(await postJson<HomeMicroTest>(MICRO_TEST));
+            onPrepare={async (filter) => {
+              micro.setData(
+                await postJson<HomeMicroTest>(MICRO_TEST, { filter }),
+              );
             }}
             onRefresh={micro.reload}
             onAnswered={async (roundId, answers) => {

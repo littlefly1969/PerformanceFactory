@@ -1,41 +1,26 @@
 "use client";
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { Calibration } from "../journey-types";
 import {
   type HomeMicroTest,
-  type MicroTestResult,
+  type MicroTestFilter,
   type SituationFeedback,
-  percent,
   postJson,
-  useResource,
 } from "../_account/account-data";
 import { HexOrb } from "../_account/account-home";
+import { FILTER_TEXT, FilterBar } from "./micro-test-filters";
+import { Practical } from "./micro-test-practical";
+import { MicroTestResultView } from "./micro-test-result";
+import { LETTERS, Pill, Working } from "./micro-test-ui";
 import "./micro-test.css";
 
 type Round = NonNullable<Calibration["round"]>;
 type Ready = NonNullable<HomeMicroTest["test"]>;
+type History = HomeMicroTest["history"];
+type FilterState = NonNullable<HomeMicroTest["filters"]>[number];
 
-const LETTERS = "ABCDE";
 const DAYS = ["L", "M", "M", "G", "V", "S", "D"];
 const ARC = 2 * Math.PI * 80;
-
-/** Pulsante a pillola della veste scura: lime pieno o con il bordo. */
-function Pill({
-  children,
-  tone = "lime",
-  ...props
-}: {
-  children: React.ReactNode;
-  tone?: "lime" | "outline";
-} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
-  return (
-    <button type="button" className={`pf-mt-pill is-${tone}`} {...props}>
-      <span>{children}</span>
-      {tone === "lime" && <span aria-hidden="true">→</span>}
-    </button>
-  );
-}
 
 const dayLabel = (iso: string) =>
   new Date(iso).toLocaleDateString("it-IT", {
@@ -43,17 +28,38 @@ const dayLabel = (iso: string) =>
     month: "2-digit",
   });
 
+/** Archivio del filtro: i micro-test già fatti, dal più recente. */
+function HistoryList({ history }: { history: History }) {
+  if (!history.length) return null;
+  return (
+    <div className="pf-mt-history">
+      <span className="pf-mt-kicker">Micro-test precedenti</span>
+      <ul>
+        {history.map((h) => (
+          <li key={h.roundId}>
+            <span>{dayLabel(h.completedAt)}</span>
+            <b>{h.title}</b>
+            <em>+{h.points} pt</em>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 /**
  * Scheda iniziale, come la demo: area e durata, l'anello dei giorni di fila
- * con la settimana, il titolo e i micro-test già fatti.
+ * con la settimana, il titolo e i micro-test già fatti del filtro.
  */
 function Intro({
   home,
   test,
+  history,
   onStart,
 }: {
   home: HomeMicroTest;
   test: Ready;
+  history: History;
   onStart: () => void;
 }) {
   const { days, week } = home.streak;
@@ -104,20 +110,7 @@ function Intro({
       <Pill className="pf-mt-pill is-lime is-pulse" onClick={onStart}>
         Inizia il micro-test
       </Pill>
-      {home.history.length > 0 && (
-        <div className="pf-mt-history">
-          <span className="pf-mt-kicker">Micro-test precedenti</span>
-          <ul>
-            {home.history.map((h) => (
-              <li key={h.roundId}>
-                <span>{dayLabel(h.completedAt)}</span>
-                <b>{h.title}</b>
-                <em>+{h.points} pt</em>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <HistoryList history={history} />
     </section>
   );
 }
@@ -245,219 +238,9 @@ function Situations({
   );
 }
 
-/** Prova pratica: istruzioni, sicurezza e l'esito che riporta l'atleta. */
-function Practical({
-  round,
-  area,
-  onDone,
-  onSkip,
-}: {
-  round: Round;
-  area: string;
-  onDone: (answers: Record<string, string>) => Promise<void>;
-  onSkip: () => Promise<void>;
-}) {
-  const q = round.questions[0];
-  const [value, setValue] = useState<string>();
-  const [busy, setBusy] = useState(false);
-  const run = (task: () => Promise<void>) => {
-    setBusy(true);
-    void task().finally(() => setBusy(false));
-  };
-  return (
-    <section className="pf-mt">
-      <span className="pf-mt-kicker is-spaced">Prova pratica · {area}</span>
-      <h2 className="pf-mt-question">{q.microTest!.title ?? q.text}</h2>
-      <p className="pf-mt-muted">{q.microTest!.instructions}</p>
-      {q.microTest!.safetyNotes && (
-        <p className="pf-mt-muted">
-          <strong>Sicurezza:</strong> {q.microTest!.safetyNotes}
-        </p>
-      )}
-      <span className="pf-mt-kicker is-spaced">
-        Com’è andata? L’esito lo riporti tu.
-      </span>
-      <div className="pf-mt-answers">
-        {q.options.map((o, k) => (
-          <button
-            type="button"
-            key={o.value}
-            disabled={busy}
-            aria-pressed={value === o.value}
-            className={`pf-mt-answer${value === o.value ? " is-selected" : ""}`}
-            onClick={() => setValue(o.value)}
-          >
-            <span className="pf-mt-answer-row">
-              <span className="pf-mt-letter">{LETTERS[k]}</span>
-              <b>{o.label}</b>
-            </span>
-          </button>
-        ))}
-      </div>
-      <Pill
-        disabled={busy || value === undefined}
-        onClick={() => run(() => onDone({ [q.id]: value! }))}
-      >
-        Invia l’esito
-      </Pill>
-      <button
-        type="button"
-        className="pf-mt-link"
-        disabled={busy}
-        onClick={() => run(onSkip)}
-      >
-        Non posso farlo ora
-      </button>
-    </section>
-  );
-}
-
 /** Riletture dello stato mentre un'altra scheda prepara il micro-test. */
 const PREPARE_POLL_MS = 3000;
 const PREPARE_POLLS = 30;
-
-/** Attesa con l'esagono: l'AI prepara il test o valuta le risposte. */
-function Working({
-  title,
-  error,
-  onRetry,
-}: {
-  title: string;
-  error?: string;
-  onRetry?: () => void;
-}) {
-  return (
-    <section className="pf-mt pf-mt-working" role="status">
-      <HexOrb size={96} tone="lime" />
-      <h2 className="pf-mt-hero-title">{title}</h2>
-      {error && (
-        <>
-          <p className="pf-mt-error" role="alert">
-            {error}
-          </p>
-          {onRetry && <Pill onClick={onRetry}>Riprova</Pill>}
-        </>
-      )}
-    </section>
-  );
-}
-
-/** Frase di riserva per i test scritti prima delle frasi dell'AI. */
-const fallbackVerdict = (r: MicroTestResult) => {
-  if (r.total === undefined || r.correct === undefined)
-    return "Esito registrato.";
-  if (r.correct === r.total) return "Perfetto.";
-  return r.correct * 2 >= r.total ? "Ci sei quasi." : "C’è margine.";
-};
-
-/** Video del micro-test: il file se c'è, altrimenti il titolo previsto. */
-function VideoCard({
-  video,
-}: {
-  video: NonNullable<MicroTestResult["video"]>;
-}) {
-  const file = video.url && /\.(mp4|webm|mov)(\?|$)/i.test(video.url);
-  if (file)
-    return (
-      <figure className="pf-mt-video is-file">
-        <video controls preload="metadata" src={video.url!} />
-        <figcaption>
-          <span className="pf-mt-kicker is-lime">Approfondisci</span>
-          <strong>{video.title}</strong>
-        </figcaption>
-      </figure>
-    );
-  const body = (
-    <>
-      <span className="pf-mt-play" aria-hidden="true">
-        ▶
-      </span>
-      <span className="pf-mt-video-text">
-        <span className="pf-mt-kicker is-lime">
-          {video.url ? "Approfondisci" : "Approfondisci · video in arrivo"}
-        </span>
-        <strong>{video.title}</strong>
-      </span>
-    </>
-  );
-  return video.url ? (
-    <a
-      className="pf-mt-video"
-      href={video.url}
-      target="_blank"
-      rel="noreferrer"
-    >
-      {body}
-    </a>
-  ) : (
-    <div className="pf-mt-video">{body}</div>
-  );
-}
-
-/**
- * Risultato come nella demo: punti dal back office, frase e consiglio
- * dell'AI, confidenza dell'area prima e dopo e il video scelto dall'AI. Si
- * legge soltanto: aprirlo dall'indirizzo non reinvia la prova.
- */
-export function MicroTestResultView({ roundId }: { roundId: string }) {
-  const { data, error, reload } = useResource<MicroTestResult>(
-    `/athlete-journey/calibration/micro-test/${roundId}`,
-  );
-  if (error)
-    return (
-      <Working
-        title="Non riesco a leggere il risultato."
-        error={error}
-        onRetry={() => void reload()}
-      />
-    );
-  if (!data) return null;
-  if (data.status !== "EVALUATED")
-    return (
-      <Working
-        title="Sto calcolando la tua performance."
-        error="Le tue risposte sono salvate: non serve rifare la prova."
-        onRetry={() => void reload()}
-      />
-    );
-  const before = data.confidence?.before ?? null;
-  const after = data.confidence?.after ?? null;
-  return (
-    <section className="pf-mt pf-mt-result" aria-labelledby="pf-mt-result">
-      <div className="pf-mt-result-head">
-        <span className="pf-mt-kicker">Micro-test completato</span>
-        <strong className="pf-mt-points">+{data.points ?? 0} pt</strong>
-        <h2 id="pf-mt-result">{data.verdict ?? fallbackVerdict(data)}</h2>
-        {(data.takeaway ?? data.summary) && (
-          <p>{data.takeaway ?? data.summary}</p>
-        )}
-      </div>
-      <div className="pf-mt-confidence">
-        <div>
-          <span className="pf-mt-kicker">{data.area.name} · confidenza</span>
-          <b>
-            {percent(before)} → {percent(after)}
-          </b>
-        </div>
-        <div
-          className="pf-mt-bar"
-          role="progressbar"
-          aria-label={`Confidenza dell’area ${data.area.name}`}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={after ?? 0}
-        >
-          <span className="is-after" style={{ width: `${after ?? 0}%` }} />
-          <span className="is-before" style={{ width: `${before ?? 0}%` }} />
-        </div>
-      </div>
-      {data.video && <VideoCard video={data.video} />}
-      <Link className="pf-mt-pill is-outline" href="/journey">
-        <span>Torna alla Home</span>
-      </Link>
-    </section>
-  );
-}
 
 /** Valutazione interrotta: le risposte sono salvate, si rilancia l'esito. */
 function StalledEvaluation({ onRetry }: { onRetry: () => Promise<void> }) {
@@ -483,10 +266,47 @@ function StalledEvaluation({ onRetry }: { onRetry: () => Promise<void> }) {
   );
 }
 
+/** Il filtro ha finito i micro-test di oggi: si torna domani. */
+function DoneToday({
+  state,
+  history,
+}: {
+  state: FilterState;
+  history: History;
+}) {
+  return (
+    <section className="pf-mt pf-mt-working pf-mt-done-day" role="status">
+      <HexOrb size={96} tone="lime" />
+      <h2 className="pf-mt-hero-title">Per oggi hai finito.</h2>
+      <p className="pf-mt-muted">
+        Hai fatto i {state.limit} micro-test {FILTER_TEXT[state.filter]} di
+        oggi. Domani ne trovi di nuovi; intanto puoi provare un altro tipo.
+      </p>
+      <HistoryList history={history} />
+    </section>
+  );
+}
+
+/** Stato del filtro; con un server che non li distingue vale il riepilogo. */
+const stateOf = (home: HomeMicroTest, filter: MicroTestFilter): FilterState =>
+  home.filters?.find((f) => f.filter === filter) ?? {
+    filter,
+    status:
+      home.status === "EVALUATING"
+        ? "EVALUATING"
+        : home.test
+          ? "READY"
+          : "PREPARING",
+    usedToday: 0,
+    limit: 0,
+    test: home.test,
+  };
+
 /**
- * Micro-test della home, fuori dal ciclo di calibrazione: c'è sempre uno
- * pronto, e se manca l'AI lo prepara mentre l'esagono respira. Dopo le
- * risposte il calcolo, poi il risultato.
+ * Micro-test della home, fuori dal ciclo di calibrazione, per filtro:
+ * Teorici, Pratici sul campo e fuori dal campo. Ogni filtro ha il suo test
+ * di oggi; se manca e ci sono ancora posti l'AI lo prepara mentre l'esagono
+ * respira. Dopo le risposte il calcolo, poi il risultato.
  */
 export function MicroTestTab({
   home,
@@ -503,8 +323,8 @@ export function MicroTestTab({
   resultRound: string | null;
   /** Round il cui esito è stato appena accettato dal server. */
   saved: string | null;
-  /** Chiede al server di preparare il micro-test se manca. */
-  onPrepare: () => Promise<void>;
+  /** Chiede al server di preparare il micro-test del filtro se manca. */
+  onPrepare: (filter: MicroTestFilter) => Promise<void>;
   /** Rilegge lo stato del micro-test senza chiederne la preparazione. */
   onRefresh: () => Promise<void>;
   onAnswered: (
@@ -513,6 +333,13 @@ export function MicroTestTab({
   ) => Promise<void>;
   onSkip: (roundId: string) => Promise<void>;
 }) {
+  // Il filtro parte da quello del test pronto in home, poi lo sceglie l'atleta.
+  const [chosen, setChosen] = useState<MicroTestFilter | null>(null);
+  const [practical, setPractical] = useState<"ON_COURT" | "OFF_COURT">(
+    "ON_COURT",
+  );
+  if (chosen === null && home) setChosen(home.test?.filter ?? "THEORY");
+  const filter = chosen ?? "THEORY";
   const [started, setStarted] = useState(false);
   const [sending, setSending] = useState(false);
   const [prepError, setPrepError] = useState("");
@@ -520,32 +347,34 @@ export function MicroTestTab({
   // un'altra scheda (il server risponde PREPARING senza aspettarla).
   const [asking, setAsking] = useState(false);
   const [polls, setPolls] = useState(0);
-  const asked = useRef(false);
-  const preparing = home?.status === "PREPARING";
+  const asked = useRef(new Set<MicroTestFilter>());
+  const state = home ? stateOf(home, filter) : null;
+  const preparing = state?.status === "PREPARING";
   const prepare = () => {
-    asked.current = true;
+    asked.current.add(filter);
     setPrepError("");
     setPolls(0);
     setAsking(true);
-    onPrepare()
+    onPrepare(filter)
       .catch((e: unknown) =>
         setPrepError(e instanceof Error ? e.message : "Riprova."),
       )
       .finally(() => setAsking(false));
   };
-  // Manca il micro-test: lo si chiede una volta, anche mentre si legge il
-  // risultato del precedente, così il prossimo è pronto al ritorno.
+  // Manca il micro-test del filtro: lo si chiede una volta, anche mentre si
+  // legge il risultato del precedente, così il prossimo è pronto al ritorno.
   useEffect(() => {
     if (!preparing) {
-      asked.current = false;
+      asked.current.delete(filter);
       return;
     }
-    if (!asked.current) prepare();
+    if (!asked.current.has(filter)) prepare();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preparing]);
+  }, [preparing, filter]);
   // Ancora PREPARING dopo la richiesta: lo sta preparando un'altra scheda.
   // Si rilegge lo stato a intervalli, poi si offre «Riprova».
-  const waiting = preparing && asked.current && !asking && !prepError;
+  const waiting =
+    preparing && asked.current.has(filter) && !asking && !prepError;
   useEffect(() => {
     if (!waiting) return;
     const timer = setTimeout(() => {
@@ -560,9 +389,17 @@ export function MicroTestTab({
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [waiting, polls]);
-  const test = home?.test ?? null;
+  const choose = (next: MicroTestFilter) => {
+    if (next === filter) return;
+    if (next !== "THEORY") setPractical(next);
+    setChosen(next);
+    setStarted(false);
+    setPrepError("");
+    setPolls(0);
+  };
+  const test = state?.test ?? null;
   const stalled =
-    home?.status === "EVALUATING" && test && !sending ? test.round : null;
+    state?.status === "EVALUATING" && test && !sending ? test.round : null;
   if (resultRound && !(stalled?.id === resultRound && saved !== resultRound))
     return <MicroTestResultView roundId={resultRound} />;
   if (sending) return <Working title="Sto calcolando la tua performance." />;
@@ -594,7 +431,7 @@ export function MicroTestTab({
       </section>
     );
   if (home === undefined) return null;
-  if (!home || home.status === "UNAVAILABLE")
+  if (!home || home.status === "UNAVAILABLE" || !state)
     return (
       <section className="pf-mt pf-mt-working">
         <h2 className="pf-mt-hero-title">La fase gratuita è conclusa.</h2>
@@ -604,18 +441,42 @@ export function MicroTestTab({
         </p>
       </section>
     );
-  if (!test || home.status === "PREPARING")
+  const history = home.history.filter((h) => !h.filter || h.filter === filter);
+  const bar = (
+    <FilterBar filter={filter} practical={practical} onChange={choose} />
+  );
+  if (state.status === "DONE_TODAY")
     return (
-      <Working
-        title="Preparo il tuo micro-test."
-        error={prepError}
-        onRetry={prepare}
-      />
+      <>
+        {bar}
+        <DoneToday state={state} history={history} />
+      </>
+    );
+  if (!test || state.status === "PREPARING")
+    return (
+      <>
+        {bar}
+        <Working
+          title="Preparo il tuo micro-test."
+          error={prepError}
+          onRetry={prepare}
+        />
+      </>
     );
   const round = test.round;
   const answered = round.questions.some((q) => q.microTest?.feedback);
   if (!started && !answered)
-    return <Intro home={home} test={test} onStart={() => setStarted(true)} />;
+    return (
+      <>
+        {bar}
+        <Intro
+          home={home}
+          test={test}
+          history={history}
+          onStart={() => setStarted(true)}
+        />
+      </>
+    );
   const done = async (answers: Record<string, string>) => {
     setSending(true);
     try {
@@ -629,9 +490,9 @@ export function MicroTestTab({
   ) : (
     <Practical
       round={round}
-      area={test.area.name}
       onDone={done}
       onSkip={() => onSkip(round.id)}
+      onExit={() => setStarted(false)}
     />
   );
 }

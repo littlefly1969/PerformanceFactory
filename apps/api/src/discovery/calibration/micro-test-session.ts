@@ -150,7 +150,8 @@ export class MicroTestSessionService {
       },
       ...(situations
         ? { correct: situations - missed.length, total: situations }
-        : {}),
+        : // Nella prova pratica l'esito scelto, ripreso nel risultato.
+          { answer: questions[0].options[level]?.label ?? null }),
       summary: after.areas[0]?.rationale ?? '',
       points: credit?.points ?? 0,
       ...(outcome

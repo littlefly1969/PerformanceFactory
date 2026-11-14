@@ -38,6 +38,8 @@ export type CalibrationSettings = {
    * ma decide passo per passo; 0 significa nessuna indicazione.
    */
   questionsPerMicroTest: number;
+  /** Micro-test della home al giorno per ciascun filtro; contano anche quelli saltati. */
+  microTestsPerDay: number;
   /** Domande conoscitive iniziali per driver, scritte dall'AI dopo la classifica FIT. */
   initialQuestionsPerArea: number;
   /** Parole o frasi vietate nei micro-test generati dall'AI. */
@@ -51,6 +53,7 @@ export const DEFAULT_CALIBRATION_SETTINGS: CalibrationSettings = {
   maxDays: 30,
   programBeforePaywall: false,
   questionsPerMicroTest: 0,
+  microTestsPerDay: 2,
   initialQuestionsPerArea: 2,
   unsafeMicroTestTerms: DEFAULT_UNSAFE_MICRO_TEST_TERMS,
   unsafeTrainingTerms: [],
@@ -190,6 +193,8 @@ export function settingsProblems(s: CalibrationSettings) {
   if (s.maxDays < 1) problems.push('La durata deve essere positiva');
   if (s.questionsPerMicroTest < 0 || s.questionsPerMicroTest > 50)
     problems.push('Le domande per micro-prova vanno da 0 a 50');
+  if (s.microTestsPerDay < 1 || s.microTestsPerDay > 10)
+    problems.push('I micro-test al giorno per filtro vanno da 1 a 10');
   if (s.initialQuestionsPerArea < 1 || s.initialQuestionsPerArea > 4)
     problems.push('Le domande iniziali per driver vanno da 1 a 4');
   if (!s.unsafeMicroTestTerms.length)
