@@ -4,6 +4,7 @@ import type { FitRankingView } from "../../../components/fit-ranking-editor";
 import type { FreeLessonView } from "../../_account/account-data";
 import { LessonDeclined } from "../../_account/lesson-declined";
 import type { lessonProgress } from "../../_account/lesson-unlock";
+import { fromSubscriber } from "./profile-origin";
 import {
   type Availability,
   WEEKDAYS,
@@ -59,13 +60,19 @@ function DoneHead({
 }
 
 /** La tua disponibilità, compilata: giorni, minuti, settimana tipo. */
-export function AvailabilityCard({ value }: { value: Availability }) {
+export function AvailabilityCard({
+  value,
+  subscriber = false,
+}: {
+  value: Availability;
+  subscriber?: boolean;
+}) {
   const days = weekPattern(value);
   return (
     <section className="pf-prof-done" aria-label="La tua disponibilità">
       <DoneHead
         title="La tua disponibilità"
-        href="/journey/profilo/disponibilita"
+        href={fromSubscriber("/journey/profilo/disponibilita", subscriber)}
         label="Modifica la disponibilità"
       />
       <div className="pf-prof-avail-big">
@@ -107,7 +114,13 @@ const labelOf = (options: { value: string; label: string }[], v: string) =>
   options.find((o) => o.value === v)?.label ?? "—";
 
 /** La tua classifica FIT, compilata: padel (con Playtomic) e tennis. */
-export function FitCard({ view }: { view: FitRankingView }) {
+export function FitCard({
+  view,
+  subscriber = false,
+}: {
+  view: FitRankingView;
+  subscriber?: boolean;
+}) {
   const r = view.ranking!;
   const playtomic =
     r.playtomicLevel === null || r.playtomicLevel === undefined
@@ -131,7 +144,7 @@ export function FitCard({ view }: { view: FitRankingView }) {
     <section className="pf-prof-done" aria-label="La tua classifica FIT">
       <DoneHead
         title="La tua classifica FIT"
-        href="/journey/profilo/classifica"
+        href={fromSubscriber("/journey/profilo/classifica", subscriber)}
         label="Modifica la classifica FIT"
       />
       <div className="pf-prof-fit-sum">

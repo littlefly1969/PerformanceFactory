@@ -27,7 +27,7 @@ const ADMIN_GROUPS = [
   },
   {
     label: "Configurazione",
-    paths: ["/admin/consents", "/admin/feature-flags"],
+    paths: ["/admin/consents", "/admin/feature-flags", "/admin/ranking"],
   },
 ];
 

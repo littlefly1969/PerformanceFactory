@@ -22,6 +22,11 @@ export const FEATURE_FLAG_REGISTRY = [
       'Minigioco «Prova il ritmo» nel campo animato dell’intro del funnel, per i visitatori (vale solo al 100%).',
   },
   {
+    key: 'platform_ranking',
+    description:
+      'Ranking PF1-PF4 della piattaforma per gli abbonati: riga nel profilo, pop-up della fascia e schermata con la classifica.',
+  },
+  {
     key: 'potential_scenarios',
     description:
       'A calibrazione chiusa mostra P3/P6/P12 e la scelta del percorso di 3, 6 o 12 mesi (1.8-1.9).',

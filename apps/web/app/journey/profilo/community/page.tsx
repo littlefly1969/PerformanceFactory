@@ -1,4 +1,6 @@
+"use client";
 import { AccountScreen, AccountTopBar } from "../../_account/account-shell";
+import { useProfileOrigin } from "../_profile/profile-origin";
 import "../_profile/profile.css";
 import "../_profile/fake-pages.css";
 
@@ -7,9 +9,10 @@ import "../_profile/fake-pages.css";
  * ancora attivo, quindi l'unico comando che funziona è la freccia indietro.
  */
 export default function CommunityPage() {
+  const origin = useProfileOrigin();
   return (
     <AccountScreen
-      top={<AccountTopBar title="Community" back="/journey/profilo" />}
+      top={<AccountTopBar title="Community" back={origin.back} />}
       footer={
         <button type="button" className="pf-acc-pill is-lime" disabled>
           <span>Entra nel gruppo</span>

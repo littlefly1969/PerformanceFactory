@@ -1,0 +1,279 @@
+/* Schermata del ranking (demo V10/V11): scura, cornice 402 px. */
+.pf-acc.is-dark .pf-acc-top a {
+  color: #fff;
+}
+.pf-acc.is-dark .pf-acc-top {
+  border-bottom-color: transparent;
+}
+.pf-rank {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 40px;
+}
+.pf-rank-glow {
+  position: absolute;
+  left: 50%;
+  top: -60px;
+  width: 340px;
+  height: 260px;
+  border-radius: 50%;
+  background: radial-gradient(#c8f02e2e, transparent 70%);
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+.pf-rank-kicker {
+  display: block;
+  margin: 0;
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: #ffffff8c;
+}
+.pf-rank-kicker.is-lime {
+  color: var(--acc-lime);
+}
+.pf-rank-title {
+  margin-top: 16px;
+}
+.pf-rank-sub {
+  font-size: 13px;
+  color: #ffffff8c;
+}
+
+.pf-rank-hero {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin-bottom: 12px;
+}
+.pf-rank-hero-hex {
+  position: relative;
+  filter: drop-shadow(0 0 28px #c8f02e59);
+}
+.pf-rank-hero-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 30px;
+  font-size: 9px;
+  letter-spacing: 1.4px;
+  text-align: center;
+  text-transform: uppercase;
+  color: #0b0b0cb3;
+}
+.pf-rank-hero-hex .pf-rank-hex b {
+  margin-top: 12px;
+}
+.pf-acc.is-dark .pf-rank-pos {
+  margin: 6px 0 2px;
+  color: #ffffff8c;
+  font-size: 14px;
+}
+.pf-rank-pos b {
+  font-size: 54px;
+  font-weight: 300;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  color: #fff;
+}
+
+.pf-rank-card {
+  padding: 20px 18px;
+  border-radius: 24px;
+  background: #ffffff0f;
+  box-shadow: inset 0 0 0 1px #ffffff14;
+}
+.pf-rank-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.pf-rank-pair b {
+  display: block;
+  margin-top: 6px;
+  font-size: 34px;
+  font-weight: 300;
+  letter-spacing: -0.04em;
+}
+.pf-rank-pair b.is-lime {
+  color: var(--acc-lime);
+}
+.pf-rank-bar {
+  position: relative;
+  height: 6px;
+  margin: 16px 0 14px;
+  border-radius: 3px;
+  background: #ffffff1a;
+}
+.pf-rank-bar i {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 3px;
+}
+.pf-rank-bar .is-pot {
+  background: #c8f02e8c;
+}
+.pf-rank-bar .is-real {
+  background: #fff;
+}
+.pf-acc.is-dark .pf-rank-card p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.pf-rank-board {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+}
+.pf-rank-board li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 42px;
+  padding: 0 14px;
+  border-radius: 16px;
+  background: #ffffff0d;
+  box-shadow: inset 0 0 0 1px #ffffff12;
+  font-size: 14px;
+}
+.pf-rank-board li > span:first-child {
+  width: 44px;
+  color: #ffffff8c;
+}
+.pf-rank-board li b {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pf-rank-board small {
+  color: #ffffff73;
+}
+.pf-rank-board li.is-me {
+  background: var(--acc-lime);
+  box-shadow: none;
+  color: var(--acc-ink);
+}
+.pf-rank-board li.is-me > span:first-child,
+.pf-rank-board li.is-me small {
+  color: #0b0b0c99;
+}
+.pf-rank-legend {
+  align-self: flex-end;
+  font-size: 9px;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #ffffff73;
+}
+
+.pf-rank-example {
+  margin-top: 12px;
+  padding: 20px 18px;
+  border-radius: 24px;
+  box-shadow: inset 0 0 0 1px #ffffff26;
+}
+.pf-rank-example ul {
+  margin: 14px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+}
+.pf-rank-example li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+.pf-rank-example small {
+  font-size: 14px;
+  color: #ffffff8c;
+}
+.pf-rank-pill {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #ffffff1a;
+  font-size: 11px;
+}
+.pf-acc.is-dark .pf-rank-example p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 19px;
+}
+
+.pf-rank-ladder {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  list-style: none;
+}
+.pf-rank-ladder li {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-radius: 18px;
+  background: #ffffff0d;
+  box-shadow: inset 0 0 0 1px #ffffff14;
+}
+.pf-rank-ladder li > b {
+  width: 38px;
+  font-size: 15px;
+  font-weight: 500;
+}
+.pf-rank-ladder li > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+.pf-rank-ladder small {
+  font-size: 11px;
+  color: #ffffff73;
+}
+.pf-rank-ladder em {
+  font-size: 9px;
+  font-style: normal;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+.pf-rank-ladder li.is-me {
+  background: var(--acc-lime);
+  box-shadow: none;
+  color: var(--acc-ink);
+}
+.pf-rank-ladder li.is-me small {
+  color: #0b0b0c99;
+}
+.pf-rank .pf-rank-visibility {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 20px;
+  background: #ffffff0a;
+}
+.pf-acc.is-dark .pf-rank-foot,
+.pf-acc.is-dark .pf-rank-empty {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 19px;
+  color: #ffffff8c;
+}
+.pf-rank-empty a {
+  color: var(--acc-lime);
+}

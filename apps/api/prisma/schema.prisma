@@ -96,6 +96,9 @@ model User {
   featureFlagChanges       FeatureFlagChange[]      @relation("FeatureFlagChangeActor")
   betaTesterChanges        BetaTesterChange[]       @relation("BetaTesterChangeUser")
   betaTesterActions        BetaTesterChange[]       @relation("BetaTesterChangeActor")
+  rankingConfigsUpdated    RankingConfig[]          @relation("RankingConfigUpdatedBy")
+  rankingConfigChanges     RankingConfigChange[]    @relation("RankingConfigChangeActor")
+  rankingAnnouncement      RankingAnnouncement?
 
   professionalLinks ProfessionalUserLink[] @relation("ProfessionalLinks")
   userLinks         ProfessionalUserLink[] @relation("UserLinks")
@@ -2239,4 +2242,43 @@ model AiHttpAttempt {
   operation   AiOperationLog @relation(fields: [operationId], references: [id], onDelete: Cascade)
 
   @@unique([operationId, sequence])
+}
+
+/// Ranking PF1-PF4 della piattaforma (funzione nuova, fuori Blueprint): pesi
+/// di reale e potenziale e soglie delle fasce, modificabili dal back office.
+/// Una sola riga, `default`; senza riga valgono i valori seminati qui.
+model RankingConfig {
+  id              String   @id @default("default")
+  realWeight      Int      @default(60)
+  potentialWeight Int      @default(40)
+  pf1Min          Int      @default(80)
+  pf2Min          Int      @default(66)
+  pf3Min          Int      @default(50)
+  updatedAt       DateTime @updatedAt
+  updatedById     String?
+
+  updatedBy User? @relation("RankingConfigUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+}
+
+model RankingConfigChange {
+  id        String   @id @default(uuid())
+  /// Null solo se l'account dell'autore è stato cancellato.
+  actorId   String?
+  before    Json?
+  after     Json
+  createdAt DateTime @default(now())
+
+  actor User? @relation("RankingConfigChangeActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorId])
+}
+
+/// Ultima fascia annunciata all'atleta con il pop-up «Sei entrato in PFx».
+model RankingAnnouncement {
+  userId      String   @id
+  band        String
+  announcedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

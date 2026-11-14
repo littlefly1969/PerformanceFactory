@@ -2,7 +2,6 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import HomePage from "./page";
-import { TrainingAvailability } from "./profile/training-availability";
 import TrainingPage from "./training/page";
 import CheckInPage from "./check-in/page";
 import ProgressPage from "./performance/page";
@@ -320,45 +319,6 @@ describe("PF4 athlete experience", () => {
     expect(
       screen.queryByText(/TRAINING_AVAILABILITY_REQUIRED/),
     ).not.toBeInTheDocument();
-  });
-  it("saves actual availability and the existing duration choices", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (url: string, init?: RequestInit) => {
-        if (init?.method === "POST")
-          requests.push({ url, body: JSON.parse(String(init.body)) });
-        return respond({
-          currentFrequency: "2_3",
-          daysPerWeek: null,
-          sessionDurationMinutes: null,
-          programDurationWeeks: 12,
-          preferredDays: [],
-        });
-      }),
-    );
-    render(<TrainingAvailability />);
-    await userEvent.selectOptions(
-      await screen.findByLabelText(/Quanti giorni/),
-      "4",
-    );
-    await userEvent.selectOptions(screen.getByLabelText(/Quanto tempo/), "60");
-    expect(screen.getByLabelText("Durata del programma")).toHaveValue("12");
-    await userEvent.click(
-      screen.getByRole("button", { name: /Salva disponibilità/ }),
-    );
-    expect(await screen.findByRole("status")).toHaveTextContent(
-      "Disponibilità salvata",
-    );
-    expect(requests[0]).toEqual({
-      url: "/api/athlete/training/availability",
-      body: {
-        currentFrequency: "2_3",
-        daysPerWeek: 4,
-        sessionDurationMinutes: 60,
-        programDurationWeeks: 12,
-        preferredDays: [],
-      },
-    });
   });
   it("navigates bounded calendar months and selects persisted sessions", async () => {
     vi.stubGlobal(

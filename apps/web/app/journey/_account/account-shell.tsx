@@ -7,14 +7,23 @@ import "./account-pages.css";
 import "./account-reveal.css";
 import "./account-lesson.css";
 
-export type AccountTab = "home" | "coach" | "profile";
+export type AccountTab = "home" | "coach" | "calendar" | "profile";
 
-const TABS: {
+type Tab = {
   tab: AccountTab;
   href: string;
   label: string;
   icon: ReactNode;
-}[] = [
+};
+
+const PROFILE_ICON = (
+  <>
+    <circle cx="12" cy="8.5" r="3.5" />
+    <path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5" />
+  </>
+);
+
+const TABS: Tab[] = [
   {
     tab: "home",
     href: "/journey",
@@ -33,12 +42,29 @@ const TABS: {
     tab: "profile",
     href: "/journey/profilo",
     label: "Profilo",
-    icon: (
-      <>
-        <circle cx="12" cy="8.5" r="3.5" />
-        <path d="M5 20c.8-3.6 3.6-5.5 7-5.5s6.2 1.9 7 5.5" />
-      </>
-    ),
+    icon: PROFILE_ICON,
+  },
+];
+
+/** Area abbonato: le stesse destinazioni della barra della home /user. */
+const SUBSCRIBER_TABS: Tab[] = [
+  {
+    tab: "home",
+    href: "/user",
+    label: "Home",
+    icon: <path d="M4 11.5 12 5l8 6.5V20h-5.5v-5h-5v5H4Z" />,
+  },
+  {
+    tab: "calendar",
+    href: "/user/training",
+    label: "Calendario",
+    icon: <path d="M5 7h14v13H5zM5 11h14M9 4v4M15 4v4" />,
+  },
+  {
+    tab: "profile",
+    href: "/user/profile",
+    label: "Profilo",
+    icon: PROFILE_ICON,
   },
 ];
 
@@ -46,31 +72,35 @@ const TABS: {
 export function AccountNav({
   active,
   coachDot = false,
+  subscriber = false,
 }: {
   active: AccountTab;
   coachDot?: boolean;
+  subscriber?: boolean;
 }) {
   return (
     <nav className="pf-acc-nav" aria-label="Navigazione atleta">
-      {TABS.map(({ tab, href, label, icon }) => (
-        <Link
-          key={tab}
-          href={href}
-          aria-label={label}
-          aria-current={tab === active ? "page" : undefined}
-          className={tab === active ? "is-active" : undefined}
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            {icon}
-          </svg>
-          {tab === "coach" && coachDot && (
-            <span
-              className="pf-acc-nav-dot"
-              aria-label="Micro-test in attesa"
-            />
-          )}
-        </Link>
-      ))}
+      {(subscriber ? SUBSCRIBER_TABS : TABS).map(
+        ({ tab, href, label, icon }) => (
+          <Link
+            key={tab}
+            href={href}
+            aria-label={label}
+            aria-current={tab === active ? "page" : undefined}
+            className={tab === active ? "is-active" : undefined}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              {icon}
+            </svg>
+            {tab === "coach" && coachDot && (
+              <span
+                className="pf-acc-nav-dot"
+                aria-label="Micro-test in attesa"
+              />
+            )}
+          </Link>
+        ),
+      )}
     </nav>
   );
 }
@@ -103,6 +133,7 @@ export function AccountScreen({
   footer,
   nav,
   coachDot,
+  subscriber,
   tone = "light",
 }: {
   children: ReactNode;
@@ -110,6 +141,8 @@ export function AccountScreen({
   footer?: ReactNode;
   nav?: AccountTab;
   coachDot?: boolean;
+  /** Barra dell'area abbonato (Home, Calendario, Profilo). */
+  subscriber?: boolean;
   /** Scura per i momenti di passaggio, come l'esito dell'assessment nella demo. */
   tone?: "light" | "dark";
 }) {
@@ -122,7 +155,9 @@ export function AccountScreen({
         {children}
       </div>
       {footer && <div className="pf-acc-footer">{footer}</div>}
-      {nav && <AccountNav active={nav} coachDot={coachDot} />}
+      {nav && (
+        <AccountNav active={nav} coachDot={coachDot} subscriber={subscriber} />
+      )}
     </main>
   );
 }
