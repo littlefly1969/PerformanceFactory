@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { FitRankingView } from "../../../components/fit-ranking-editor";
 import type { FreeLessonView } from "../../_account/account-data";
+import { LessonDeclined } from "../../_account/lesson-declined";
 import type { lessonProgress } from "../../_account/lesson-unlock";
 import {
   type Availability,
@@ -226,6 +227,13 @@ export function LessonSection({
         <p>Non ancora disponibile nella tua zona.</p>
       </section>
     );
+  if (phase === "FULL")
+    return (
+      <section className="pf-prof-lz-off" aria-label="Lezione gratuita">
+        <span className="pf-prof-kicker">Lezione di prova</span>
+        <p>Al momento i circoli sono al completo.</p>
+      </section>
+    );
   if (phase === "LOCKED") {
     // Una revisione interna del profilo resta neutra per l'atleta.
     const review = !!view.missing?.includes("PROFILE");
@@ -253,7 +261,8 @@ export function LessonSection({
       </section>
     );
   }
-  if (phase === "ELIGIBLE" || phase === "DECLINED")
+  if (phase === "DECLINED") return <LessonDeclined />;
+  if (phase === "ELIGIBLE")
     return (
       <Link href="/journey/circolo" className="pf-prof-lz-ready">
         <span className="pf-prof-lz-pin" aria-hidden="true">

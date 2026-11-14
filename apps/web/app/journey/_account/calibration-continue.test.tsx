@@ -88,8 +88,8 @@ describe("Calibrazione con la lezione in attesa o R consolidata", () => {
       screen.queryByRole("button", { name: /Continua la calibrazione/ }),
     ).toBeNull();
     expect(
-      screen.getByRole("link", { name: "Salva e vai alla home" }),
-    ).toHaveAttribute("href", "/journey");
+      screen.getByRole("link", { name: "Salva e vai al profilo" }),
+    ).toHaveAttribute("href", "/journey/profilo?esito=calibrazione");
     await userEvent.click(scenarios);
     await waitFor(() => expect(assign).toHaveBeenCalledWith("/journey/stima"));
     expect(calls.some((c) => c.url.endsWith("/calibration/finish"))).toBe(true);

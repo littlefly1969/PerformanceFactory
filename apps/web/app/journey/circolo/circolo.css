@@ -543,3 +543,47 @@
 .pf-lz-group-dots i.is-me {
   background: var(--acc-lime);
 }
+
+/* Demo V11: stato del circolo sulla foto, «Disponibile» o «Al completo». */
+.pf-acc.is-dark .pf-lz-lead.is-small {
+  margin-top: 8px;
+  font-size: 13px;
+  line-height: 19px;
+  color: #ffffff8c;
+}
+.pf-lz-card-state {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: #0b0b0cb8;
+  color: #ffffffbf;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+}
+.pf-lz-card-state i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ff7a59;
+}
+.pf-lz-card-state.is-free {
+  background: var(--acc-lime);
+  color: var(--acc-ink);
+}
+.pf-lz-card-state.is-free i {
+  background: var(--acc-ink);
+}
+.pf-lz-card.is-full .pf-lz-photo {
+  filter: grayscale(0.6) brightness(0.8);
+}
+.pf-lz .pf-acc-pill[aria-disabled="true"] {
+  opacity: 0.4;
+}

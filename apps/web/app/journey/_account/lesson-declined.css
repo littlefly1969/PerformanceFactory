@@ -1,0 +1,67 @@
+/* Lezione di prova rifiutata, demo V11: scheda bianca con «Ho cambiato idea». */
+.pf-lz-declined {
+  padding: 18px;
+  border-radius: 26px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #eaeae7;
+  color: var(--acc-ink, #0b0b0c);
+}
+.pf-lz-declined-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.pf-lz-declined-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px #d6d6d2;
+}
+.pf-lz-declined-icon svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: #8a8a8f;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pf-lz-declined-kicker {
+  font-size: 9px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: #8a8a8f;
+}
+.pf-lz-declined strong {
+  display: block;
+  margin-top: 4px;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 22px;
+}
+.pf-lz-declined-cta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 46px;
+  margin-top: 14px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--acc-ink, #0b0b0c);
+  color: #fff;
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  text-decoration: none;
+}
+.pf-lz-declined-cta span:last-child {
+  font-size: 15px;
+  color: var(--acc-lime, #c8f02e);
+}
+.pf-lz-declined-cta:active {
+  transform: scale(0.985);
+}

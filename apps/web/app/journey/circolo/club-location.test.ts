@@ -6,6 +6,7 @@ const club = (
   city: string | null,
   province: string | null,
   location: { latitude: number; longitude: number } | null = null,
+  available = true,
 ) => ({
   id,
   name: id,
@@ -15,6 +16,7 @@ const club = (
   location,
   logoUrl: null,
   photoUrl: null,
+  available,
 });
 
 const clubs = [
@@ -28,6 +30,30 @@ const clubs = [
 ];
 
 describe("clubsFor", () => {
+  it("puts the full clubs after the available ones, keeping the order", () => {
+    const list = [
+      club(
+        "Pieno",
+        "Pescara",
+        "PE",
+        { latitude: 42.46, longitude: 14.21 },
+        false,
+      ),
+      ...clubs,
+    ];
+    const result = clubsFor(list, {
+      kind: "position",
+      coords: { latitude: 42.46, longitude: 14.21 },
+    });
+    expect(result.clubs.map((c) => c.id)).toEqual([
+      "Pescara 1",
+      "Montesilvano",
+      "Aquilano",
+      "Senza sede",
+      "Pieno",
+    ]);
+  });
+
   it("keeps the clubs of the city, ignoring case, accents and apostrophes", () => {
     const result = clubsFor(clubs, {
       kind: "area",

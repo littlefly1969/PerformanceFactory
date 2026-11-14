@@ -5,7 +5,9 @@ import ProfilePage from "../profilo/page";
 import CalibrationPage from "../calibrazione/page";
 import ClubPage from "../circolo/page";
 import type { Journey } from "../journey-types";
+import type { FreeLessonView } from "./account-data";
 import { AccountHome } from "./account-home";
+import { nextStep } from "./next-step";
 import { calibration, journey, lesson, ROUND, serve } from "./account-fixtures";
 vi.mock("../../lib/api", () => ({
   API_BASE: "/api",
@@ -94,9 +96,10 @@ describe("Round di domande completato", () => {
       }),
     ).toBeVisible();
     expect(screen.getByText("Blocco 2 completato")).toBeVisible();
+    // Demo V11: a fine blocco si esce verso il profilo.
     expect(
       screen.getByRole("link", { name: "Salva i progressi ed esci" }),
-    ).toHaveAttribute("href", "/journey");
+    ).toHaveAttribute("href", "/journey/profilo?esito=calibrazione");
     expect(assign).not.toHaveBeenCalled();
     expect(
       calls.find((c) => c.url.endsWith("/calibration/answers"))?.body,
@@ -314,7 +317,7 @@ const PROFILE = {
   global: { value: 83, low: 70, high: 96, confidence: 30, provisional: true },
 };
 
-describe("Prossimo passo nel profilo", () => {
+describe("Prossimo passo della fase gratuita", () => {
   const closedRound = calibration(null, "PAYWALL_READY");
   it.each([
     [
@@ -361,6 +364,16 @@ describe("Prossimo passo nel profilo", () => {
       "/journey/calibrazione",
     ],
     [
+      // Tutti i circoli al completo: si va agli scenari senza rinunciare.
+      "every club full and R consolidated",
+      calibration(null, "FREE_LEVEL_ESTIMATED", {
+        ruleMet: true,
+        canFinish: true,
+      }),
+      { ...lesson, phase: "FULL" },
+      "/journey/calibrazione",
+    ],
+    [
       "lesson declined",
       calibration(null),
       { ...lesson, phase: "DECLINED" },
@@ -384,17 +397,36 @@ describe("Prossimo passo nel profilo", () => {
       { ...lesson, phase: "CLOSED" },
       "/journey/stima",
     ],
-  ])("with %s", async (_case, current, view, href) => {
-    const j = journey({ calibration: current });
+  ])("with %s", (_case, current, view, href) => {
+    // Lo stesso passo guida la home e la scheda della lezione nel profilo.
+    const j = journey({ calibration: current }) as unknown as Journey;
+    expect(nextStep(j, view as unknown as FreeLessonView).href).toBe(href);
+  });
+
+  it("says the clubs are full in the profile, with no circle to choose", async () => {
     serve({
-      "/auth/journey": j,
+      "/auth/journey": journey({ calibration: calibration(null) }),
       "/athlete-journey/profile": PROFILE,
-      "/athlete-journey/free-lesson": view,
+      "/athlete-journey/free-lesson": { ...lesson, phase: "FULL" },
     });
     render(<ProfilePage />);
-    const profileStep = await screen.findByLabelText("Prossimo passo");
-    const profileLink = profileStep.querySelector("a")!;
-    expect(profileLink).toHaveAttribute("href", href);
+    expect(
+      await screen.findByText("Al momento i circoli sono al completo."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Scegli il circolo/)).toBeNull();
+    expect(screen.queryByText(/Ho cambiato idea/)).toBeNull();
+  });
+
+  it("no longer shows the «Fase gratuita» card in the profile (demo V11)", async () => {
+    serve({
+      "/auth/journey": journey({ calibration: calibration(null) }),
+      "/athlete-journey/profile": PROFILE,
+      "/athlete-journey/free-lesson": lesson,
+    });
+    render(<ProfilePage />);
+    expect(await screen.findByText("≈ 83")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Prossimo passo")).toBeNull();
+    expect(screen.queryByText("Fase gratuita")).toBeNull();
   });
 });
 
@@ -437,7 +469,8 @@ describe("Conferma nel riepilogo", () => {
 });
 
 describe("Lezione gratuita", () => {
-  it("shows the outcome of a decline and leads back to the summary", async () => {
+  it("declines from «Dove sei?» and confirms it in the profile", async () => {
+    const { assign } = navigation();
     const calls = serve({
       "/auth/journey": journey(),
       "/free-lesson/decline": { ...lesson, phase: "DECLINED" },
@@ -446,18 +479,59 @@ describe("Lezione gratuita", () => {
     render(<ClubPage />);
     await userEvent.click(
       await screen.findByRole("button", {
-        name: "Preferisco non fare la lezione",
+        name: "Non voglio fare la lezione di prova",
       }),
     );
-    const outcome = await screen.findByRole("status", { name: "Esito" });
-    expect(outcome).toHaveTextContent("Hai scelto di non fare la lezione.");
-    expect(outcome).toHaveFocus();
-    expect(
-      screen.getByRole("link", { name: /Torna al riepilogo/ }),
-    ).toHaveAttribute("href", "/journey/profilo?esito=lezione");
+    await waitFor(() =>
+      expect(assign).toHaveBeenCalledWith(
+        "/journey/profilo?esito=lezione-rifiutata",
+      ),
+    );
     expect(calls.some((c) => c.url.endsWith("/free-lesson/decline"))).toBe(
       true,
     );
+  });
+
+  it("shows «Ho cambiato idea» in home and profile after a decline", async () => {
+    window.history.replaceState(
+      null,
+      "",
+      "/journey/profilo?esito=lezione-rifiutata",
+    );
+    const declined = { ...lesson, phase: "DECLINED" };
+    serve({
+      "/auth/journey": journey({ calibration: calibration(null) }),
+      "/athlete-journey/profile": PROFILE,
+      "/athlete-journey/free-lesson": declined,
+    });
+    render(<ProfilePage />);
+    expect(
+      await screen.findByText("Va bene. Se ci ripensi, la lezione resta qui."),
+    ).toHaveAttribute("role", "status");
+    const card = await screen.findByRole("region", {
+      name: "Lezione di prova",
+    });
+    expect(card).toHaveTextContent("Hai scelto di non fare la lezione.");
+    expect(
+      screen.getByRole("link", { name: /Ho cambiato idea/ }),
+    ).toHaveAttribute("href", "/journey/circolo");
+    expect(screen.queryByText(/Scegli il circolo/)).toBeNull();
+    cleanup();
+
+    render(
+      <AccountHome
+        journey={
+          journey({ calibration: calibration(null) }) as unknown as Journey
+        }
+      />,
+    );
+    expect(
+      await screen.findByRole("link", { name: /Ho cambiato idea/ }),
+    ).toHaveAttribute("href", "/journey/circolo");
+    expect(
+      screen.getByText("Hai scelto di non fare la lezione."),
+    ).toBeVisible();
+    expect(screen.queryByText(/Scegli il circolo/)).toBeNull();
   });
 });
 

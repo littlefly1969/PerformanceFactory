@@ -106,6 +106,7 @@ export const lesson = {
       location: { latitude: 45.49, longitude: 9.19 },
       logoUrl: null,
       photoUrl: null,
+      available: true,
     },
     {
       id: "c2",
@@ -116,6 +117,7 @@ export const lesson = {
       location: { latitude: 45.45, longitude: 9.17 },
       logoUrl: null,
       photoUrl: null,
+      available: true,
     },
     {
       id: "c3",
@@ -126,6 +128,7 @@ export const lesson = {
       location: null,
       logoUrl: null,
       photoUrl: null,
+      available: true,
     },
   ],
   slots: [

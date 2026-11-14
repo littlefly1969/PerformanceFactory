@@ -6,6 +6,7 @@ import { ConsentStep } from "./consent-step";
 import { DurationStep, PerformanceResult } from "./performance-result";
 import { useJourney } from "./use-journey";
 import { MultiChoiceStep } from "./choice-options";
+import { mixedOptions } from "./mix-order";
 import { NumberChoiceStep, numericOptions } from "./number-choice";
 import { AccountHome } from "./_account/account-home";
 import { DarkQuestion, SingleOptions } from "./_account/dark-question";
@@ -183,11 +184,7 @@ export default function JourneyPage() {
     );
   if (j?.phase === "EVALUATION" && j.evaluation)
     return ready ? (
-      <ProvisionalReady
-        evaluation={j.evaluation}
-        calibration={j.calibration}
-        onHome={() => setReady(false)}
-      />
+      <ProvisionalReady evaluation={j.evaluation} calibration={j.calibration} />
     ) : (
       <AccountHome journey={j} />
     );
@@ -224,7 +221,7 @@ export default function JourneyPage() {
         {q.multiple ? (
           <MultiChoiceStep
             key={q.id}
-            options={q.options}
+            options={mixedOptions(q.options, q.id)}
             initial={j.answers[q.id]}
             busy={busy}
             onSubmit={(value) => answer(value)}
@@ -239,7 +236,7 @@ export default function JourneyPage() {
           />
         ) : (
           <SingleOptions
-            options={q.options}
+            options={mixedOptions(q.options, q.id)}
             selected={j.answers[q.id]}
             busy={busy}
             onSelect={(value) => void answer(value)}

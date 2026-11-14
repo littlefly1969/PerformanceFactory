@@ -11,6 +11,7 @@ const base = {
   calibrationStatus: 'FREE_LEVEL_ESTIMATED',
   eligibilityMet: true,
   clubs: 1,
+  bookable: 1,
   seatStatus: null,
   declined: false,
 };
@@ -81,6 +82,26 @@ describe('free lesson rules', () => {
     expect(
       lessonEligibility({ ...base, declined: true, eligibilityMet: false }),
     ).toEqual({ phase: 'LOCKED', missing: ['CONFIDENCE'] });
+  });
+
+  it('V11: with every club full the lesson is not a choice to make, nor a decline', () => {
+    expect(lessonEligibility({ ...base, bookable: 0 })).toEqual({
+      phase: 'FULL',
+      missing: [],
+    });
+    // Neanche una rinuncia passata: con posti liberi torna reversibile.
+    expect(
+      lessonEligibility({ ...base, bookable: 0, declined: true }).phase,
+    ).toBe('FULL');
+    // Un posto già richiesto resta tale anche se i calendari si riempiono.
+    expect(
+      lessonEligibility({ ...base, bookable: 0, seatStatus: 'REQUESTED' })
+        .phase,
+    ).toBe('REQUESTED');
+    // Le condizioni mancanti vengono prima.
+    expect(
+      lessonEligibility({ ...base, bookable: 0, eligibilityMet: false }).phase,
+    ).toBe('LOCKED');
   });
 
   it('AT-11: an open internal flag suspends only the lesson, with a neutral reason', () => {

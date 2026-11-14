@@ -3,18 +3,19 @@ import type { ReactNode } from "react";
 import type { Calibration, Evaluation } from "../journey-types";
 import { AccountScreen, PillButton, PillLink } from "./account-shell";
 import { definedAreas } from "./calibration-state";
+import { summaryHref } from "./next-step";
 import { MiniSpider } from "./spiders";
 
 /**
  * Esito dell'assessment nella veste della demo PF10: fondo scuro, Spider
  * provvisorio e barra della calibrazione con la soglia della regola di
  * consolidamento restituita dal server. È una prima stima, che si affina con
- * i blocchi di calibrazione; la stessa schermata chiude ogni blocco.
+ * i blocchi di calibrazione; la stessa schermata chiude ogni blocco. Come
+ * nella demo V11, uscendo si salva e si va al profilo.
  */
 export function ProvisionalReady({
   evaluation,
   calibration,
-  onHome,
   kicker = "Prime domande completate",
   title = "Il tuo profilo provvisorio è pronto.",
   onContinue,
@@ -22,8 +23,6 @@ export function ProvisionalReady({
 }: {
   evaluation: Evaluation;
   calibration?: Calibration | null;
-  /** Uscita senza ricaricare; senza, «Salva i progressi ed esci» porta alla home. */
-  onHome?: () => void;
   kicker?: string;
   title?: string;
   /** Prossimo blocco nella stessa pagina; senza, si apre la calibrazione. */
@@ -43,8 +42,9 @@ export function ProvisionalReady({
   // Aree già definite: il loro braccio dello Spider è continuo.
   const defined = definedAreas(calibration, evaluation.drivers);
   // Calibrazione sufficiente: niente «Continua la calibrazione». Il passo
-  // giallo è quello in più (circolo, scenari) o, senza, il ritorno alla home.
-  const home = reached && !extra;
+  // giallo è quello in più (circolo, scenari) o, senza, il profilo.
+  const exit = summaryHref("calibrazione");
+  const toProfile = reached && !extra;
   return (
     <AccountScreen
       tone="dark"
@@ -60,24 +60,12 @@ export function ProvisionalReady({
             </PillLink>
           )}
           {extra}
-          {home && onHome ? (
-            <PillButton tone="lime" onClick={onHome}>
-              Salva e vai alla home
-            </PillButton>
-          ) : home ? (
-            <PillLink href="/journey" tone="lime">
-              Salva e vai alla home
+          {toProfile ? (
+            <PillLink href={exit} tone="lime">
+              Salva e vai al profilo
             </PillLink>
           ) : (
-            <Link
-              href="/journey"
-              className="pf-acc-link"
-              onClick={(event) => {
-                if (!onHome) return;
-                event.preventDefault();
-                onHome();
-              }}
-            >
+            <Link href={exit} className="pf-acc-link">
               Salva i progressi ed esci
             </Link>
           )}

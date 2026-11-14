@@ -493,45 +493,6 @@
   font-size: 16px;
 }
 
-/* Prossimo passo della fase gratuita. */
-.pf-prof-phase {
-  margin-top: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 14px 14px 14px 18px;
-  border-radius: 26px;
-  background: var(--acc-ink);
-}
-.pf-prof-phase > div {
-  min-width: 0;
-}
-.pf-prof-phase .pf-prof-kicker {
-  color: #ffffff8c;
-}
-.pf-prof-phase strong {
-  display: block;
-  margin-top: 4px;
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  color: #fff;
-}
-.pf-prof-body .pf-prof-phase a {
-  min-height: 44px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 8px 16px;
-  border-radius: 999px;
-  background: var(--acc-lime);
-  font-size: 10px;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
-}
-
 /* Schede larghe: analisi, invito, community. */
 .pf-prof-link {
   display: block;
@@ -553,10 +514,6 @@
 }
 .pf-prof-link.is-outline .pf-prof-arrow {
   background: none;
-}
-.pf-prof-areas + .pf-prof-phase + .pf-prof-link,
-.pf-prof-phase + .pf-prof-link {
-  margin-top: 8px;
 }
 .pf-prof-ext {
   width: 14px;

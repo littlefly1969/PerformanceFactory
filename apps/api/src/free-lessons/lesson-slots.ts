@@ -42,6 +42,10 @@ export async function lessonSlots(db: Db, now = new Date()) {
     .filter((lesson) => lesson.seatsLeft > 0);
 }
 
+/** Circoli con almeno una lezione in calendario con posti liberi. */
+export const openClubIds = (slots: Array<{ partnerId: string }>) =>
+  new Set(slots.map((slot) => slot.partnerId));
+
 /** La lezione preferita è in calendario, nel circolo scelto e ha posto. */
 export async function checkPreferredLesson(
   db: Db,

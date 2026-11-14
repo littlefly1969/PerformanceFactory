@@ -24,9 +24,12 @@ import { loadFreeLessonSettings, syncCredits } from './free-lesson-config';
 import { loadGift } from './free-lesson-gift';
 import { lessonEligibility } from './free-lesson-rules';
 import { holdCalibration, releaseCalibration } from './lesson-hold';
-import { checkPreferredLesson, lessonSlots } from './lesson-slots';
+import { checkPreferredLesson, lessonSlots, openClubIds } from './lesson-slots';
 
 type Db = PrismaService | Prisma.TransactionClient;
+
+export const CLUB_FULL =
+  'Questo circolo al momento è al completo: nessun posto per la lezione di prova.';
 
 /**
  * Le due verifiche della lezione (PF-FS-PREPAYWALL §6.2) sull'ultima
@@ -34,27 +37,38 @@ type Db = PrismaService | Prisma.TransactionClient;
  * anche la versione della regola e la valutazione usate, da registrare.
  */
 async function checkLesson(db: Db, userId: string) {
-  const [calibration, seat, clubs, policy, consolidation, latest, suspended] =
-    await Promise.all([
-      db.athleteCalibration.findUnique({
-        where: { userId },
-        select: { status: true, lessonDeclinedAt: true },
-      }),
-      db.freeLessonSeat.findUnique({ where: { userId } }),
-      lessonClubs(db),
-      loadActivePolicy(db, 'LESSON_ELIGIBILITY'),
-      loadActivePolicy(db, 'R_CONSOLIDATION'),
-      db.assessmentEvaluation.findFirst({
-        where: { userId },
-        orderBy: { sequence: 'desc' },
-        select: {
-          id: true,
-          overallConfidence: true,
-          areas: { select: { areaId: true, confidence: true } },
-        },
-      }),
-      lessonSuspended(db, userId),
-    ]);
+  const [
+    calibration,
+    seat,
+    clubs,
+    policy,
+    consolidation,
+    latest,
+    suspended,
+    slots,
+  ] = await Promise.all([
+    db.athleteCalibration.findUnique({
+      where: { userId },
+      select: { status: true, lessonDeclinedAt: true },
+    }),
+    db.freeLessonSeat.findUnique({ where: { userId } }),
+    lessonClubs(db),
+    loadActivePolicy(db, 'LESSON_ELIGIBILITY'),
+    loadActivePolicy(db, 'R_CONSOLIDATION'),
+    db.assessmentEvaluation.findFirst({
+      where: { userId },
+      orderBy: { sequence: 'desc' },
+      select: {
+        id: true,
+        overallConfidence: true,
+        areas: { select: { areaId: true, confidence: true } },
+      },
+    }),
+    lessonSuspended(db, userId),
+    lessonSlots(db),
+  ]);
+  // Circoli con posti: senza nessuno la lezione è al completo (FULL).
+  const open = openClubIds(slots);
   // Si sblocca solo con tutte le aree Reali (e la regola in vigore).
   const eligibilityMet =
     !!latest &&
@@ -65,12 +79,14 @@ async function checkLesson(db: Db, userId: string) {
   return {
     seat,
     clubs,
+    open,
     policy,
     evaluationId: latest?.id ?? null,
     ...lessonEligibility({
       calibrationStatus: calibration?.status ?? null,
       eligibilityMet,
       clubs: clubs.length,
+      bookable: clubs.filter((club) => open.has(club.id)).length,
       seatStatus: seat?.status ?? null,
       declined: !!calibration?.lessonDeclinedAt,
       suspended,
@@ -130,6 +146,7 @@ export class FreeLessonService {
       },
     });
     const detailById = new Map(details.map((d) => [d.id, d]));
+    const open = openClubIds(slots);
     const clubsForAthlete = clubs.map((club) => {
       const detail = detailById.get(club.id);
       return {
@@ -145,6 +162,9 @@ export class FreeLessonService {
           'photo',
           detail?.photoUpdatedAt ?? null,
         ),
+        // «Disponibile» con almeno una lezione in calendario con posto,
+        // altrimenti «Al completo» e non si sceglie (demo V11).
+        available: open.has(club.id),
       };
     });
     const seat = check.seat
@@ -237,15 +257,18 @@ export class FreeLessonService {
     if (!club) throw new BadRequestException('Circolo non disponibile');
     await this.prisma.$transaction(async (tx) => {
       await lockCalibration(tx, userId);
-      const { phase, missing, policy, evaluationId } = await checkLesson(
-        tx,
-        userId,
-      );
+      const { phase, missing, policy, evaluationId, seat, open } =
+        await checkLesson(tx, userId);
       const preferredLessonId = await checkPreferredLesson(
         tx,
         lessonId,
         partnerId,
       );
+      // Un circolo al completo non si sceglie; chi l'ha già richiesto può
+      // tenerlo e cambiare solo l'orario preferito.
+      const kept = phase === 'REQUESTED' && seat?.partnerId === partnerId;
+      if (!kept && !open.has(partnerId))
+        throw new BadRequestException(CLUB_FULL);
       if (phase === 'REQUESTED')
         // Cambio di circolo o di orario finché il posto non è assegnato.
         return void (await tx.freeLessonSeat.update({

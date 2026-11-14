@@ -14,6 +14,7 @@ import {
   isClosed,
   isConsolidated,
 } from "./calibration-state";
+import { LessonDeclined } from "./lesson-declined";
 import { lessonProgress } from "./lesson-unlock";
 import { REVEAL_HREF, nextStep } from "./next-step";
 import "./account-home.css";
@@ -159,7 +160,9 @@ function Banner({
       </section>
     );
   }
-  if (phase === "ELIGIBLE" || phase === "DECLINED")
+  // Rinuncia reversibile: «Ho cambiato idea» riapre la scelta del circolo.
+  if (phase === "DECLINED") return <LessonDeclined />;
+  if (phase === "ELIGIBLE")
     return (
       <section className="pf-hm-lesson is-ready" aria-label="Lezione gratuita">
         <div className="pf-hm-lesson-head">

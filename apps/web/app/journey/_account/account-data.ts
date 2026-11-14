@@ -40,6 +40,11 @@ export type LessonClub = {
   /** Percorsi relativi alla base dell'API, versionati dal back office. */
   logoUrl: string | null;
   photoUrl: string | null;
+  /**
+   * Almeno una lezione in calendario con posti liberi: «Disponibile».
+   * Altrimenti «Al completo» e il circolo non si sceglie (demo V11).
+   */
+  available: boolean;
 };
 
 export type FreeLessonView =
@@ -55,7 +60,9 @@ export type FreeLessonView =
         | "ASSIGNED"
         | "ATTENDED"
         | "NO_SHOW"
-        | "CLOSED";
+        | "CLOSED"
+        /** Circoli che la offrono, ma tutti al completo: niente da scegliere né rifiutare. */
+        | "FULL";
       missing: Array<"LEVEL" | "CONFIDENCE" | "PROFILE">;
       credits: { balance: number; toUnlock: number };
       clubs: LessonClub[];

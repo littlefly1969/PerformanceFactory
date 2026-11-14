@@ -25,9 +25,21 @@ const SCOPE_NOTE = {
     `A ${city} non ci sono circoli con la lezione gratuita: ecco tutti quelli disponibili.`,
 } as const;
 
+export const CLUB_FULL_NOTICE =
+  "Questo circolo al momento è al completo: nessun posto per la lezione di prova.";
+
+/** «3 circoli disponibili per la lezione di prova · 2 al completo.» */
+export const availabilityLine = (clubs: Array<{ available: boolean }>) => {
+  const free = clubs.filter((club) => club.available).length;
+  const full = clubs.length - free;
+  return `${free} ${free === 1 ? "circolo disponibile" : "circoli disponibili"} per la lezione di prova${full ? ` · ${full} al completo` : ""}.`;
+};
+
 /**
- * «Dove giochi?» della demo PF10: il luogo scelto in alto, la ricerca per
- * nome e i circoli a carosello con foto, logo e distanza (o città).
+ * «Dove giochi?» della demo V11: il luogo scelto in alto, quanti circoli
+ * hanno posto, la ricerca per nome e i circoli a carosello con foto,
+ * iniziali, distanza (o città) e stato «Disponibile» / «Al completo». Un
+ * circolo al completo non si sceglie. In fondo, la rinuncia alla lezione.
  */
 export function ClubStep({
   place,
@@ -36,6 +48,8 @@ export function ClubStep({
   onSelect,
   onPick,
   onChangePlace,
+  onDecline,
+  busy = false,
   headingRef,
 }: {
   place: Place;
@@ -44,9 +58,14 @@ export function ClubStep({
   onSelect: (id: string) => void;
   onPick: (id: string) => void;
   onChangePlace: () => void;
+  /** «Non voglio fare la lezione di prova»; senza, il link non c'è. */
+  onDecline?: () => void;
+  busy?: boolean;
   headingRef: React.RefObject<HTMLHeadingElement | null>;
 }) {
   const [query, setQuery] = useState("");
+  // Avviso del circolo al completo, finché non se ne sceglie un altro.
+  const [fullNotice, setFullNotice] = useState(false);
   const track = useRef<HTMLDivElement>(null);
   // Durante lo scorrimento automatico il centro passa su altri circoli.
   const autoScrollUntil = useRef(0);
@@ -108,6 +127,9 @@ export function ClubStep({
       <h1 className="pf-lz-title" tabIndex={-1} ref={headingRef}>
         Dove giochi?
       </h1>
+      {search.clubs.length > 0 && (
+        <p className="pf-lz-lead is-small">{availabilityLine(search.clubs)}</p>
+      )}
       {note && <p className="pf-lz-note">{note}</p>}
       {search.clubs.length > 1 && (
         <div className="pf-lz-search is-small">
@@ -140,20 +162,33 @@ export function ClubStep({
           >
             {list.map((club, index) => {
               const on = club.id === active?.id;
+              const state = club.available ? "Disponibile" : "Al completo";
               return (
                 <button
                   type="button"
                   role="radio"
                   aria-checked={on}
                   key={club.id}
-                  className={`pf-lz-card${on ? " is-active" : ""}`}
-                  aria-label={`${club.name}${clubBadge(club) ? `, ${clubBadge(club)}` : ""}`}
-                  onClick={() => (on ? onPick(club.id) : onSelect(club.id))}
+                  className={`pf-lz-card${on ? " is-active" : ""}${club.available ? "" : " is-full"}`}
+                  aria-label={`${club.name}${clubBadge(club) ? `, ${clubBadge(club)}` : ""}, ${state}`}
+                  onClick={() => {
+                    setFullNotice(false);
+                    if (!on) return onSelect(club.id);
+                    if (club.available) onPick(club.id);
+                    else setFullNotice(true);
+                  }}
                 >
                   <ClubPhoto club={club} eager={index < 3} />
                   {clubBadge(club) && (
                     <span className="pf-lz-card-badge">{clubBadge(club)}</span>
                   )}
+                  <span
+                    className={`pf-lz-card-state${club.available ? " is-free" : ""}`}
+                    aria-hidden="true"
+                  >
+                    <i />
+                    {state}
+                  </span>
                   <span className="pf-lz-card-id">
                     <ClubLogo club={club} />
                     <b>{club.name}</b>
@@ -174,14 +209,34 @@ export function ClubStep({
           )}
         </>
       )}
+      {fullNotice && active && !active.available && (
+        <p className="pf-lz-note" role="status">
+          {CLUB_FULL_NOTICE}
+        </p>
+      )}
       <div className="pf-acc-footer">
         <PillButton
           tone="lime"
           disabled={!active}
-          onClick={() => active && onPick(active.id)}
+          aria-disabled={active && !active.available ? true : undefined}
+          onClick={() => {
+            if (!active) return;
+            if (active.available) onPick(active.id);
+            else setFullNotice(true);
+          }}
         >
-          Gioco qui
+          {active && !active.available ? "Al completo" : "Gioco qui"}
         </PillButton>
+        {onDecline && (
+          <button
+            type="button"
+            className="pf-acc-link pf-lz-decline"
+            disabled={busy}
+            onClick={onDecline}
+          >
+            Non voglio fare la lezione di prova
+          </button>
+        )}
       </div>
     </div>
   );

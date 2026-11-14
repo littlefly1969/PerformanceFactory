@@ -1,25 +1,12 @@
 import { API_BASE } from "../../lib/api";
-
-type WithImages = {
-  name: string;
-  logoUrl: string | null;
-  photoUrl: string | null;
-};
-
-const initials = (name: string) =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0]!.toUpperCase())
-    .join("");
+import { clubInitials } from "../../lib/club-initials";
 
 /** Foto del circolo dal back office; senza, un fondo scuro. */
 export function ClubPhoto({
   club,
   eager = true,
 }: {
-  club: WithImages;
+  club: { photoUrl: string | null };
   eager?: boolean;
 }) {
   return club.photoUrl ? (
@@ -35,14 +22,14 @@ export function ClubPhoto({
   );
 }
 
-/** Logo del circolo su fondo bianco; senza, le iniziali. */
-export function ClubLogo({ club }: { club: WithImages }) {
-  return club.logoUrl ? (
-    // eslint-disable-next-line @next/next/no-img-element -- immagine dall'API, già ridimensionata
-    <img className="pf-lz-logo" src={`${API_BASE}${club.logoUrl}`} alt="" />
-  ) : (
+/**
+ * Iniziali del circolo su fondo bianco, sempre al posto del logo (demo V11):
+ * l'immagine del circolo è la foto.
+ */
+export function ClubLogo({ club }: { club: { name: string } }) {
+  return (
     <span className="pf-lz-logo is-empty" aria-hidden="true">
-      {initials(club.name)}
+      {clubInitials(club.name)}
     </span>
   );
 }
