@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma, ProgramHorizon, UserRole } from '@prisma/client';
 import { ConsentsService } from '../consents/consents.service';
-import { globalR } from '../discovery/athlete-profile';
+import { weightedScore } from '../discovery/athlete-profile';
 import { FeatureFlagsService } from '../features/feature-flags.service';
 import { PROGRAM_HORIZON_MONTHS } from '../payments/payment-plans';
 import { hasEntitlement } from '../payments/subscription-transitions';
@@ -20,8 +20,8 @@ import {
   publicName,
   rankEntries,
   rankingConfigProblems,
+  rankingNumbers,
   rankingScore,
-  toPercent,
 } from './ranking-rules';
 
 const CONFIG_ID = 'default';
@@ -68,7 +68,8 @@ export class RankingService {
   /**
    * Abbonati con accesso al programma, con reale (R globale dell'ultima
    * valutazione) e potenziale (P dell'orizzonte pagato, dagli scenari più
-   * recenti). Senza valutazione o senza P per quell'orizzonte non si entra.
+   * recenti), entrambi riportati a 0-100. Senza valutazione o senza P per
+   * quell'orizzonte non si entra.
    */
   async population(
     config: RankingConfigValues,
@@ -102,7 +103,6 @@ export class RankingService {
         distinct: ['userId'],
         select: {
           userId: true,
-          overallConfidence: true,
           minScore: true,
           maxScore: true,
           areas: { select: { score: true, confidence: true } },
@@ -125,17 +125,12 @@ export class RankingService {
     ]);
     const entries: RankingEntry[] = [];
     for (const evaluation of evaluations) {
-      const scale = { min: evaluation.minScore, max: evaluation.maxScore };
-      const real = globalR(
-        evaluation.areas,
-        evaluation.overallConfidence,
-        scale,
-      )?.value;
+      const real = weightedScore(evaluation.areas);
       const paid = horizons.get(evaluation.userId);
       const rows = scenarios.filter(
         (r) => r.userId === evaluation.userId && r.horizon === paid,
       );
-      if (real === undefined || !rows.length) continue;
+      if (real === null || !rows.length) continue;
       // Scenari dell'ultima generazione: stessa valutazione e stesso motore.
       const [latest] = rows;
       const group = rows.filter(
@@ -144,26 +139,26 @@ export class RankingService {
           r.engine === latest.engine &&
           r.engineVersion === latest.engineVersion,
       );
-      const potentialScale = {
-        min: latest.evaluation.minScore,
-        max: latest.evaluation.maxScore,
-      };
-      const p = globalR(
-        group.map((r) => ({ score: r.value, confidence: r.confidence })),
-        100,
-        potentialScale,
-      )!.value;
-      const realPercent = toPercent(real, scale);
-      // P non scende sotto R: il potenziale è dove puoi arrivare da qui.
-      const potentialPercent = Math.max(
-        realPercent,
-        toPercent(p, potentialScale),
+      // Ognuno nella scala della sua valutazione, poi tutti e due su 0-100.
+      const numbers = rankingNumbers(
+        {
+          value: real,
+          scale: { min: evaluation.minScore, max: evaluation.maxScore },
+        },
+        {
+          value: weightedScore(
+            group.map((r) => ({ score: r.value, confidence: r.confidence })),
+          )!,
+          scale: {
+            min: latest.evaluation.minScore,
+            max: latest.evaluation.maxScore,
+          },
+        },
       );
       entries.push({
         userId: evaluation.userId,
-        real,
-        potential: Math.max(p, real),
-        score: rankingScore(realPercent, potentialPercent, config),
+        ...numbers,
+        score: rankingScore(numbers.real, numbers.potential, config),
       });
     }
     return { ranked: rankEntries(entries, config), horizons };
@@ -223,8 +218,9 @@ export class RankingService {
       bandText: BAND_TEXT[me.band],
       position: me.position,
       size: band.length,
-      real: me.real,
-      potential: me.potential,
+      // Numeri su 0-100, come il punteggio che decide la fascia.
+      real: Math.round(me.real),
+      potential: Math.round(me.potential),
       horizon,
       months: PROGRAM_HORIZON_MONTHS[horizon],
       weights: {
@@ -234,8 +230,8 @@ export class RankingService {
       board: rows.map((r) => ({
         position: r.position,
         name: nameOf(r.userId),
-        real: r.real,
-        potential: r.potential,
+        real: Math.round(r.real),
+        potential: Math.round(r.potential),
         me: r.userId === userId,
       })),
       bands: this.bands(ranked, config, me.band),

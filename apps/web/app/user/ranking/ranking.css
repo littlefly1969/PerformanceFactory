@@ -48,6 +48,32 @@
   margin: 8px 0 0 32px;
   font-size: 12px;
 }
+.pf-rank-consent {
+  margin: 10px 0 0 32px;
+  font-size: 12px;
+  line-height: 17px;
+}
+.pf-rank-consent summary {
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.pf-rank-consent section {
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #0b0b0c0a;
+}
+.pf-rank-consent section p {
+  margin: 6px 0 0;
+}
+.pf-rank-consent section small {
+  margin-top: 8px;
+}
+.pf-rank-visibility.is-dark .pf-rank-consent section {
+  background: #ffffff12;
+}
 .pf-rank-visibility.is-dark {
   color: #fff;
 }

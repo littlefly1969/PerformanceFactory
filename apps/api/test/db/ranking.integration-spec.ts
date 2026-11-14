@@ -71,10 +71,46 @@ describe('Ranking PF1-PF4 on PostgreSQL', () => {
       update: { enabled, rolloutPercent: 100 },
     });
 
+  type Scale = { min: number; max: number };
+  const HUNDRED: Scale = { min: 0, max: 100 };
+
+  const evaluate = (
+    userId: string,
+    sequence: number,
+    scale: Scale,
+    score: number,
+  ) =>
+    prisma.assessmentEvaluation.create({
+      data: {
+        userId,
+        sequence,
+        status: 'CONSOLIDATED',
+        summary: 's',
+        overallConfidence: 80,
+        minScore: scale.min,
+        maxScore: scale.max,
+        provider: 'stub',
+        model: 'stub',
+        promptHash: 'h',
+        inputJson: {},
+        outputJson: {},
+        areas: {
+          create: areaIds.map((areaId) => ({
+            areaId,
+            score,
+            confidence: 80,
+            rationale: 'r',
+            evidenceGaps: [],
+          })),
+        },
+      },
+    });
+
   /**
-   * Atleta con valutazione (R = `real` su tutte le aree) e scenari per gli
-   * orizzonti dati; `paid` crea l'abbonamento con accesso, `expired` uno
-   * scaduto.
+   * Atleta con valutazione (R = `real` su tutte le aree, nella scala
+   * `scale`) e scenari per gli orizzonti dati; `paid` crea l'abbonamento
+   * con accesso, `expired` uno scaduto. Con `scenarioScale` gli scenari
+   * vengono da una valutazione precedente con quell'altra scala.
    */
   const athlete = async (input: {
     firstName: string;
@@ -83,6 +119,8 @@ describe('Ranking PF1-PF4 on PostgreSQL', () => {
     potential: Partial<Record<ProgramHorizon, number>>;
     paid?: ProgramHorizon;
     expired?: boolean;
+    scale?: Scale;
+    scenarioScale?: Scale;
   }) => {
     const user = await prisma.user.create({
       data: {
@@ -94,31 +132,15 @@ describe('Ranking PF1-PF4 on PostgreSQL', () => {
       },
     });
     users.push(user.id);
-    const evaluation = await prisma.assessmentEvaluation.create({
-      data: {
-        userId: user.id,
-        sequence: 1,
-        status: 'CONSOLIDATED',
-        summary: 's',
-        overallConfidence: 80,
-        minScore: 0,
-        maxScore: 100,
-        provider: 'stub',
-        model: 'stub',
-        promptHash: 'h',
-        inputJson: {},
-        outputJson: {},
-        areas: {
-          create: areaIds.map((areaId) => ({
-            areaId,
-            score: input.real,
-            confidence: 80,
-            rationale: 'r',
-            evidenceGaps: [],
-          })),
-        },
-      },
-    });
+    const scale = input.scale ?? HUNDRED;
+    // Gli scenari restano legati alla valutazione da cui sono nati.
+    const evaluation = await evaluate(
+      user.id,
+      1,
+      input.scenarioScale ?? scale,
+      input.real,
+    );
+    if (input.scenarioScale) await evaluate(user.id, 2, scale, input.real);
     await prisma.potentialScenario.createMany({
       data: Object.entries(input.potential).flatMap(([horizon, value]) =>
         areaIds.map((areaId) => ({
@@ -234,6 +256,53 @@ describe('Ranking PF1-PF4 on PostgreSQL', () => {
     expect(pf1).toMatchObject({ min: 80, me: true });
     expect(pf1.size).toBe(view.size);
     expect(view.example?.athletes.map((a) => a.band)).toEqual(['PF2', 'PF3']);
+  });
+
+  it('compares real and potential on 0-100 when evaluations use different scales', async () => {
+    await setFlag(true);
+    await prisma.rankingConfig.deleteMany({});
+    // Ultima valutazione su 0-10 (7,5 → 75), scenari della precedente su
+    // 0-100 (85): punteggio 0,6 · 75 + 0,4 · 85 = 79.
+    const tenths = await athlete({
+      firstName: 'Teo',
+      real: 7.5,
+      scale: { min: 0, max: 10 },
+      potential: { PROGRAM_3M: 85 },
+      scenarioScale: HUNDRED,
+      paid: 'PROGRAM_3M',
+    });
+    // Tutto su 0-100: 0,6 · 73 + 0,4 · 88 = 79, pari punteggio. Lo spareggio
+    // guarda il reale su 0-100 (75 contro 73), non il grezzo (7,5 contro 73).
+    const percent = await athlete({
+      firstName: 'Pia',
+      real: 73,
+      potential: { PROGRAM_3M: 88 },
+      paid: 'PROGRAM_3M',
+    });
+    // Reale su 0-100 (70), scenari di una valutazione su 0-10 (8 → 80).
+    const mixed = await athlete({
+      firstName: 'Max',
+      real: 70,
+      potential: { PROGRAM_3M: 8 },
+      scenarioScale: { min: 0, max: 10 },
+      paid: 'PROGRAM_3M',
+    });
+
+    const teo = await ranked(tenths);
+    const pia = await ranked(percent);
+    expect(teo).toMatchObject({ band: 'PF2', real: 75, potential: 85 });
+    expect(pia).toMatchObject({ band: 'PF2', real: 73, potential: 88 });
+    expect(pia.position).toBe(teo.position + 1);
+    expect(teo.board.find((r) => r.me)).toMatchObject({
+      real: 75,
+      potential: 85,
+    });
+    // 0,6 · 70 + 0,4 · 80 = 74: PF2, con il potenziale non schiacciato a 70.
+    expect(await ranked(mixed)).toMatchObject({
+      band: 'PF2',
+      real: 70,
+      potential: 80,
+    });
   });
 
   it('announces a band once and again when it changes with the admin config', async () => {

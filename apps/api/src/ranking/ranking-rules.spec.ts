@@ -6,6 +6,7 @@ import {
   publicName,
   rankEntries,
   rankingConfigProblems,
+  rankingNumbers,
   rankingScore,
   toPercent,
 } from './ranking-rules';
@@ -52,6 +53,68 @@ describe('ranking rules', () => {
       ['b', 'PF4', 1],
       ['d', 'PF4', 2],
       ['c', 'PF4', 3],
+    ]);
+  });
+
+  it('brings real and potential to 0-100 before comparing them', () => {
+    const ten = { min: 0, max: 10 };
+    const hundred = { min: 0, max: 100 };
+    // Stessa scala 0-10: 7,2 e 8,5 diventano 72 e 85.
+    const a = rankingNumbers(
+      { value: 7.2, scale: ten },
+      { value: 8.5, scale: ten },
+    );
+    expect(a.real).toBeCloseTo(72);
+    expect(a.potential).toBeCloseTo(85);
+    // Reale su 0-10, potenziale da una valutazione precedente su 0-100: il
+    // massimo grezzo (max(64, 7,2) = 64) sarebbe sbagliato, normalizzato è 72.
+    const b = rankingNumbers(
+      { value: 7.2, scale: ten },
+      { value: 64, scale: hundred },
+    );
+    expect(b.real).toBeCloseTo(72);
+    expect(b.potential).toBeCloseTo(72);
+    // Al contrario: reale 70 su 0-100, potenziale 8 su 0-10 → 80.
+    const c = rankingNumbers(
+      { value: 70, scale: hundred },
+      { value: 8, scale: ten },
+    );
+    expect([c.real, c.potential]).toEqual([70, 80]);
+    expect(
+      rankingNumbers(
+        { value: 5, scale: { min: 1, max: 9 } },
+        {
+          value: 9,
+          scale: { min: 1, max: 9 },
+        },
+      ),
+    ).toEqual({ real: 50, potential: 100 });
+  });
+
+  it('breaks ties on the normalised real across different scales', () => {
+    // Stesso punteggio: vince il reale più alto su 0-100 (7,2/10 = 72 batte
+    // 70/100), non il numero grezzo più grande.
+    const tenths = rankingNumbers(
+      { value: 7.2, scale: { min: 0, max: 10 } },
+      { value: 7.5, scale: { min: 0, max: 10 } },
+    );
+    const percent = rankingNumbers(
+      { value: 70, scale: { min: 0, max: 100 } },
+      { value: 78, scale: { min: 0, max: 100 } },
+    );
+    const score = (n: { real: number; potential: number }) =>
+      rankingScore(n.real, n.potential, DEFAULT_RANKING_CONFIG);
+    expect(score(tenths)).toBeCloseTo(score(percent));
+    const ranked = rankEntries(
+      [
+        { userId: 'a', ...percent, score: 73.2 },
+        { userId: 'z', ...tenths, score: 73.2 },
+      ],
+      DEFAULT_RANKING_CONFIG,
+    );
+    expect(ranked.map((r) => [r.userId, r.position])).toEqual([
+      ['z', 1],
+      ['a', 2],
     ]);
   });
 

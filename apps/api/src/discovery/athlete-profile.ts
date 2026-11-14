@@ -23,6 +23,17 @@ const MIN_WEIGHT = 5;
 type Driver = { score: number; confidence: number };
 
 /**
+ * Media delle aree pesata sulla confidenza, senza arrotondare: è il valore
+ * di R prima di presentarlo (il ranking lo riporta su 0-100 da qui).
+ */
+export function weightedScore(drivers: Driver[]) {
+  if (!drivers.length) return null;
+  const weights = drivers.map((d) => Math.max(d.confidence, MIN_WEIGHT));
+  const total = weights.reduce((sum, w) => sum + w, 0);
+  return drivers.reduce((sum, d, i) => sum + d.score * weights[i], 0) / total;
+}
+
+/**
  * Sintesi globale di R, provvisoria finché manca la Parte C: non è la media
  * dei driver ma la media pesata per la loro confidenza, con un intervallo
  * che dipende dalla confidenza complessiva.
@@ -32,11 +43,8 @@ export function globalR(
   overallConfidence: number,
   scale: { min: number; max: number },
 ) {
-  if (!drivers.length) return null;
-  const weights = drivers.map((d) => Math.max(d.confidence, MIN_WEIGHT));
-  const total = weights.reduce((sum, w) => sum + w, 0);
-  const value =
-    drivers.reduce((sum, d, i) => sum + d.score * weights[i], 0) / total;
+  const value = weightedScore(drivers);
+  if (value === null) return null;
   const confidence = Math.max(0, Math.min(100, overallConfidence));
   const half =
     ((100 - confidence) / 100) * (scale.max - scale.min) * GLOBAL_R_SPREAD;

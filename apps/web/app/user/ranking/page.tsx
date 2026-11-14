@@ -83,7 +83,7 @@ function Ranked({ view }: { view: RankedView }) {
           </li>
         ))}
       </ol>
-      <span className="pf-rank-legend">Reale / potenziale</span>
+      <span className="pf-rank-legend">Reale / potenziale, su 100</span>
 
       {example && upper && lower && (
         <section className="pf-rank-example" aria-labelledby="pf-rank-example">

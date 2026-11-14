@@ -32,11 +32,18 @@ modifica dalla pagina del profilo gratuito.
 | Voce | Regola |
 |---|---|
 | Chi entra | Atleti (`USER` attivi) con un abbonamento che dà accesso al programma (attivo o in tolleranza), una valutazione e gli scenari P dell'orizzonte pagato |
-| Reale | R globale dell'ultima valutazione, la stessa del profilo |
-| Potenziale | P dell'orizzonte pagato (abbonamento più recente con accesso), dagli scenari più recenti, aggregato come R; non scende sotto R |
-| Punteggio | 0-100: reale e potenziale portati sulla scala 0-100, media pesata 60 % reale e 40 % potenziale |
+| Reale | R globale dell'ultima valutazione (media delle aree pesata sulla confidenza), riportato a 0-100 dalla scala di quella valutazione |
+| Potenziale | P dell'orizzonte pagato (abbonamento più recente con accesso), dagli scenari più recenti, aggregato come R e riportato a 0-100 dalla scala della valutazione da cui sono nati gli scenari; non scende sotto il reale |
+| Punteggio | 0-100: media pesata 60 % reale e 40 % potenziale, entrambi già su 0-100 |
 | Fasce | PF1 da 80, PF2 da 66, PF3 da 50, sotto PF4 |
-| Posizione | dentro la fascia, per punteggio; a parità il reale più alto, poi l'id |
+| Posizione | dentro la fascia, per punteggio; a parità il reale più alto (su 0-100), poi l'id |
+
+Scala unica: reale e potenziale si normalizzano ciascuno con la scala della
+propria valutazione (gli scenari possono venire da una valutazione precedente
+con un'altra scala) prima del confronto «il potenziale non scende sotto il
+reale», del punteggio e dello spareggio. Schermate e API mostrano gli stessi
+numeri 0-100 arrotondati: con una valutazione su 0-10, R 7,5 nel profilo è
+«Reale 75» nel ranking.
 
 Pesi e soglie si cambiano in `/admin/ranking` (menu «Ranking»): i pesi sommano
 100, le soglie scendono da PF1 a PF3. Ogni salvataggio scrive
@@ -52,7 +59,11 @@ Consenso facoltativo `RANKING_VISIBILITY` (versione `ranking-v1-2026-11-13`,
 testo in `apps/api/src/ranking/ranking-consent.ts`): con il consenso gli altri
 vedono nome e iniziale del cognome («Sara P.»), senza vedono «Atleta». Posizione,
 reale e potenziale restano visibili anche senza nome. Si dà o si toglie dal
-profilo o dalla schermata del ranking.
+profilo o dalla schermata del ranking. Sotto la casella «Leggi il testo
+completo» apre titolo, testo e versione del documento restituito da
+`GET /athlete/ranking/visibility`; la casella si attiva solo quando il
+documento è arrivato, così il consenso registrato è sempre su un testo che
+l'atleta ha potuto leggere.
 
 ## Schermate
 

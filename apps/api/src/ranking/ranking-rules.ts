@@ -66,6 +66,29 @@ export function toPercent(value: number, scale: { min: number; max: number }) {
   return Math.max(0, Math.min(100, ((value - scale.min) / span) * 100));
 }
 
+type Scale = { min: number; max: number };
+
+/**
+ * Reale e potenziale sulla stessa scala 0-100. Ciascuno arriva nella scala
+ * della propria valutazione (gli scenari possono venire da una valutazione
+ * precedente, con un'altra scala): si normalizza prima, poi il potenziale
+ * non scende sotto il reale. Così confronto, punteggio, spareggio e barre
+ * dello schermo usano gli stessi numeri.
+ */
+export function rankingNumbers(
+  real: { value: number; scale: Scale },
+  potential: { value: number; scale: Scale },
+) {
+  const realPercent = toPercent(real.value, real.scale);
+  return {
+    real: realPercent,
+    potential: Math.max(
+      realPercent,
+      toPercent(potential.value, potential.scale),
+    ),
+  };
+}
+
 /** Punteggio 0-100 da reale e potenziale già in percentuale. */
 export function rankingScore(
   real: number,
@@ -88,7 +111,7 @@ export function bandOf(score: number, config: RankingConfigValues) {
 
 export type RankingEntry = {
   userId: string;
-  /** Reale e potenziale nella scala della valutazione, per lo schermo. */
+  /** Reale e potenziale riportati a 0-100 (vedi `rankingNumbers`). */
   real: number;
   potential: number;
   /** Punteggio 0-100 che decide fascia e posizione. */
@@ -102,7 +125,8 @@ export type RankedEntry = RankingEntry & {
 
 /**
  * Fascia e posizione di ciascuno. A parità di punteggio vale il reale più
- * alto, poi l'ordine dell'id: la posizione è stabile fra due letture.
+ * alto (già su 0-100, quindi confrontabile fra scale diverse), poi l'ordine
+ * dell'id: la posizione è stabile fra due letture.
  */
 export function rankEntries(
   entries: RankingEntry[],

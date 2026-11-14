@@ -54,6 +54,23 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+const visibility = (granted: boolean) => ({
+  granted,
+  grantedAt: null,
+  document: {
+    type: "RANKING_VISIBILITY",
+    version: "ranking-v1-2026-11-13",
+    title: "Nome nel ranking della piattaforma",
+    summary:
+      "Facoltativo. Gli altri atleti della tua fascia vedono il tuo nome.",
+    body: [
+      "Con questo consenso il tuo nome compare nella classifica della tua fascia.",
+      "Puoi revocarlo in qualsiasi momento dal tuo profilo.",
+    ],
+    documentHash: "h",
+  },
+});
+
 const ranked = (over: Partial<RankedView> = {}): RankedView => ({
   status: "RANKED",
   band: "PF4",
@@ -152,6 +169,7 @@ const subscriberRoutes = (ranking: unknown) => ({
     },
   },
   "GET /athlete/ranking": ranking,
+  "GET /athlete/ranking/visibility": visibility(false),
   "POST /athlete/ranking/announcement": 204,
   "GET /athlete/training/availability": {
     daysPerWeek: 3,
@@ -235,9 +253,9 @@ describe("subscriber profile like the V11 demo", () => {
 
 describe("ranking screen", () => {
   it("shows band, position, nearby athletes, the example and the four bands", async () => {
-    const calls = serve({
+    serve({
       "GET /athlete/ranking": ranked(),
-      "PUT /athlete/ranking/visibility": { granted: true },
+      "GET /athlete/ranking/visibility": visibility(false),
     });
     render(<RankingPage />);
     const hero = await screen.findByRole("region", {
@@ -258,17 +276,77 @@ describe("ranking screen", () => {
       screen.getByText(/Luca ha un potenziale più basso.*va in PF2/),
     ).toBeVisible();
     expect(screen.getByText("Sei qui")).toBeVisible();
-    await userEvent.click(
-      screen.getByLabelText(/Compaio nel ranking con nome e iniziale/),
+    expect(screen.getByText("Reale / potenziale, su 100")).toBeVisible();
+  });
+
+  it("lets the athlete read the versioned consent, then grant and revoke it", async () => {
+    const routes: Record<string, unknown> = {
+      "GET /athlete/ranking": ranked(),
+      "GET /athlete/ranking/visibility": visibility(false),
+      "PUT /athlete/ranking/visibility": visibility(true),
+    };
+    const calls = serve(routes);
+    render(<RankingPage />);
+    const box = await screen.findByLabelText(
+      /Compaio nel ranking con nome e iniziale/,
     );
+    // Prima del consenso: riassunto, poi il testo completo con la versione.
+    await waitFor(() => expect(box).toBeEnabled());
+    expect(box).not.toBeChecked();
+    expect(box).toHaveAccessibleDescription(
+      "Facoltativo. Gli altri atleti della tua fascia vedono il tuo nome.",
+    );
+    expect(calls.some((c) => c.method === "PUT")).toBe(false);
+    await userEvent.click(screen.getByText("Leggi il testo completo"));
+    const text = screen.getByRole("region", {
+      name: "Nome nel ranking della piattaforma",
+    });
+    expect(text).toBeVisible();
+    expect(text).toHaveTextContent(
+      "Con questo consenso il tuo nome compare nella classifica della tua fascia.",
+    );
+    expect(text).toHaveTextContent("Puoi revocarlo in qualsiasi momento");
+    expect(text).toHaveTextContent("Versione ranking-v1-2026-11-13");
+
+    await userEvent.click(box);
     await waitFor(() =>
-      expect(calls.find((c) => c.method === "PUT")).toMatchObject({
-        body: { granted: true },
-      }),
+      expect(calls.filter((c) => c.method === "PUT")).toEqual([
+        expect.objectContaining({ body: { granted: true } }),
+      ]),
     );
     expect(
       await screen.findByText("Gli altri vedono il tuo nome e l’iniziale."),
     ).toBeVisible();
+    expect(box).toBeChecked();
+
+    routes["PUT /athlete/ranking/visibility"] = visibility(false);
+    await userEvent.click(box);
+    expect(
+      await screen.findByText("Nel ranking compari come «Atleta»."),
+    ).toBeVisible();
+    expect(box).not.toBeChecked();
+    expect(calls.filter((c) => c.method === "PUT").at(-1)).toMatchObject({
+      body: { granted: false },
+    });
+  });
+
+  it("keeps the consent box off until the document can be read", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) =>
+        url.endsWith("/athlete/ranking/visibility")
+          ? new Response("{}", { status: 503 })
+          : new Response(JSON.stringify(ranked())),
+      ),
+    );
+    render(<RankingPage />);
+    expect(
+      await screen.findByText(/Il testo del consenso non è disponibile/),
+    ).toBeVisible();
+    expect(
+      screen.getByLabelText(/Compaio nel ranking con nome e iniziale/),
+    ).toBeDisabled();
+    expect(screen.queryByText("Leggi il testo completo")).toBeNull();
   });
 
   it("explains why an athlete without potential is not ranked yet", async () => {
